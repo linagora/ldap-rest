@@ -31,6 +31,7 @@ import {
 import {
   BadRequestError,
   ForbiddenError,
+  isAuthzRefusal,
   NotFoundError,
 } from '../../lib/errors';
 import type { LdapSchema, SchemaIndex } from '../../lib/ldapSchema';
@@ -370,10 +371,7 @@ export default class LdapRaw extends DmPlugin {
       result = await read(['*', '+']);
     } catch (err) {
       // A refusal by an authorization hook must not be retried
-      if (
-        err instanceof Error &&
-        ('statusCode' in err || /\[authz-forbidden\]/.test(err.message))
-      )
+      if (err instanceof Error && ('statusCode' in err || isAuthzRefusal(err)))
         throw err;
       // Not every server understands the `+` operational-attributes shortcut
       this.logger.debug(

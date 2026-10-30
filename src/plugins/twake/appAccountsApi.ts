@@ -12,13 +12,13 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
 import { wantJson } from '../../lib/expressFormatedResponses';
-import { AUTHZ_REFUSED, HttpError, errorBody } from '../../lib/errors';
 import {
-  escapeDnValue,
-  escapeLdapFilter,
+  AUTHZ_REFUSED,
+  HttpError,
+  errorBody,
   isAuthzRefusal,
-  isDnInBranch,
-} from '../../lib/utils';
+} from '../../lib/errors';
+import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
 
 /**
  * @openapi-component

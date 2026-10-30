@@ -19,7 +19,6 @@ import {
   escapeDnValue,
   getParentDn,
   hookOwner,
-  isAuthzRefusal,
   isDnInBranch,
   knownAttributeName,
   normalizeDn,
@@ -41,7 +40,12 @@ import {
   secondsSince,
   timedLdap,
 } from './metrics';
-import { BadRequestError, ConflictError, NotFoundError } from './errors';
+import {
+  BadRequestError,
+  ConflictError,
+  isAuthzRefusal,
+  NotFoundError,
+} from './errors';
 import { extractLdapCode, isSchemaRefusal } from './ldapCodes';
 import { parseSchema, SchemaIndex } from './ldapSchema';
 

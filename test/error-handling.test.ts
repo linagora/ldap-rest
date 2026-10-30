@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import request from 'supertest';
 import { DM } from '../src/bin/index';
 import { serverErrorBody, setDebug } from '../src/lib/expressFormatedResponses';
+import { AUTHZ_REFUSED } from '../src/lib/errors';
 
 describe('Error Handling', () => {
   let server: DM | null;
@@ -85,6 +86,39 @@ describe('Error Handling', () => {
     expect(res.status).to.equal(404);
     expect(res.body).to.have.property('error');
     expect(res.body.error).to.equal('Resource not found');
+  });
+
+  it('should keep the 403 of a refusal wrapped as a cause, without naming the branch', async () => {
+    const res = await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-wrapped-refusal'
+    );
+    expect(res.status).to.equal(403);
+    expect(res.body).to.deep.equal({
+      error: AUTHZ_REFUSED,
+      code: 'forbidden',
+    });
+  });
+
+  it('should keep the status of an error wrapped as a cause', async () => {
+    const port = process.env.DM_PORT;
+    const notFound = await request(`http://localhost:${port}`).get(
+      '/api/error-wrapped-notfound'
+    );
+    expect(notFound.status).to.equal(404);
+    // The status comes from the chain; the sentence is the route's, which is
+    // the one that knows what the request was about.
+    expect(notFound.body).to.deep.equal({
+      error: 'Failed to read it: NotFoundError: Resource not found',
+    });
+
+    const timeout = await request(`http://localhost:${port}`).get(
+      '/api/error-wrapped-timeout'
+    );
+    expect(timeout.status).to.equal(504);
+    expect(timeout.body).to.deep.equal({
+      error: 'Internal Server Error',
+      message: 'An error occurred',
+    });
   });
 
   it('should keep server alive after client errors', async () => {

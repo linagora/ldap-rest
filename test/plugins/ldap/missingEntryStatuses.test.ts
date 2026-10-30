@@ -7,6 +7,12 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
+import { errorResponse } from '../../../src/lib/expressFormatedResponses';
+import {
+  AUTHZ_REFUSED,
+  AuthzRefusedError,
+  GatewayTimeoutError,
+} from '../../../src/lib/errors';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
@@ -108,6 +114,45 @@ describe('Writes to what the directory does not hold', function () {
         status: 404,
         code: 32,
       });
+    });
+  });
+
+  describe('a plugin wrapping its error', () => {
+    /** A route whose handler throws what a plugin wrapped as `cause`. */
+    const route = (path: string, thrown: () => Error): void => {
+      server.app.get(path, () => {
+        try {
+          throw thrown();
+        } catch (err) {
+          throw new Error(`Failed to read it: ${String(err)}`, { cause: err });
+        }
+      });
+      server.setupErrorMiddleware();
+    };
+
+    it('keeps the 403 of a refusal, and names no branch', async () => {
+      route(
+        '/api/plugin-wrapped-refusal',
+        () => new AuthzRefusedError('User bob may not write ou=Sales,dc=x')
+      );
+      const res = await request.get('/api/plugin-wrapped-refusal');
+      expect(res.status, JSON.stringify(res.body)).to.equal(403);
+      expect(res.body).to.deep.equal({
+        error: AUTHZ_REFUSED,
+        code: 'forbidden',
+      });
+    });
+
+    it('keeps the status of a server error', async () => {
+      route(
+        '/api/plugin-wrapped-timeout',
+        () => new GatewayTimeoutError('Upstream timeout')
+      );
+      const res = await request.get('/api/plugin-wrapped-timeout');
+      expect(res.status, JSON.stringify(res.body)).to.equal(504);
+      expect(res.body).to.deep.equal(
+        errorResponse(new GatewayTimeoutError('Upstream timeout')).body
+      );
     });
   });
 

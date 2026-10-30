@@ -4,7 +4,7 @@ import supertest from 'supertest';
 import DmPlugin from '../../../src/abstract/plugin';
 import { DM } from '../../../src/bin';
 import type { Hooks } from '../../../src/hooks';
-import { ForbiddenError } from '../../../src/lib/errors';
+import { AuthzRefusedError, ForbiddenError } from '../../../src/lib/errors';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
@@ -29,7 +29,7 @@ class ReadSpy extends DmPlugin {
       if (this.refused && base.toLowerCase().endsWith(this.refused))
         throw this.rule
           ? new ForbiddenError(this.rule)
-          : new Error(`[authz-forbidden] Not allowed to read ${base}`);
+          : new AuthzRefusedError(`Not allowed to read ${base}`);
       if (this.unseen)
         opts = {
           ...opts,

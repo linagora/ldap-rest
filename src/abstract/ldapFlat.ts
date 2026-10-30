@@ -56,6 +56,7 @@ import {
   BadRequestError,
   ConflictError,
   HttpError,
+  isAuthzRefusal,
   NotFoundError,
   UnprocessableEntityError,
 } from '../lib/errors';
@@ -1507,9 +1508,11 @@ export default abstract class LdapFlat extends DmPlugin {
       // `ldapActions.add` already turned entryAlreadyExists into a
       // `ConflictError`, for every creation route at once, so a duplicate
       // arrives here as a refusal like any other.
-      if (err instanceof HttpError) throw err;
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Failed to add ${this.singularName} ${dn}: ${err}`);
+      if (err instanceof HttpError || isAuthzRefusal(err)) throw err;
+      throw new Error(
+        `Failed to add ${this.singularName} ${dn}: ${String(err)}`,
+        { cause: err }
+      );
     }
     this.ownHooks.notify('adddone', dn, entry);
     return res;
@@ -1726,8 +1729,9 @@ export default abstract class LdapFlat extends DmPlugin {
       if (code === 32)
         throw new NotFoundError(`Organization ${orgDn} not found`);
       if (code === 34) throw new BadRequestError(`${orgDn} is not a valid DN`);
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Failed to fetch organization ${orgDn}: ${err}`);
+      throw new Error(`Failed to fetch organization ${orgDn}: ${String(err)}`, {
+        cause: err,
+      });
     }
   }
 

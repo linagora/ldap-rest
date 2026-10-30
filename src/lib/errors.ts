@@ -75,7 +75,7 @@ export const errorBody = (
   message: string
 ): { error: string } & Partial<Refusal> => {
   if (message === AUTHZ_REFUSED) return { error: message, code: 'forbidden' };
-  const refusal = err instanceof HttpError ? err.refusal : undefined;
+  const refusal = errorChain(err).find(e => e instanceof HttpError)?.refusal;
   return refusal ? { error: message, ...refusal } : { error: message };
 };
 
@@ -87,6 +87,89 @@ export class ForbiddenError extends HttpError {
 }
 
 /**
+ * An authorization plugin's refusal.
+ *
+ * Its message is for the operator, not for the client: it names the model
+ * and the branch it judged, which the caller may not know of. Its class is
+ * what says an authorization plugin refused, so the 403 is recognised
+ * through the `new Error(\`…\`, { cause })` wrappers along the way — see
+ * {@link isAuthzRefusal} — and the client is told {@link AUTHZ_REFUSED}.
+ */
+export class AuthzRefusedError extends ForbiddenError {
+  /**
+   * Read instead of the class and the name: a plugin loaded from `dist` holds
+   * another copy of this module, where `instanceof` answers false, and a
+   * subclass may replace `name`.
+   */
+  readonly authzRefusal = true as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthzRefusedError';
+  }
+}
+
+/** How far a chain of `cause`s is followed before it is taken as a loop. */
+const CAUSE_DEPTH = 32;
+
+/**
+ * Every error in a chain of `cause`s, the outermost first.
+ *
+ * A plugin wrapping what the directory or an authorization hook threw as
+ * `new Error(\`…\`, { cause: err })` keeps the reason and what it carries:
+ * its class, its status, the database's refusal. The serializers read the
+ * whole chain rather than the wrapper alone.
+ *
+ * @param err what was thrown, which need not be an error
+ * @returns the errors of the chain, the outermost first
+ */
+export const errorChain = (err: unknown): Error[] => {
+  const chain: Error[] = [];
+  let current: unknown = err;
+  while (current instanceof Error && !chain.includes(current)) {
+    chain.push(current);
+    if (chain.length === CAUSE_DEPTH) break;
+    current = current.cause;
+  }
+  return chain;
+};
+
+/**
+ * Whether an error is, or wraps through `cause`, an authorization plugin's
+ * refusal.
+ *
+ * Read by the `authzRefusal` marker rather than by class: a plugin loaded
+ * from `dist` while its caller runs from `src` throws a `AuthzRefusedError`
+ * whose `instanceof` answers false, and a subclass that replaces `name`
+ * would escape a name test — the refusal would then be answered as the
+ * wrapper's own error.
+ *
+ * @param err what was thrown
+ * @returns true for a refusal, or for an error wrapping one
+ */
+export const isAuthzRefusal = (err: unknown): boolean =>
+  errorChain(err).some(
+    e => (e as { authzRefusal?: unknown }).authzRefusal === true
+  );
+
+/**
+ * The status a thrown thing is answered with.
+ *
+ * The first error from the outside that names one decides: a wrapper names
+ * none, so the error it wraps is read; a layer that translates an inner error
+ * keeps its own status.
+ *
+ * @param err what was thrown
+ * @returns its status code, 500 when it names none
+ */
+export const statusCodeOf = (err: unknown): number => {
+  const named = errorChain(err).find(
+    e => typeof (e as { statusCode?: unknown }).statusCode === 'number'
+  ) as { statusCode?: number } | undefined;
+  return named?.statusCode ?? 500;
+};
+
+/**
  * An identity that names more than one directory entry.
  *
  * A `uid` (or whatever `--ldap-user-main-attribute` names) is only unique if
@@ -96,13 +179,13 @@ export class ForbiddenError extends HttpError {
  * rather than a `null`: a `null` resolution is what
  * `--authz-unresolved-user allow` lets through unchecked.
  */
-export class AmbiguousIdentityError extends ForbiddenError {
+export class AmbiguousIdentityError extends AuthzRefusedError {
   constructor(
     public identity: string,
     public count: number
   ) {
     super(
-      `[authz-forbidden] ${identity} names ${count} directory entries, ` +
+      `${identity} names ${count} directory entries, ` +
         'so no single one can be taken for the caller'
     );
     this.name = 'AmbiguousIdentityError';

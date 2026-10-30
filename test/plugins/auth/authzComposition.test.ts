@@ -22,6 +22,7 @@ import type { Hooks } from '../../../src/hooks';
 import { DM, type Config } from '../../../src/bin';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import { assertAuthzComposition } from '../../../src/lib/authz/composition';
+import { AuthzRefusedError } from '../../../src/lib/errors';
 import { asyncHandler } from '../../../src/lib/utils';
 import HookBus from '../../../src/lib/hookBus';
 import {
@@ -296,7 +297,7 @@ describe('Authorization plugins loaded together', function () {
         warn: (message: string) => warned.push(String(message)),
       } as unknown as winston.Logger);
       function pushedByHand(): never {
-        throw new Error('[authz-forbidden] not yours');
+        throw new AuthzRefusedError('not yours');
       }
       server.hookBus.subscribe('ldapsearchrequest', pushedByHand);
       try {
@@ -308,7 +309,7 @@ describe('Authorization plugins loaded together', function () {
         setLogger(installed);
       }
       expect(warned).to.deep.equal([
-        'a hook no plugin registered (pushedByHand) refused: [authz-forbidden] not yours',
+        'a hook no plugin registered (pushedByHand) refused: not yours',
       ]);
     });
 

@@ -1,6 +1,7 @@
 import Plugin from '../../../dist/abstract/plugin.js';
 import {
   asyncHandler,
+  AuthzRefusedError,
   BadRequestError,
   NotFoundError,
   BadGatewayError,
@@ -62,6 +63,48 @@ class ErrorTestPlugin extends Plugin {
       '/api/error-gatewaytimeout',
       asyncHandler(async (req, res) => {
         throw new GatewayTimeoutError('Upstream timeout');
+      })
+    );
+
+    // A refusal an intermediate plugin wrapped as `new Error(…, { cause })`
+    app.get(
+      '/api/error-wrapped-refusal',
+      asyncHandler(async (req, res) => {
+        try {
+          throw new AuthzRefusedError('User bob may not write ou=Sales,dc=x');
+        } catch (err) {
+          throw new Error(`Failed to add group: ${String(err)}`, {
+            cause: err,
+          });
+        }
+      })
+    );
+
+    // A server error wrapped the same way keeps its status
+    app.get(
+      '/api/error-wrapped-timeout',
+      asyncHandler(async (req, res) => {
+        try {
+          throw new GatewayTimeoutError('Upstream timeout');
+        } catch (err) {
+          throw new Error(`Failed to reach it: ${String(err)}`, {
+            cause: err,
+          });
+        }
+      })
+    );
+
+    // A client error wrapped the same way keeps its status
+    app.get(
+      '/api/error-wrapped-notfound',
+      asyncHandler(async (req, res) => {
+        try {
+          throw new NotFoundError('Resource not found');
+        } catch (err) {
+          throw new Error(`Failed to read it: ${String(err)}`, {
+            cause: err,
+          });
+        }
       })
     );
 

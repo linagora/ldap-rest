@@ -1340,8 +1340,9 @@ no `limit` was given —
 
 #### 500 Internal Server Error
 
-The failure is in the server's logs, not in the response; the message names
-it only when the server runs with `--debug`:
+Every 5xx answers this body, whether the route threw or reported the failure
+through the server's own helper. The failure is in the server's logs, not in
+the response; the message names it only when the server runs with `--debug`:
 
 ```json
 {

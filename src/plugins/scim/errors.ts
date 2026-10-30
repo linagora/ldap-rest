@@ -6,7 +6,13 @@
  */
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
-import { AUTHZ_REFUSED, HttpError } from '../../lib/errors';
+import {
+  AUTHZ_REFUSED,
+  HttpError,
+  errorChain,
+  isAuthzRefusal,
+} from '../../lib/errors';
+import { messageOf } from '../../lib/expressFormatedResponses';
 // Moved to `lib`: nothing in it is SCIM's business, and an LDAP plugin needs
 // it too. Imported and re-exported, so this module stays the one SCIM reads
 // it from.
@@ -79,18 +85,13 @@ export function writeScimError(
  * Split out from `writeScimErrorFromException` so `/Bulk`, which reports a
  * status per operation instead of writing a response, applies exactly the
  * same translations — including the ones that matter: an authorization
- * refusal is a 403 with the internal marker stripped, not a 500 quoting it.
+ * refusal is a 403 saying `AUTHZ_REFUSED`, not a 500 quoting the branch it
+ * judged.
  */
 export function scimErrorFromException(
   err: unknown,
   fallbackStatus = 500
 ): ScimErrorResponse {
-  // Authz plugins (e.g. core/auth/authzDynamic) embed a `[authz-forbidden]`
-  // marker in the thrown message so a 403 can be recognised even after
-  // intermediate callers wrap the error. Strip the marker before emitting
-  // a client-facing message so the internal token never leaks.
-  const sanitize = (s: string): string =>
-    /\[authz-forbidden\]/.test(s) ? AUTHZ_REFUSED : s;
   const body = (
     status: number,
     detail: string,
@@ -102,25 +103,27 @@ export function scimErrorFromException(
     detail,
   });
 
+  const message = messageOf(err);
+  // An authorization plugin's refusal is a `ForbiddenError` whatever a plugin
+  // wrapped it in, and its message names the model and the branch it judged.
+  if (isAuthzRefusal(err)) return body(403, AUTHZ_REFUSED);
   if (err instanceof ScimError) {
-    return body(err.statusCode, sanitize(err.message), err.scimType);
+    return body(err.statusCode, message, err.scimType);
   }
-  if (err instanceof HttpError) {
+  // A hook wraps what it caught with `cause`; the status and the directory's
+  // refusal are read through the chain, as the REST answers do.
+  const http = errorChain(err).find(e => e instanceof HttpError);
+  if (http) {
     // `ldapActions` answers a schema refusal with a 400 of its own
     const scimType =
-      err.statusCode === 400 && isSchemaRefusal(extractLdapCode(err))
+      http.statusCode === 400 && isSchemaRefusal(extractLdapCode(http))
         ? 'invalidValue'
         : undefined;
-    return body(err.statusCode, sanitize(err.message), scimType);
-  }
-  const message = err instanceof Error ? err.message : String(err);
-  // Wrapped authz-forbidden (no HttpError instance but marker is in the msg)
-  if (/\[authz-forbidden\]/.test(message)) {
-    return body(403, AUTHZ_REFUSED);
+    return body(http.statusCode, message, scimType);
   }
   const ldapCode = extractLdapCode(err);
   if (ldapCode === 32) return body(404, 'Resource not found');
-  if (ldapCode === 68) return body(409, sanitize(message), 'uniqueness');
+  if (ldapCode === 68) return body(409, message, 'uniqueness');
   // The request named something the directory's schema does not allow here.
   // That is the client's or the operator's doing, not a server fault, so it
   // is a 400 rather than a bare 500 — but which of the two, and which flag to
@@ -129,13 +132,11 @@ export function scimErrorFromException(
   if (isSchemaRefusal(ldapCode)) {
     return body(
       400,
-      `The directory rejected this write against its schema: ${sanitize(
-        message
-      )}`,
+      `The directory rejected this write against its schema: ${message}`,
       'invalidValue'
     );
   }
-  return body(fallbackStatus, sanitize(message) || 'Internal error');
+  return body(fallbackStatus, message || 'Internal error');
 }
 
 export function writeScimErrorFromException(

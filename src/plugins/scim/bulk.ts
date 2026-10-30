@@ -199,8 +199,8 @@ export class ScimBulk {
     } catch (err) {
       // The same translation the single-resource routes apply. Reading only
       // `ScimError` here meant a directory refusal came back as 500 with its
-      // raw message — including the `[authz-forbidden]` marker and the branch
-      // DN behind it, which every other route strips.
+      // raw message, naming the branch DN behind it, which every other route
+      // keeps from the client.
       const body = scimErrorFromException(err);
       base.status = body.status;
       base.response = body;

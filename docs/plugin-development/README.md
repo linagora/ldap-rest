@@ -711,6 +711,29 @@ app.get(
 );
 ```
 
+**Wrapping an error keeps its answer:**
+
+Wrap with `cause` rather than in the message alone. The status and the class
+of what was thrown are read through the chain, so a refusal stays a 403 and
+a timeout a 504 wherever it surfaces:
+
+```typescript
+// ✅ GOOD: the refusal keeps its 403 when it reaches the client
+throw new Error(`Failed to add group ${dn}: ${String(err)}`, { cause: err });
+
+// ❌ BAD: a 403 becomes a 500, and its message is all that is left
+throw new Error(`Failed to add group ${dn}: ${String(err)}`);
+```
+
+**Refusing a caller:**
+
+An authorization plugin throws `AuthzRefusedError`, whose message is for the
+operator: it names the model and the branch it judged. The client is told
+`AUTHZ_REFUSED` with `code: "forbidden"` instead, whatever a plugin wrapped
+it in on the way. A refusal that is not an authorization plugin's is any
+`ForbiddenError`, answered with its own message; `isAuthzRefusal(err)` tells
+the two apart.
+
 **Custom error handling:**
 
 ```typescript

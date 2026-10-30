@@ -38,6 +38,10 @@
 
 ### Fixed
 
+- A plugin that wrapped an error keeps the answer it deserved: the status and
+  the class of what was thrown are read through the `cause` chain, so a
+  refusal stays a 403 and a timeout a 504, where both surfaced as a 500
+  ([details](docs/client-development/api/rest-api.md#error-handling)).
 - A burst of requests arriving with the connection pool empty used to open
   one connection per request and keep them all, going past
   `--ldap-pool-size`: a connection being opened now takes its place in the

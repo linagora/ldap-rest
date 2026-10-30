@@ -42,4 +42,26 @@ describe('SCIM errors from LDAP refusals', () => {
     const body = scimErrorFromException(withCode(new Error('other'), 80));
     expect(body.status).to.equal('500');
   });
+
+  it('should read the status of an HTTP error wrapped as a cause', () => {
+    const body = scimErrorFromException(
+      new Error('Failed to add: ConflictError: held', {
+        cause: new ConflictError('held'),
+      })
+    );
+    expect(body).to.include({
+      status: '409',
+      detail: 'Failed to add: ConflictError: held',
+    });
+    expect(body).to.not.have.property('scimType');
+  });
+
+  it('should name a wrapped schema refusal an invalid value', () => {
+    const body = scimErrorFromException(
+      new Error('Failed to add', {
+        cause: withCode(new BadRequestError('mail: invalid'), 17),
+      })
+    );
+    expect(body).to.include({ status: '400', scimType: 'invalidValue' });
+  });
 });

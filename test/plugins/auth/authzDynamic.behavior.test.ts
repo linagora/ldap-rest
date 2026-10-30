@@ -7,6 +7,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
+import { AUTHZ_REFUSED } from '../../../src/lib/errors';
 import { currentRequest } from '../../../src/lib/requestContext';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
@@ -173,7 +174,10 @@ describe('authzDynamic behavioural regressions', function () {
       expect(res.body.error).to.match(/permission/i);
       expect(res.body.error).to.not.match(/explicit-json-tenant/);
       expect(res.body.error).to.not.match(/ou=groups/);
-      expect(res.body.error).to.not.match(/\[authz-forbidden\]/);
+      expect(res.body).to.deep.equal({
+        error: AUTHZ_REFUSED,
+        code: 'forbidden',
+      });
     });
   });
 

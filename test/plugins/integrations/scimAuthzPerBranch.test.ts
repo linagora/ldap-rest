@@ -411,9 +411,8 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
 
   it('a refused Bulk operation answers 403 and leaks no marker', async () => {
     // /Bulk reports a status per operation instead of writing a response, so
-    // it built its own error body and read only ScimError — a directory
-    // refusal came back as 500 quoting `[authz-forbidden]` and the branch DN
-    // behind it, which every other route strips.
+    // it builds its own error body: a refusal must come back as the 403 the
+    // other routes answer, not as a 500 quoting the branch DN it judged.
     const res = await supertest(server.app)
       .post('/scim/v2/Bulk')
       .set('x-scim-user', 'reader')
