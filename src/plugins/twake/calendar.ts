@@ -5,6 +5,8 @@ import type { ChangesToNotify } from '../ldap/onChange';
 import { Hooks, MaybePromise } from '../../hooks';
 import { isDnInBranch, rdnValue } from '../../lib/utils';
 
+import { calendarOptions, calendarOptionsOf } from './calendar.options';
+
 /** A Twake Calendar registered user, as the WebAdmin API returns it */
 interface RegisteredUser {
   id: string;
@@ -49,6 +51,8 @@ type CalendarResourceHooks = {
 };
 
 export default class Calendar extends TwakePlugin {
+  static optionDefinitions = calendarOptions;
+
   name = 'calendar';
   roles: Role[] = ['consistency'] as const;
 
@@ -65,23 +69,22 @@ export default class Calendar extends TwakePlugin {
   private lastnameAttr: string;
 
   constructor(server: import('../../bin').DM) {
+    const settings = calendarOptionsOf(server.config);
     super(server, {
-      url: server.config.calendar_webadmin_url || '',
-      token: server.config.calendar_webadmin_token || '',
-      concurrency: server.config.calendar_concurrency ?? 10,
+      url: settings.calendar_webadmin_url,
+      token: settings.calendar_webadmin_token,
+      concurrency: settings.calendar_concurrency,
       urlOption: 'calendar_webadmin_url',
       tokenOption: 'calendar_webadmin_token',
       concurrencyOption: 'calendar_concurrency',
     });
 
     // Initialize Calendar-specific configuration attributes
-    this.resourceBase = (this.config.calendar_resource_base as string) || '';
-    this.resourceObjectClass =
-      (this.config.calendar_resource_objectclass as string) || '';
+    this.resourceBase = settings.calendar_resource_base;
+    this.resourceObjectClass = settings.calendar_resource_objectclass;
     this.resourceCreator =
-      (this.config.calendar_resource_creator as string) || 'admin@example.com';
-    this.resourceDomain =
-      (this.config.calendar_resource_domain as string) || '';
+      settings.calendar_resource_creator || 'admin@example.com';
+    this.resourceDomain = settings.calendar_resource_domain;
 
     // The resource base is compared to an entry's DN part by part, so it has
     // to be a full DN: `ou=resources` alone names no branch and would leave
@@ -99,10 +102,8 @@ export default class Calendar extends TwakePlugin {
     }
 
     // LDAP attributes holding the user's first and last name (for registered users)
-    this.firstnameAttr =
-      (this.config.calendar_firstname_attribute as string) || 'givenName';
-    this.lastnameAttr =
-      (this.config.calendar_lastname_attribute as string) || 'sn';
+    this.firstnameAttr = settings.calendar_firstname_attribute;
+    this.lastnameAttr = settings.calendar_lastname_attribute;
   }
 
   hooks: Hooks & CalendarResourceHooks = {

@@ -10,6 +10,7 @@ import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
 import { scimOptions } from '../plugins/scim/scim.options';
 import { appAccountsOptions } from '../plugins/twake/appAccounts.options';
+import { calendarOptions } from '../plugins/twake/calendar.options';
 import { jamesOptions } from '../plugins/twake/james.options';
 
 import { toConfigEntries } from './options';
@@ -815,23 +816,7 @@ const configArgs: ConfigTemplate = [
   ],
 
   // Twake Calendar plugin
-  [
-    '--calendar-webadmin-url',
-    'DM_CALENDAR_WEBADMIN_URL',
-    'http://localhost:8080',
-  ],
-  ['--calendar-webadmin-token', 'DM_CALENDAR_WEBADMIN_TOKEN', ''],
-  ['--calendar-concurrency', 'DM_CALENDAR_CONCURRENCY', 10, 'number'],
-  ['--calendar-resource-base', 'DM_CALENDAR_RESOURCE_BASE', ''],
-  ['--calendar-resource-objectclass', 'DM_CALENDAR_RESOURCE_OBJECTCLASS', ''],
-  ['--calendar-resource-creator', 'DM_CALENDAR_RESOURCE_CREATOR', ''],
-  ['--calendar-resource-domain', 'DM_CALENDAR_RESOURCE_DOMAIN', ''],
-  [
-    '--calendar-firstname-attribute',
-    'DM_CALENDAR_FIRSTNAME_ATTRIBUTE',
-    'givenName',
-  ],
-  ['--calendar-lastname-attribute', 'DM_CALENDAR_LASTNAME_ATTRIBUTE', 'sn'],
+  ...toConfigEntries(calendarOptions),
 
   // Cozy provisioning plugin (twake/cozyProvision)
   ['--cozy-admin-url', 'DM_COZY_ADMIN_URL', ''],

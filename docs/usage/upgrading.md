@@ -79,12 +79,11 @@ const options = scimOptionsOf(config);
 `BaseResolver` keeps its `(config, options)` form; the others take the checked
 values beside what they already require.
 
-### An invalid SCIM or applicative accounts value
+### An invalid SCIM or Twake value
 
-**Who is affected:** a deployment setting `--scim-max-results`,
-`--scim-max-scanned`, `--scim-bulk-max-operations` or
-`--scim-bulk-max-payload-size` to zero or a negative number, or giving a
-per-instance override of the wrong JSON type.
+**Who is affected:** a deployment setting a SCIM limit to zero or a negative
+number, giving a per-instance override of the wrong JSON type, or setting the
+James or Calendar concurrency to the wrong type.
 
 These SCIM limits now refuse a value below 1 when the plugin loads: a zero
 used to be silently replaced by the default, and a negative value used as it
@@ -96,6 +95,10 @@ null}` are refused, where the quoted number used to be coerced and the null
 treated as unset. The applicative accounts options refuse the same:
 `{"max_app_accounts": "5"}` used to be kept as the string, and
 `{"applicative_account_attribute": "cn"}` was spread into `['c', 'n']`.
+
+The James and Calendar concurrency used to replace a value that was not a
+number with `10`, and now refuses it. A zero or a negative value was already
+refused by `p-limit`, and the message now names the option.
 
 ### Node 22 or later is required
 
