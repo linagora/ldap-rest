@@ -186,6 +186,65 @@ describe('defineRoute', () => {
     );
   });
 
+  it('answers a route of another media type under its own Accept', async () => {
+    const app = appWith();
+    defineRoute(app, {
+      method: 'get',
+      path: '/scim',
+      json: false,
+      handler: ({ res }) => {
+        res.status(200).json({ ok: true });
+      },
+    });
+    defineRoute(app, {
+      method: 'get',
+      path: '/json',
+      handler: ({ res }) => {
+        res.status(200).json({ ok: true });
+      },
+    });
+    serveErrors(app);
+
+    await supertest(app)
+      .get('/scim')
+      .set('Accept', 'application/scim+json')
+      .expect(200);
+    await supertest(app)
+      .get('/json')
+      .set('Accept', 'application/scim+json')
+      .expect(400);
+  });
+
+  it('continues to the next route when the handler calls next', async () => {
+    const app = appWith();
+    defineRoute(app, {
+      method: 'get',
+      path: '/fallthrough',
+      json: false,
+      handler: ({ next }) => next(),
+    });
+    app.get('/fallthrough', (_req, res) => {
+      res.status(200).json({ next: true });
+    });
+    serveErrors(app);
+
+    const res = await supertest(app).get('/fallthrough').expect(200);
+    expect(res.body).to.deep.equal({ next: true });
+  });
+
+  it('hands the handler Express next, whose error reaches the middleware', async () => {
+    const app = appWith();
+    defineRoute(app, {
+      method: 'get',
+      path: '/next',
+      handler: ({ next }) => next(new Error('boom')),
+    });
+    serveErrors(app);
+
+    const res = await supertest(app).get('/next').expect(500);
+    expect(res.body.error).to.equal('Internal Server Error');
+  });
+
   it('names every failing part at once', async () => {
     const app = appWith();
     defineRoute(app, {

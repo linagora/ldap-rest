@@ -1,5 +1,1 @@
-[
-  "src/plugins/ldap/bulkImport.ts",
-  "src/plugins/scim/scim.ts",
-  "src/plugins/static.ts"
-]
+["src/plugins/ldap/bulkImport.ts", "src/plugins/static.ts"]
