@@ -1,8 +1,6 @@
 [
   "src/abstract/ldapFlat.ts",
   "src/plugins/ldap/bulkImport.ts",
-  "src/plugins/ldap/groups.ts",
-  "src/plugins/ldap/organizations.ts",
   "src/plugins/ldap/passwordPolicy.ts",
   "src/plugins/ldap/raw.ts",
   "src/plugins/scim/scim.ts",

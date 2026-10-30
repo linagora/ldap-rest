@@ -823,7 +823,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -859,7 +867,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/GroupCreate"
               }
             }
@@ -877,6 +884,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "cn parameter"
@@ -888,7 +896,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/Group"
                 },
                 "example": {
@@ -934,6 +941,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "cn parameter"
@@ -945,7 +953,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -985,6 +1001,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "cn parameter"
@@ -996,7 +1013,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -1025,7 +1050,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/GroupModify"
               }
             }
@@ -1042,6 +1066,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "cn parameter"
@@ -1053,7 +1078,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -1124,6 +1157,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "cn parameter"
@@ -1133,6 +1167,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "member parameter"
@@ -1144,7 +1179,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -1183,6 +1226,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "cn parameter"
@@ -1194,7 +1238,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -1251,6 +1303,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "cn parameter"
@@ -1262,7 +1315,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -1320,7 +1381,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/Organization"
                 },
                 "example": {
@@ -1370,6 +1430,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "dn parameter"
@@ -1381,7 +1442,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/Organization"
                 },
                 "example": {
@@ -1436,6 +1496,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "dn parameter"
@@ -1447,7 +1508,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -1490,7 +1559,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/OrganizationModify"
               }
             }
@@ -1506,6 +1574,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "dn parameter"
@@ -1517,7 +1586,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -1570,6 +1647,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "dn parameter"
@@ -1659,6 +1737,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "dn parameter"
@@ -1731,6 +1810,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "dn parameter"
@@ -1801,7 +1881,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -1847,7 +1935,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/OrganizationCreate"
               }
             }
@@ -1865,6 +1952,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "dn parameter"
@@ -1877,7 +1965,13 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "success"
+                  ],
                   "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
                     "newDn": {
                       "type": "string"
                     }
