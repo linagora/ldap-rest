@@ -13,6 +13,7 @@ import type { Config } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
 import { loadSchemaFile } from '../../lib/schemaFile';
 
+import type { ScimOptions } from './scim.options';
 import {
   type ResourceTypeDefinition,
   type ServiceProviderConfig,
@@ -26,6 +27,7 @@ import {
 
 export interface DiscoveryOptions {
   config: Config;
+  options: ScimOptions;
   schemaDir: string;
   scimPrefix: string;
   loadedPlugins: { [name: string]: unknown };
@@ -42,19 +44,21 @@ interface AuthScheme {
 
 export class ScimDiscovery {
   private readonly config: Config;
+  private readonly options: ScimOptions;
   private readonly schemaDir: string;
   private readonly scimPrefix: string;
   private readonly loadedPlugins: { [name: string]: unknown };
 
   constructor(opts: DiscoveryOptions) {
     this.config = opts.config;
+    this.options = opts.options;
     this.schemaDir = opts.schemaDir;
     this.scimPrefix = opts.scimPrefix;
     this.loadedPlugins = opts.loadedPlugins;
   }
 
   private baseUrl(req?: DmRequest): string {
-    const fromConfig = (this.config.scim_base_url as string) || '';
+    const fromConfig = this.options.scim_base_url;
     if (fromConfig) return fromConfig.replace(/\/$/, '');
     if (req?.protocol && req.get) {
       return `${req.protocol}://${String(req.get('host') || '')}`;
@@ -112,20 +116,19 @@ export class ScimDiscovery {
       patch: { supported: true },
       bulk: {
         supported: true,
-        maxOperations: (this.config.scim_bulk_max_operations as number) || 100,
-        maxPayloadSize:
-          (this.config.scim_bulk_max_payload_size as number) || 1048576,
+        maxOperations: this.options.scim_bulk_max_operations,
+        maxPayloadSize: this.options.scim_bulk_max_payload_size,
       },
       filter: {
         supported: true,
-        maxResults: (this.config.scim_max_results as number) || 200,
+        maxResults: this.options.scim_max_results,
       },
       changePassword: { supported: false },
       // Sorting is parsed for backwards compatibility but not consistently
       // applied server-side (see Users/Groups list handlers). We advertise
       // it as unsupported to avoid clients depending on stale guarantees.
       sort: { supported: false },
-      etag: { supported: Boolean(this.config.scim_etag) },
+      etag: { supported: this.options.scim_etag },
       authenticationSchemes: this.authSchemes(),
       meta: {
         resourceType: 'ServiceProviderConfig',

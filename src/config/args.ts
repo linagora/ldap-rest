@@ -8,6 +8,9 @@ import { dirname, join } from 'path';
 
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
+import { scimOptions } from '../plugins/scim/scim.options';
+
+import { toConfigEntries } from './options';
 
 /** The headers `core/static` sends unless told otherwise: no framing by another site */
 export const STATIC_CSP = "frame-ancestors 'self'";
@@ -1453,58 +1456,7 @@ const configArgs: ConfigTemplate = [
   ['--ldap-users-base', 'DM_LDAP_USERS_BASE', ''],
 
   // SCIM plugin
-  ['--scim-prefix', 'DM_SCIM_PREFIX', '/scim/v2'],
-  ['--scim-user-base', 'DM_SCIM_USER_BASE', ''],
-  ['--scim-group-base', 'DM_SCIM_GROUP_BASE', ''],
-  ['--scim-user-base-template', 'DM_SCIM_USER_BASE_TEMPLATE', ''],
-  ['--scim-group-base-template', 'DM_SCIM_GROUP_BASE_TEMPLATE', ''],
-  ['--scim-base-map', 'DM_SCIM_BASE_MAP', ''],
-  ['--scim-user-base-header', 'DM_SCIM_USER_BASE_HEADER', ''],
-  ['--scim-group-base-header', 'DM_SCIM_GROUP_BASE_HEADER', ''],
-  ['--scim-base-header-root', 'DM_SCIM_BASE_HEADER_ROOT', ''],
-  [
-    '--scim-user-object-class',
-    'DM_SCIM_USER_OBJECT_CLASSES',
-    ['top', 'inetOrgPerson', 'organizationalPerson', 'person'],
-    'array',
-    '--scim-user-object-classes',
-    'identifiers',
-  ],
-  ['--scim-user-rdn-attribute', 'DM_SCIM_USER_RDN_ATTRIBUTE', 'uid'],
-  [
-    '--scim-user-lock-attribute',
-    'DM_SCIM_USER_LOCK_ATTRIBUTE',
-    'pwdAccountLockedTime',
-  ],
-  ['--scim-user-lock-value', 'DM_SCIM_USER_LOCK_VALUE', ''],
-  [
-    '--scim-group-object-class',
-    'DM_SCIM_GROUP_OBJECT_CLASSES',
-    ['top', 'groupOfNames'],
-    'array',
-    '--scim-group-object-classes',
-    'identifiers',
-  ],
-  ['--scim-group-rdn-attribute', 'DM_SCIM_GROUP_RDN_ATTRIBUTE', 'cn'],
-  [
-    '--scim-group-external-id-attribute',
-    'DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE',
-    '',
-  ],
-  ['--scim-id-attribute', 'DM_SCIM_ID_ATTRIBUTE', 'rdn'],
-  ['--scim-user-mapping', 'DM_SCIM_USER_MAPPING', ''],
-  ['--scim-group-mapping', 'DM_SCIM_GROUP_MAPPING', ''],
-  ['--scim-max-results', 'DM_SCIM_MAX_RESULTS', 200, 'number'],
-  ['--scim-max-scanned', 'DM_SCIM_MAX_SCANNED', 10000, 'number'],
-  ['--scim-bulk-max-operations', 'DM_SCIM_BULK_MAX_OPERATIONS', 100, 'number'],
-  [
-    '--scim-bulk-max-payload-size',
-    'DM_SCIM_BULK_MAX_PAYLOAD_SIZE',
-    1048576,
-    'number',
-  ],
-  ['--scim-etag', 'DM_SCIM_ETAG', false, 'boolean'],
-  ['--scim-base-url', 'DM_SCIM_BASE_URL', ''],
+  ...toConfigEntries(scimOptions),
 ];
 
 export default configArgs;

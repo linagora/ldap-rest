@@ -12,11 +12,11 @@
  */
 import type winston from 'winston';
 
-import type { Config } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
 import type HookBus from '../../lib/hookBus';
 
 import type { ScimUsers } from './users';
+import type { ScimOptions } from './scim.options';
 import type { ScimGroups } from './groups';
 import {
   type BulkRequest,
@@ -36,7 +36,7 @@ import {
 } from './errors';
 
 export interface ScimBulkOptions {
-  config: Config;
+  options: ScimOptions;
   logger: winston.Logger;
   users: ScimUsers;
   groups: ScimGroups;
@@ -49,7 +49,7 @@ const BULK_REF_RE = /^bulkId:([A-Za-z0-9_-]+)$/;
 const MAX_DATA_DEPTH = 64;
 
 export class ScimBulk {
-  private readonly config: Config;
+  private readonly options: ScimOptions;
   private readonly logger: winston.Logger;
   private readonly users: ScimUsers;
   private readonly groups: ScimGroups;
@@ -57,7 +57,7 @@ export class ScimBulk {
   private readonly hookBus: HookBus;
 
   constructor(opts: ScimBulkOptions) {
-    this.config = opts.config;
+    this.options = opts.options;
     this.logger = opts.logger;
     this.users = opts.users;
     this.groups = opts.groups;
@@ -66,7 +66,7 @@ export class ScimBulk {
   }
 
   async execute(req: DmRequest, body: BulkRequest): Promise<BulkResponse> {
-    const maxOps = (this.config.scim_bulk_max_operations as number) || 100;
+    const maxOps = this.options.scim_bulk_max_operations;
     if (!body.Operations || !Array.isArray(body.Operations)) {
       throw scimInvalidValue('Missing Operations array');
     }
@@ -251,7 +251,7 @@ export class ScimBulk {
     id: string,
     req?: DmRequest
   ): string {
-    const fromConfig = (this.config.scim_base_url as string) || '';
+    const fromConfig = this.options.scim_base_url;
     const baseUrl = fromConfig
       ? fromConfig.replace(/\/$/, '')
       : req?.protocol && req.get

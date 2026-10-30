@@ -24,12 +24,15 @@
 import fs from 'fs';
 
 import type { Config } from '../../config/args';
+import { readOptions } from '../../config/options';
 import {
   assertIdentityMode,
   identityFor,
   type DmRequest,
 } from '../../lib/auth/base';
 import { escapeDnValue, fillPattern, isChildOf } from '../../lib/utils';
+
+import { scimOptions, type ScimOptions } from './scim.options';
 
 export interface BaseMapEntry {
   userBase?: string;
@@ -49,7 +52,10 @@ export class BaseResolver {
   /** Kept so a base is keyed on whatever `--authz-identity` names. */
   private readonly config: Config;
 
-  constructor(config: Config) {
+  constructor(
+    config: Config,
+    options: ScimOptions = readOptions(scimOptions, config)
+  ) {
     // This resolver keys a base on the same value the authorization plugins
     // key a rule on, so it refuses an unknown `--authz-identity` as they
     // do: a deployment running SCIM without an authorization plugin would
@@ -58,19 +64,15 @@ export class BaseResolver {
     assertIdentityMode(config, 'scim base resolver');
     this.config = config;
     const fallback = config.ldap_base || '';
-    this.defaultUserBase = (config.scim_user_base as string) || fallback;
-    this.defaultGroupBase = (config.scim_group_base as string) || fallback;
-    this.userTemplate = (config.scim_user_base_template as string) || '';
-    this.groupTemplate = (config.scim_group_base_template as string) || '';
-    this.userBaseHeader = (
-      (config.scim_user_base_header as string) || ''
-    ).toLowerCase();
-    this.groupBaseHeader = (
-      (config.scim_group_base_header as string) || ''
-    ).toLowerCase();
-    this.headerRoot = (config.scim_base_header_root as string) || '';
+    this.defaultUserBase = options.scim_user_base || fallback;
+    this.defaultGroupBase = options.scim_group_base || fallback;
+    this.userTemplate = options.scim_user_base_template;
+    this.groupTemplate = options.scim_group_base_template;
+    this.userBaseHeader = options.scim_user_base_header.toLowerCase();
+    this.groupBaseHeader = options.scim_group_base_header.toLowerCase();
+    this.headerRoot = options.scim_base_header_root;
 
-    const mapPath = (config.scim_base_map as string) || '';
+    const mapPath = options.scim_base_map;
     if (mapPath) {
       try {
         const content = fs.readFileSync(mapPath, 'utf8');

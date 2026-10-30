@@ -18,8 +18,8 @@ import type { DmRequest } from '../../lib/auth/base';
 import { setChangeSource } from '../../lib/changeContext';
 import { jsonBodyParser } from '../../lib/rawBody';
 import { staticPlugins } from '../../lib/staticFiles';
-import type { Config } from '../../config/args';
 
+import { scimOptions, type ScimOptions } from './scim.options';
 import { BaseResolver } from './baseResolver';
 import { ScimUsers } from './users';
 import { ScimGroups } from './groups';
@@ -438,17 +438,19 @@ import {
  * that a SCIM request sent as such gets the SCIM limit rather than the global
  * parser's 100kb
  *
- * @param config the configuration holding the SCIM limit
+ * @param options the SCIM options holding the payload limit
  * @returns the parser
  */
-export function scimBodyParser(config: Config): RequestHandler {
+export function scimBodyParser(options: ScimOptions): RequestHandler {
   return jsonBodyParser({
     type: ['application/json', 'application/scim+json'],
-    limit: `${(config.scim_bulk_max_payload_size as number) || 1048576}b`,
+    limit: `${options.scim_bulk_max_payload_size}b`,
   });
 }
 
 export default class Scim extends DmPlugin {
+  static optionDefinitions = scimOptions;
+
   name = 'scim';
   roles: Role[] = ['api', 'configurable'] as const;
 
@@ -461,17 +463,20 @@ export default class Scim extends DmPlugin {
   /** Where it reads its schema files, which the static plugins may serve */
   private readonly scimSchemaDir: string;
   private readonly baseResolver: BaseResolver;
+  private readonly settings: ScimOptions;
 
   constructor(server: DM) {
     super(server);
     this.ldap = server.ldap;
-    this.scimPrefix = (this.config.scim_prefix as string) || '/scim/v2';
+    const options = this.options(scimOptions);
+    this.settings = options;
+    this.scimPrefix = options.scim_prefix;
 
-    this.baseResolver = new BaseResolver(this.config);
+    this.baseResolver = new BaseResolver(this.config, options);
 
     this.users = new ScimUsers({
       ldap: this.ldap,
-      config: this.config,
+      options,
       logger: this.logger,
       baseResolver: this.baseResolver,
       hookBus: this.hookBus,
@@ -480,6 +485,7 @@ export default class Scim extends DmPlugin {
     this.groups = new ScimGroups({
       ldap: this.ldap,
       config: this.config,
+      options,
       logger: this.logger,
       baseResolver: this.baseResolver,
       users: this.users,
@@ -487,7 +493,7 @@ export default class Scim extends DmPlugin {
     });
 
     this.bulk = new ScimBulk({
-      config: this.config,
+      options,
       logger: this.logger,
       users: this.users,
       groups: this.groups,
@@ -508,6 +514,7 @@ export default class Scim extends DmPlugin {
     this.scimSchemaDir = join(schemaDir, 'scim');
     this.discovery = new ScimDiscovery({
       config: this.config,
+      options,
       schemaDir: this.scimSchemaDir,
       scimPrefix: this.scimPrefix,
       loadedPlugins: server.loadedPlugins,
@@ -546,7 +553,7 @@ export default class Scim extends DmPlugin {
     const relative = resource.id
       ? `${this.scimPrefix}/${endpoint}/${encodeURIComponent(resource.id)}`
       : undefined;
-    const configuredBaseUrl = (this.config.scim_base_url as string) || '';
+    const configuredBaseUrl = this.settings.scim_base_url;
     const location =
       configuredBaseUrl && resource.meta?.location
         ? resource.meta.location
@@ -591,7 +598,7 @@ export default class Scim extends DmPlugin {
   api(app: Express): void {
     const prefix = this.scimPrefix;
 
-    this.server.registerBodyParser(prefix, scimBodyParser(this.config));
+    this.server.registerBodyParser(prefix, scimBodyParser(this.settings));
 
     // RFC 7644 section 3.9 makes `attributes` and `excludedAttributes`
     // mutually exclusive. Refuse the pair before any handler runs, not while
@@ -1437,8 +1444,7 @@ export default class Scim extends DmPlugin {
         if (!body || typeof body !== 'object') {
           return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
         }
-        const maxPayload =
-          (this.config.scim_bulk_max_payload_size as number) || 1048576;
+        const maxPayload = this.settings.scim_bulk_max_payload_size;
         let size: number;
         try {
           size = JSON.stringify(body).length;
@@ -1806,23 +1812,20 @@ export default class Scim extends DmPlugin {
         bulk: true,
         filter: true,
         sort: true,
-        etag: Boolean(this.config.scim_etag),
+        etag: this.settings.scim_etag,
         changePassword: false,
-        maxResults: (this.config.scim_max_results as number) || 200,
-        maxScanned: (this.config.scim_max_scanned as number) || 10000,
-        bulkMaxOperations:
-          (this.config.scim_bulk_max_operations as number) || 100,
-        bulkMaxPayloadSize:
-          (this.config.scim_bulk_max_payload_size as number) || 1048576,
+        maxResults: this.settings.scim_max_results,
+        maxScanned: this.settings.scim_max_scanned,
+        bulkMaxOperations: this.settings.scim_bulk_max_operations,
+        bulkMaxPayloadSize: this.settings.scim_bulk_max_payload_size,
       },
       resourceTypes: [
         {
           id: 'User',
           endpoint: `${prefix}/Users`,
           schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
-          rdnAttribute:
-            (this.config.scim_user_rdn_attribute as string) || 'uid',
-          objectClass: this.config.scim_user_object_class as string[],
+          rdnAttribute: this.settings.scim_user_rdn_attribute,
+          objectClass: this.settings.scim_user_object_class,
           filterableAttributes: filterableUserAttrs,
           mapping: userMapping.entries,
         },
@@ -1830,20 +1833,17 @@ export default class Scim extends DmPlugin {
           id: 'Group',
           endpoint: `${prefix}/Groups`,
           schema: 'urn:ietf:params:scim:schemas:core:2.0:Group',
-          rdnAttribute:
-            (this.config.scim_group_rdn_attribute as string) || 'cn',
-          objectClass: this.config.scim_group_object_class as string[],
+          rdnAttribute: this.settings.scim_group_rdn_attribute,
+          objectClass: this.settings.scim_group_object_class,
           filterableAttributes: filterableGroupAttrs,
           mapping: groupMapping.entries,
         },
       ],
-      idStrategy: (this.config.scim_id_attribute as string) || 'rdn',
+      idStrategy: this.settings.scim_id_attribute,
       baseResolution: {
-        userBaseTemplate:
-          (this.config.scim_user_base_template as string) || undefined,
-        groupBaseTemplate:
-          (this.config.scim_group_base_template as string) || undefined,
-        hasBaseMap: Boolean(this.config.scim_base_map),
+        userBaseTemplate: this.settings.scim_user_base_template || undefined,
+        groupBaseTemplate: this.settings.scim_group_base_template || undefined,
+        hasBaseMap: Boolean(this.settings.scim_base_map),
         // `userBase` / `groupBase` are NOT exposed here because they may vary
         // per-request via req.user; clients should treat SCIM ids as opaque.
       },

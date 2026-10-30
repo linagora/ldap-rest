@@ -12,7 +12,6 @@ import type {
   ModifyRequest,
   SearchResult,
 } from '../../lib/ldapActions';
-import type { Config } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
 import type HookBus from '../../lib/hookBus';
 import {
@@ -23,6 +22,7 @@ import {
 } from '../../lib/utils';
 
 import { BaseResolver } from './baseResolver';
+import type { ScimOptions } from './scim.options';
 import {
   type ResourceMapping,
   type ScimUser,
@@ -65,7 +65,7 @@ export interface ListQuery {
 
 export interface ScimUsersOptions {
   ldap: ldapActions;
-  config: Config;
+  options: ScimOptions;
   logger: winston.Logger;
   baseResolver: BaseResolver;
   hookBus: HookBus;
@@ -88,7 +88,7 @@ function touchesLock(changes: ModifyRequest, lockAttribute: string): boolean {
 
 export class ScimUsers {
   private readonly ldap: ldapActions;
-  private readonly config: Config;
+  private readonly options: ScimOptions;
   private readonly logger: winston.Logger;
   private readonly baseResolver: BaseResolver;
   private readonly hookBus: HookBus;
@@ -104,26 +104,25 @@ export class ScimUsers {
 
   constructor(opts: ScimUsersOptions) {
     this.ldap = opts.ldap;
-    this.config = opts.config;
+    this.options = opts.options;
     this.logger = opts.logger;
     this.baseResolver = opts.baseResolver;
     this.hookBus = opts.hookBus;
 
-    this.rdnAttribute =
-      (this.config.scim_user_rdn_attribute as string) || 'uid';
-    this.objectClass = this.config.scim_user_object_class as string[];
-    this.idAttribute = (this.config.scim_id_attribute as string) || 'rdn';
-    this.maxResults = (this.config.scim_max_results as number) || 200;
-    this.maxScanned = (this.config.scim_max_scanned as number) || 10000;
-    this.scimPrefix = (this.config.scim_prefix as string) || '/scim/v2';
+    this.rdnAttribute = this.options.scim_user_rdn_attribute;
+    this.objectClass = this.options.scim_user_object_class;
+    this.idAttribute = this.options.scim_id_attribute;
+    this.maxResults = this.options.scim_max_results;
+    this.maxScanned = this.options.scim_max_scanned;
+    this.scimPrefix = this.options.scim_prefix;
     const lock = resolveLockConfig(
-      (this.config.scim_user_lock_attribute as string) || '',
-      (this.config.scim_user_lock_value as string) || ''
+      this.options.scim_user_lock_attribute,
+      this.options.scim_user_lock_value
     );
     this.lockAttribute = lock.attribute;
     this.lockValue = lock.value;
 
-    const override = (this.config.scim_user_mapping as string) || '';
+    const override = this.options.scim_user_mapping;
     this.mapping = mergeMapping(
       DEFAULT_USER_MAPPING,
       override ? loadMappingFile(override) : undefined
@@ -136,7 +135,7 @@ export class ScimUsers {
       rdnAttribute: this.rdnAttribute,
       resourceType: 'User',
       baseUrl:
-        (this.config.scim_base_url as string) ||
+        this.options.scim_base_url ||
         (req?.protocol && req.get
           ? `${req.protocol}://${String(req.get('host') || '')}`
           : ''),

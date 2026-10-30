@@ -56,6 +56,7 @@ import {
   scimUniqueness,
 } from './errors';
 import type { ScimUsers } from './users';
+import type { ScimOptions } from './scim.options';
 
 export interface GroupListQuery {
   filter?: string;
@@ -70,6 +71,7 @@ export interface GroupListQuery {
 export interface ScimGroupsOptions {
   ldap: ldapActions;
   config: Config;
+  options: ScimOptions;
   logger: winston.Logger;
   baseResolver: BaseResolver;
   users: ScimUsers;
@@ -79,6 +81,7 @@ export interface ScimGroupsOptions {
 export class ScimGroups {
   private readonly ldap: ldapActions;
   private readonly config: Config;
+  private readonly options: ScimOptions;
   private readonly logger: winston.Logger;
   private readonly baseResolver: BaseResolver;
   private readonly users: ScimUsers;
@@ -95,26 +98,26 @@ export class ScimGroups {
   constructor(opts: ScimGroupsOptions) {
     this.ldap = opts.ldap;
     this.config = opts.config;
+    this.options = opts.options;
     this.logger = opts.logger;
     this.baseResolver = opts.baseResolver;
     this.users = opts.users;
     this.hookBus = opts.hookBus;
 
-    this.rdnAttribute =
-      (this.config.scim_group_rdn_attribute as string) || 'cn';
-    this.objectClass = this.config.scim_group_object_class as string[];
-    this.idAttribute = (this.config.scim_id_attribute as string) || 'rdn';
-    this.maxResults = (this.config.scim_max_results as number) || 200;
-    this.maxScanned = (this.config.scim_max_scanned as number) || 10000;
-    this.scimPrefix = (this.config.scim_prefix as string) || '/scim/v2';
+    this.rdnAttribute = this.options.scim_group_rdn_attribute;
+    this.objectClass = this.options.scim_group_object_class;
+    this.idAttribute = this.options.scim_id_attribute;
+    this.maxResults = this.options.scim_max_results;
+    this.maxScanned = this.options.scim_max_scanned;
+    this.scimPrefix = this.options.scim_prefix;
 
-    const override = (this.config.scim_group_mapping as string) || '';
+    const override = this.options.scim_group_mapping;
     this.mapping = withExternalId(
       mergeMapping(
         DEFAULT_GROUP_MAPPING,
         override ? loadMappingFile(override) : undefined
       ),
-      (this.config.scim_group_external_id_attribute as string) || ''
+      this.options.scim_group_external_id_attribute
     );
     this.attributes = requiredLdapAttributes(this.mapping, [
       this.rdnAttribute,
@@ -128,7 +131,7 @@ export class ScimGroups {
       rdnAttribute: this.rdnAttribute,
       resourceType: 'Group',
       baseUrl:
-        (this.config.scim_base_url as string) ||
+        this.options.scim_base_url ||
         (req?.protocol && req.get
           ? `${req.protocol}://${String(req.get('host') || '')}`
           : ''),
@@ -158,15 +161,14 @@ export class ScimGroups {
     const groupBase = this.baseResolver.groupBase(req);
     const scimPrefix = this.scimPrefix;
     const baseUrl =
-      (this.config.scim_base_url as string) ||
+      this.options.scim_base_url ||
       (req?.protocol && req.get
         ? `${req.protocol}://${String(req.get('host') || '')}`
         : '');
-    const userRdn = (this.config.scim_user_rdn_attribute as string) || 'uid';
+    const userRdn = this.options.scim_user_rdn_attribute;
     const groupRdn = this.rdnAttribute;
 
-    const placeholder =
-      (this.config.group_dummy_user as string) || 'cn=fakeuser';
+    const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
     return (dn: string): MultiValued | undefined => {
       if (!dn) return undefined;
       // Hide the schema-placeholder member from SCIM responses. Compared as
@@ -341,8 +343,7 @@ export class ScimGroups {
     // groupOfNames requires at least one member
     if (memberDns.length === 0) {
       // Fall back to a placeholder; mirrors --group-dummy-user convention
-      const placeholder =
-        (this.config.group_dummy_user as string) || 'cn=fakeuser';
+      const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
       memberDns.push(placeholder);
     }
     attributes.member = memberDns;
@@ -395,8 +396,7 @@ export class ScimGroups {
       }
     }
     if (memberDns.length === 0) {
-      const placeholder =
-        (this.config.group_dummy_user as string) || 'cn=fakeuser';
+      const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
       memberDns.push(placeholder);
     }
 
@@ -439,8 +439,7 @@ export class ScimGroups {
           ? changes.delete.member
           : undefined;
       if (removed !== undefined) {
-        const placeholder =
-          (this.config.group_dummy_user as string) || 'cn=fakeuser';
+        const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
         if (removed === '') {
           delete (changes.delete as Record<string, unknown>).member;
           if (Object.keys(changes.delete!).length === 0) delete changes.delete;
