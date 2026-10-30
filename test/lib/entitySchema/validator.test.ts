@@ -104,7 +104,7 @@ describe('EntityValidator', () => {
       expect(candidate.businessCategory).to.deep.equal([]);
     });
 
-    it('refuses an empty list for a declared attribute, not by dropping it', async () => {
+    it('refuses an empty list for a required attribute', async () => {
       expect(
         await refusal(validator().validateNew(entry({ description: [] })))
       ).to.equal('Attribute "description" is required');

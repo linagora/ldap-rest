@@ -316,7 +316,7 @@ describe('Entity schema contract', function () {
    * through what the schemas above refuse: what it lets through must still be
    * written, and `null` is written by leaving the key out.
    */
-  describe('an entity that declares no value rule', () => {
+  describe('a non-strict entity declaring few attributes', () => {
     const dn = () => `uid=contract-loose,ou=users,${process.env.DM_LDAP_BASE}`;
     const route = '/api/v1/ldap/loosePeople';
     const body: Body = {
@@ -715,6 +715,20 @@ describe('Entity schema contract', function () {
         .send(group.create({ member: pointee }));
       created(res);
       expect(await stored(group.dn(), 'member')).to.include(pointee);
+    });
+
+    // `objectClass` is the entity's whatever the body carries, a `null` under
+    // it included: the key is dropped like any undeclared one, and the
+    // classes written are the configured ones. This asserts an invariant, not
+    // the fix: it held before too, through `candidateGroup`.
+    it('writes the entity’s own classes for a null objectClass', async () => {
+      const res = await request
+        .post(group.route)
+        .send(group.create({ objectClass: null }));
+      created(res);
+      expect(await stored(group.dn(), 'objectClass')).to.have.members(
+        group.classes()
+      );
     });
   });
 });

@@ -70,29 +70,24 @@ export class EntityValidator {
   }
 
   /**
-   * Check the parts of a change, then convert them in place. No value under
-   * a name is the empty list for the directory layer, which clears the
-   * attribute in a `replace` and, in an `add`, leaves the key out with the
-   * rest of no value.
+   * Check the parts of a change, then convert them in place. Under a name
+   * the schema declares, no value becomes the empty list, which clears the
+   * attribute in a `replace` and is refused in an `add`; under a name it
+   * does not declare, a `null` is dropped from an `add` and becomes that
+   * empty list in a `replace`.
    *
    * @param changes change as the client sent it
    */
   async validateChanges(changes: ModifyRequest): Promise<void> {
-    if (!this.schema) {
-      if (changes.add) this.dropUndeclaredEmpty(changes.add);
-      // A replace clears the attribute with no value: `null` never reaches
-      // ldapts, which throws on it
-      for (const [field, value] of Object.entries(changes.replace ?? {}))
-        if (value === null || value === undefined)
-          (changes.replace as AttributesList)[field] = [];
-      toDirectoryChanges(undefined, changes);
-      return;
-    }
     for (const part of ['add', 'replace'] as const) {
       const values = changes[part];
       if (!values) continue;
       if (part === 'add') this.dropUndeclaredEmpty(values);
       await this.checkValues(values, part);
+    }
+    if (!this.schema) {
+      toDirectoryChanges(undefined, changes);
+      return;
     }
     if (changes.delete) {
       // A required attribute is refused to a delete of the whole attribute:

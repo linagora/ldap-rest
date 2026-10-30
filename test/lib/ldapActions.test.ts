@@ -157,7 +157,14 @@ describe('ldapActions', function () {
       });
 
       it('answers 400 for no value in an add', async () => {
-        for (const value of [[], null, [null], ['a', null]]) {
+        for (const value of [
+          [],
+          null,
+          undefined,
+          [null],
+          [undefined],
+          ['a', null],
+        ]) {
           let error: unknown;
           try {
             await ldapActions.modify(testDN, {

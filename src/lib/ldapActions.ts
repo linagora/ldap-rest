@@ -359,18 +359,20 @@ function ldapRefusal(what: string, code: number, error: unknown): Error {
 }
 
 /**
- * An empty list or a `null` adds nothing: the directory answers a protocol
- * error, or ldapts throws, both of which reached the client as a 500. A
- * replace with no value is how an attribute is cleared, and does not come
- * here.
+ * No value adds nothing: an empty list is a protocol error for the directory,
+ * and ldapts throws on `null` or `undefined`, alone or in a list. Either
+ * reached the client as a 500. A replace with no value is how an attribute is
+ * cleared, and does not come here.
  */
+const unwritable = (value: unknown): boolean => {
+  const absent = (v: unknown): boolean => v === null || v === undefined;
+  if (Array.isArray(value))
+    return value.length === 0 || value.some(item => absent(item));
+  return absent(value);
+};
+
 function assertHasValue(name: string, value: unknown): void {
-  if (
-    (Array.isArray(value) &&
-      (value.length === 0 || value.some(item => item === null))) ||
-    value === null ||
-    value === undefined
-  )
+  if (unwritable(value))
     throw new BadRequestError(`Attribute "${name}" has no value`);
 }
 
