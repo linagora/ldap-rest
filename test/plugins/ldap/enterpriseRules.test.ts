@@ -103,12 +103,57 @@ describe('Enterprise rules', () => {
       );
     });
 
+    it('should read the year as written, below 100 too', () => {
+      expect(parseDirectoryDate('0029123123')?.toISOString()).to.equal(
+        '0029-12-31T23:00:00.000Z'
+      );
+      expect(
+        parseDirectoryDate('00950704115160.0996-11:51')?.toISOString()
+      ).to.equal('0095-07-04T23:43:00.100Z');
+      // Year 0 is a leap year: its February counts from year -1
+      expect(parseDirectoryDate('0000022913')?.toISOString()).to.equal(
+        '0000-02-29T13:00:00.000Z'
+      );
+      expect(parseDirectoryDate('0000010100Z')?.toISOString()).to.equal(
+        '0000-01-01T00:00:00.000Z'
+      );
+    });
+
+    it('should read a leap second at the end of a day', () => {
+      expect(parseDirectoryDate('20991231235960Z')?.toISOString()).to.equal(
+        '2100-01-01T00:00:00.000Z'
+      );
+      expect(
+        parseDirectoryDate('20991231235960.5+0530')?.toISOString()
+      ).to.equal('2099-12-31T18:30:00.500Z');
+      expect(parseDirectoryDate('20240630235960Z')?.toISOString()).to.equal(
+        '2024-07-01T00:00:00.000Z'
+      );
+    });
+
     it('should return null for anything unreadable', () => {
       expect(parseDirectoryDate('not a date')).to.be.null;
       expect(parseDirectoryDate('20241340220000Z')).to.be.null;
       expect(parseDirectoryDate('20240231000000Z')).to.be.null;
+      expect(parseDirectoryDate('000002300000Z')).to.be.null;
       expect(parseDirectoryDate('20240930250000Z')).to.be.null;
+      expect(parseDirectoryDate('20240930225961Z')).to.be.null;
       expect(parseDirectoryDate('20240930000000+25')).to.be.null;
+    });
+
+    it('should accept the offsets RFC 4517 allows', () => {
+      expect(parseDirectoryDate('20240930000000+1330')).to.be.null;
+      expect(parseDirectoryDate('20240930000000+1260')).to.be.null;
+      expect(parseDirectoryDate('20240930000000+00')).to.be.null;
+      expect(parseDirectoryDate('20240930000000-1300')?.toISOString()).to.equal(
+        '2024-09-30T13:00:00.000Z'
+      );
+      expect(parseDirectoryDate('20240930000000-1230')?.toISOString()).to.equal(
+        '2024-09-30T12:30:00.000Z'
+      );
+      expect(parseDirectoryDate('20240930000000+12')?.toISOString()).to.equal(
+        '2024-09-29T12:00:00.000Z'
+      );
     });
   });
 
@@ -822,6 +867,14 @@ describe('Enterprise rules', () => {
           .send({ replace: { twakeDeletionDate: '20200101220000Z' } });
         expect(res.status).to.equal(400);
         expect(res.body.error).to.match(/not be earlier than today/);
+      });
+
+      it('should accept a leap second at the end of a future day', async () => {
+        const res = await request
+          .put('/api/v1/ldap/users/rules.date')
+          .type('json')
+          .send({ replace: { twakeDeletionDate: '20991231235960Z' } });
+        expect(res.status, JSON.stringify(res.body)).to.equal(200);
       });
     });
 

@@ -351,10 +351,20 @@ export function parseDirectoryDate(raw: AttributeValue): Date | null {
   );
   if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 60)
     return null;
-  let time = Date.UTC(year, month - 1, day, hour, minute, second);
-  const check = new Date(time);
-  if (check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day)
+  // Date.UTC() reads a year below 100 as 19xx, and setUTCFullYear() over a
+  // zeroed date re-reads the normalized day and month, so the day is checked
+  // once it has been set, before the hour: a leap second (RFC 4517 allows
+  // 60) then carries over to the next day instead of failing the check.
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  )
     return null;
+  date.setUTCHours(hour, minute, second);
+  let time = date.getTime();
 
   if (fraction !== undefined) {
     const unit = s !== undefined ? 1000 : mi !== undefined ? 60000 : 3600000;
@@ -365,7 +375,14 @@ export function parseDirectoryDate(raw: AttributeValue): Date | null {
     const digits = zone.slice(1).replace(':', '');
     const offsetHours = Number(digits.slice(0, 2));
     const offsetMinutes = digits.length > 2 ? Number(digits.slice(2, 4)) : 0;
-    if (offsetHours > 23 || offsetMinutes > 59) return null;
+    // RFC 4517 reads the difference of UTC as HHMM: 1 to 12 hours, or 1300,
+    // the offset of UTC+13:00 that is still in use
+    if (
+      offsetHours < 1 ||
+      offsetMinutes > 59 ||
+      (offsetHours > 12 && !(offsetHours === 13 && offsetMinutes === 0))
+    )
+      return null;
     const sign = zone[0] === '-' ? -1 : 1;
     time -= sign * (offsetHours * 60 + offsetMinutes) * 60000;
   }
