@@ -5,7 +5,7 @@ The rules on comments, documentation, changelog and commit messages are in
 
 ## Getting started
 
-Prerequisites: Node.js 20+, Docker (the test suite starts its own LDAP
+Prerequisites: Node.js 22+, Docker (the test suite starts its own LDAP
 server).
 
 ```bash
@@ -59,6 +59,14 @@ a lower threshold. Raise them when the real figure moves up.
 The gate excludes `src/browser`, which the suite cannot exercise without a
 DOM, and the type-only files listed in `.c8rc.json`. `npm run coverage` still
 reports everything in `coverage/index.html`.
+
+### Dependencies
+
+Dependabot opens the updates (`.github/dependabot.yml`), grouped for npm.
+CI fails on a `high` or `critical` advisory in a production dependency, as
+`npm run audit:prod` reports it. Fix, or if the advisory does not apply, add
+an entry to `.github/audit-allowlist.json` naming the advisory and the date
+it is to be revisited; remove it when it expires.
 
 ## Submitting changes
 

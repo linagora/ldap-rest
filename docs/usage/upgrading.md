@@ -6,6 +6,14 @@ decision or a configuration change appear here; see the
 
 ## From 1.2.1
 
+### Node 22 is the floor
+
+**Who is affected:** a deployment running on Node 20, whose end of life is
+2026-04-30; the published image is built on Node 24 and is not.
+
+`engines` declares `>=22`, and the CI runs the suite on 22, 24 and 26. Node
+20 is neither tested nor supported.
+
 ### Values past 4096 characters, and an address with a trailing or empty label
 
 **Who is affected:** a deployment whose schemas accept a value longer than

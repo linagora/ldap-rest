@@ -1,0 +1,38 @@
+version: 2
+updates:
+  # Runtime and build dependencies, the dev toolchain grouped apart from
+  # what ships: a dev update that breaks the build is not a production
+  # change, and reviewing the two together hides that
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      production:
+        dependency-type: production
+        patterns: ['*']
+      development:
+        dependency-type: development
+        patterns: ['*']
+    open-pull-requests-limit: 5
+
+  # The Maven dependencies of lsc-plugin, including lsc-core
+  - package-ecosystem: maven
+    directory: /lsc-plugin
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # The base image of the Dockerfile, which scripts/buildDockerfile.ts
+  # generates: an update it opens has to be made in the script
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

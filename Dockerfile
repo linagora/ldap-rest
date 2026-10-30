@@ -2,8 +2,6 @@
 
 FROM node:24-alpine as builder
 
-RUN apk update && apk upgrade
-
 WORKDIR /app-build
 COPY .dev.mk .
 COPY bin ./bin
@@ -22,7 +20,7 @@ RUN npm install --no-package-lock /tmp/app.tgz && rm -f /tmp/app.tgz && rm -rf /
 ENV NODE_ENV=production \
  DM_PORT="8081" \
  DM_SHUTDOWN_TIMEOUT="20000" \
- DM_PLUGINS=core/static,core/helloworld \
+ DM_PLUGINS=core/static,core/demo/helloworld \
  DM_LOG_LEVEL="notice" \
  DM_LOGGER="console" \
  DM_DEBUG=false \
@@ -312,4 +310,6 @@ ENV NODE_ENV=production \
 USER node
 
 EXPOSE 8081 9464
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.DM_PORT ?? 8081) + '/healthz').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["npx", "ldap-rest"]

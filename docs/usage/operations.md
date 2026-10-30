@@ -41,7 +41,12 @@ and `/readyz` names the loaded plugins that report: on an ingress exposing
 the server to the internet, keep the two paths to the cluster.
 
 The Helm chart probes both routes over HTTP (`livenessProbe` and
-`readinessProbe` in `values.yaml`).
+`readinessProbe` in `values.yaml`). The published image also declares a
+`HEALTHCHECK` calling `GET /healthz` on `--port`: Docker marks the container
+unhealthy when it stops answering and `docker run --restart` replaces it,
+while an orchestrator with probes of its own ignores the declaration. The
+image runs as its unprivileged `node` user, so keep the port above 1023, as
+the default 8081 is.
 
 ### What the shipped plugins report
 
