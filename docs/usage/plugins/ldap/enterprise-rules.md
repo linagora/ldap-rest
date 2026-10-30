@@ -119,7 +119,8 @@ whenever the link changes. Mark the path `generated` so a client cannot set it.
 
 `5GB`, `500 MB`, `2KB` and `2048` all become a number of bytes, with decimal
 multipliers (1 GB = 10⁹ bytes) as mail servers count them. The same conversion
-applies to creations and to updates.
+applies to creations and to updates. A size above 2⁵³ − 1 bytes is refused
+(400), since its number of bytes would be rounded.
 
 ### Server-owned defaults
 

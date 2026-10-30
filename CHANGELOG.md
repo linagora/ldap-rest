@@ -9,6 +9,13 @@
   that moved the `package.json` outside the package leaves the field out
   ([details](docs/client-development/api/rest-api.md#get-configuration)).
 
+### Fixed
+
+- A size normalised with `byteSize` is answered 400 when it exceeds
+  2⁵³ − 1 bytes (`53687 TB`, a too large `default`), where it was stored as
+  `53687000000000000`, `1e+21` or `Infinity`
+  ([#493](https://github.com/linagora/ldap-rest/issues/493)).
+
 ### Security
 
 - A name sent as a DN, when creating a flat entry or a group, is no longer

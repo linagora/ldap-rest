@@ -271,15 +271,29 @@ const SIZE_UNITS: Record<string, number> = {
  *
  * @param raw value as submitted
  * @returns the size in bytes
- * @throws BadRequestError when the value is not a size
+ * @throws BadRequestError when the value is not a size, or when its number of
+ * bytes is one a `Number` cannot hold exactly
  */
 export function parseByteSize(raw: AttributeValue): number {
-  if (typeof raw === 'number') return Math.round(raw);
+  if (typeof raw === 'number') return assertSafeSize(Math.round(raw));
   const text = String(raw).trim();
   const match = /^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB)?$/i.exec(text);
   if (!match) throw new BadRequestError(`"${text}" is not a valid size`);
   const unit = (match[2] || 'B').toUpperCase();
-  return Math.round(parseFloat(match[1]) * SIZE_UNITS[unit]);
+  return assertSafeSize(Math.round(parseFloat(match[1]) * SIZE_UNITS[unit]));
+}
+
+/**
+ * Refuse a byte count no `Number` holds exactly.
+ *
+ * A larger one is rounded (`1e21`), or not a number at all (`Infinity`), and
+ * is written as such: the directory stores something else than what was
+ * asked, and a mail server is handed a quota it cannot use.
+ */
+function assertSafeSize(size: number): number {
+  if (!Number.isSafeInteger(size))
+    throw new BadRequestError('the size is too large to be written');
+  return size;
 }
 
 /**
