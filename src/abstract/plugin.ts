@@ -3,7 +3,6 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Express } from 'express';
-import fetch, { type RequestInit, type Response } from 'node-fetch';
 import type winston from 'winston';
 
 import type { Config, DM } from '../bin';
@@ -139,7 +138,7 @@ export default abstract class DmPlugin {
    * this plugin's name, see `docs/usage/operations.md#metrics`.
    */
   protected fetch(
-    url: Parameters<typeof fetch>[0],
+    url: Parameters<typeof globalThis.fetch>[0],
     init?: RequestInit
   ): Promise<Response> {
     return timedOutbound(this.name, () => fetch(url, init));

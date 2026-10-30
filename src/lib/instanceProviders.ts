@@ -5,8 +5,6 @@
  * answers at once and builds the instance afterwards, and the cozy-stack
  * admin API, which builds it before answering.
  */
-import fetch, { type RequestInit, type Response } from 'node-fetch';
-
 import { BadGatewayError, ConflictError, GatewayTimeoutError } from './errors';
 import { timedOutbound } from './metrics';
 
@@ -137,7 +135,8 @@ abstract class HttpProvider {
   }
 
   private timedOut(err: unknown, url: string): unknown {
-    // node-fetch names the timeout AbortError; the only signal is ours
+    // The deadline is the only signal fetch is given, so both DOMException
+    // names an abort raises mean it ran out
     return ['AbortError', 'TimeoutError'].includes((err as Error).name)
       ? new GatewayTimeoutError(
           `${new URL(url).host} did not answer within ${this.timeout} ms`

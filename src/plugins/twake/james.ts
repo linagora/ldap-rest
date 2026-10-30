@@ -372,7 +372,7 @@ export default class James extends TwakePlugin {
         return;
       }
 
-      const quotaData = await quotaRes.json();
+      const quotaData = (await quotaRes.json()) as unknown;
       res.json(quotaData);
     } catch (error) {
       this.logger.error({
