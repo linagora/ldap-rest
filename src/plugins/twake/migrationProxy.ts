@@ -52,12 +52,14 @@ export default class MigrationProxy extends TwakePlugin {
   private readonly queues = new Map<string, Promise<void>>();
 
   constructor(server: DM) {
-    super(
-      server,
-      'migration_proxy_url',
-      'migration_proxy_token',
-      'migration_proxy_concurrency'
-    );
+    super(server, {
+      url: server.config.migration_proxy_url || '',
+      token: server.config.migration_proxy_token || '',
+      concurrency: server.config.migration_proxy_concurrency ?? 10,
+      urlOption: 'migration_proxy_url',
+      tokenOption: 'migration_proxy_token',
+      concurrencyOption: 'migration_proxy_concurrency',
+    });
     this.branches = this.config.migration_proxy_branch || [];
     if (!this.branches.length)
       throw new Error(`${this.name}: --migration-proxy-branch is required`);

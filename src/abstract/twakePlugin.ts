@@ -13,6 +13,19 @@ import { escapeLdapFilter } from '../lib/utils';
 
 import DmPlugin, { type Role } from './plugin';
 
+/** What a Twake plugin needs to reach its WebAdmin API */
+export interface TwakeConnection {
+  url: string;
+  token: string;
+  concurrency: number;
+  /** Option holding the URL, named in the startup error when it is empty */
+  urlOption: string;
+  /** Option holding the token, named in the warning when it is empty */
+  tokenOption: string;
+  /** Option holding the concurrency, named when it is not a positive integer */
+  concurrencyOption: string;
+}
+
 /**
  * Abstract base class for all Twake-related plugins (James, Calendar, Matrix, etc.)
  * Consolidates common patterns for HTTP communication with Twake WebAdmin APIs
@@ -38,49 +51,42 @@ export abstract class TwakePlugin extends DmPlugin {
   /**
    * Constructor - initializes common Twake plugin configuration
    * @param server DM server instance
-   * @param urlConfig Configuration key for WebAdmin URL
-   * @param tokenConfig Configuration key for WebAdmin token
-   * @param concurrencyConfig Configuration key for concurrency limit
+   * @param connection WebAdmin URL, token and concurrency
    */
-  constructor(
-    server: DM,
-    urlConfig: string,
-    tokenConfig: string,
-    concurrencyConfig: string
-  ) {
+  constructor(server: DM, connection: TwakeConnection) {
     super(server);
 
-    let url = (this.config[urlConfig] as string) || '';
+    let url = connection.url;
     while (url.endsWith('/')) url = url.slice(0, -1);
     this.webadminUrl = url;
-    this.webadminToken = (this.config[tokenConfig] as string) || '';
+    this.webadminToken = connection.token;
 
     // Validate required configuration
     if (!this.webadminUrl) {
-      throw new Error(`Twake plugin: ${urlConfig} is required`);
+      throw new Error(`Twake plugin: ${connection.urlOption} is required`);
     }
 
     // Warn if authentication token is not configured
     if (!this.webadminToken) {
       this.logger.warn(
-        `Twake plugin: No authentication token configured (${tokenConfig}) - requests will be unauthenticated`
+        `Twake plugin: No authentication token configured (${connection.tokenOption}) - requests will be unauthenticated`
       );
     }
 
     // Initialize concurrency limiter
-    const concurrency =
-      typeof this.config[concurrencyConfig] === 'number'
-        ? this.config[concurrencyConfig]
-        : 10;
+    const concurrency = connection.concurrency;
+    if (!Number.isInteger(concurrency) || concurrency < 1)
+      throw new Error(
+        `Twake plugin: ${connection.concurrencyOption} must be a positive integer`
+      );
     this.requestLimit = pLimit(concurrency);
     this.logger.info(
       `Twake plugin HTTP request concurrency limit set to ${concurrency}`
     );
 
     // Cache common LDAP attributes
-    this.mailAttr = (this.config.mail_attribute as string) || 'mail';
-    this.displayNameAttr =
-      (this.config.display_name_attribute as string) || 'displayName';
+    this.mailAttr = this.config.mail_attribute || 'mail';
+    this.displayNameAttr = this.config.display_name_attribute || 'displayName';
   }
 
   /**

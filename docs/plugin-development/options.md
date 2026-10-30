@@ -72,9 +72,10 @@ export default class Example extends DmPlugin {
 ```
 
 `options(exampleOptions)` applies the defaults, copies array defaults and
-checks `required`, `min`, `max` and `choices`. The base constructor calls it
-once, so a bad value stops the plugin from loading rather than failing at the
-first request. `--plugin example:name:{...}` overrides still work: the view the
+checks `required`, `min`, `max` and `choices`. The base constructor asks once,
+so a bad value stops the plugin from loading rather than failing at the first
+request. Each later call reads the configuration again rather than keeping
+the first values. `--plugin example:name:{...}` overrides still work: the view the
 plugin receives carries the merged configuration, and `options()` reads that
 view. Give it the same declaration object the class names in
 `optionDefinitions`: any other one is refused, so the generic type parameter

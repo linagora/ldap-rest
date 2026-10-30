@@ -26,6 +26,12 @@ import {
   parseDn,
 } from '../../lib/utils';
 
+import {
+  jamesOptions,
+  jamesOptionsOf,
+  type JamesOptions,
+} from './james.options';
+
 /**
  * What James WebAdmin answers about a user missing from its users
  * repository. Read through LDAP, that repository can lag behind the write
@@ -205,6 +211,8 @@ const sameDn = (a: string, b: string): boolean => {
 };
 
 export default class James extends TwakePlugin {
+  static optionDefinitions = jamesOptions;
+
   name = 'james';
   roles: Role[] = ['consistency', 'api', 'configurable'] as const;
 
@@ -225,34 +233,27 @@ export default class James extends TwakePlugin {
   private initDelay: number;
 
   constructor(server: DM) {
-    super(
-      server,
-      'james_webadmin_url',
-      'james_webadmin_token',
-      'james_concurrency'
-    );
-
+    const settings = jamesOptionsOf(server.config);
+    super(server, {
+      url: settings.james_webadmin_url,
+      token: settings.james_webadmin_token,
+      concurrency: settings.james_concurrency,
+      urlOption: 'james_webadmin_url',
+      tokenOption: 'james_webadmin_token',
+      concurrencyOption: 'james_concurrency',
+    });
     // Initialize James-specific configuration attributes
-    this.quotaAttr = this.config.quota_attribute as string;
-    this.aliasAttr =
-      (this.config.alias_attribute as string) || 'mailAlternateAddress';
-    this.mailboxTypeAttr =
-      (this.config.james_mailbox_type_attribute as string) ||
-      'twakeMailboxType';
-    this.forwardAttr =
-      (this.config.forward_attribute as string) || 'mailForwardingAddress';
-    this.initDelay =
-      typeof this.config.james_init_delay === 'number'
-        ? this.config.james_init_delay
-        : 1000;
-    this.retryAttempts =
-      typeof this.config.james_retry_attempts === 'number'
-        ? Math.max(1, this.config.james_retry_attempts)
-        : 5;
-    this.retryDelay =
-      typeof this.config.james_retry_delay === 'number'
-        ? Math.max(0, this.config.james_retry_delay)
-        : 1000;
+    this.quotaAttr = this.config.quota_attribute || '';
+    this.aliasAttr = this.config.alias_attribute || 'mailAlternateAddress';
+    this.mailboxTypeAttr = settings.james_mailbox_type_attribute;
+    this.forwardAttr = this.config.forward_attribute || 'mailForwardingAddress';
+    this.initDelay = settings.james_init_delay;
+    this.retryAttempts = Math.max(1, settings.james_retry_attempts);
+    this.retryDelay = Math.max(0, settings.james_retry_delay);
+  }
+
+  private get settings(): JamesOptions {
+    return this.options(jamesOptions);
   }
 
   /**
@@ -611,7 +612,7 @@ export default class James extends TwakePlugin {
     ) => {
       // Users set their forwards in Twake Mail, see
       // docs/usage/plugins/integrations/james-mail.md#forwards
-      if (!this.config.james_sync_forwards) return;
+      if (!this.settings.james_sync_forwards) return;
       if (await this.isGroupDn(dn)) return;
       const domain = this.extractMailDomain(mail);
       if (!domain) {
@@ -1136,7 +1137,7 @@ export default class James extends TwakePlugin {
     const mail = this.attributeToString(entry[this.mailAttr]);
     if (!mail) return null;
     const dn = String(entry.dn);
-    const branches = this.config.james_mailing_list_branch || [];
+    const branches = this.settings.james_mailing_list_branch;
     if (branches.some(branch => dn === branch || dn.endsWith(',' + branch)))
       return {
         mail,
@@ -1294,7 +1295,7 @@ export default class James extends TwakePlugin {
    */
   getConfigApiData(): Record<string, unknown> {
     return {
-      teamMailboxAnyDomain: Boolean(this.config.james_team_mailbox_any_domain),
+      teamMailboxAnyDomain: this.settings.james_team_mailbox_any_domain,
     };
   }
 
@@ -1307,7 +1308,7 @@ export default class James extends TwakePlugin {
     type: AttributeValue | undefined
   ): string | null {
     if (
-      this.config.james_team_mailbox_any_domain ||
+      this.settings.james_team_mailbox_any_domain ||
       this.getMailboxType({
         [this.mailboxTypeAttr]: type,
       } as AttributesList) !== 'teamMailbox'
@@ -1333,7 +1334,7 @@ export default class James extends TwakePlugin {
     dn: string,
     changes: ModifyRequest
   ): Promise<void> {
-    if (this.config.james_team_mailbox_any_domain) return;
+    if (this.settings.james_team_mailbox_any_domain) return;
     const watched = [this.mailAttr, this.mailboxTypeAttr, 'member'];
     const touched = [changes.add, changes.replace].some(
       list =>
@@ -1496,7 +1497,7 @@ export default class James extends TwakePlugin {
   }
 
   async generateSignature(dn: string): Promise<string | null> {
-    const template = this.config.james_signature_template;
+    const template = this.settings.james_signature_template;
     if (!template) return null;
 
     // Get all attributes (needed for template placeholders)
@@ -1714,7 +1715,7 @@ export default class James extends TwakePlugin {
    * (`--james-sync-forwards`).
    */
   private ownForwards(value: AttributesList[string] | undefined): string[] {
-    return this.config.james_sync_forwards ? this.getAliases(value) : [];
+    return this.settings.james_sync_forwards ? this.getAliases(value) : [];
   }
 
   /**

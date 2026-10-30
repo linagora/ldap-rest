@@ -30,12 +30,17 @@
   A plugin built outside this repository needs updating
   ([details](docs/usage/upgrading.md#from-121))
   ([#415](https://github.com/linagora/ldap-rest/issues/415)).
-- Options a plugin declares are checked when it loads: a SCIM limit outside
-  its range, or a SCIM or applicative accounts value of the wrong JSON type
-  in a per-instance override, such as `--scim-max-results 0`,
-  `{"scim_max_results": "50"}` or `{"max_app_accounts": "5"}`, stops the
+- Options a plugin declares are checked when it loads: a SCIM limit or the
+  James concurrency outside its range, or a SCIM, applicative accounts or
+  James value of the wrong JSON type in a per-instance override, such as
+  `--scim-max-results 0`, `{"scim_max_results": "50"}`,
+  `{"max_app_accounts": "5"}` or `{"james_concurrency": "5"}`, stops the
   server instead of being replaced by the default or coerced
   ([details](docs/plugin-development/options.md)).
+- `TwakePlugin` takes the WebAdmin URL, token and concurrency instead of the
+  names of the options holding them: a plugin built outside this repository
+  that extends it must update its `super()` call
+  ([upgrading](docs/usage/upgrading.md#a-plugin-extending-twakeplugin)).
 
 ### Fixed
 

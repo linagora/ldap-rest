@@ -9,11 +9,13 @@ import {
 } from '../../src/config/options';
 import { ConfigParser } from '../../src/lib/parseConfig';
 import DmPlugin from '../../src/abstract/plugin';
+import { TwakePlugin } from '../../src/abstract/twakePlugin';
 import { DM } from '../../src/bin';
 import {
   scimOptions,
   scimOptionsOf,
 } from '../../src/plugins/scim/scim.options';
+import { jamesOptionsOf } from '../../src/plugins/twake/james.options';
 
 describe('plugin options', () => {
   const parse = (argv: string[] = ['node', 'ldap-rest']) =>
@@ -223,6 +225,106 @@ describe('plugin options', () => {
     });
   });
 
+  describe('James options in the configuration', () => {
+    const names = [
+      'DM_JAMES_WEBADMIN_URL',
+      'DM_JAMES_WEBADMIN_TOKEN',
+      'DM_JAMES_SIGNATURE_TEMPLATE',
+      'DM_JAMES_CONCURRENCY',
+      'DM_JAMES_INIT_DELAY',
+      'DM_JAMES_RETRY_ATTEMPTS',
+      'DM_JAMES_RETRY_DELAY',
+      'DM_JAMES_MAILING_LIST_BRANCHES',
+      'DM_JAMES_MAILBOX_TYPE_ATTRIBUTE',
+      'DM_JAMES_SYNC_FORWARDS',
+      'DM_JAMES_TEAM_MAILBOX_ANY_DOMAIN',
+    ];
+    let saved: Record<string, string | undefined>;
+
+    beforeEach(() => {
+      saved = {};
+      for (const name of names) {
+        saved[name] = process.env[name];
+        delete process.env[name];
+      }
+    });
+    afterEach(() => {
+      for (const name of names)
+        if (saved[name] === undefined) delete process.env[name];
+        else process.env[name] = saved[name];
+    });
+
+    it('keeps the defaults the parser used to declare', () => {
+      const config = parse();
+      expect(config.james_webadmin_url).to.equal('http://localhost:8000');
+      expect(config.james_webadmin_token).to.equal('');
+      expect(config.james_signature_template).to.equal('');
+      expect(config.james_concurrency).to.equal(10);
+      expect(config.james_init_delay).to.equal(1000);
+      expect(config.james_retry_attempts).to.equal(5);
+      expect(config.james_retry_delay).to.equal(1000);
+      expect(config.james_mailing_list_branch).to.deep.equal([]);
+      expect(config.james_mailbox_type_attribute).to.equal('twakeMailboxType');
+      expect(config.james_sync_forwards).to.equal(false);
+      expect(config.james_team_mailbox_any_domain).to.equal(false);
+    });
+
+    it('reads the environment and the CLI as before', () => {
+      process.env.DM_JAMES_CONCURRENCY = '3';
+      process.env.DM_JAMES_MAILING_LIST_BRANCHES =
+        'ou=Teams,dc=example,dc=com;ou=Other,dc=example,dc=com';
+      const config = parse([
+        'node',
+        'ldap-rest',
+        '--james-retry-delay',
+        '250',
+        '--james-team-mailbox-any-domain',
+        '--james-sync-forwards',
+      ]);
+      expect(config.james_concurrency).to.equal(3);
+      expect(config.james_mailing_list_branch).to.deep.equal([
+        'ou=Teams,dc=example,dc=com',
+        'ou=Other,dc=example,dc=com',
+      ]);
+      expect(config.james_retry_delay).to.equal(250);
+      expect(config.james_team_mailbox_any_domain).to.equal(true);
+      expect(config.james_sync_forwards).to.equal(true);
+    });
+
+    it('refuses a concurrency below 1 when the plugin reads it', () => {
+      process.env.DM_JAMES_CONCURRENCY = '0';
+      expect(() => jamesOptionsOf(parse())).to.throw(
+        /james_concurrency must be at least 1/
+      );
+    });
+  });
+
+  describe('the Twake connection', () => {
+    class SampleTwake extends TwakePlugin {
+      name = 'sampleTwake';
+      roles = [];
+
+      constructor(concurrency: unknown) {
+        super(new DM(), {
+          url: 'http://localhost:8000',
+          token: 'secret',
+          concurrency: concurrency as number,
+          urlOption: 'sample_url',
+          tokenOption: 'sample_token',
+          concurrencyOption: 'sample_concurrency',
+        });
+      }
+    }
+
+    it('refuses a concurrency that is not a positive integer', () => {
+      for (const value of ['5', 0, -1, 1.5]) {
+        expect(() => new SampleTwake(value), String(value)).to.throw(
+          /sample_concurrency must be a positive integer/
+        );
+      }
+    });
+  });
+
   describe('reading and checking values', () => {
     const definitions = defineOptions({
       name: opt.string({ required: true }),
@@ -295,6 +397,13 @@ describe('plugin options', () => {
         sample_size: 3,
         sample_label: 'x',
       });
+    });
+
+    it('reads the configuration again when it changed', () => {
+      const dm = new DM();
+      const plugin = new Sample(dm);
+      dm.config.sample_size = 4;
+      expect(plugin.options(definitions).sample_size).to.equal(4);
     });
 
     it('refuses definitions the plugin does not declare', () => {
