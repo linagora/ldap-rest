@@ -13,7 +13,11 @@ import type { DM } from '../../bin';
 import type { AttributeValue } from '../../lib/ldapActions';
 import { Hooks } from '../../hooks';
 
+import { driveOptions, driveOptionsOf } from './drive.options';
+
 export default class Drive extends TwakePlugin {
+  static optionDefinitions = driveOptions;
+
   name = 'drive';
   roles: Role[] = ['consistency'] as const;
 
@@ -28,22 +32,21 @@ export default class Drive extends TwakePlugin {
   private driveQuotaAttr: string;
 
   constructor(server: DM) {
+    const settings = driveOptionsOf(server.config);
     super(server, {
-      url: server.config.twake_drive_webadmin_url || '',
-      token: server.config.twake_drive_webadmin_token || '',
-      concurrency: server.config.twake_drive_concurrency ?? 10,
+      url: settings.twake_drive_webadmin_url,
+      token: settings.twake_drive_webadmin_token,
+      concurrency: settings.twake_drive_concurrency,
       urlOption: 'twake_drive_webadmin_url',
       tokenOption: 'twake_drive_webadmin_token',
       concurrencyOption: 'twake_drive_concurrency',
     });
 
     // LDAP attribute that stores the Cozy instance domain (e.g., "john.mycozy.cloud")
-    this.cozyDomainAttr =
-      (this.config.twake_drive_domain_attribute as string) || 'twakeCozyDomain';
+    this.cozyDomainAttr = settings.twake_drive_domain_attribute;
 
     // Default domain template for fallback (e.g., "{uid}.company.cloud")
-    this.defaultDomainTemplate =
-      (this.config.twake_drive_default_domain_template as string) || '';
+    this.defaultDomainTemplate = settings.twake_drive_default_domain_template;
 
     // Extract attribute names from template placeholders (e.g., "{uid}" → "uid")
     this.templateAttrs = this.defaultDomainTemplate
@@ -52,7 +55,7 @@ export default class Drive extends TwakePlugin {
 
     // LDAP attribute that stores the drive quota in bytes
     this.driveQuotaAttr =
-      (this.config.drive_quota_attribute as string) || 'twakeDriveQuota';
+      this.config.drive_quota_attribute || 'twakeDriveQuota';
   }
 
   /**

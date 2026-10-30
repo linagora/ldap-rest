@@ -390,6 +390,60 @@ describe('plugin options', () => {
     });
   });
 
+  describe('Drive options in the configuration', () => {
+    const names = [
+      'DM_TWAKE_DRIVE_WEBADMIN_URL',
+      'DM_TWAKE_DRIVE_WEBADMIN_TOKEN',
+      'DM_TWAKE_DRIVE_CONCURRENCY',
+      'DM_TWAKE_DRIVE_DOMAIN_ATTRIBUTE',
+      'DM_TWAKE_DRIVE_DEFAULT_DOMAIN_TEMPLATE',
+    ];
+    let saved: Record<string, string | undefined>;
+
+    beforeEach(() => {
+      saved = {};
+      for (const name of names) {
+        saved[name] = process.env[name];
+        delete process.env[name];
+      }
+    });
+    afterEach(() => {
+      for (const name of names)
+        if (saved[name] === undefined) delete process.env[name];
+        else process.env[name] = saved[name];
+    });
+
+    it('keeps the defaults the parser used to declare', () => {
+      const config = parse();
+      expect(config.twake_drive_webadmin_url).to.equal('');
+      expect(config.twake_drive_webadmin_token).to.equal('');
+      expect(config.twake_drive_concurrency).to.equal(10);
+      expect(config.twake_drive_domain_attribute).to.equal('twakeCozyDomain');
+      expect(config.twake_drive_default_domain_template).to.equal('');
+    });
+
+    it('reads the environment and the CLI as before', () => {
+      process.env.DM_TWAKE_DRIVE_CONCURRENCY = '4';
+      process.env.DM_TWAKE_DRIVE_DOMAIN_ATTRIBUTE = 'cozyDomain';
+      const config = parse([
+        'node',
+        'ldap-rest',
+        '--twake-drive-webadmin-url',
+        'https://drive.example.com',
+        '--twake-drive-default-domain-template',
+        '{uid}.example.com',
+      ]);
+      expect(config.twake_drive_concurrency).to.equal(4);
+      expect(config.twake_drive_domain_attribute).to.equal('cozyDomain');
+      expect(config.twake_drive_webadmin_url).to.equal(
+        'https://drive.example.com'
+      );
+      expect(config.twake_drive_default_domain_template).to.equal(
+        '{uid}.example.com'
+      );
+    });
+  });
+
   describe('reading and checking values', () => {
     const definitions = defineOptions({
       name: opt.string({ required: true }),
