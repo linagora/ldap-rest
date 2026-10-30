@@ -432,6 +432,16 @@ describe('LDAP Raw Plugin', function () {
       expect(res.status).to.equal(400);
     });
 
+    it('should reject a limit that is not a number', async () => {
+      const res = await request
+        .get(`${prefix}/search`)
+        .query({ limit: 'soon' });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Invalid request: query.limit: Expected integer'
+      );
+    });
+
     it('should reject a base outside the exposed bases', async () => {
       const res = await request
         .get(`${prefix}/search`)

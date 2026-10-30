@@ -77,6 +77,32 @@ describe('PasswordPolicy Plugin', () => {
       expect(response.body.warningDays).to.equal(7);
     });
 
+    it('should refuse a days parameter that is not a number', async () => {
+      const plugin = new PasswordPolicy(dm);
+      dm.registerPlugin('passwordPolicy', plugin);
+
+      const response = await supertest(dm.app).get(
+        '/api/v1/password-policy/expiring-soon?days=soon'
+      );
+      expect(response.status).to.equal(400);
+      expect(response.body.error).to.equal(
+        'Invalid request: query.days: Expected integer'
+      );
+    });
+
+    it('should refuse a days parameter below one', async () => {
+      const plugin = new PasswordPolicy(dm);
+      dm.registerPlugin('passwordPolicy', plugin);
+
+      const response = await supertest(dm.app).get(
+        '/api/v1/password-policy/expiring-soon?days=0'
+      );
+      expect(response.status).to.equal(400);
+      expect(response.body.error).to.equal(
+        'Invalid request: query.days: Expected integer to be greater or equal to 1'
+      );
+    });
+
     it('should expose GET /password-policy/locked-accounts endpoint', async () => {
       const plugin = new PasswordPolicy(dm);
       dm.registerPlugin('passwordPolicy', plugin);
@@ -122,6 +148,21 @@ describe('PasswordPolicy Plugin', () => {
         .send('Test123!@#Strong');
 
       expect(response.status).to.equal(400);
+    });
+
+    it('should refuse a password that is not text', async () => {
+      dm.config.ppolicy_validate_complexity = true;
+      const plugin = new PasswordPolicy(dm);
+      dm.registerPlugin('passwordPolicy', plugin);
+
+      const response = await supertest(dm.app)
+        .post('/api/v1/password/validate')
+        .send({ password: 5 })
+        .set('Content-Type', 'application/json');
+      expect(response.status).to.equal(400);
+      expect(response.body.error).to.equal(
+        'Invalid request: body.password: Expected string'
+      );
     });
 
     it('should reject password too short', async () => {
@@ -576,6 +617,16 @@ describe('PasswordPolicy Plugin: policy management', () => {
     expect(
       (expiring.body.users as { dn: string }[]).map(u => u.dn.toLowerCase())
     ).not.to.include(userDn.toLowerCase());
+  });
+
+  it('refuses a policy that is not a name', async () => {
+    const res = await request
+      .put('/api/v1/users/ppolicy.mgmt/password-policy')
+      .send({ policy: 5 });
+    expect(res.status).to.equal(400);
+    expect(res.body.error).to.equal(
+      'Invalid request: body.policy: Expected union value'
+    );
   });
 
   it('refuses to delete a policy still applied, or the default one', async () => {
