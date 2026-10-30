@@ -9,7 +9,7 @@ import type { SearchResult } from 'ldapts';
 import multer from 'multer';
 import { parse as csvParse } from 'csv-parse/sync';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 import { badRequest, serverError } from '../../lib/expressFormatedResponses';
@@ -260,10 +260,11 @@ export default class LdapBulkImport extends DmPlugin {
        *         schema: { $ref: '#/components/schemas/Error' }
        */
       // GET CSV template
-      app.get(
-        `${this.config.api_prefix}/v1/ldap/bulk-import/${resourceName}/template.csv`,
-        (req, res) => this.getTemplate(req, res, resource)
-      );
+      defineRoute(app, {
+        method: 'get',
+        path: `${this.config.api_prefix}/v1/ldap/bulk-import/${resourceName}/template.csv`,
+        handler: ({ req, res }) => this.getTemplate(req, res, resource),
+      });
 
       /**
        * @openapi
@@ -338,11 +339,12 @@ export default class LdapBulkImport extends DmPlugin {
        *         schema: { $ref: '#/components/schemas/Error' }
        */
       // POST bulk import
-      app.post(
-        `${this.config.api_prefix}/v1/ldap/bulk-import/${resourceName}`,
-        this.upload.single('file'),
-        async (req, res) => this.bulkImport(req, res, resource)
-      );
+      defineRoute(app, {
+        method: 'post',
+        path: `${this.config.api_prefix}/v1/ldap/bulk-import/${resourceName}`,
+        middleware: this.upload.single('file'),
+        handler: async ({ req, res }) => this.bulkImport(req, res, resource),
+      });
     }
   }
 

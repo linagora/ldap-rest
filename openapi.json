@@ -638,7 +638,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/BulkImportResult"
                 },
                 "example": {
@@ -699,6 +698,9 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "file"
+                ],
                 "properties": {
                   "file": {
                     "type": "string",
@@ -715,13 +717,10 @@
                   },
                   "continueOnError": {
                     "type": "boolean",
-                    "description": "Continue processing subsequent rows after a row-level error.\n",
-                    "default": true
+                    "default": true,
+                    "description": "Continue processing subsequent rows after a row-level error.\n"
                   }
-                },
-                "required": [
-                  "file"
-                ]
+                }
               }
             }
           }
@@ -5108,7 +5107,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/LdapSchema"
                 },
                 "example": {
@@ -5201,7 +5199,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/LdapSchema"
                 },
                 "example": {
@@ -5302,7 +5299,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/LdapSchema"
                 }
               }

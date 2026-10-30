@@ -68,6 +68,8 @@ export interface RouteDefinition<
    * (default). A route answering another media type sets it false.
    */
   json?: boolean;
+  /** Handlers run before the declaration's, as Express mounts them */
+  middleware?: RequestHandler | RequestHandler[];
   /** The answers, for the OpenAPI document */
   responses?: Partial<Record<number, TSchema | RouteResponse>>;
   summary?: string;
@@ -79,7 +81,7 @@ export interface RouteDefinition<
 /** A route recorded on an app, with its schemas kept for the document. */
 export type RegisteredRoute = Omit<
   RouteDefinition<TSchema, TSchema, TSchema>,
-  'handler'
+  'handler' | 'middleware'
 >;
 
 const registries = new WeakMap<Express, RegisteredRoute[]>();
@@ -202,23 +204,23 @@ const register = (
   app: Express,
   method: RouteMethod,
   path: string,
-  handler: RequestHandler
+  ...handlers: RequestHandler[]
 ): void => {
   switch (method) {
     case 'get':
-      app.get(path, handler);
+      app.get(path, ...handlers);
       return;
     case 'post':
-      app.post(path, handler);
+      app.post(path, ...handlers);
       return;
     case 'put':
-      app.put(path, handler);
+      app.put(path, ...handlers);
       return;
     case 'patch':
-      app.patch(path, handler);
+      app.patch(path, ...handlers);
       return;
     case 'delete':
-      app.delete(path, handler);
+      app.delete(path, ...handlers);
   }
 };
 
@@ -285,5 +287,10 @@ export const defineRoute = <
     tags: route.tags,
   });
 
-  register(app, route.method, route.path, handler);
+  const middleware = route.middleware
+    ? Array.isArray(route.middleware)
+      ? route.middleware
+      : [route.middleware]
+    : [];
+  register(app, route.method, route.path, ...middleware, handler);
 };

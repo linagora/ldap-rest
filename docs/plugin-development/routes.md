@@ -77,6 +77,9 @@ properties a `description`, or rely on what TypeBox emits.
 | `query`  | `req.query`  | converted  |
 | `body`   | `req.body`   | as parsed  |
 
+A route that needs a route middleware — a multipart parser, say — passes it
+as `middleware`, and Express runs it before the handler.
+
 Path and query values always arrive as strings, so they are converted before
 being checked: a `Type.Number()` query accepts `?limit=10` and hands the
 handler `10`. The body is whatever the registered parser left in `req.body`;
@@ -137,7 +140,7 @@ lists what the Express stack carries that `defineRoute` did not declare.
 
 `npm run lint` refuses `app.<verb>(` under `src/plugins` and `src/abstract`,
 through `eslint-rules/no-raw-route.mjs`. The files still to migrate are
-listed in `eslint-rules/route-allowlist.json`; remove a file from it as its
-routes move. `test/scripts/routeAllowlist.test.ts` keeps the list exact: a
+listed in `eslint-rules/route-allowlist.json`, now empty: every route in the
+tree is declared. `test/scripts/routeAllowlist.test.ts` keeps the list exact: a
 file that no longer declares a raw route must leave it, and a raw route in an
 unlisted file fails.
