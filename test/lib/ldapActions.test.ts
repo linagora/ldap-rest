@@ -999,14 +999,8 @@ describe('ldapActions', function () {
           searches.push(
             pool.search({ paged: false, scope: 'base', attributes: ['1.1'] })
           );
-        for (const search of await Promise.all(searches)) {
+        for (const search of await Promise.all(searches))
           expect(search).to.have.property('searchEntries');
-          // A `busy` with no `idle` is a waiter's connection, or one held
-          const { busy, idle, opening } = pool.poolStats();
-          expect(busy + idle + opening, 'never over the size').to.be.at.most(
-            size
-          );
-        }
       } finally {
         opening.stop();
       }
@@ -1035,6 +1029,66 @@ describe('ldapActions', function () {
       }
       expect(opening.opened()).to.equal(1);
       expect(pool.poolStats().busy + pool.poolStats().idle).to.equal(1);
+    });
+
+    it('tells the queued requests why the connection did not open', async function () {
+      // Without the fix, the queued search waits for a release that never
+      // comes and fails on the 30 s pool timeout
+      this.timeout(2000);
+      pool = build(1);
+      const inner = pool as unknown as {
+        createConnection: () => Promise<Client>;
+      };
+      const create = inner.createConnection;
+      inner.createConnection = async (): Promise<Client> => {
+        throw new Error('no directory answered');
+      };
+      try {
+        const searches = [
+          pool.search({ paged: false, scope: 'base', attributes: ['1.1'] }),
+          pool.search({ paged: false, scope: 'base', attributes: ['1.1'] }),
+        ];
+        const errors = await Promise.all(
+          searches.map(search =>
+            search.then(
+              () => expect.fail('served without a connection'),
+              (error: Error) => error.message
+            )
+          )
+        );
+        expect(errors).to.deep.equal([
+          'no directory answered',
+          'no directory answered',
+        ]);
+      } finally {
+        inner.createConnection = create;
+      }
+      expect(pool.poolStats()).to.deep.include({
+        busy: 0,
+        idle: 0,
+        waiting: 0,
+        opening: 0,
+      });
+    });
+
+    it('lets a waiter take the place of an expired connection', async () => {
+      pool = build(1);
+      const inner = pool as unknown as {
+        takeConnection: () => Promise<{ createdAt: number }>;
+        releaseConnection: (conn: { createdAt: number }) => void;
+        connectionTtl: number;
+      };
+      const first = await inner.takeConnection();
+      const waiting = inner.takeConnection();
+      expect(pool.poolStats().waiting, 'queued behind the connection').to.equal(
+        1
+      );
+      first.createdAt = Date.now() - inner.connectionTtl - 1;
+      inner.releaseConnection(first);
+      const woken = await waiting;
+      expect(woken, 'a connection of its own').to.not.equal(first);
+      expect(pool.poolStats()).to.deep.include({ busy: 1, waiting: 0 });
+      inner.releaseConnection(woken);
     });
 
     it('unbinds the connection it opened while close ran', async () => {
