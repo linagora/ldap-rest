@@ -834,7 +834,7 @@ export class OpenAPIGenerator {
     const body = await this.schemaOf(property('body'), sourceFile);
     if (body !== undefined && documentedSchema === undefined) {
       route.requestBody = {
-        required: true,
+        required: ((body as { required?: string[] }).required?.length ?? 0) > 0,
         content: { 'application/json': { schema: body } },
       };
     }

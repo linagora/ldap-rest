@@ -12,7 +12,6 @@ import type { Express, Request, Response } from 'express';
 import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
-import { wantJson } from '../../lib/expressFormatedResponses';
 import {
   AUTHZ_REFUSED,
   HttpError,
@@ -398,8 +397,6 @@ export default class AppAccountsApi extends DmPlugin {
    * List applicative accounts for a user
    */
   private async listAccounts(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
-
     const principal = req.params.user as string;
 
     try {
@@ -471,8 +468,6 @@ export default class AppAccountsApi extends DmPlugin {
    * Create a new applicative account
    */
   private async createAccount(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
-
     const principal = req.params.user as string;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { name } = req.body || {};
@@ -667,8 +662,6 @@ export default class AppAccountsApi extends DmPlugin {
    * Delete an applicative account
    */
   private async deleteAccount(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
-
     const principal = req.params.user as string;
     const uid = req.params.uid as string;
 

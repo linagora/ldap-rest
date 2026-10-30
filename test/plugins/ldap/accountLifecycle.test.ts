@@ -202,17 +202,6 @@ describe('Account lifecycle', () => {
         expect(res.body).to.not.have.property('password');
       });
 
-      it('should refuse a forceChange that is not a boolean', async () => {
-        const res = await request
-          .post('/api/v1/ldap/users/lifecycle.user/password')
-          .type('json')
-          .send({ forceChange: 'yes' });
-        expect(res.status).to.equal(400);
-        expect(res.body.error).to.equal(
-          'Invalid request: body.forceChange: Expected boolean'
-        );
-      });
-
       it('should refuse an empty password rather than generate one', async () => {
         // An empty string is falsy, so it used to read as "no password
         // given": the answer said `success` after setting a random
@@ -279,6 +268,9 @@ describe('Account lifecycle', () => {
             .type('json')
             .send({ forceChange });
           expect(res.status, JSON.stringify(res.body)).to.equal(400);
+          expect(res.body.error).to.equal(
+            'Invalid request: body.forceChange: Expected boolean'
+          );
           expect(res.body).not.to.have.property('password');
         }
       });

@@ -13,6 +13,9 @@
 
 ### Changed
 
+- A route whose input is malformed answers `400` with an
+  `Invalid request: <part>.<field>: <reason>` body naming every failing path
+  ([details](docs/plugin-development/routes.md#refusals)).
 - Node 22 is the oldest runtime supported and tested
   ([upgrading](docs/usage/upgrading.md#from-121)).
 - The published image loads `core/demo/helloworld` as its second plugin and

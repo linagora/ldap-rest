@@ -108,8 +108,26 @@ describe('defineRoute', () => {
 
     const missing = await supertest(app).post('/things').expect(400);
     expect(missing.body.error).to.equal(
-      'Invalid request: body: Expected object'
+      'Invalid request: body.member: Expected required property; body.member: Expected string'
     );
+  });
+
+  it('treats an absent body as no fields', async () => {
+    const app = appWith();
+    let received: unknown;
+    defineRoute(app, {
+      method: 'post',
+      path: '/things',
+      body: Type.Object({ name: Type.Optional(Type.String()) }),
+      handler: ({ body, res }) => {
+        received = body;
+        res.sendStatus(204);
+      },
+    });
+    serveErrors(app);
+
+    await supertest(app).post('/things').expect(204);
+    expect(received).to.deep.equal({});
   });
 
   it('refuses a caller that does not accept JSON, before the handler', async () => {

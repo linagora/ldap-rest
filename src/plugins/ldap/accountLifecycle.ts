@@ -292,8 +292,7 @@ export default class LdapAccountLifecycle extends DmPlugin {
     // so it used to mean "generate one": the answer said `success` after
     // writing a random credential the caller never saw, and a client that
     // emptied the field by accident believed it had set the password it
-    // typed. `null` and anything that is not text are refused for the same
-    // reason — they are a value the client meant to send, not an absence.
+    // typed. Anything that is not text is refused by `PasswordBody`.
     const given = body.password;
     if (given === '') {
       throw new BadRequestError(

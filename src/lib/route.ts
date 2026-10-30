@@ -223,7 +223,7 @@ export const defineRoute = <
       ? check('query', route.query, req.query, true, invalid)
       : req.query;
     const body: unknown = route.body
-      ? check('body', route.body, req.body, false, invalid)
+      ? check('body', route.body, req.body ?? {}, false, invalid)
       : req.body;
     if (invalid.length)
       throw new BadRequestError(`Invalid request: ${invalid.join('; ')}`);
