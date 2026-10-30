@@ -4,6 +4,7 @@ import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
 import { NotFoundError } from '../../../src/lib/errors';
+import type { Hooks } from '../../../src/hooks';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
@@ -419,8 +420,8 @@ describe('LDAP Organizations Plugin', function () {
           0,
           req,
         ]);
-        // The request must come back out: `launchHooksChained` feeds this
-        // return value to the next hook, and an authorization plugin that
+        // The request must come back out: the chain feeds this return value
+        // to the next hook, and an authorization plugin that
         // does not see it skips its check.
         expect(result).to.deep.equal([dn, changes, 0, req]);
       });
@@ -923,13 +924,12 @@ describe('LDAP Organizations Plugin', function () {
 
       it('should return 400 when the directory refuses the move', async () => {
         // A hook naming the entry by an attribute its classes do not allow
-        const hooks = (server.hooks.ldaprenamerequest ??= []);
-        const rename = ([dn, newDn, req]: [string, string, unknown]) => [
+        const rename: NonNullable<Hooks['ldaprenamerequest']> = ([
           dn,
-          newDn.replace(/^ou=/, 'uid='),
+          newDn,
           req,
-        ];
-        hooks.push(rename);
+        ]) => [dn, newDn.replace(/^ou=/, 'uid='), req];
+        server.hookBus.subscribe('ldaprenamerequest', rename);
         try {
           const res = await request
             .post(
@@ -940,7 +940,7 @@ describe('LDAP Organizations Plugin', function () {
           expect(res.status, JSON.stringify(res.body)).to.equal(400);
           expect(res.body.error).to.include(`uid=child,${targetOrgDn}`);
         } finally {
-          hooks.splice(hooks.indexOf(rename), 1);
+          server.hookBus.unsubscribe('ldaprenamerequest', rename);
         }
         // Still where it was
         const org = await plugin.getOrganisationByDn(childOrgDn);

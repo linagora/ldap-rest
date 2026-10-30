@@ -10,6 +10,7 @@ import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import { currentRequest } from '../../../src/lib/requestContext';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
+import type { Hooks } from '../../../src/hooks';
 import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
 
 describe('authzDynamic behavioural regressions', function () {
@@ -52,9 +53,7 @@ describe('authzDynamic behavioural regressions', function () {
     if (plugin.hooks) {
       for (const [name, fn] of Object.entries(plugin.hooks)) {
         if (!fn) continue;
-        const list = (server.hooks[name] =
-          server.hooks[name] || ([] as unknown[] as never));
-        (list as unknown as Array<unknown>).push(fn as unknown);
+        server.hookBus.subscribe(name as keyof Hooks, fn);
       }
     }
     groupsPlugin = new LdapGroups(server);
@@ -62,9 +61,7 @@ describe('authzDynamic behavioural regressions', function () {
     if (groupsPlugin.hooks) {
       for (const [name, fn] of Object.entries(groupsPlugin.hooks)) {
         if (!fn) continue;
-        const list = (server.hooks[name] =
-          server.hooks[name] || ([] as unknown[] as never));
-        (list as unknown as Array<unknown>).push(fn as unknown);
+        server.hookBus.subscribe(name as keyof Hooks, fn);
       }
     }
     server.loadedPlugins['authzDynamic'] = plugin;
@@ -216,16 +213,12 @@ describe('authzDynamic behavioural regressions', function () {
   describe('another authenticator identified the caller (GHSA-rxq9-qj94-27gg)', () => {
     /** A prior middleware that identifies the caller, as the dispatcher would */
     const identifyAs = (key: string): (() => void) => {
-      server.hooks.beforeAuth = server.hooks.beforeAuth || [];
-      (server.hooks.beforeAuth as Array<unknown>).push(
-        (args: [{ user?: string }, unknown]) => {
-          args[0].user = key;
-          return args;
-        }
-      );
-      return () => {
-        (server.hooks.beforeAuth as Array<unknown>).pop();
+      const identify: NonNullable<Hooks['beforeAuth']> = args => {
+        (args[0] as { user?: string }).user = key;
+        return args;
       };
+      server.hookBus.subscribe('beforeAuth', identify);
+      return () => server.hookBus.unsubscribe('beforeAuth', identify);
     };
 
     it('should not let a request past the ACLs just because someone else named it', async () => {

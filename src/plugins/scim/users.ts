@@ -14,12 +14,11 @@ import type {
 } from '../../lib/ldapActions';
 import type { Config } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
+import type HookBus from '../../lib/hookBus';
 import {
   escapeDnValue,
   escapeLdapFilter,
   isChildOf,
-  launchHooks,
-  launchHooksChained,
   validateDnValue,
 } from '../../lib/utils';
 
@@ -69,8 +68,7 @@ export interface ScimUsersOptions {
   config: Config;
   logger: winston.Logger;
   baseResolver: BaseResolver;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  hooks: { [K: string]: Function[] | undefined };
+  hookBus: HookBus;
 }
 
 /**
@@ -93,8 +91,7 @@ export class ScimUsers {
   private readonly config: Config;
   private readonly logger: winston.Logger;
   private readonly baseResolver: BaseResolver;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  private readonly hooks: { [K: string]: Function[] | undefined };
+  private readonly hookBus: HookBus;
   private readonly mapping: ResourceMapping;
   private readonly rdnAttribute: string;
   private readonly objectClass: string[];
@@ -110,7 +107,7 @@ export class ScimUsers {
     this.config = opts.config;
     this.logger = opts.logger;
     this.baseResolver = opts.baseResolver;
-    this.hooks = opts.hooks;
+    this.hookBus = opts.hookBus;
 
     this.rdnAttribute =
       (this.config.scim_user_rdn_attribute as string) || 'uid';
@@ -278,11 +275,7 @@ export class ScimUsers {
     }
     // The hooks read the body as a User: refuse a malformed one before they do
     scimUserToLdap(resource, this.mapping, this.ctx(req), this.objectClass);
-    const hookInput = await launchHooksChained(this.hooks.scimusercreate, [
-      resource,
-      req,
-    ] as [ScimUser, DmRequest]);
-    const user = hookInput[0];
+    const [user] = await this.hookBus.chain('scimusercreate', [resource, req]);
 
     const { rdn, attributes } = scimUserToLdap(
       user,
@@ -313,7 +306,7 @@ export class ScimUsers {
     }
 
     const created = await this.get(req, rdn);
-    void launchHooks(this.hooks.scimusercreatedone, created);
+    this.hookBus.notify('scimusercreatedone', created);
     return created;
   }
 
@@ -347,11 +340,11 @@ export class ScimUsers {
     }
     const currentEntry = currentResult.searchEntries[0] as AttributesList;
 
-    const hookInput = await launchHooksChained(this.hooks.scimuserupdate, [
+    const hookInput = await this.hookBus.chain('scimuserupdate', [
       id,
       resource,
       req,
-    ] as [string, ScimUser, DmRequest]);
+    ]);
     const incoming = hookInput[1];
 
     const { attributes, active } = scimUserToLdap(
@@ -428,7 +421,7 @@ export class ScimUsers {
     }
 
     const updated = await this.get(req, id);
-    void launchHooks(this.hooks.scimuserupdatedone, id, updated);
+    this.hookBus.notify('scimuserupdatedone', id, updated);
     return updated;
   }
 
@@ -467,7 +460,7 @@ export class ScimUsers {
       }
     });
     const updated = await this.get(req, id);
-    void launchHooks(this.hooks.scimuserupdatedone, id, updated);
+    this.hookBus.notify('scimuserupdatedone', id, updated);
     return updated;
   }
 
@@ -522,14 +515,10 @@ export class ScimUsers {
 
   async delete(req: DmRequest, id: string): Promise<void> {
     await this.get(req, id); // ensure exists
-    const hookInput = await launchHooksChained(this.hooks.scimuserdelete, [
-      id,
-      req,
-    ] as [string, DmRequest]);
-    const finalId = hookInput[0];
+    const [finalId] = await this.hookBus.chain('scimuserdelete', [id, req]);
     const dn = this.dnForId(finalId, req);
     await this.ldap.forRequest(req).delete(dn);
-    void launchHooks(this.hooks.scimuserdeletedone, finalId);
+    this.hookBus.notify('scimuserdeletedone', finalId);
   }
 
   /**

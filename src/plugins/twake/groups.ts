@@ -346,7 +346,7 @@ export default class TwakeGroups extends LdapGroups {
     // A group moved to another organization's branch follows it: kept
     // linked to the one it left, the administrators of that one would keep
     // it under an authorization model judging by attachment
-    ldaprenamedone: async ([dn, newDn]) => {
+    ldaprenamedone: async (dn, newDn) => {
       const org = movedInto(this.groupPattern, dn, newDn);
       const attribute = this.config.ldap_organization_link_attribute;
       if (

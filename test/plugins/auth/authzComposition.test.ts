@@ -2,7 +2,7 @@
  * Two authorization plugins loaded together (#189).
  *
  * Every plugin judging LDAP operations registers the same hooks and
- * `launchHooksChained` runs them all, so two of them compose as an AND: the
+ * the chain runs them all, so two of them compose as an AND: the
  * first refusal wins. `authzPerBranch` beside `authzDynamic` judged a machine
  * token by a branch configuration written for administrators, found no key
  * for the tenant, and refused a write the token's own ACLs grant — with
@@ -22,7 +22,8 @@ import type { Hooks } from '../../../src/hooks';
 import { DM, type Config } from '../../../src/bin';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import { assertAuthzComposition } from '../../../src/lib/authz/composition';
-import { asyncHandler, launchHooksChained } from '../../../src/lib/utils';
+import { asyncHandler } from '../../../src/lib/utils';
+import HookBus from '../../../src/lib/hookBus';
 import {
   getLogger,
   setLogger,
@@ -283,24 +284,27 @@ describe('Authorization plugins loaded together', function () {
     });
 
     it('should say a refusal from a hook no plugin registered', async () => {
-      // Pushed straight onto the list, as a suite does through
-      // `registeredHooks`: there is no owner on record, and the refusal
-      // must still reach the log rather than vanish into a bare 403.
+      // Subscribed straight onto the server's hook, as a suite does: there is
+      // no owner on record, and the refusal must still reach the log rather
+      // than vanish into a bare 403.
       const warned: string[] = [];
       const installed = getLogger();
+      // Built before the logger is swapped: the `DM` constructor installs
+      // its own over whatever stands there.
+      const server = new DM();
       setLogger({
         warn: (message: string) => warned.push(String(message)),
       } as unknown as winston.Logger);
+      function pushedByHand(): never {
+        throw new Error('[authz-forbidden] not yours');
+      }
+      server.hookBus.subscribe('ldapsearchrequest', pushedByHand);
       try {
-        await launchHooksChained(
-          [
-            function pushedByHand(): never {
-              throw new Error('[authz-forbidden] not yours');
-            },
-          ],
-          []
-        ).catch(() => undefined);
+        await server.hookBus
+          .chain('ldapsearchrequest', ['', {}, undefined])
+          .catch(() => undefined);
       } finally {
+        server.hookBus.unsubscribe('ldapsearchrequest', pushedByHand);
         setLogger(installed);
       }
       expect(warned).to.deep.equal([
@@ -366,7 +370,9 @@ describe('Authorization plugins loaded together', function () {
       const server = new DM();
       await server.ready;
       await server.registerPlugin('authzPerBranch', new AuthzPerBranch(server));
-      const hooksBefore = (server.hooks.ldapmodifyrequest ?? []).length;
+      const hooksBefore = (
+        server.hookBus.subscribers('ldapmodifyrequest') ?? []
+      ).length;
       const linid = new AuthzLinid1(server);
       await server
         .registerPlugin('authzLinid1', linid)
@@ -375,9 +381,9 @@ describe('Authorization plugins loaded together', function () {
           expect(err.message).to.match(/authzPerBranch and authzLinid1/)
         );
       expect(server.loadedPlugins).to.not.have.property('authzLinid1');
-      expect((server.hooks.ldapmodifyrequest ?? []).length).to.equal(
-        hooksBefore
-      );
+      expect(
+        (server.hookBus.subscribers('ldapmodifyrequest') ?? []).length
+      ).to.equal(hooksBefore);
     });
 
     it('should refuse two plugins judging reads only through ldapsearchfilter', async () => {
@@ -534,7 +540,7 @@ describe('Authorization plugins loaded together', function () {
         )
       );
       const write = (req: Partial<DmRequest>): Promise<unknown> =>
-        launchHooksChained(server.hooks.ldapmodifyrequest, [
+        server.hookBus.chain('ldapmodifyrequest', [
           targetDn,
           { replace: { description: 'x' } },
           0,

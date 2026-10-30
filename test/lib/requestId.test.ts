@@ -11,7 +11,9 @@ import WebLogs from '../../src/plugins/weblogs';
 import PostgresStore from '../../src/plugins/storage/postgres';
 import ValkeyStore from '../../src/plugins/storage/valkey';
 import { changeContext, requestId } from '../../src/lib/changeContext';
-import { launchHooks, launchHooksChained } from '../../src/lib/utils';
+import HookBus from '../../src/lib/hookBus';
+import type { Hooks } from '../../src/hooks';
+import type { SearchOptions } from 'ldapts';
 import {
   currentLogContext,
   outsideAnyRequest,
@@ -57,22 +59,27 @@ describe('Request id', () => {
     server.logger.level = 'info';
     class Probe extends DmPlugin {
       name = 'probe';
-      hooks = {
-        probedone: async (): Promise<void> => {
+      // Two hooks the server declares, so `registerPlugin` records the
+      // plugin they belong to: that is what names them on the lines they
+      // write.
+      hooks: Hooks = {
+        ldapadddone: async (): Promise<void> => {
           this.logger.info('in the hook');
           this.logger.info({ message: 'as another plugin', plugin: 'other' });
           this.logger.info({ message: 'as itself', plugin: 'probe' });
           this.logger.info({ message: 'on its own op', op: 'mine' });
-          await launchHooks([
-            function unregistered(): void {
-              server.logger.info('in a hook no plugin registered');
-            },
-          ]);
+          await new HookBus({
+            ldapadddone: [
+              function unregistered(): void {
+                server.logger.info('in a hook no plugin registered');
+              },
+            ],
+          }).notifyAndWait('ldapadddone', 'cn=x', {}, {});
           throw new Error('a hook failing');
         },
-        proberequest: (dn: string): string => {
+        ldapsearchopts: (opts: SearchOptions): SearchOptions => {
           this.logger.info('in the chained hook');
-          return dn;
+          return opts;
         },
       };
       api(app: Express): void {
@@ -82,14 +89,8 @@ describe('Request id', () => {
           );
           // As the server, the line is still the request's
           outsideRequest(() => this.logger.info('as the server'));
-          await launchHooks(
-            (server.hooks as Record<string, unknown[]>).probedone as never,
-            []
-          );
-          await launchHooksChained(
-            (server.hooks as Record<string, unknown[]>).proberequest as never,
-            'cn=x'
-          );
+          await server.hookBus.notifyAndWait('ldapadddone', 'cn=x', {}, {});
+          await server.hookBus.chain('ldapsearchopts', { paged: false });
           res.json({
             id: requestId(req),
             context: changeContext(req).requestId,
@@ -131,13 +132,13 @@ describe('Request id', () => {
       return [line!.plugin, line!.op];
     };
     expect(fields('serving the probe')).to.deep.equal([undefined, undefined]);
-    expect(fields('in the hook')).to.deep.equal(['probe', 'probedone']);
+    expect(fields('in the hook')).to.deep.equal(['probe', 'ldapadddone']);
     expect(fields('in the chained hook')).to.deep.equal([
       'probe',
-      'proberequest',
+      'ldapsearchopts',
     ]);
-    expect(fields('Hook error')).to.deep.equal(['probe', 'probedone']);
-    expect(fields('as itself')).to.deep.equal(['probe', 'probedone']);
+    expect(fields('Hook error')).to.deep.equal(['probe', 'ldapadddone']);
+    expect(fields('as itself')).to.deep.equal(['probe', 'ldapadddone']);
     expect(fields('on its own op')).to.deep.equal(['probe', 'mine']);
     expect(fields('as another plugin'), 'its own name kept').to.deep.equal([
       'other',

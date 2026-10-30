@@ -9,9 +9,11 @@ import type {
   ModifyRequest,
   AttributesList,
   AttributeValue,
+  LdapList,
 } from './lib/ldapActions';
 import type { ChangesToNotify } from './plugins/ldap/onChange';
 import type { ChangeContext } from './lib/changeContext';
+import type { BulkResponse, ScimGroup, ScimUser } from './plugins/scim/types';
 import * as utils from './lib/utils';
 
 export type MaybePromise<T> = Promise<T> | T;
@@ -37,8 +39,6 @@ export interface OidcSessionClaims {
 export type OidcLogoutToken = OidcSessionClaims;
 
 export type VoidHook<T extends unknown[]> = (...args: T) => MaybePromise<void>;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-export type OtherHook = Function;
 export { utils };
 
 /**
@@ -75,18 +75,22 @@ export interface Hooks {
   // The "done" hooks get, after their arguments, who made the write and
   // through which door: empty for a write no request is behind
   ldapadddone?: (
-    args: [string, AttributesList],
+    dn: string,
+    entry: AttributesList,
     context?: ChangeContext
   ) => MaybePromise<void>;
   /** See docs/plugin-development/hooks.md#ldapaddafter */
   ldapaddafter?: (
-    args: [string, AttributesList],
+    dn: string,
+    entry: AttributesList,
     context?: ChangeContext
   ) => MaybePromise<void>;
   // modify
   ldapmodifyrequest?: ChainedHook<[string, ModifyRequest, number, Request?]>;
   ldapmodifydone?: (
-    args: [string, ModifyRequest, number],
+    dn: string,
+    changes: ModifyRequest,
+    op: number,
     context?: ChangeContext
   ) => MaybePromise<void>;
   /**
@@ -109,7 +113,8 @@ export interface Hooks {
   // rename
   ldaprenamerequest?: ChainedHook<[string, string, Request?]>;
   ldaprenamedone?: (
-    args: [string, string],
+    dn: string,
+    newDn: string,
     context?: ChangeContext
   ) => MaybePromise<void>;
   /**
@@ -164,22 +169,31 @@ export interface Hooks {
   /** LdapGroups plugin */
   ldapgroupvalidatemembers?: ChainedHook<[string, string[]]>;
   ldapgroupadd?: ChainedHook<[string, AttributesList]>;
-  ldapgroupadddone?: (args: [string, AttributesList]) => MaybePromise<void>;
+  ldapgroupadddone?: (dn: string, entry: AttributesList) => MaybePromise<void>;
 
   // the number given as 3rd argument is a uniq operation number
   // It can be used to save state before modify and launch the
   // real hook after change but with previous value
   ldapgroupmodify?: ChainedHook<[string, ModifyRequest, number]>;
   ldapgroupmodifydone?: (
-    args: [string, ModifyRequest, number]
+    dn: string,
+    changes: ModifyRequest,
+    op: number
   ) => MaybePromise<void>;
+
+  ldapgrouprename?: ChainedHook<[string, string]>;
+  ldapgrouprenamedone?: (dn: string, newDn: string) => MaybePromise<void>;
+  /** Before `ldapgroupadd`, to judge the group about to be created */
+  ldapgroupvalidatenew?: ChainedHook<[string, AttributesList]>;
+  /** Before `ldapgroupmodify`, to judge the changes about to be written */
+  ldapgroupvalidatechanges?: ChainedHook<[string, ModifyRequest]>;
 
   ldapgroupdelete?: ChainedHook<string>;
   ldapgroupdeletedone?: (dn: string) => MaybePromise<void>;
   ldapgroupaddmember?: ChainedHook<[string, string[]]>;
-  ldapgroupdeletemember?: ChainedHook<[string, string[]]>;
+  ldapgroupdeletemember?: ChainedHook<[string, string]>;
   // this hook is for low-level ldap listGroups method
-  _ldapgrouplist?: ChainedHook<AsyncGenerator<SearchResult>>;
+  _ldapgrouplist?: ChainedHook<LdapList>;
 
   /**
    * "onLdapChange"
@@ -234,51 +248,64 @@ export interface Hooks {
 
   /** externalUsersInGroup */
   externaluserentry?: ChainedHook<[string, AttributesList]>;
-  externaluseradded?: (dn: string, mail: string) => MaybePromise<void>;
+  /** The external member was created, with its DN and the entry written */
+  externaluseradded?: (dn: string, entry: AttributesList) => MaybePromise<void>;
 
   /**
-   * Generic flat resource move hooks
-   * Pattern: {hookPrefix}move
-   * Examples: ldapusermove, ldappositionmove, etc.
-   *
-   * move: before moving - can modify target or cancel
-   * Note: After move, onLdapChange is triggered automatically by modifyEntry()
+   * Generic flat resource hooks, one set per `--ldap-flat-schema` entity,
+   * `ldapusermove` for one renamed user: `{hookPrefix}` followed by the
+   * suffix of the shared hook of the same kind, see {@link FlatHookPrefix}.
+   * An entity's `move` hook takes `[dn, targetOrgDn, request?]`, and a move
+   * is followed by `onLdapChange`, as a modify is.
    */
-  // Note: These are defined dynamically via the index signature below
-  // but documented here for reference:
-  // - ldapusermove?: ChainedHook<[string, string, Request?]>  // [dn, targetOrgDn, req]
-
-  // External hooks (allows dynamic hook names like ldapusermove, ldapgroupmove, etc.)
-  [K: string]:
-    | ChainedHook<unknown>
-    | VoidHook<unknown[]>
-    | OtherHook
-    | undefined;
 
   /** Common authentication hooks */
   beforeAuth?: ChainedHook<[Request, Response]>;
   afterAuth?: ChainedHook<[Request, Response]>;
 
   /** Organization hooks */
-  getOrganisationTop?: ChainedHook<
-    [Request | undefined, AttributesList | null]
-  >;
+  getOrganisationTop?: ChainedHook<[Request | undefined, AttributesList]>;
 
   /**
-   * SCIM plugin hooks (typed dynamically via the index signature above)
+   * SCIM plugin hooks
    *
-   * - scimusercreate:      ChainedHook<[ScimUser, Request?]>     — pre-create, can mutate
-   * - scimusercreatedone:  VoidHook<[ScimUser]>                   — post-create
-   * - scimuserupdate:      ChainedHook<[string, ScimUser, Request?]>
-   * - scimuserupdatedone:  VoidHook<[string, ScimUser]>
-   * - scimuserdelete:      ChainedHook<[string, Request?]>
-   * - scimuserdeletedone:  VoidHook<[string]>
-   * - scimgroupcreate:     ChainedHook<[ScimGroup, Request?, string]>  — [group, req, groupBase]
-   * - scimgroupcreatedone: VoidHook<[ScimGroup]>
-   * - scimgroupupdate:     ChainedHook<[string, ScimGroup, Request?]>
-   * - scimgroupupdatedone: VoidHook<[string, ScimGroup]>
-   * - scimgroupdelete:     ChainedHook<[string, Request?]>
-   * - scimgroupdeletedone: VoidHook<[string]>
-   * - scimbulkdone:        VoidHook<[BulkResponse]>
+   * The `create` and `update` hooks are chained and can mutate the resource
+   * about to be written; the `done` ones are notified once it is written.
+   * `scimgroupcreate` gets the group's base beside the request, which is
+   * always there: a group is created through the API.
    */
+  scimusercreate?: ChainedHook<[ScimUser, Request?]>;
+  scimusercreatedone?: VoidHook<[ScimUser]>;
+  scimuserupdate?: ChainedHook<[string, ScimUser, Request?]>;
+  scimuserupdatedone?: VoidHook<[string, ScimUser]>;
+  scimuserdelete?: ChainedHook<[string, Request?]>;
+  scimuserdeletedone?: VoidHook<[string]>;
+  /** `[group, request, base]` */
+  scimgroupcreate?: ChainedHook<[ScimGroup, Request, string]>;
+  scimgroupcreatedone?: VoidHook<[ScimGroup]>;
+  scimgroupupdate?: ChainedHook<[string, ScimGroup, Request?]>;
+  scimgroupupdatedone?: VoidHook<[string, ScimGroup]>;
+  scimgroupdelete?: ChainedHook<[string, Request?]>;
+  scimgroupdeletedone?: VoidHook<[string]>;
+  scimbulkdone?: VoidHook<[BulkResponse]>;
+
+  /**
+   * A delete asked of an entry that is already a tombstone. Fired
+   * synchronously with the request that asked it: whoever replays deletions
+   * records it from there. `[dn, entry, context]`.
+   */
+  twakedeletionreplay?: (
+    dn: string,
+    entry: AttributesList,
+    context: ChangeContext
+  ) => MaybePromise<void>;
 }
+
+/**
+ * The prefix of a flat entity's hooks, as `abstract/ldapFlat.ts` builds it:
+ * `ldap${entity.name}`. They are `{prefix}add`, `{prefix}adddone` and so on,
+ * one convention each, as the shared hook of the same suffix declares it,
+ * plus `{prefix}move` before an entry is moved. A plugin watching one
+ * declares them beside its other hooks.
+ */
+export type FlatHookPrefix = `ldap${string}`;

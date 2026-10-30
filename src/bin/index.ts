@@ -41,7 +41,8 @@ import {
   LDAP_JUDGING_HOOKS,
 } from '../lib/authz/composition';
 import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
-import { recordHookOwner, registerAttributeTypes } from '../lib/utils';
+import { registerAttributeTypes } from '../lib/utils';
+import HookBus, { recordHookOwner, type HookFn } from '../lib/hookBus';
 import { runForRequest, runWithLogContext } from '../lib/requestContext';
 import { requestId } from '../lib/changeContext';
 import { HEALTH_PATHS, mountHealth } from '../lib/health';
@@ -123,8 +124,13 @@ export class DM {
   set server(server: import('http').Server | undefined) {
     this.life.server = server;
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  hooks: { [K in keyof Hooks]?: Function[] } = {};
+  /**
+   * What each hook's subscribers do, as a plugin declares them. The type
+   * names every hook: raising or subscribing to one goes through `hookBus`,
+   * which checks the arguments.
+   */
+  hooks: Hooks = {};
+  readonly hookBus: HookBus = new HookBus(this.hooks);
   loadedPlugins: { [key: string]: DmPlugin } = {};
   ldap: ldapActions;
   operationSequence: number;
@@ -1025,30 +1031,26 @@ export class DM {
         this.setupErrorMiddleware();
       }
     }
-    if (obj.hooks as Hooks) {
-      for (const hookName in obj.hooks as Hooks) {
+    if (obj.hooks) {
+      for (const hookName in obj.hooks) {
         this.logger.debug(
           `Plugin ${obj.name} has hook ${hookName}, registering it`
         );
-        const hook = (obj.hooks as Hooks)[hookName as keyof Hooks];
-        if (!this.hooks[hookName as keyof Hooks]) {
-          this.hooks[hookName as keyof Hooks] = [];
-        }
-        if (hook && typeof hook === 'function') {
-          const list = this.hooks[hookName as keyof Hooks]!;
-          if (
-            obj.roles?.includes('authz') &&
-            AUTHZ_FIRST_HOOKS.includes(hookName)
-          ) {
-            // After the authorization hooks already there, before the rest
-            const at = list.findIndex(other => !this.authzHooks.has(other));
-            list.splice(at === -1 ? list.length : at, 0, hook);
-            this.authzHooks.add(hook);
-          } else list.push(hook);
-          recordHookOwner(hook, obj.name, hookName);
-        } else {
+        const hook = obj.hooks[hookName as keyof Hooks];
+        // A map spread from a base's may hold an unset optional hook
+        if (hook === undefined) continue;
+        if (typeof hook !== 'function') {
           throw new Error(`Plugin ${obj.name}: hook ${hookName} is invalid`);
         }
+        const name = hookName as keyof Hooks;
+        recordHookOwner(hook, obj.name, hookName);
+        if (obj.roles?.includes('authz') && AUTHZ_FIRST_HOOKS.includes(name)) {
+          // After the authorization hooks already there, before the rest
+          const others = this.hookBus.subscribers(name) as HookFn[];
+          const at = others.findIndex(other => !this.authzHooks.has(other));
+          this.hookBus.insert(name, hook, at < 0 ? others.length : at);
+          this.authzHooks.add(hook);
+        } else this.hookBus.subscribe(name, hook);
       }
     }
     this.loadedPlugins[obj.name] = obj;

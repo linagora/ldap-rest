@@ -27,12 +27,7 @@ import { jsonBody } from '../../lib/expressFormatedResponses';
 import { changeContext } from '../../lib/changeContext';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import {
-  asyncHandler,
-  escapeLdapFilter,
-  isDnInBranch,
-  launchHooks,
-} from '../../lib/utils';
+import { asyncHandler, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
 
 import {
   first,
@@ -99,12 +94,8 @@ export default class TwakeTombstone extends DmPlugin {
    */
   afterLoad(): void {
     for (const name of ['ldapdeleterequest', 'ldapaddrequest'] as const) {
-      const list = this.server.hooks[name];
-      const own = this.hooks[name];
-      const at = list && own ? list.indexOf(own) : -1;
-      if (at < 0) continue;
-      list!.splice(at, 1);
-      list!.push(own!);
+      const own = this.hooks?.[name];
+      if (own) this.hookBus.toLast(name, own);
     }
   }
 
@@ -413,12 +404,7 @@ export default class TwakeTombstone extends DmPlugin {
       // Deleting a tombstone again writes nothing, and a write changing
       // nothing announces nothing: say so to whoever replays the deletion,
       // with the date the first deletion wrote.
-      void launchHooks(
-        this.server.hooks.twakedeletionreplay,
-        dn,
-        entry,
-        changeContext(req)
-      );
+      this.hookBus.notify('twakedeletionreplay', dn, entry, changeContext(req));
       this.logger.info({ plugin: this.name, event: 'replay', dn });
       return;
     }

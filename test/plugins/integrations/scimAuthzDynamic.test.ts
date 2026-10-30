@@ -34,9 +34,7 @@ function wireHooks(server: DM, plugin: { hooks?: Hooks }): void {
   if (!plugin.hooks) return;
   for (const [name, fn] of Object.entries(plugin.hooks)) {
     if (!fn) continue;
-    const list = (server.hooks[name] =
-      server.hooks[name] || ([] as unknown[] as never));
-    (list as unknown as Array<unknown>).push(fn as unknown);
+    server.hookBus.subscribe(name as keyof Hooks, fn);
   }
 }
 

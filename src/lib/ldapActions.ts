@@ -22,12 +22,11 @@ import {
   isAuthzRefusal,
   isDnInBranch,
   knownAttributeName,
-  launchHooks,
-  launchHooksChained,
   normalizeDn,
   rdnTypes,
 } from './utils';
 import { changeContext, type ChangeContext } from './changeContext';
+import HookBus from './hookBus';
 import { outsideOperation, runOperation } from './operation';
 import {
   currentRequest,
@@ -80,6 +79,9 @@ const AUTHORIZED_REQUEST_AT: Record<AuthorizedHook, number> = {
   ldaprenamerequest: 2,
   ldapdeleterequest: 1,
 };
+
+/** The hooks a write launches once its "done" hooks have returned */
+type EndHook = 'ldapmodifyend' | 'ldapdeleteend' | 'ldaprenameend';
 
 /** The operations {@link ldapActions.system} makes as the server. */
 const SYSTEM_OPERATIONS = new Set<string | symbol>([
@@ -1142,14 +1144,17 @@ class ldapActions {
         ? [[target].flat().map(dn => this.setDn(String(dn))), ...rest]
         : [this.setDn(String(target)), ...rest];
     if (hook === 'ldaprenamerequest') judged[1] = this.setDn(String(judged[1]));
-    const judges = (this.parent.hooks[hook] ?? []).filter(fn => {
+    const judges = this.parent.hookBus.subscribers(hook).filter(fn => {
       const owner = hookOwner(fn);
       return Boolean(
         owner &&
         this.parent.loadedPlugins[owner.plugin]?.roles?.includes('authz')
       );
     });
-    await launchHooksChained(judges, judged as typeof args);
+    // Only the judges: the other subscribers of the hook run with the
+    // operation, which runs every one of them again
+    const one = new HookBus({ [hook]: judges });
+    await one.chain(hook as 'ldapaddrequest', judged as never);
   }
 
   /**
@@ -1641,10 +1646,13 @@ class ldapActions {
     req?: Request,
     opts?: SearchOptions
   ): SearchResult | AsyncGenerator<SearchResult> | Promise<SearchResult> {
-    if (!this.parent.hooks.ldapsearchfilter) return value;
-    const hook = this.parent.hooks.ldapsearchfilter;
+    if (!this.parent.hookBus.has('ldapsearchfilter')) return value;
     const one = async (chunk: SearchResult): Promise<SearchResult> => {
-      const [filtered] = await launchHooksChained(hook, [chunk, req, opts]);
+      const [filtered] = await this.parent.hookBus.chain('ldapsearchfilter', [
+        chunk,
+        req,
+        opts,
+      ]);
       // A subscriber that returns nothing must not turn the answer into one.
       return filtered ?? chunk;
     };
@@ -1670,11 +1678,12 @@ class ldapActions {
       ...defaultSearchOptions,
       ...options,
     };
-    opts = await launchHooksChained(this.parent.hooks.ldapsearchopts, opts);
-    [base, opts] = await launchHooksChained(
-      this.parent.hooks.ldapsearchrequest,
-      [base, opts, req]
-    );
+    opts = await this.parent.hookBus.chain('ldapsearchopts', opts);
+    [base, opts] = await this.parent.hookBus.chain('ldapsearchrequest', [
+      base,
+      opts,
+      req,
+    ]);
 
     // Cache non-paginated, base-scope searches only: they are the common
     // attribute lookups, and one entry is small enough to keep.
@@ -1702,24 +1711,26 @@ class ldapActions {
     // Acquire connection from pool
     const pooled = await this.acquireConnection();
     try {
-      let res = opts.paged
+      const searched = opts.paged
         ? dropSelectorsPaged(pooled.client.searchPaginated(base, opts))
         : timedLdap('search', () => pooled.client.search(base, opts)).then(
             dropSelectors
           );
-      res = (await launchHooksChained(
-        this.parent.hooks.ldapsearchresult,
-        res
-      )) as typeof res;
+      // The hooks are handed the driver's value unawaited, and the chain
+      // resolves it: a non-paginated result is never a Promise after this.
+      const res = (await this.parent.hookBus.chain(
+        'ldapsearchresult',
+        searched as unknown as SearchResult
+      )) as unknown as typeof searched;
 
       // Cache non-paginated, base-scope search results.
       //
-      // `launchHooksChained` awaits whatever each hook returns, so by here
-      // `res` is the resolved result of a non-paginated search and never a
-      // Promise: the `res instanceof Promise` guard that used to stand here
-      // could not be true, and nothing was ever cached (#166). What the
-      // hooks see is untouched — the chain above is still handed the
-      // unawaited value the driver returned, in the same place as before.
+      // The chain awaits whatever each hook returns, so by here `res` is the
+      // resolved result of a non-paginated search and never a Promise: the
+      // `res instanceof Promise` guard that used to stand here could not be
+      // true, and nothing was ever cached (#166). What the hooks see is
+      // untouched — the chain is still handed the unawaited value the driver
+      // returned, in the same place as before.
       //
       // A search that fails — noSuchObject on a DN that is not there — threw
       // out of the chain above and never reaches this line, so a missing
@@ -1831,11 +1842,11 @@ class ldapActions {
         sanitizedEntry[key] = value as string | string[];
       }
     }
-    [dn, entry] = (await launchHooksChained(this.parent.hooks.ldapaddrequest, [
+    [dn, entry] = await this.parent.hookBus.chain('ldapaddrequest', [
       dn,
       sanitizedEntry,
       req,
-    ])) as [string, typeof entry, Request?];
+    ]);
 
     const members = membersNamed(entry);
 
@@ -1877,21 +1888,18 @@ class ldapActions {
       // otherwise keep answering the entry that used to carry this DN.
       this.invalidateCache(dn);
       for (const member of members) this.invalidateCache(member);
-      void launchHooks(
-        this.parent.hooks.ldapadddone,
-        [dn, entry],
-        changeContext(req)
-      );
+      this.parent.hookBus.notify('ldapadddone', dn, entry, changeContext(req));
     } catch (error) {
       throw ldapAddError(dn, error);
     } finally {
       this.releaseConnection(pooled);
     }
     // After the finally, so no pooled connection is held while subscribers
-    // run; launchHooks logs their errors, the add having succeeded
-    await launchHooks(
-      this.parent.hooks.ldapaddafter,
-      [dn, entry],
+    // run; a failure is logged and goes no further, the add having succeeded
+    await this.parent.hookBus.notifyAndWait(
+      'ldapaddafter',
+      dn,
+      entry,
       changeContext(req)
     );
     return true;
@@ -1914,7 +1922,7 @@ class ldapActions {
         this.applyModify(dn, changes, req, options, op, done)
       );
     } finally {
-      this.endOperation(done, this.parent.hooks.ldapmodifyend, op);
+      this.endOperation(done, 'ldapmodifyend', op);
     }
   }
 
@@ -1929,10 +1937,12 @@ class ldapActions {
     dn = this.setDn(dn);
     const ldapChanges: Change[] = [];
     await this.canonicalChanges(changes);
-    [dn, changes] = await launchHooksChained(
-      this.parent.hooks.ldapmodifyrequest,
-      [dn, changes, op, req]
-    );
+    [dn, changes] = await this.parent.hookBus.chain('ldapmodifyrequest', [
+      dn,
+      changes,
+      op,
+      req,
+    ]);
     if (changes.add) {
       for (const [key, value] of Object.entries(changes.add)) {
         assertHasValue(key, value);
@@ -2067,9 +2077,11 @@ class ldapActions {
         }
         invalidate();
         done.push(
-          launchHooks(
-            this.parent.hooks.ldapmodifydone,
-            [dn, changes, op],
+          this.parent.hookBus.notifyAndWait(
+            'ldapmodifydone',
+            dn,
+            changes,
+            op,
             options.context ?? changeContext(req)
           )
         );
@@ -2106,9 +2118,11 @@ class ldapActions {
         this.logger.debug(`Modify on ${dn} had nothing to apply`);
       }
       done.push(
-        launchHooks(
-          this.parent.hooks.ldapmodifydone,
-          [dn, {}, op],
+        this.parent.hookBus.notifyAndWait(
+          'ldapmodifydone',
+          dn,
+          {},
+          op,
           options.context ?? changeContext(req)
         )
       );
@@ -2137,7 +2151,7 @@ class ldapActions {
         this.applyRename(dn, newRdn, req, done)
       );
     } finally {
-      this.endOperation(done, this.parent.hooks.ldaprenameend, op);
+      this.endOperation(done, 'ldaprenameend', op);
     }
   }
 
@@ -2147,10 +2161,11 @@ class ldapActions {
     req: Request | undefined,
     done: Promise<void>[]
   ): Promise<boolean> {
-    [dn, newRdn] = await launchHooksChained(
-      this.parent.hooks.ldaprenamerequest,
-      [dn, newRdn, req]
-    );
+    [dn, newRdn] = await this.parent.hookBus.chain('ldaprenamerequest', [
+      dn,
+      newRdn,
+      req,
+    ]);
     const pooled = await this.acquireConnection();
     try {
       // Dropped before the write is issued as well as after it lands. The
@@ -2175,9 +2190,10 @@ class ldapActions {
       this.invalidateCache(newRdn);
       this.invalidateReferences(dn);
       done.push(
-        launchHooks(
-          this.parent.hooks.ldaprenamedone,
-          [dn, newRdn],
+        this.parent.hookBus.notifyAndWait(
+          'ldaprenamedone',
+          dn,
+          newRdn,
           changeContext(req)
         )
       );
@@ -2238,9 +2254,10 @@ class ldapActions {
       // operation a request hook may have moved it from (the trash moves
       // from ldapdeleterequest): this move is not that write.
       void outsideOperation(() =>
-        launchHooks(
-          this.parent.hooks.ldaprenamedone,
-          [dn, newDn],
+        this.parent.hookBus.notify(
+          'ldaprenamedone',
+          dn,
+          newDn,
           changeContext(req)
         )
       );
@@ -2270,7 +2287,7 @@ class ldapActions {
         this.applyDelete(requested, req, options, done)
       );
     } finally {
-      this.endOperation(done, this.parent?.hooks.ldapdeleteend, op);
+      this.endOperation(done, 'ldapdeleteend', op);
     }
   }
 
@@ -2280,10 +2297,7 @@ class ldapActions {
     options: Pick<ModifyOptions, 'context'>,
     done: Promise<void>[]
   ): Promise<boolean> {
-    [dn] = (await launchHooksChained(this.parent?.hooks.ldapdeleterequest, [
-      dn,
-      req,
-    ])) as [string | string[], Request?];
+    [dn] = await this.parent.hookBus.chain('ldapdeleterequest', [dn, req]);
 
     const pooled = await this.acquireConnection();
     try {
@@ -2310,8 +2324,8 @@ class ldapActions {
             : ldapError(`LDAP delete error`, error);
         }
         done.push(
-          launchHooks(
-            this.parent.hooks.ldapdeletedone,
+          this.parent.hookBus.notifyAndWait(
+            'ldapdeletedone',
             entry,
             options.context ?? changeContext(req)
           )
@@ -2339,14 +2353,11 @@ class ldapActions {
    * number. A plugin keeping state from a request hook to a done one, keyed
    * by `currentOperation()`, drops there what no done hook took.
    */
-  private endOperation(
-    done: Promise<void>[],
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-    hooks: Function[] | undefined,
-    ...args: unknown[]
-  ): void {
-    if (!hooks?.length) return;
-    void Promise.all(done).then(() => launchHooks(hooks, ...args));
+  private endOperation(done: Promise<void>[], hook: EndHook, op: number): void {
+    if (!this.parent.hookBus.has(hook)) return;
+    void Promise.all(done).then(() =>
+      this.parent.hookBus.notify(hook as 'ldapmodifyend', op)
+    );
   }
 
   opNumber(): number {

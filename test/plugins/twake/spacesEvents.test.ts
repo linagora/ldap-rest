@@ -580,8 +580,7 @@ const suite = (role: string) => (): void => {
         if (outcome === 'fails') throw new Error('refused');
         return args;
       };
-      const chain = (dm.hooks.ldapdeleterequest ||= []) as unknown[];
-      chain.push(pause);
+      dm.hookBus.subscribe('ldapdeleterequest', pause as never);
       try {
         const deleting = api.delete(`${groupRoute}/${designers}`).then(
           () => undefined,
@@ -593,7 +592,7 @@ const suite = (role: string) => (): void => {
         resume();
         await deleting;
       } finally {
-        chain.splice(chain.indexOf(pause), 1);
+        dm.hookBus.unsubscribe('ldapdeleterequest', pause as never);
       }
       await quiet();
       expect(

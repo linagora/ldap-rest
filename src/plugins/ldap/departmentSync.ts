@@ -110,7 +110,7 @@ export default class LdapDepartmentSync extends DmPlugin {
      * (users, groups, etc.) that reference the old DN or its descendants
      * via twakeDepartmentLink
      */
-    ldaprenamedone: async ([oldDn, newDn]) => {
+    ldaprenamedone: async (oldDn, newDn) => {
       // Only process organization renames (ou=...)
       if (!/^ou=/.test(oldDn)) return;
 

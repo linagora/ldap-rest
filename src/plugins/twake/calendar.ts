@@ -1,8 +1,8 @@
 import TwakePlugin from '../../abstract/twakePlugin';
 import { type Role } from '../../abstract/plugin';
-import type { AttributesList } from '../../lib/ldapActions';
+import type { AttributesList, ModifyRequest } from '../../lib/ldapActions';
 import type { ChangesToNotify } from '../ldap/onChange';
-import { Hooks } from '../../hooks';
+import { Hooks, MaybePromise } from '../../hooks';
 import { isDnInBranch, rdnValue } from '../../lib/utils';
 
 /** A Twake Calendar registered user, as the WebAdmin API returns it */
@@ -30,6 +30,24 @@ function isRegisteredUser(value: unknown): value is RegisteredUser {
  * Also propagates user identity changes (email, first name, last name) to the
  * Twake Calendar "registered users" via the WebAdmin API.
  */
+/**
+ * The hooks of the `calendarResource` flat entity, which no flag of the
+ * core names: `ldapcalendarResourceadddone`, `…modifydone` and
+ * `…deletedone`.
+ */
+type CalendarResourceHooks = {
+  ldapcalendarResourceadddone?: (
+    dn: string,
+    entry: AttributesList
+  ) => MaybePromise<void>;
+  ldapcalendarResourcemodifydone?: (
+    dn: string,
+    changes: ModifyRequest,
+    op: number
+  ) => MaybePromise<void>;
+  ldapcalendarResourcedeletedone?: (dn: string) => MaybePromise<void>;
+};
+
 export default class Calendar extends TwakePlugin {
   name = 'calendar';
   roles: Role[] = ['consistency'] as const;
@@ -85,11 +103,12 @@ export default class Calendar extends TwakePlugin {
       (this.config.calendar_lastname_attribute as string) || 'sn';
   }
 
-  hooks: Hooks = {
+  hooks: Hooks & CalendarResourceHooks = {
     // Hook when a resource is added to LDAP
-    ldapcalendarResourceadddone: async (args: [string, AttributesList]) => {
-      const [dn, attributes] = args;
-
+    ldapcalendarResourceadddone: async (
+      dn: string,
+      attributes: AttributesList
+    ) => {
       // Only process resources (identified by objectClass or specific branch)
       if (!this.isResource(dn, attributes)) {
         return;
@@ -115,18 +134,10 @@ export default class Calendar extends TwakePlugin {
 
     // Hook when a resource is modified in LDAP
     ldapcalendarResourcemodifydone: async (
-      args: [
-        string,
-        {
-          add?: AttributesList;
-          replace?: AttributesList;
-          delete?: string[] | AttributesList;
-        },
-        number,
-      ]
+      dn: string,
+      changes: ModifyRequest,
+      _op: number
     ) => {
-      const [dn, changes] = args;
-
       // Same branch guard as the add hook, and the branch alone: a modify
       // carries the attributes that changed, so an untouched objectClass is
       // simply not there to compare against calendar_resource_objectclass.

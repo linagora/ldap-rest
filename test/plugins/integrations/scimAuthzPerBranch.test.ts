@@ -46,9 +46,7 @@ function wireHooks(server: DM, plugin: { hooks?: Hooks }): void {
   if (!plugin.hooks) return;
   for (const [name, fn] of Object.entries(plugin.hooks)) {
     if (!fn) continue;
-    const list = (server.hooks[name] =
-      server.hooks[name] || ([] as unknown[] as never));
-    (list as unknown as Array<unknown>).push(fn as unknown);
+    server.hookBus.subscribe(name as keyof Hooks, fn);
   }
 }
 
@@ -114,8 +112,8 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
     const auth = new HeaderAuthPlugin(server);
     auth.api(server.app);
 
-    // Registered BEFORE the authorization plugin on purpose. `launchHooksChained`
-    // feeds each hook's return value to the next, so a hook that rebuilds the
+    // Registered BEFORE the authorization plugin on purpose: the chain feeds
+    // each hook's return value to the next, so a hook that rebuilds the
     // tuple without the request blinds everything downstream of it.
     const onChange = new OnLdapChange(server);
     wireHooks(server, onChange);
@@ -194,7 +192,7 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
     ) => {
       seen.push([dn, context]);
     };
-    server.hooks.onLdapEntryChange = [listener];
+    server.hookBus.set('onLdapEntryChange', ...[listener]);
     try {
       await createUser('writer', 'alice').expect(201);
       const dn = `uid=alice,${peopleBase}`;
@@ -203,7 +201,7 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
       expect(context).to.include({ actor: 'writer', source: 'scim' });
       expect(context.requestId).to.be.a('string');
     } finally {
-      server.hooks.onLdapEntryChange = [];
+      server.hookBus.set('onLdapEntryChange', ...[]);
     }
   });
 

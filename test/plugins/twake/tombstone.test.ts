@@ -144,17 +144,18 @@ describe('Twake tombstone plugin', function () {
     const events = new TwakeLifecycleEvents(dm);
     // Count the events plugin's work, so a test waits for it rather than for
     // a guessed delay.
-    for (const name of ['onLdapEntryChange', 'twakedeletionreplay']) {
-      const hook = events.hooks[name] as (
-        dn: string,
-        ...a: unknown[]
-      ) => unknown;
-      events.hooks[name] = (dn: string, ...args: unknown[]) => {
-        const done = Promise.resolve(hook(dn, ...args));
-        handled.push({ dn, done, args });
-        return done;
-      };
-    }
+    const entryChange = events.hooks.onLdapEntryChange!;
+    events.hooks.onLdapEntryChange = (dn, ...args) => {
+      const done = Promise.resolve(entryChange(dn, ...args));
+      handled.push({ dn, done, args });
+      return done;
+    };
+    const replay = events.hooks.twakedeletionreplay!;
+    events.hooks.twakedeletionreplay = (dn, ...args) => {
+      const done = Promise.resolve(replay(dn, ...args));
+      handled.push({ dn, done, args });
+      return done;
+    };
     await dm.registerPlugin('core/twake/lifecycleEvents', events);
     plugin = new TwakeTombstone(dm);
     await dm.registerPlugin('core/twake/tombstone', plugin);
@@ -164,11 +165,9 @@ describe('Twake tombstone plugin', function () {
     await dm.registerPlugin('core/ldap/groups', groups);
     await dm.registerPlugin('core/scim', new Scim(dm));
     plugin.afterLoad();
-    (dm.hooks.ldapaddafter ||= []).push(
-      ([dn, entry]: [string, AttributesList]) => {
-        added.push({ dn, entry });
-      }
-    );
+    dm.hookBus.subscribe('ldapaddafter', (dn, entry) => {
+      added.push({ dn, entry });
+    });
   });
 
   beforeEach(() => {
@@ -305,11 +304,11 @@ describe('Twake tombstone plugin', function () {
       const refuse = async (): Promise<never> => {
         throw new Error('refused');
       };
-      dm.hooks.ldapdeleterequest!.unshift(refuse);
+      dm.hookBus.insert('ldapdeleterequest', refuse, 0);
       try {
         await dm.ldap.delete(flat('ts-alice')).catch(() => undefined);
       } finally {
-        dm.hooks.ldapdeleterequest!.shift();
+        dm.hookBus.unsubscribe('ldapdeleterequest', refuse);
       }
       expect(await read(flat('ts-alice'))).not.to.have.property('employeeType');
     });

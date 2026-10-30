@@ -1,3 +1,4 @@
+import type { Hooks } from '../../../src/hooks';
 import { expect } from 'chai';
 import supertest from 'supertest';
 
@@ -101,15 +102,15 @@ describe('SCIM Groups (integration)', function () {
 
   it('keeps displayName as the RDN when the mapping stores it there', async () => {
     let seenBase: string | undefined;
-    const hook = ([group, req, base]: [
-      Record<string, unknown>,
-      unknown,
-      string,
+    const hook: NonNullable<Hooks['scimgroupcreate']> = ([
+      group,
+      req,
+      base,
     ]) => {
       seenBase = base;
       return [{ ...group, id: 'from-hook' }, req, base];
     };
-    (server.hooks.scimgroupcreate ||= []).push(hook);
+    server.hookBus.subscribe('scimgroupcreate', hook);
     try {
       const res = await supertest(server.app)
         .post('/scim/v2/Groups')
@@ -123,8 +124,7 @@ describe('SCIM Groups (integration)', function () {
       expect(res.body.displayName).to.equal('scim-testgroup');
       expect(seenBase).to.equal(groupBase);
     } finally {
-      const hooks = server.hooks.scimgroupcreate as unknown[];
-      hooks.splice(hooks.indexOf(hook), 1);
+      server.hookBus.unsubscribe('scimgroupcreate', hook);
     }
   });
 
@@ -335,16 +335,11 @@ describe('SCIM Groups (integration)', function () {
         }
         return args;
       };
-      server.hooks.ldapmodifyrequest = [
-        ...(server.hooks.ldapmodifyrequest || []),
-        race as never,
-      ];
+      server.hookBus.subscribe('ldapmodifyrequest', race as never);
       try {
         await remove('scim-m1').expect(200);
       } finally {
-        server.hooks.ldapmodifyrequest = server.hooks.ldapmodifyrequest!.filter(
-          h => h !== (race as never)
-        );
+        server.hookBus.unsubscribe('ldapmodifyrequest', race as never);
       }
       expect(await members()).to.have.members([
         dnOf('scim-groupuser'),
@@ -386,10 +381,7 @@ describe('SCIM Groups (integration)', function () {
             );
       return [result, req, opts];
     };
-    server.hooks.ldapsearchfilter = [
-      ...(server.hooks.ldapsearchfilter || []),
-      hide as never,
-    ];
+    server.hookBus.subscribe('ldapsearchfilter', hide as never);
     const patch = (Operations: unknown[]) =>
       supertest(server.app)
         .patch('/scim/v2/Groups/scim-testgroup')
@@ -408,9 +400,7 @@ describe('SCIM Groups (integration)', function () {
         { op: 'add', path: 'members', value: [{ value: 'scim-hidden' }] },
       ]);
     } finally {
-      server.hooks.ldapsearchfilter = server.hooks.ldapsearchfilter!.filter(
-        h => h !== (hide as never)
-      );
+      server.hookBus.unsubscribe('ldapsearchfilter', hide as never);
       const found = (await plugin.ldap.search(
         { scope: 'base', paged: false, attributes: ['member'] },
         `cn=scim-testgroup,${groupBase}`

@@ -27,7 +27,7 @@ overrides builds a second instance, and it needs a name of its own.
 ### Hook Dependencies
 
 **Hook Providers**: Plugins that implement hooks (via `hooks: Hooks = { ... }`)
-**Hook Consumers**: Plugins that call hooks (via `runHook()` or `launchHooks()`)
+**Hook Consumers**: Plugins that raise hooks (via `this.hookBus`)
 
 ## Complete Dependency Graph
 
@@ -601,10 +601,10 @@ refused before a plugin judges its content, or replaces it.
 2. Returns modified data to next plugin
 3. Last plugin's return value is used
 
-For non-chained hooks:
+For notified hooks, see [hooks](hooks.md#the-bus):
 
-- All hooks execute in parallel
-- Order doesn't matter
+- All hooks run one after the other, in load order
+- A failing one is logged and the next still runs
 
 **Example**: `ldapdeleterequest` chain
 
@@ -642,11 +642,16 @@ export default class MyPlugin extends DmPlugin {
 
 ### Providing Hooks
 
+A hook is declared in `src/hooks.ts` before anything raises it, and raised
+through the bus of the kind it is, see [hooks](hooks.md#the-bus):
+
 ```typescript
 export default class MyPlugin extends DmPlugin {
   async someMethod() {
-    // Fire a hook for other plugins to consume
-    await this.server.launchHooks('myCustomHook', [param1, param2]);
+    // Thread a value through the subscribers of a chained hook
+    value = await this.hookBus.chain('ldapsearchopts', value);
+    // Tell the subscribers of a notified one, without waiting for them
+    this.hookBus.notify('ldapadddone', dn, entry, changeContext(req));
   }
 }
 ```

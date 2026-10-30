@@ -25,7 +25,6 @@ import {
   isAuthzRefusal,
   isChildOf,
   isDnInBranch,
-  launchHooksChained,
   normalizeDn,
   rdnValue,
   substringSearchFilter,
@@ -968,11 +967,12 @@ export default class LdapOrganizations extends DmPlugin {
     if ((top as SearchResult).searchEntries.length !== 1)
       throw new NotFoundError('Top organization not found');
 
+    const org = (top as SearchResult).searchEntries[0];
     // Call hook to allow plugins (like authzPerBranch) to modify the result
-    const [, result] = await launchHooksChained(
-      this.registeredHooks.getOrganisationTop,
-      [req, (top as SearchResult).searchEntries[0]]
-    );
+    const [, result] = await this.hookBus.chain('getOrganisationTop', [
+      req,
+      org,
+    ]);
 
     return result;
   }

@@ -410,8 +410,7 @@ describe('Twake groups plugin routes', function () {
 
   it('still names a SCIM group after a hook that drops the base', async () => {
     const legacy = ([group, req]: unknown[]) => [group, req];
-    const hooks = dm.hooks.scimgroupcreate as unknown[];
-    hooks.unshift(legacy);
+    dm.hookBus.insert('scimgroupcreate', legacy as never, 0);
     try {
       const created = await api
         .post('/scim/v2/Groups')
@@ -423,7 +422,7 @@ describe('Twake groups plugin routes', function () {
         .expect(201);
       expect(created.body.id).to.match(/^[0-9a-f-]{36}$/);
     } finally {
-      hooks.splice(hooks.indexOf(legacy), 1);
+      dm.hookBus.unsubscribe('scimgroupcreate', legacy as never);
     }
   });
 

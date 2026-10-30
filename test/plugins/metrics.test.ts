@@ -8,7 +8,6 @@ import { Router } from 'express';
 import { DM } from '../../src/bin';
 import DmPlugin from '../../src/abstract/plugin';
 import Metrics from '../../src/plugins/metrics';
-import { launchHooks } from '../../src/lib/utils';
 
 describe('metrics', function () {
   this.timeout(20000);
@@ -263,7 +262,7 @@ describe('metrics', function () {
       };
     }
     await dm.registerPlugin('broken', new Broken(dm));
-    await launchHooks(dm.hooks.ldapadddone, ['cn=x', {}]);
+    await dm.hookBus.notifyAndWait('ldapadddone', 'cn=x', {});
     const text = await scrape();
     expect(
       sample(

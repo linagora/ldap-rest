@@ -47,19 +47,23 @@ describe('LdapUsersFlat validation with standard schema (via flatGeneric)', func
 
   describe('when an ldapaddafter subscriber fails', () => {
     afterEach(() => {
-      delete server.hooks.ldapaddafter;
-      delete server.hooks.ldapstandardUseradddone;
+      server.hookBus.set('ldapaddafter');
+      (server.hooks as Record<string, unknown>).ldapstandardUseradddone =
+        undefined;
     });
 
     it('still creates the user and fires its adddone hook', async () => {
       const done: string[] = [];
-      server.hooks.ldapaddafter = [
-        () => {
-          throw new Error('provider down');
-        },
-      ];
-      server.hooks.ldapstandardUseradddone = [
-        ([dn]: [string]) => void done.push(dn),
+      server.hookBus.set(
+        'ldapaddafter',
+        ...[
+          () => {
+            throw new Error('provider down');
+          },
+        ]
+      );
+      (server.hooks as Record<string, unknown>).ldapstandardUseradddone = [
+        (dn: string) => void done.push(dn),
       ];
       expect(
         await plugin.addUser('testuser2', {

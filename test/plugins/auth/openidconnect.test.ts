@@ -2,6 +2,10 @@ import { expect } from 'chai';
 import request from 'supertest';
 import nock from 'nock';
 import type { Express, Request, Response } from 'express';
+
+// Taken from `Hooks`: chai's supertest brings a second copy of express's types
+type AuthTuple = Parameters<NonNullable<Hooks['beforeAuth']>>[0];
+import type { Hooks } from '../../../src/hooks';
 import { DM } from '../../../src/bin';
 import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
 import DmPlugin from '../../../src/abstract/plugin';
@@ -589,19 +593,15 @@ describe('OpenID Connect Plugin', () => {
       dm.config.base_url = 'http://localhost:3000';
 
       // Add hooks
-      dm.hooks.beforeAuth = [
-        async (req: Request, res: Response) => {
-          beforeAuthCalled = true;
-          return [req, res];
-        },
-      ];
+      dm.hookBus.set('beforeAuth', async (args: AuthTuple) => {
+        beforeAuthCalled = true;
+        return [args[0], args[1]];
+      });
 
-      dm.hooks.afterAuth = [
-        async (req: Request, res: Response) => {
-          afterAuthCalled = true;
-          return [req, res];
-        },
-      ];
+      dm.hookBus.set('afterAuth', async (args: AuthTuple) => {
+        afterAuthCalled = true;
+        return [args[0], args[1]];
+      });
     });
 
     afterEach(() => {
@@ -612,17 +612,20 @@ describe('OpenID Connect Plugin', () => {
       const oidcPlugin = new OpenIDConnect(dm);
       await dm.registerPlugin('openidconnect', oidcPlugin);
 
-      // Verify hooks are available
-      expect(dm.hooks.beforeAuth).to.be.an('array');
-      expect(dm.hooks.afterAuth).to.be.an('array');
+      // The registration kept the subscribers the test set
+      expect(dm.hookBus.has('beforeAuth')).to.equal(true);
+      expect(dm.hookBus.has('afterAuth')).to.equal(true);
     });
 
     it('should handle hook errors gracefully', async () => {
-      dm.hooks.beforeAuth = [
-        async () => {
-          throw new Error('Hook error');
-        },
-      ];
+      dm.hookBus.set(
+        'beforeAuth',
+        ...[
+          async () => {
+            throw new Error('Hook error');
+          },
+        ]
+      );
 
       const oidcPlugin = new OpenIDConnect(dm);
       const result = await dm.registerPlugin('openidconnect', oidcPlugin);

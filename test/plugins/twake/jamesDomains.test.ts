@@ -58,25 +58,16 @@ const jamesServer = async (
   await before(dm);
   const james = new James(dm);
   await dm.registerPlugin('james', james);
-  dm.hooks.onLdapEntryChange = [
-    ...(dm.hooks.onLdapEntryChange || []),
-    (dn: string, _before: Entry | null, after: Entry | null) => {
-      changed.push(dn.toLowerCase());
-      if (after) changed.push(String(after.dn).toLowerCase());
-    },
-  ];
-  dm.hooks.ldapadddone = [
-    ...(dm.hooks.ldapadddone || []),
-    ([dn]: [string, unknown]) => {
-      provisioned.push(dn.toLowerCase());
-    },
-  ];
-  dm.hooks.ldaprenamedone = [
-    ...(dm.hooks.ldaprenamedone || []),
-    ([, newDn]: [string, string]) => {
-      renamed.push(newDn.toLowerCase());
-    },
-  ];
+  dm.hookBus.subscribe('onLdapEntryChange', (dn, _before, after) => {
+    changed.push(dn.toLowerCase());
+    if (after) changed.push(String(after.dn).toLowerCase());
+  });
+  dm.hookBus.subscribe('ldapadddone', dn => {
+    provisioned.push(dn.toLowerCase());
+  });
+  dm.hookBus.subscribe('ldaprenamedone', (_dn, newDn) => {
+    renamed.push(newDn.toLowerCase());
+  });
   const waiting =
     (seen: string[]) =>
     async (dn: string, write: () => Promise<unknown>): Promise<void> => {

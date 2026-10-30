@@ -416,11 +416,10 @@ export default class James extends TwakePlugin {
     },
     // A rename a request makes is followed from onLdapEntryChange, which a
     // move made outside one, as the trash makes them, does not publish
-    ldaprenamedone: async ([dn, newDn]: [string, string]) => {
+    ldaprenamedone: async (dn, newDn) => {
       if (currentOperation() === undefined) await this.followMove(dn, newDn);
     },
-    ldapadddone: ([dn, attributes]: [string, AttributesList]) =>
-      this.provisionAccount(dn, attributes),
+    ldapadddone: (dn, attributes) => this.provisionAccount(dn, attributes),
     onLdapMailChange: async (
       dn: string,
       oldmail: AttributeValue | null,

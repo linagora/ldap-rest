@@ -630,14 +630,8 @@ describe('Twake instances plugin', function () {
             throw new ForbiddenError('read only');
           return args;
         };
-        dm.hooks.ldapsearchfilter = [
-          ...(dm.hooks.ldapsearchfilter || []),
-          filter,
-        ];
-        dm.hooks.ldapmodifyrequest = [
-          ...(dm.hooks.ldapmodifyrequest || []),
-          readOnly,
-        ];
+        dm.hookBus.subscribe('ldapsearchfilter', filter as never);
+        dm.hookBus.subscribe('ldapmodifyrequest', readOnly as never);
         try {
           const ensure = (who: string, body: object) =>
             supertest(dm.app)
@@ -653,12 +647,8 @@ describe('Twake instances plugin', function () {
             'description'
           );
         } finally {
-          dm.hooks.ldapsearchfilter = dm.hooks.ldapsearchfilter.filter(
-            h => h !== filter
-          );
-          dm.hooks.ldapmodifyrequest = dm.hooks.ldapmodifyrequest!.filter(
-            h => h !== readOnly
-          );
+          dm.hookBus.unsubscribe('ldapsearchfilter', filter as never);
+          dm.hookBus.unsubscribe('ldapmodifyrequest', readOnly as never);
         }
       });
 
@@ -669,10 +659,7 @@ describe('Twake instances plugin', function () {
             throw new Error('mark refused');
           return args;
         };
-        dm.hooks.ldapmodifyrequest = [
-          ...(dm.hooks.ldapmodifyrequest || []),
-          refuseMark,
-        ];
+        dm.hookBus.subscribe('ldapmodifyrequest', refuseMark as never);
         const built = () =>
           search('in-alice.example.org').reply(200, {
             items: [
@@ -693,9 +680,7 @@ describe('Twake instances plugin', function () {
           );
           expect(rabbit.published).to.have.lengthOf(1);
         } finally {
-          dm.hooks.ldapmodifyrequest = dm.hooks.ldapmodifyrequest!.filter(
-            h => h !== refuseMark
-          );
+          dm.hookBus.unsubscribe('ldapmodifyrequest', refuseMark as never);
         }
         // At least once: the next call announces again, then marks
         expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
@@ -1570,19 +1555,14 @@ describe('Twake instances plugin', function () {
             throw new ForbiddenError('organization read only');
           return args;
         };
-        dm.hooks.ldapmodifyrequest = [
-          ...(dm.hooks.ldapmodifyrequest || []),
-          memberOnly,
-        ];
+        dm.hookBus.subscribe('ldapmodifyrequest', memberOnly as never);
         try {
           await work({
             user: 'admin',
             headers: { 'x-test': 'member-only' },
           } as unknown as Request);
         } finally {
-          dm.hooks.ldapmodifyrequest = dm.hooks.ldapmodifyrequest!.filter(
-            h => h !== memberOnly
-          );
+          dm.hookBus.unsubscribe('ldapmodifyrequest', memberOnly as never);
           nock.cleanAll();
         }
       };

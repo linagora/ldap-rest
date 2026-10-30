@@ -9,7 +9,6 @@ import AuthToken from '../src/plugins/auth/token';
 import DmPlugin, { type Role } from '../src/abstract/plugin';
 import TrustedProxy from '../src/plugins/auth/trustedProxy';
 import { jsonBodyParser } from '../src/lib/rawBody';
-import { launchHooksChained } from '../src/lib/utils';
 
 /** Express 5 exposes the layer stack as `router`, Express 4 as `_router` */
 interface AppInternal {
@@ -208,7 +207,7 @@ describe('Server internals', () => {
 
       for (const hook of REQUEST_HOOKS) {
         calls.length = 0;
-        await launchHooksChained(dm.hooks[hook], []);
+        await dm.hookBus.chain(hook, [] as never);
         expect(calls, hook).to.deep.equal([
           'authzA',
           'authzB',
@@ -219,7 +218,7 @@ describe('Server internals', () => {
 
       // A result filter keeps registration order
       calls.length = 0;
-      await launchHooksChained(dm.hooks.ldapsearchfilter, []);
+      await dm.hookBus.chain('ldapsearchfilter', [] as never);
       expect(calls).to.deep.equal(['rules', 'authzA', 'other', 'authzB']);
     });
   });

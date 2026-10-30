@@ -100,7 +100,7 @@ describe('LDAP Department Sync Plugin', function () {
       const newDn = `uid=testuser2,${DM_LDAP_BASE}`;
 
       // Should not throw error
-      await plugin.hooks.ldaprenamedone?.([oldDn, newDn]);
+      await plugin.hooks.ldaprenamedone?.(oldDn, newDn);
     });
 
     it('should update resources directly linked to renamed organization', async () => {
@@ -131,7 +131,7 @@ describe('LDAP Department Sync Plugin', function () {
       await server.ldap.rename(testOrgDn, movedOrgDn);
 
       // Trigger the hook
-      await plugin.hooks.ldaprenamedone?.([testOrgDn, movedOrgDn]);
+      await plugin.hooks.ldaprenamedone?.(testOrgDn, movedOrgDn);
 
       // Verify user's link was updated
       const userResult = (await server.ldap.search(
@@ -174,7 +174,7 @@ describe('LDAP Department Sync Plugin', function () {
           [pathAttr]: 'R&D (Paris)',
         });
         await server.ldap.rename(org, moved);
-        await plugin.hooks.ldaprenamedone?.([org, moved]);
+        await plugin.hooks.ldaprenamedone?.(org, moved);
         const user = (
           (await server.ldap.search(
             { paged: false, scope: 'base', attributes: [linkAttr] },
@@ -224,7 +224,7 @@ describe('LDAP Department Sync Plugin', function () {
       const movedSubOrg1Dn = `ou=SubOrg1,${movedOrgDn}`;
 
       // Trigger the hook
-      await plugin.hooks.ldaprenamedone?.([testOrgDn, movedOrgDn]);
+      await plugin.hooks.ldaprenamedone?.(testOrgDn, movedOrgDn);
 
       // Verify user's link was updated to new sub-org DN
       const userResult = (await server.ldap.search(
@@ -290,7 +290,7 @@ describe('LDAP Department Sync Plugin', function () {
       await server.ldap.rename(testOrgDn, movedOrgDn);
 
       // Trigger the hook
-      await plugin.hooks.ldaprenamedone?.([testOrgDn, movedOrgDn]);
+      await plugin.hooks.ldaprenamedone?.(testOrgDn, movedOrgDn);
 
       // Verify all resources were updated
       const entries = [testUserDn, testUser2Dn, testGroupDn];
@@ -357,7 +357,7 @@ describe('LDAP Department Sync Plugin', function () {
       const movedSubOrg2Dn = `ou=SubOrg2,${movedSubOrg1Dn}`;
 
       // Trigger the hook
-      await plugin.hooks.ldaprenamedone?.([testOrgDn, movedOrgDn]);
+      await plugin.hooks.ldaprenamedone?.(testOrgDn, movedOrgDn);
 
       // Verify user's link was updated to new deep sub-org DN
       const userResult = (await server.ldap.search(
@@ -419,7 +419,7 @@ describe('LDAP Department Sync Plugin', function () {
       const movedSub1 = `ou=SubOrg1,${targetOrgDn}`;
       const movedSub2 = `ou=SubOrg2,${movedSub1}`;
       await server.ldap.rename(testSubOrg1Dn, movedSub1);
-      await plugin.hooks.ldaprenamedone?.([testSubOrg1Dn, movedSub1]);
+      await plugin.hooks.ldaprenamedone?.(testSubOrg1Dn, movedSub1);
 
       const read = async (dn: string, attr: string): Promise<string> => {
         const result = (await server.ldap.search(
@@ -457,7 +457,7 @@ describe('LDAP Department Sync Plugin', function () {
       await server.ldap.rename(testOrgDn, movedOrgDn);
 
       // Trigger the hook (should not throw)
-      await plugin.hooks.ldaprenamedone?.([testOrgDn, movedOrgDn]);
+      await plugin.hooks.ldaprenamedone?.(testOrgDn, movedOrgDn);
     });
 
     it('should handle organization path without attribute', async () => {
@@ -488,7 +488,7 @@ describe('LDAP Department Sync Plugin', function () {
       await server.ldap.rename(testOrgDn, movedOrgDn);
 
       // Trigger the hook (should fallback to constructing path from ou attribute)
-      await plugin.hooks.ldaprenamedone?.([testOrgDn, movedOrgDn]);
+      await plugin.hooks.ldaprenamedone?.(testOrgDn, movedOrgDn);
 
       // Verify user's link was updated
       const userResult = (await server.ldap.search(
@@ -592,7 +592,7 @@ describe('LDAP Department Sync Plugin, attributes named by their roles', functio
 
     const moved = `ou=Sub,${target()}`;
     await server.ldap.rename(`ou=Sub,${source()}`, moved);
-    await plugin.hooks.ldaprenamedone?.([`ou=Sub,${source()}`, moved]);
+    await plugin.hooks.ldaprenamedone?.(`ou=Sub,${source()}`, moved);
 
     const read = async (dn: string, attr: string): Promise<string> => {
       const result = (await server.ldap.search(

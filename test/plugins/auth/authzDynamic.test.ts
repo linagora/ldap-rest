@@ -4,6 +4,7 @@ import supertest from 'supertest';
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
+import type { Hooks } from '../../../src/hooks';
 import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
 
 describe('authzDynamic (integration)', function () {
@@ -46,9 +47,7 @@ describe('authzDynamic (integration)', function () {
     if (plugin.hooks) {
       for (const [name, fn] of Object.entries(plugin.hooks)) {
         if (!fn) continue;
-        const list = (server.hooks[name] =
-          server.hooks[name] || ([] as unknown[] as never));
-        (list as unknown as Array<unknown>).push(fn as unknown);
+        server.hookBus.subscribe(name as keyof Hooks, fn);
       }
     }
     groupsPlugin = new LdapGroups(server);
@@ -56,9 +55,7 @@ describe('authzDynamic (integration)', function () {
     if (groupsPlugin.hooks) {
       for (const [name, fn] of Object.entries(groupsPlugin.hooks)) {
         if (!fn) continue;
-        const list = (server.hooks[name] =
-          server.hooks[name] || ([] as unknown[] as never));
-        (list as unknown as Array<unknown>).push(fn as unknown);
+        server.hookBus.subscribe(name as keyof Hooks, fn);
       }
     }
     server.loadedPlugins['authzDynamic'] = plugin;

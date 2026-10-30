@@ -6,6 +6,26 @@ decision or a configuration change appear here; see the
 
 ## From 1.2.1
 
+### A plugin written against the old hooks API
+
+**Who is affected:** a deployment loading a plugin built outside this
+repository that calls `launchHooks` / `launchHooksChained`, or subscribes
+to a `*done` hook with its arguments packed in one tuple.
+
+Hooks are raised through `this.hookBus`, and every hook is declared in
+`src/hooks.ts`: a plugin raising or subscribing to a hook the server does
+not declare no longer compiles. A notified hook — `ldapadddone`,
+`ldapaddafter`, `ldapmodifydone`, `ldaprenamedone`, `ldapgroupadddone`,
+`ldapgroupmodifydone`, `ldapgrouprenamedone`, `ldapexternaluseradded` — now
+gets its arguments one by one: `(dn, entry, context) => …`, not
+`([dn, entry], context) => …`. The packed form still compiles — parameters
+are bivariant — and then reads the DN's first character, so a plugin left
+as it was stops reacting without saying so. `ldapgroupdeletemember` threads
+`[cn, member]`, a single member DN, as it always handed one.
+
+A test waiting for a hook to land waits on `await server.hookBus.settled()`
+rather than sleeping. See [hooks](../plugin-development/hooks.md#the-bus).
+
 ### Node 22 or later is required
 
 **Who is affected:** a deployment running on Node 20 (end of life

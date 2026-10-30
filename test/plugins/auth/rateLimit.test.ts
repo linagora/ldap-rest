@@ -3,6 +3,7 @@ import request from 'supertest';
 import type { Express, Request, Response } from 'express';
 
 import { DM } from '../../../src/bin';
+import type { ChainedHook, Hooks } from '../../../src/hooks';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import RateLimit from '../../../src/plugins/auth/rateLimit';
 
@@ -10,12 +11,8 @@ import RateLimit from '../../../src/plugins/auth/rateLimit';
 class TestAuthPlugin extends AuthBase {
   name = 'testAuth';
 
-  // Need this to trigger afterAuth hook in AuthBase
-  hooks = {
-    onAuth: (): void => {
-      // Triggers afterAuth hook chain
-    },
-  };
+  // Set in api(): registering the plugin is what reads its hooks
+  hooks: Hooks = {};
 
   authMethod(req: DmRequest, res: Response, next: () => void): void {
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -27,6 +24,15 @@ class TestAuthPlugin extends AuthBase {
   }
 
   api(app: Express): void {
+    // Threaded on, as `afterAuth` does. The tuple is declared rather than
+    // written out, so that its type is not inferred from the plugin's own
+    // express types, which chai's `supertest` brings in a second copy of.
+    this.hooks = {
+      afterAuth: (args: Parameters<ChainedHook<[Request, Response]>>[0]) => [
+        args[0],
+        args[1],
+      ],
+    };
     // Call parent to set up beforeAuth/afterAuth hooks
     super.api(app);
 
