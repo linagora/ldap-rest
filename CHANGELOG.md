@@ -47,8 +47,14 @@
   is now refused. A zero rate-limit window or maximum, CrowdSec cache TTL or
   authorization cache TTL used to be replaced by the default and is now
   refused too; a zero TOTP step or HMAC window was accepted and broke the
-  plugin, and is now refused at startup
-  ([details](docs/plugin-development/options.md)).
+  plugin, and is now refused at startup. A zero
+  `--ldap-organization-max-subnodes`, `--ldap-raw-max-results`,
+  `--ppolicy-warn-days` or `--ppolicy-min-length` used to be replaced by the
+  default and is now refused ([details](docs/plugin-development/options.md)).
+- `--group-allow-unexistent-members` is gone: it was stored under a key the
+  groups plugin never read. Use `--groups-allow-unexistent-members` or
+  `DM_ALLOW_UNEXISTENT_MEMBERS`, which the plugin now reads
+  ([upgrading](docs/usage/upgrading.md#the-group-member-check-option)).
 - `TwakePlugin` takes the WebAdmin URL, token and concurrency instead of the
   names of the options holding them: a plugin built outside this repository
   that extends it must update its `super()` call

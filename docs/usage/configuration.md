@@ -229,15 +229,15 @@ at `0` otherwise.
 
 #### `core/ldap/groups`
 
-| CLI                                | Plural            | Env                             | Default                            | Description                 |
-| ---------------------------------- | ----------------- | ------------------------------- | ---------------------------------- | --------------------------- |
-| `--ldap-group-base`                |                   | `DM_LDAP_GROUP_BASE`            |                                    | Groups base DN              |
-| `--ldap-groups-main-attribute`     |                   | `DM_LDAP_GROUPS_MAIN_ATTRIBUTE` | `cn`                               | Group identifier attribute  |
-| `--group-class`                    | `--group-classes` | `DM_GROUP_CLASSES`              | `top,groupOfNames`                 | Group objectClasses         |
-| `--group-allow-unexistent-members` |                   | `DM_ALLOW_UNEXISTENT_MEMBERS`   | `false`                            | Allow non-existent members  |
-| `--group-default-attributes`       |                   | `DM_GROUP_DEFAULT_ATTRIBUTES`   | `{}`                               | Default attributes (JSON)   |
-| `--group-dummy-user`               |                   | `DM_GROUP_DUMMY_USER`           | `cn=fakeuser`                      | Dummy user for empty groups |
-| `--group-schema`                   |                   | `DM_GROUP_SCHEMA`               | `static/schemas/twake/groups.json` | Group JSON schema path      |
+| CLI                                 | Plural            | Env                             | Default                            | Description                 |
+| ----------------------------------- | ----------------- | ------------------------------- | ---------------------------------- | --------------------------- |
+| `--ldap-group-base`                 |                   | `DM_LDAP_GROUP_BASE`            |                                    | Groups base DN              |
+| `--ldap-groups-main-attribute`      |                   | `DM_LDAP_GROUPS_MAIN_ATTRIBUTE` | `cn`                               | Group identifier attribute  |
+| `--group-class`                     | `--group-classes` | `DM_GROUP_CLASSES`              | `top,groupOfNames`                 | Group objectClasses         |
+| `--groups-allow-unexistent-members` |                   | `DM_ALLOW_UNEXISTENT_MEMBERS`   | `false`                            | Allow non-existent members  |
+| `--group-default-attributes`        |                   | `DM_GROUP_DEFAULT_ATTRIBUTES`   | `{}`                               | Default attributes (JSON)   |
+| `--group-dummy-user`                |                   | `DM_GROUP_DUMMY_USER`           | `cn=fakeuser`                      | Dummy user for empty groups |
+| `--group-schema`                    |                   | `DM_GROUP_SCHEMA`               | `static/schemas/twake/groups.json` | Group JSON schema path      |
 
 #### `core/ldap/externalUsersInGroups`
 

@@ -113,7 +113,9 @@ The authentication and authorization options are checked the same way. A zero
 replaced by the default and is now refused. A zero `--auth-totp-step` or
 `--auth-hmac-window` was accepted and broke the plugin — every counter was
 `Infinity`, every signature not made in the same millisecond was refused — and
-is now refused at startup.
+is now refused at startup. A zero `--ldap-organization-max-subnodes`,
+`--ldap-raw-max-results`, `--ppolicy-warn-days` or `--ppolicy-min-length` used
+to be replaced by the default and is now refused.
 
 `ConfigParser` keeps an empty string for a string option. A plugin reads the
 declared default instead when that default is not empty, as its `|| default`
@@ -123,6 +125,15 @@ its declaration (`--cozy-apps`, `--cozy-user-deleted-routing-key`,
 `--twake-instance-cozy-apps`, `--twake-instance-cozy-context`,
 `--twake-instance-cloudery-offer`) and keeps it; an option whose default is
 empty keeps the empty string.
+
+### The group member check option
+
+**Who is affected:** a deployment passing `--group-allow-unexistent-members`.
+
+That spelling was stored under a key the groups plugin never read, so it never
+disabled member validation. The option is now `--groups-allow-unexistent-members`
+and `DM_ALLOW_UNEXISTENT_MEMBERS`, which the plugin reads; the old spelling is
+gone.
 
 ### Node 22 or later is required
 

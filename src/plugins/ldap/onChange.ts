@@ -418,7 +418,7 @@ class OnLdapChange extends DmPlugin {
     };
 
     const displayName = getValue(
-      (this.config.display_name_attribute as string) || 'displayName'
+      this.config.display_name_attribute || 'displayName'
     );
     if (displayName) return displayName;
 

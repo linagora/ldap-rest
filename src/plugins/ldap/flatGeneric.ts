@@ -15,6 +15,8 @@ import { staticSchemaUrl } from '../../lib/staticFiles';
 import type { LocalizedText, Schema } from '../../config/schema';
 import type { AttributesList } from '../../lib/ldapActions';
 
+import { flatGenericOptions } from './ldap.options';
+
 interface EnrichedSchema extends Schema {
   entity: {
     name: string;
@@ -112,6 +114,8 @@ class LdapFlatInstance extends LdapFlat {
 }
 
 export default class LdapFlatGeneric extends DmPlugin {
+  static optionDefinitions = flatGenericOptions;
+
   name = 'ldapFlatGeneric';
   roles: Role[] = ['configurable'] as const;
   instances: LdapFlatInstance[] = [];
@@ -120,7 +124,7 @@ export default class LdapFlatGeneric extends DmPlugin {
   constructor(server: DM) {
     super(server);
 
-    const schemas = this.config.ldap_flat_schema || [];
+    const schemas = this.options(flatGenericOptions).ldap_flat_schema;
     // An entity is identified twice over: by `name`, which becomes the hook
     // prefix every plugin listens on, and by `pluralName`, which becomes the
     // URL. Two schemas claiming either would register the same hooks and the

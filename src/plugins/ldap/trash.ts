@@ -19,7 +19,11 @@ import type { Hooks } from '../../hooks';
 import type { SearchResult } from '../../lib/ldapActions';
 import { isDnInBranch, normalizeDn, parseDn } from '../../lib/utils';
 
+import { trashOptions } from './ldap.options';
+
 class TrashPlugin extends DmPlugin {
+  static optionDefinitions = trashOptions;
+
   name = 'trash';
   roles: Role[] = ['consistency'] as const;
 
@@ -33,11 +37,10 @@ class TrashPlugin extends DmPlugin {
     super(dm);
 
     // Parse configuration
-    const trashBase = this.config.trash_base;
-    this.trashBase =
-      typeof trashBase === 'string' ? trashBase : 'ou=trash,dc=example,dc=com';
+    const settings = this.options(trashOptions);
+    this.trashBase = settings.trash_base;
 
-    const watchedBases = this.config.trash_watched_bases;
+    const watchedBases = settings.trash_watched_bases;
     if (typeof watchedBases === 'string' && watchedBases) {
       // A DN holds commas: bases are separated by `;`
       this.watchedBases = watchedBases
@@ -66,8 +69,8 @@ class TrashPlugin extends DmPlugin {
       }
     }
 
-    this.addMetadata = this.config.trash_add_metadata !== 'false';
-    this.autoCreateTrash = this.config.trash_auto_create !== 'false';
+    this.addMetadata = settings.trash_add_metadata !== 'false';
+    this.autoCreateTrash = settings.trash_auto_create !== 'false';
 
     this.logger.info(
       `Trash plugin initialized: base=${this.trashBase}, watched=${this.watchedBases.join(';')}, metadata=${this.addMetadata}`

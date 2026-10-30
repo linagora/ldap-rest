@@ -155,19 +155,25 @@ interface BulkImportResult {
  *           description: Total data rows attempted.
  *           example: 42
  */
+import { bulkImportOptions, type BulkImportOptions } from './ldap.options';
+
 export default class LdapBulkImport extends DmPlugin {
+  static optionDefinitions = bulkImportOptions;
+
   name = 'ldapBulkImport';
   roles: Role[] = ['configurable'] as const;
 
+  private readonly settings: BulkImportOptions;
   private resources: Map<string, BulkImportResource> = new Map();
   private upload: multer.Multer;
 
   constructor(parent: DM) {
     super(parent);
+    this.settings = this.options(bulkImportOptions);
 
     // Configure multer for file uploads
     const maxFileSize =
-      parseInt(this.config.bulk_import_max_file_size as string, 10) || 10485760; // 10MB default
+      parseInt(this.settings.bulk_import_max_file_size, 10) || 10485760; // 10MB default
 
     this.upload = multer({
       storage: multer.memoryStorage(),
@@ -189,7 +195,7 @@ export default class LdapBulkImport extends DmPlugin {
     });
 
     // Load schemas configuration
-    const schemasConfig = this.config.bulk_import_schemas as string;
+    const schemasConfig = this.settings.bulk_import_schemas;
     if (!schemasConfig) {
       this.logger.warn('No bulk import schemas configured');
       return;
@@ -722,10 +728,8 @@ export default class LdapBulkImport extends DmPlugin {
         mainAttribute: resource.mainAttribute,
         base: resource.base,
         maxFileSize:
-          parseInt(this.config.bulk_import_max_file_size as string, 10) ||
-          10485760,
-        batchSize:
-          parseInt(this.config.bulk_import_batch_size as string, 10) || 100,
+          parseInt(this.settings.bulk_import_max_file_size, 10) || 10485760,
+        batchSize: parseInt(this.settings.bulk_import_batch_size, 10) || 100,
         endpoints: {
           template: `${apiPrefix}/v1/ldap/bulk-import/${resourceName}/template.csv`,
           import: `${apiPrefix}/v1/ldap/bulk-import/${resourceName}`,
