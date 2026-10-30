@@ -41,6 +41,11 @@ import {
 
 const REASON = /^[A-Za-z0-9_.-]{1,64}$/;
 
+export const EraseTombstoneBody = Type.Object({
+  dn: Type.String(),
+  force: Type.Optional(Type.Boolean()),
+});
+
 export default class TwakeTombstone extends DmPlugin {
   name = 'twakeTombstone';
   roles: Role[] = ['consistency', 'api'] as const;
@@ -173,10 +178,7 @@ export default class TwakeTombstone extends DmPlugin {
     defineRoute(app, {
       method: 'post',
       path: `${this.config.api_prefix}/v1/twake/tombstones/erase`,
-      body: Type.Object({
-        dn: Type.String(),
-        force: Type.Optional(Type.Boolean()),
-      }),
+      body: EraseTombstoneBody,
       handler: async ({ req, res, body }) => {
         await this.erase(body.dn, { force: body.force === true, req });
         res.json({ success: true });

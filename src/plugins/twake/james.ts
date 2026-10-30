@@ -211,6 +211,10 @@ const sameDn = (a: string, b: string): boolean => {
   }
 };
 
+export const QuotaParams = Type.Object({
+  user: Type.String({ minLength: 1 }),
+});
+
 export default class James extends TwakePlugin {
   static optionDefinitions = jamesOptions;
 
@@ -318,7 +322,7 @@ export default class James extends TwakePlugin {
     defineRoute(app, {
       method: 'get',
       path: `${apiPrefix}/v1/users/:user/quota-usage`,
-      params: Type.Object({ user: Type.String({ minLength: 1 }) }),
+      params: QuotaParams,
       handler: async ({ req, res }) => this.getUserQuota(req, res),
     });
 

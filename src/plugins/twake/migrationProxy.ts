@@ -39,6 +39,10 @@ const HEAD_TIMEOUT_MS = 10_000;
  *           type: boolean
  *           description: Whether the proxy routes the user to the new backend
  */
+export const MailMigrationParams = Type.Object({
+  user: Type.String({ minLength: 1 }),
+});
+
 export default class MigrationProxy extends TwakePlugin {
   name = 'migrationProxy';
   roles: Role[] = ['consistency', 'api'] as const;
@@ -120,7 +124,7 @@ export default class MigrationProxy extends TwakePlugin {
     defineRoute(app, {
       method: 'get',
       path: `${apiPrefix}/v1/users/:user/mail-migration`,
-      params: Type.Object({ user: Type.String({ minLength: 1 }) }),
+      params: MailMigrationParams,
       handler: async ({ req, res }) => this.getMigrationStatus(req, res),
     });
   }

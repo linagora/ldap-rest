@@ -56,6 +56,11 @@ const first = (value: unknown): string | undefined => {
 
 const REPLACED = /(^|\/)twake\/(cozy|cloudery)Provision(\.js)?$/;
 
+export const EnsureInstanceBody = Type.Object({
+  dn: Type.Optional(Type.String()),
+  mail: Type.Optional(Type.String()),
+});
+
 export default class TwakeInstances extends DmPlugin {
   name = 'twakeInstances';
   roles: Role[] = ['consistency', 'api'] as const;
@@ -272,10 +277,7 @@ export default class TwakeInstances extends DmPlugin {
     defineRoute(app, {
       method: 'post',
       path: `${this.config.api_prefix}/v1/twake/instances/ensure`,
-      body: Type.Object({
-        dn: Type.Optional(Type.String()),
-        mail: Type.Optional(Type.String()),
-      }),
+      body: EnsureInstanceBody,
       handler: async ({ req, res, body }) => {
         let dn: unknown = body.dn;
         if (dn === undefined && body.mail) {

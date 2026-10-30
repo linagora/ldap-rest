@@ -5487,7 +5487,6 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "description": "The account, by DN or by mail.",
                 "properties": {
                   "dn": {
                     "type": "string"
@@ -5495,7 +5494,8 @@
                   "mail": {
                     "type": "string"
                   }
-                }
+                },
+                "description": "The account, by DN or by mail."
               }
             }
           }
@@ -5512,6 +5512,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "user parameter"
@@ -5606,6 +5607,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "user parameter"
