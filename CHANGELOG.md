@@ -9,17 +9,15 @@
   that moved the `package.json` outside the package leaves the field out
   ([details](docs/client-development/api/rest-api.md#get-configuration)).
 - The published image declares a `HEALTHCHECK` that calls `GET /healthz`
-  ([details](docs/usage/operations.md#health-and-readiness), [#424](https://github.com/linagora/ldap-rest/issues/424)).
+  ([details](docs/usage/operations.md#health-and-readiness)).
 
 ### Changed
 
 - Node 22 is the oldest runtime supported and tested
   ([upgrading](docs/usage/upgrading.md#from-121)).
-- The published image loads `core/demo/helloworld` as its second plugin, so
-  the server it starts has the demo routes
-  ([details](docs/usage/operations.md#health-and-readiness)): the default it
-  named before matched no plugin, and every `docker run` without
-  `DM_PLUGINS` stopped at startup.
+- The published image loads `core/demo/helloworld` as its second plugin and
+  starts without `DM_PLUGINS`
+  ([details](docs/usage/operations.md#health-and-readiness)).
 
 ### Fixed
 

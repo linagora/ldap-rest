@@ -59,6 +59,18 @@ function normalizeAlias(alias) {
 }
 
 /**
+ * What to log about a failure: a refused connection says `fetch failed`,
+ * and the host and port are in its cause.
+ * @param {unknown} err
+ * @returns {string}
+ */
+function errorMessage(err) {
+  if (!(err instanceof Error)) return String(err);
+  const cause = /** @type {{ message?: string }} */ (err.cause);
+  return cause?.message ? `${err.message}: ${cause.message}` : err.message;
+}
+
+/**
  * Extract normalized aliases from an LDAP attribute value.
  * @param {string|string[]|Buffer|Buffer[]|undefined} value
  * @returns {string[]}
@@ -334,7 +346,7 @@ async function syncJames() {
           // are removed even when the LDAP attribute has been cleared.
           await syncAliases(dn, mail, entry[aliasAttr]);
         } catch (err) {
-          dm.logger.error(`Error processing ${mail}: ${err.message}`);
+          dm.logger.error(`Error processing ${mail}: ${errorMessage(err)}`);
           stats.errors++;
         }
       }

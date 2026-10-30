@@ -135,9 +135,9 @@ abstract class HttpProvider {
   }
 
   private timedOut(err: unknown, url: string): unknown {
-    // The deadline is the only signal fetch is given, and it aborts the
-    // headers as TimeoutError and the body as AbortError: both mean it ran
-    // out
+    // The deadline is the only signal fetch is given. Node 22 answers a
+    // TimeoutError at every stage; AbortError covers the runtimes that name
+    // an abort of the body so
     return ['AbortError', 'TimeoutError'].includes(
       (err as { name?: string }).name ?? ''
     )

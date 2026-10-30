@@ -42,13 +42,15 @@ the server to the internet, keep the two paths to the cluster.
 
 The Helm chart probes both routes over HTTP (`livenessProbe` and
 `readinessProbe` in `values.yaml`). The published image also declares a
-`HEALTHCHECK` calling `GET /healthz` on `--port`, from inside the container:
+`HEALTHCHECK` calling `GET /healthz` from inside the container, on `DM_PORT`:
 `docker ps` reports the container unhealthy when it stops answering, and a
 `--restart` policy restarts it as it would after a crash, while an
-orchestrator with probes of its own ignores the declaration.
+orchestrator with probes of its own ignores the declaration. A port given
+any other way (`--port` in a configuration file, a plugin) leaves the check
+on 8081.
 
 The image runs as its unprivileged `node` user: with `docker run`, a
-`--port` below 1024 stops the server at startup, where the default 8081
+`DM_PORT` below 1024 stops the server at startup, where the default 8081
 changes nothing.
 
 ### What the shipped plugins report

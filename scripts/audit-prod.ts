@@ -85,8 +85,21 @@ export const advisories = (report: unknown): Advisory[] => {
 const covers = (entry: AllowlistEntry, advisory: Advisory): boolean =>
   entry.id === advisory.name || advisory.ids.includes(entry.id);
 
-const isDay = (value: string): boolean =>
-  /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+// A day is one that exists: the date parser rolls 2027-02-30 over to March
+const isDay = (value: unknown): boolean =>
+  typeof value === 'string' &&
+  /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+
+const isEntry = (value: unknown): value is AllowlistEntry => {
+  const { id, reason } = (value ?? {}) as Partial<AllowlistEntry>;
+  return (
+    typeof id === 'string' &&
+    id !== '' &&
+    typeof reason === 'string' &&
+    reason !== ''
+  );
+};
 
 /**
  * What stops the build, and the allowlist entries to clean up: high or
@@ -132,6 +145,7 @@ const run = (): void => {
     out = execFileSync('npm', ['audit', '--omit=dev', '--json'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 120_000,
     });
   } catch (err) {
     // npm exits non-zero when it finds an advisory, and its report is the
@@ -158,9 +172,14 @@ const run = (): void => {
   if ((report as { auditReportVersion?: unknown }).auditReportVersion !== 2)
     throw new Error('unexpected npm audit report version');
 
-  const allowlist: AllowlistEntry[] = fs.existsSync(allowlistPath)
-    ? (JSON.parse(fs.readFileSync(allowlistPath, 'utf8')) as AllowlistEntry[])
+  const allowlist: unknown = fs.existsSync(allowlistPath)
+    ? JSON.parse(fs.readFileSync(allowlistPath, 'utf8'))
     : [];
+  if (!Array.isArray(allowlist) || !allowlist.every(isEntry))
+    throw new Error(
+      'allowlist: every entry names an id and a reason' +
+        ' (see CONTRIBUTING.md#dependencies)'
+    );
   const { blocked, expired, unused, invalid } = gate(
     advisories(report),
     allowlist,
@@ -168,7 +187,9 @@ const run = (): void => {
   );
 
   for (const entry of invalid)
-    console.error(`allowlist: ${entry.id} has no "until" day (YYYY-MM-DD)`);
+    console.error(
+      `allowlist: ${entry.id} has no "until" day that exists (YYYY-MM-DD)`
+    );
   for (const entry of expired)
     console.error(
       `allowlist: ${entry.id} (${entry.reason}) expired on ${entry.until}`
