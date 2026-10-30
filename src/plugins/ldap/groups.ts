@@ -12,6 +12,7 @@ import type { Express, Request, Response } from 'express';
 
 import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
+import type { OptionSet } from '../../config/options';
 import type { Hooks } from '../../hooks';
 import type ldapActions from '../../lib/ldapActions';
 import type {
@@ -184,7 +185,17 @@ export const GroupMoveBody = Type.Object({ targetOrgDn: Type.String() });
 
 export const GroupRenameBody = Type.Object({ newCn: Type.String() });
 
+import {
+  groupsOptions,
+  groupsOptionsOf,
+  organizationOptionsOf,
+  type GroupsOptions,
+  type OrganizationOptions,
+} from './ldap.options';
+
 export default class LdapGroups extends DmPlugin {
+  static optionDefinitions: OptionSet = groupsOptions;
+
   name = 'ldapGroups';
   roles: Role[] = ['api', 'configurable'] as const;
   base?: string;
@@ -192,11 +203,19 @@ export default class LdapGroups extends DmPlugin {
   cn: string;
   schema?: Schema;
 
+  private get groupSettings(): GroupsOptions {
+    return groupsOptionsOf(this.config);
+  }
+
+  private get orgSettings(): OrganizationOptions {
+    return organizationOptionsOf(this.config);
+  }
+
   constructor(server: DM) {
     super(server);
     this.ldap = server.ldap;
-    this.base = this.config.ldap_group_base as string;
-    this.cn = this.config.ldap_groups_main_attribute as string;
+    this.base = this.groupSettings.ldap_group_base;
+    this.cn = this.groupSettings.ldap_groups_main_attribute;
     if (!this.base) {
       this.base = this.config.ldap_base;
       this.logger.warn(`LDAP group base is not defined, using "${this.base}"`);
@@ -206,13 +225,13 @@ export default class LdapGroups extends DmPlugin {
     }
     // Not on the fallback: groups would then be declared for the whole
     // directory, and any entry outside the other bases given their classes.
-    if (this.config.ldap_group_base)
+    if (this.groupSettings.ldap_group_base)
       server.ldap.declareObjectClasses(
         this.base,
-        (this.config.group_class as string[]) || []
+        this.groupSettings.group_class
       );
-    if (this.config.group_schema) {
-      const file = this.config.group_schema;
+    if (this.groupSettings.group_schema) {
+      const file = this.groupSettings.group_schema;
       loadSchemaFileAsync<Schema>(file, { config: this.config })
         .then(schema => {
           this.schema = this.adaptSchema(schema);
@@ -568,8 +587,8 @@ export default class LdapGroups extends DmPlugin {
 
     // Move group to different organization (only if organization attributes are configured)
     if (
-      this.config.ldap_organization_link_attribute &&
-      this.config.ldap_organization_path_attribute
+      this.orgSettings.ldap_organization_link_attribute &&
+      this.orgSettings.ldap_organization_path_attribute
     ) {
       /**
        * @openapi
@@ -607,8 +626,7 @@ export default class LdapGroups extends DmPlugin {
         handler: async ({ req, params, res, body }) => {
           const cn = decodeURIComponent(params.cn);
           const dn = this.routeGroupDn(cn);
-          const linkAttr = this.config
-            .ldap_organization_link_attribute as string;
+          const linkAttr = this.orgSettings.ldap_organization_link_attribute;
           await this.judgedGroup(dn, () =>
             this.ldap.authorize('ldapmodifyrequest', [
               dn,
@@ -684,8 +702,11 @@ export default class LdapGroups extends DmPlugin {
    * @param member DN of a member
    * @returns true for the placeholder
    */
-  isDummyMember(member: string): boolean {
-    return isDummyMemberDn(member, this.config.group_dummy_user);
+  isDummyMember(
+    member: string,
+    placeholder = this.groupSettings.group_dummy_user
+  ): boolean {
+    return isDummyMemberDn(member, placeholder);
   }
 
   /**
@@ -701,9 +722,10 @@ export default class LdapGroups extends DmPlugin {
     const members = entry.member;
     if (members === undefined) return entry;
     const list = Array.isArray(members) ? members : [members];
+    const placeholder = this.groupSettings.group_dummy_user;
     return {
       ...entry,
-      member: list.filter(m => !this.isDummyMember(m as string)),
+      member: list.filter(m => !this.isDummyMember(m as string, placeholder)),
     };
   }
 
@@ -904,7 +926,7 @@ export default class LdapGroups extends DmPlugin {
     additional: AttributesList
   ): AttributesList {
     // Build entry
-    const objectClasses = [...(this.config.group_class as string[])];
+    const objectClasses = [...this.groupSettings.group_class];
 
     // Add twakeGroup objectClass if group has mail or twake-specific attributes
     // Only add if not already using twakeStaticGroup (which includes all these attributes)
@@ -923,11 +945,11 @@ export default class LdapGroups extends DmPlugin {
       // Classes from --group-class (with twakeGroup added if mail present)
       objectClass: objectClasses,
       // Default attributes from --group-default-attributes
-      ...this.config.group_default_attributes,
+      ...this.groupSettings.group_default_attributes,
       // cn calculated here
       [this.cn]: cn,
       // members with at least one fake member to satisfy LDAP groupOfNames schema
-      member: [this.config.group_dummy_user as string],
+      member: [this.groupSettings.group_dummy_user],
       ...additional,
     };
     if (members.length) (entry.member as string[]).push(...members);
@@ -1116,7 +1138,7 @@ export default class LdapGroups extends DmPlugin {
       .modify(dn, { delete: { member } }, req)
       .catch(err => {
         if (extractLdapCode(err) !== 65) throw err;
-        const placeholder = this.config.group_dummy_user;
+        const placeholder = this.groupSettings.group_dummy_user;
         if (!placeholder)
           throw new ConflictError(
             `Cannot remove ${member}, the last member of ${dn}: a group needs at least one member`
@@ -1176,8 +1198,8 @@ export default class LdapGroups extends DmPlugin {
     targetOrgDn: string,
     req?: Request
   ): Promise<{ success: boolean }> {
-    const linkAttr = this.config.ldap_organization_link_attribute as string;
-    const pathAttr = this.config.ldap_organization_path_attribute as string;
+    const linkAttr = this.orgSettings.ldap_organization_link_attribute;
+    const pathAttr = this.orgSettings.ldap_organization_path_attribute;
     const dn = this.toGroupDn(cn);
 
     // Judged before the group and the target are read, as the server: which
@@ -1407,7 +1429,7 @@ export default class LdapGroups extends DmPlugin {
   private groupFilter(): string {
     const classes = new Set(
       [
-        ...(this.config.group_class ?? []),
+        ...this.groupSettings.group_class,
         'groupOfNames',
         'groupOfUniqueNames',
         'groupOfURLs',
@@ -1465,7 +1487,7 @@ export default class LdapGroups extends DmPlugin {
    * With `req`, each member is looked up as the caller sees the directory:
    * an entry an authorization plugin hides from them is refused as one that
    * does not exist, so that an administrator cannot put an account of
-   * another branch in a group of theirs. `--group-allow-unexistent-members`
+   * another branch in a group of theirs. `--groups-allow-unexistent-members`
    * still accepts a member that does not exist, but not one that does and
    * is hidden — which tells the caller it exists, a smaller leak than the
    * membership it would otherwise grant.
@@ -1484,7 +1506,7 @@ export default class LdapGroups extends DmPlugin {
       dn,
       members,
     ]);
-    const allowMissing = Boolean(this.config.groups_allow_unexistent_members);
+    const allowMissing = this.groupSettings.groups_allow_unexistent_members;
     if (allowMissing && !req) return;
     if (!members || !members.length) return;
     try {
@@ -1585,15 +1607,15 @@ export default class LdapGroups extends DmPlugin {
     const apiPrefix = this.config.api_prefix || '/api';
 
     // Where a static plugin serves the file, whatever its name
-    const schemaUrl = this.config.group_schema
-      ? staticSchemaUrl(this.server, this.config.group_schema)
+    const schemaUrl = this.groupSettings.group_schema
+      ? staticSchemaUrl(this.server, this.groupSettings.group_schema)
       : undefined;
 
     return {
       enabled: true,
       base: this.base || '',
       mainAttribute: this.cn || 'cn',
-      objectClass: this.config.group_class || ['top', 'groupOfNames'],
+      objectClass: this.groupSettings.group_class,
       schema: this.schema,
       schemaUrl,
       endpoints: {

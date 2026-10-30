@@ -29,7 +29,11 @@ export const mailDomainOf = (mail: string): string => {
         .replace(/\.$/, '');
 };
 
+import { externalUsersOptions, groupsOptionsOf } from './ldap.options';
+
 export default class ExternalUsersInGroups extends DmPlugin {
+  static optionDefinitions = externalUsersOptions;
+
   name = 'externalUsersInGroups';
   roles: Role[] = ['consistency', 'configurable'] as const;
 
@@ -72,10 +76,10 @@ export default class ExternalUsersInGroups extends DmPlugin {
               }
 
               let entry: AttributesList = {
-                objectClass: (this.config.external_branch_class ||
-                  this.config.user_class) as string[],
+                objectClass:
+                  this.options(externalUsersOptions).external_branch_class,
                 mail,
-                [this.config.ldap_groups_main_attribute as string]: mail,
+                [groupsOptionsOf(this.config).ldap_groups_main_attribute]: mail,
                 sn: mail,
               };
               [m, entry] = await this.hookBus.chain('externaluserentry', [
@@ -107,7 +111,7 @@ export default class ExternalUsersInGroups extends DmPlugin {
    * right under the branch. Null for any other member.
    */
   externalAddress(member: string): string | null {
-    const branch = this.config.external_members_branch;
+    const branch = this.options(externalUsersOptions).external_members_branch;
     if (!branch) return null;
     const [rdn, ...parent] = parseDn(member);
     if (!rdn || normalizeDn(parent.join(',')) !== normalizeDn(branch))
@@ -165,7 +169,7 @@ export default class ExternalUsersInGroups extends DmPlugin {
     }
     return {
       enabled: true,
-      branch: this.config.external_members_branch,
+      branch: this.options(externalUsersOptions).external_members_branch,
       rdnAttribute: 'mail',
       managedDomains,
     };

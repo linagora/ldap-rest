@@ -1083,7 +1083,7 @@ curl -X POST \
 ```
 
 A member that does not exist answers 400 naming it, and none of the members
-is added (unless `--group-allow-unexistent-members` is set). Group creation
+is added (unless `--groups-allow-unexistent-members` is set). Group creation
 checks its `member` list the same way:
 
 ```json

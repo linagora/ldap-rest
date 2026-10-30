@@ -489,7 +489,14 @@ export const ValidatePasswordBody = Type.Object({
   password: Type.String({ minLength: 1 }),
 });
 
+import {
+  passwordPolicyOptions,
+  type PasswordPolicyOptions,
+} from './ldap.options';
+
 export default class PasswordPolicy extends DmPlugin {
+  static optionDefinitions = passwordPolicyOptions;
+
   name = 'ldapPasswordPolicy';
   roles: Role[] = ['api', 'configurable'];
 
@@ -503,6 +510,10 @@ export default class PasswordPolicy extends DmPlugin {
   private warnedMissingBase = false;
   private warnedUnreadableSchema = false;
   private readonly POLICY_CACHE_TTL = 60000; // 1 minute
+
+  private get settings(): PasswordPolicyOptions {
+    return this.options(passwordPolicyOptions);
+  }
 
   api(app: Express): void {
     const prefix = `${this.config.api_prefix}/v1`;
@@ -687,8 +698,7 @@ export default class PasswordPolicy extends DmPlugin {
       path: `${prefix}/password-policy/expiring-soon`,
       query: ExpiringQuery,
       handler: async ({ req, res, query }) => {
-        const days =
-          query.days || (this.config.ppolicy_warn_days as number) || 14;
+        const days = query.days || this.settings.ppolicy_warn_days;
         const users = await this.findExpiringPasswords(days, req);
         res.json({ warningDays: days, users });
       },
@@ -968,7 +978,7 @@ export default class PasswordPolicy extends DmPlugin {
     });
 
     // POST /password/validate (optional)
-    if (this.config.ppolicy_validate_complexity) {
+    if (this.settings.ppolicy_validate_complexity) {
       /**
        * @openapi
        * summary: Validate password complexity
@@ -1090,7 +1100,7 @@ export default class PasswordPolicy extends DmPlugin {
 
     // Check warning period
     let isExpiringSoon = false;
-    const warnDays = (this.config.ppolicy_warn_days as number) || 14;
+    const warnDays = this.settings.ppolicy_warn_days;
     if (daysUntilExpiration !== null && daysUntilExpiration > 0) {
       isExpiringSoon = daysUntilExpiration <= warnDays;
     }
@@ -1205,9 +1215,7 @@ export default class PasswordPolicy extends DmPlugin {
     req?: Request
   ): Promise<ExpiringUser[]> {
     // Search users with pwdChangedTime
-    const base =
-      (this.config.ldap_users_base as string) ||
-      (this.config.ldap_base as string);
+    const base = this.settings.ldap_users_base || this.config.ldap_base;
 
     const result = (await this.server.ldap.search(
       {
@@ -1265,9 +1273,7 @@ export default class PasswordPolicy extends DmPlugin {
    * Find locked accounts
    */
   private async findLockedAccounts(req?: Request): Promise<LockedAccount[]> {
-    const base =
-      (this.config.ldap_users_base as string) ||
-      (this.config.ldap_base as string);
+    const base = this.settings.ldap_users_base || this.config.ldap_base;
 
     const result = (await this.server.ldap.search(
       {
@@ -1323,8 +1329,7 @@ export default class PasswordPolicy extends DmPlugin {
    */
   private async readPolicyConfig(): Promise<PpolicyConfig> {
     const dn =
-      (this.config.ppolicy_default_dn as string) ||
-      (await this.discoverDefaultDn());
+      this.settings.ppolicy_default_dn || (await this.discoverDefaultDn());
     const policy = dn ? await this.readPolicyAt(dn) : null;
     return policy ?? {};
   }
@@ -1400,7 +1405,7 @@ export default class PasswordPolicy extends DmPlugin {
     }
     // A dangling pwdPolicySubentry is the account's business; a default
     // policy that cannot be read is a configuration error
-    const configured = this.config.ppolicy_default_dn as string;
+    const configured = this.settings.ppolicy_default_dn;
     if (!policy && configured && normalizeDn(configured) === key) {
       this.logger.warn(
         `--ppolicy-default-dn ${dn} holds no password policy${failure ? `: ${failure}` : ''}`
@@ -1422,9 +1427,7 @@ export default class PasswordPolicy extends DmPlugin {
    * `--ldap-base`. `authzScope` asks whether a caller may search it.
    */
   policyBase(): string {
-    return (
-      (this.config.ppolicy_base as string) || (this.config.ldap_base as string)
-    );
+    return this.settings.ppolicy_base || this.config.ldap_base || '';
   }
 
   /**
@@ -1667,7 +1670,7 @@ export default class PasswordPolicy extends DmPlugin {
         sizeLimit: 1,
         paged: false,
       },
-      this.config.ldap_base as string
+      this.config.ldap_base || ''
     )) as SearchResult;
     if (users.searchEntries.length > 0) {
       throw new ConflictError(
@@ -1756,10 +1759,8 @@ export default class PasswordPolicy extends DmPlugin {
    */
   private resolveUserDn(userId: string): string {
     if (userId.includes('=')) return userId; // Already a DN
-    const base =
-      (this.config.ldap_users_base as string) ||
-      (this.config.ldap_base as string);
-    const attr = (this.config.ldap_user_main_attribute as string) || 'uid';
+    const base = this.settings.ldap_users_base || this.config.ldap_base;
+    const attr = this.config.ldap_user_main_attribute || 'uid';
     return `${attr}=${escapeDnValue(userId)},${base}`;
   }
 
@@ -1768,7 +1769,7 @@ export default class PasswordPolicy extends DmPlugin {
    */
   getConfigApiData(): Record<string, unknown> | undefined {
     const apiPrefix = this.config.api_prefix || '/api';
-    const validateComplexity = !!this.config.ppolicy_validate_complexity;
+    const validateComplexity = !!this.settings.ppolicy_validate_complexity;
 
     return {
       name: this.name,
@@ -1787,16 +1788,16 @@ export default class PasswordPolicy extends DmPlugin {
           : undefined,
       },
       config: {
-        warnDays: this.config.ppolicy_warn_days || 14,
+        warnDays: this.settings.ppolicy_warn_days,
         validateComplexity,
         // Include complexity rules when validation is enabled
         ...(validateComplexity && {
           complexityRules: {
-            minLength: this.config.ppolicy_min_length || 12,
-            requireUppercase: this.config.ppolicy_require_uppercase ?? true,
-            requireLowercase: this.config.ppolicy_require_lowercase ?? true,
-            requireDigit: this.config.ppolicy_require_digit ?? true,
-            requireSpecial: this.config.ppolicy_require_special ?? true,
+            minLength: this.settings.ppolicy_min_length,
+            requireUppercase: this.settings.ppolicy_require_uppercase,
+            requireLowercase: this.settings.ppolicy_require_lowercase,
+            requireDigit: this.settings.ppolicy_require_digit,
+            requireSpecial: this.settings.ppolicy_require_special,
           },
         }),
       },

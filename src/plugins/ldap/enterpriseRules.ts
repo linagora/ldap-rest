@@ -422,7 +422,17 @@ export function mailInDomains(
   });
 }
 
+import {
+  enterpriseRulesOptions,
+  groupsOptionsOf,
+  organizationOptionsOf,
+  type EnterpriseRulesOptions,
+  type OrganizationOptions,
+} from './ldap.options';
+
 export default class LdapEnterpriseRules extends DmPlugin {
+  static optionDefinitions = enterpriseRulesOptions;
+
   name = 'ldapEnterpriseRules';
   roles: Role[] = ['consistency'] as const;
 
@@ -431,10 +441,15 @@ export default class LdapEnterpriseRules extends DmPlugin {
   /** Root of the organization tree */
   private topOrganization?: string;
 
+  private readonly enterpriseSettings: EnterpriseRulesOptions;
+  private readonly orgSettings: OrganizationOptions;
+
   constructor(server: DM) {
     super(server);
-    this.dummyMember = this.config.group_dummy_user;
-    this.topOrganization = this.config.ldap_top_organization;
+    this.enterpriseSettings = this.options(enterpriseRulesOptions);
+    this.orgSettings = organizationOptionsOf(server.config);
+    this.dummyMember = groupsOptionsOf(server.config).group_dummy_user;
+    this.topOrganization = this.orgSettings.ldap_top_organization;
     this.logger.info('Enterprise directory rules enabled');
   }
 
@@ -773,7 +788,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
       !stop || parent.toLowerCase().endsWith(`,${stop}`)
         ? await this.organizationPath(parent)
         : undefined;
-    const separator = this.config.ldap_organization_path_separator || ' / ';
+    const separator = this.orgSettings.ldap_organization_path_separator;
     values[pathAttr] = parentPath ? `${parentPath}${separator}${name}` : name;
   }
 
@@ -942,7 +957,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     )?.schema;
     const domainLinkAttr =
       roleAttribute(orgSchema, 'domainLink') ||
-      this.config.enterprise_domain_link_attribute;
+      this.enterpriseSettings.enterprise_domain_link_attribute;
     if (!domainLinkAttr) return [];
 
     const domains: string[] = [];
@@ -996,7 +1011,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
       const name = roleAttribute(binding.schema, 'domainName');
       if (name) return name;
     }
-    return this.config.enterprise_domain_name_attribute || 'associatedDomain';
+    return this.enterpriseSettings.enterprise_domain_name_attribute;
   }
 
   /** Every mail domain declared anywhere in the directory. */
@@ -1063,7 +1078,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     )?.schema;
     const pathAttr =
       roleAttribute(orgSchema, 'organizationPath') ||
-      this.config.ldap_organization_path_attribute;
+      this.orgSettings.ldap_organization_path_attribute;
     if (!pathAttr) return undefined;
     const org = await this.readEntry(orgDn);
     if (!org) return undefined;

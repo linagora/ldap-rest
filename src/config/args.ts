@@ -24,6 +24,17 @@ import {
   totpOptions,
   trustedProxyOptions,
 } from '../plugins/auth/auth.options';
+import {
+  bulkImportOptions,
+  enterpriseRulesOptions,
+  externalUsersOptions,
+  flatGenericOptions,
+  groupsOptions,
+  organizationOptions,
+  passwordPolicyOptions,
+  rawOptions,
+  trashOptions,
+} from '../plugins/ldap/ldap.options';
 import { appAccountsOptions } from '../plugins/twake/appAccounts.options';
 import { calendarOptions } from '../plugins/twake/calendar.options';
 import { clouderyOptions } from '../plugins/twake/cloudery.options';
@@ -597,52 +608,10 @@ const configArgs: ConfigTemplate = [
   // Plugins options
 
   // LDAP organizations
-  ['--ldap-top-organization', 'DM_LDAP_TOP_ORGANIZATION', ''],
-  [
-    '--ldap-organization-class',
-    'DM_LDAP_ORGANIZATION_CLASSES',
-    ['top', 'organizationalUnit', 'twakeDepartment'],
-    'array',
-    '--ldap-organization-classes',
-    'identifiers',
-  ],
-  [
-    '--ldap-organization-link-attribute',
-    'DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE',
-    'twakeDepartmentLink',
-  ],
-  [
-    '--ldap-organization-path-attribute',
-    'DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE',
-    'twakeDepartmentPath',
-  ],
-  [
-    '--ldap-organization-path-separator',
-    'DM_LDAP_ORGANIZATION_PATH_SEPARATOR',
-    ' / ',
-  ],
-  [
-    '--ldap-organization-max-subnodes',
-    'DM_LDAP_ORGANIZATION_MAX_SUBNODES',
-    50,
-    'number',
-  ],
-  // No default: loading a schema turns on validation the organizations plugin
-  // does not perform otherwise, so it stays an explicit choice.
-  ['--organization-schema', 'DM_ORGANIZATION_SCHEMA', ''],
+  ...toConfigEntries(organizationOptions),
 
   // LDAP enterprise rules plugin
-
-  [
-    '--enterprise-domain-name-attribute',
-    'DM_ENTERPRISE_DOMAIN_NAME_ATTRIBUTE',
-    'associatedDomain',
-  ],
-  [
-    '--enterprise-domain-link-attribute',
-    'DM_ENTERPRISE_DOMAIN_LINK_ATTRIBUTE',
-    '',
-  ],
+  ...toConfigEntries(enterpriseRulesOptions),
 
   // Metrics plugin
   ['--metrics-port', 'DM_METRICS_PORT', 9464, 'number'],
@@ -687,55 +656,9 @@ const configArgs: ConfigTemplate = [
   // often expired ones are reclaimed, is core/storage's business.
   ['--bcl-retention', 'DM_BCL_RETENTION', 604800, 'number'],
 
-  // LDAP groups plugin
-
-  ['--ldap-group-base', 'DM_LDAP_GROUP_BASE', ''],
-  ['--ldap-groups-main-attribute', 'DM_LDAP_GROUPS_MAIN_ATTRIBUTE', 'cn'],
-  [
-    '--group-class',
-    'DM_GROUP_CLASSES',
-    ['top', 'groupOfNames'],
-    'array',
-    '--group-classes',
-    'identifiers',
-  ],
-  [
-    '--group-allow-unexistent-members',
-    'DM_ALLOW_UNEXISTENT_MEMBERS',
-    false,
-    'boolean',
-  ],
-  ['--group-default-attributes', 'DM_GROUP_DEFAULT_ATTRIBUTES', {}, 'json'],
-  ['--group-dummy-user', 'DM_GROUP_DUMMY_USER', 'cn=fakeuser'],
-  [
-    '--group-schema',
-    'DM_GROUP_SCHEMA',
-    join(
-      dirname(fileURLToPath(import.meta.url)),
-      '..',
-      '..',
-      'static',
-      'schemas',
-      'twake',
-      'groups.json'
-    ),
-  ],
-
-  // externalUsersInGroups
-
-  [
-    '--external-members-branch',
-    'DM_EXTERNAL_MEMBERS_BRANCH',
-    'ou=contacts,dc=example,dc=com',
-  ],
-  [
-    '--external-branch-class',
-    'DM_EXTERNAL_BRANCH_CLASSES',
-    ['top', 'inetOrgPerson'],
-    'array',
-    '--external-branch-classes',
-    'identifiers',
-  ],
+  // LDAP groups and external users plugins
+  ...toConfigEntries(groupsOptions),
+  ...toConfigEntries(externalUsersOptions),
 
   // static
   [
@@ -749,46 +672,10 @@ const configArgs: ConfigTemplate = [
   ['--static-csp', 'DM_STATIC_CSP', STATIC_CSP],
   ['--static-frame-options', 'DM_STATIC_FRAME_OPTIONS', STATIC_FRAME_OPTIONS],
 
-  // LDAP Flat generic plugin
-  [
-    '--ldap-flat-schema',
-    'DM_LDAP_FLAT_SCHEMA',
-    [],
-    'array',
-    '--ldap-flat-schemas',
-  ],
-  ['--ldap-flat-auto-repair', 'DM_LDAP_FLAT_AUTO_REPAIR', true, 'boolean'],
-
-  // LDAP raw (low-level browsing) plugin
-  [
-    '--ldap-raw-base',
-    'DM_LDAP_RAW_BASE',
-    [],
-    'array',
-    '--ldap-raw-bases',
-    'dns',
-  ],
-  [
-    '--ldap-raw-hidden-attribute',
-    'DM_LDAP_RAW_HIDDEN_ATTRIBUTES',
-    [],
-    'array',
-    '--ldap-raw-hidden-attributes',
-    'identifiers',
-  ],
-  ['--ldap-raw-show-secrets', 'DM_LDAP_RAW_SHOW_SECRETS', false, 'boolean'],
-  ['--ldap-raw-max-results', 'DM_LDAP_RAW_MAX_RESULTS', 200, 'number'],
-  [
-    '--ldap-raw-schema-cache-ttl',
-    'DM_LDAP_RAW_SCHEMA_CACHE_TTL',
-    3600,
-    'number',
-  ], // seconds
-
-  // LDAP Bulk Import plugin
-  ['--bulk-import-schemas', 'DM_BULK_IMPORT_SCHEMAS', ''],
-  ['--bulk-import-max-file-size', 'DM_BULK_IMPORT_MAX_FILE_SIZE', '10485760'],
-  ['--bulk-import-batch-size', 'DM_BULK_IMPORT_BATCH_SIZE', '100'],
+  // LDAP flat, raw and bulk import plugins
+  ...toConfigEntries(flatGenericOptions),
+  ...toConfigEntries(rawOptions),
+  ...toConfigEntries(bulkImportOptions),
 
   // James plugin
   ['--ldap-concurrency', 'DM_LDAP_CONCURRENCY', 10, 'number'],
@@ -824,10 +711,7 @@ const configArgs: ConfigTemplate = [
   ...toConfigEntries(appAccountsOptions),
 
   // Trash plugin
-  ['--trash-base', 'DM_TRASH_BASE', ''],
-  ['--trash-watched-bases', 'DM_TRASH_WATCHED_BASES', ''],
-  ['--trash-add-metadata', 'DM_TRASH_ADD_METADATA', 'true'],
-  ['--trash-auto-create', 'DM_TRASH_AUTO_CREATE', 'true'],
+  ...toConfigEntries(trashOptions),
 
   /* Access control plugins */
 
@@ -920,31 +804,7 @@ const configArgs: ConfigTemplate = [
   ...toConfigEntries(trustedProxyOptions),
 
   // Password Policy plugin
-  ['--ppolicy-default-dn', 'DM_PPOLICY_DEFAULT_DN', ''],
-  ['--ppolicy-base', 'DM_PPOLICY_BASE', ''],
-  ['--ppolicy-warn-days', 'DM_PPOLICY_WARN_DAYS', 14, 'number'],
-  [
-    '--ppolicy-validate-complexity',
-    'DM_PPOLICY_VALIDATE_COMPLEXITY',
-    false,
-    'boolean',
-  ],
-  ['--ppolicy-min-length', 'DM_PPOLICY_MIN_LENGTH', 12, 'number'],
-  [
-    '--ppolicy-require-uppercase',
-    'DM_PPOLICY_REQUIRE_UPPERCASE',
-    true,
-    'boolean',
-  ],
-  [
-    '--ppolicy-require-lowercase',
-    'DM_PPOLICY_REQUIRE_LOWERCASE',
-    true,
-    'boolean',
-  ],
-  ['--ppolicy-require-digit', 'DM_PPOLICY_REQUIRE_DIGIT', true, 'boolean'],
-  ['--ppolicy-require-special', 'DM_PPOLICY_REQUIRE_SPECIAL', true, 'boolean'],
-  ['--ldap-users-base', 'DM_LDAP_USERS_BASE', ''],
+  ...toConfigEntries(passwordPolicyOptions),
 
   // SCIM plugin
   ...toConfigEntries(scimOptions),

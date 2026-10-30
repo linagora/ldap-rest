@@ -140,6 +140,10 @@
       "types": "./dist/src/plugins/ldap/groups.d.ts",
       "import": "./dist/plugins/ldap/groups.js"
     },
+    "./plugin-ldap-ldap.options": {
+      "types": "./dist/src/plugins/ldap/ldap.options.d.ts",
+      "import": "./dist/plugins/ldap/ldap.options.js"
+    },
     "./plugin-ldap-onchange": {
       "types": "./dist/src/plugins/ldap/onChange.d.ts",
       "import": "./dist/plugins/ldap/onChange.js"

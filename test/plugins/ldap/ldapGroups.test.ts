@@ -474,7 +474,7 @@ describe('LdapGroups Plugin', function () {
 
       it('should answer 409 when no placeholder is configured', async () => {
         const placeholder = server.config.group_dummy_user;
-        server.config.group_dummy_user = undefined;
+        server.config.group_dummy_user = '';
         try {
           const res = await request
             .delete(`/api/v1/ldap/groups/testgroup/members/${user2}`)

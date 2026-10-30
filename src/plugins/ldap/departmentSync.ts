@@ -28,22 +28,25 @@ interface LinkedAttributes {
   path: string;
 }
 
+import {
+  organizationOptionsOf,
+  type OrganizationOptions,
+} from './ldap.options';
+
 export default class LdapDepartmentSync extends DmPlugin {
   name = 'ldapDepartmentSync';
   roles: Role[] = ['consistency'] as const;
 
+  private readonly settings: OrganizationOptions;
   private linkAttr: string;
   private pathAttr: string;
 
   constructor(server: DM) {
     super(server);
+    this.settings = organizationOptionsOf(server.config);
 
-    this.linkAttr =
-      (this.config.ldap_organization_link_attribute as string) ||
-      'twakeDepartmentLink';
-    this.pathAttr =
-      (this.config.ldap_organization_path_attribute as string) ||
-      'twakeDepartmentPath';
+    this.linkAttr = this.settings.ldap_organization_link_attribute;
+    this.pathAttr = this.settings.ldap_organization_path_attribute;
   }
 
   /**
@@ -119,7 +122,7 @@ export default class LdapDepartmentSync extends DmPlugin {
       );
 
       try {
-        const baseDn = (this.config.ldap_top_organization as string).replace(
+        const baseDn = this.settings.ldap_top_organization.replace(
           /^ou=[^,]+,/,
           ''
         );
@@ -162,10 +165,9 @@ export default class LdapDepartmentSync extends DmPlugin {
    */
   private async updateOrganizationPaths(orgDn: string): Promise<void> {
     const pathAttr = this.organizationPathAttribute();
-    const top = this.config.ldap_top_organization;
+    const top = this.settings.ldap_top_organization;
     if (!top || !isDnInBranch(orgDn, top)) return;
-    const separator =
-      (this.config.ldap_organization_path_separator as string) || ' / ';
+    const separator = this.settings.ldap_organization_path_separator;
 
     // As the server: the paths below a renamed organization are kept in step whoever renamed it
     const results = await this.server.ldap.system.search(

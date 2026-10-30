@@ -23,6 +23,11 @@ import {
   rateLimitOptionsOf,
   totpOptionsOf,
 } from '../../src/plugins/auth/auth.options';
+import {
+  organizationOptions,
+  passwordPolicyOptions,
+  rawOptions,
+} from '../../src/plugins/ldap/ldap.options';
 import { jamesOptionsOf } from '../../src/plugins/twake/james.options';
 import { calendarOptionsOf } from '../../src/plugins/twake/calendar.options';
 import { clouderyOptionsOf } from '../../src/plugins/twake/cloudery.options';
@@ -651,6 +656,130 @@ describe('plugin options', () => {
         ['DM_CROWDSEC_CACHE_TTL', () => crowdsecOptionsOf(parse())],
         ['DM_AUTHZ_PER_BRANCH_CACHE_TTL', () => perBranchOptionsOf(parse())],
         ['DM_AUTHZ_DYNAMIC_CACHE_TTL', () => dynamicOptionsOf(parse())],
+      ];
+      for (const [name, read] of cases) {
+        const saved = process.env[name];
+        process.env[name] = '0';
+        try {
+          expect(read, name).to.throw(/must be at least 1/);
+        } finally {
+          if (saved === undefined) delete process.env[name];
+          else process.env[name] = saved;
+        }
+      }
+    });
+  });
+
+  describe('LDAP plugin options', () => {
+    it('keeps the defaults the parser used to declare', () => {
+      const saved = {
+        DM_LDAP_TOP_ORGANIZATION: process.env.DM_LDAP_TOP_ORGANIZATION,
+        DM_LDAP_GROUP_BASE: process.env.DM_LDAP_GROUP_BASE,
+        DM_GROUP_SCHEMA: process.env.DM_GROUP_SCHEMA,
+        DM_GROUP_DUMMY_USER: process.env.DM_GROUP_DUMMY_USER,
+        DM_EXTERNAL_MEMBERS_BRANCH: process.env.DM_EXTERNAL_MEMBERS_BRANCH,
+      };
+      for (const name of Object.keys(saved)) delete process.env[name];
+      try {
+        const config = parse();
+        expect(config.ldap_top_organization).to.equal('');
+        expect(config.ldap_organization_class).to.deep.equal([
+          'top',
+          'organizationalUnit',
+          'twakeDepartment',
+        ]);
+        expect(config.ldap_organization_link_attribute).to.equal(
+          'twakeDepartmentLink'
+        );
+        expect(config.ldap_organization_path_separator).to.equal(' / ');
+        expect(config.ldap_organization_max_subnodes).to.equal(50);
+        expect(config.enterprise_domain_name_attribute).to.equal(
+          'associatedDomain'
+        );
+        expect(config.ldap_group_base).to.equal('');
+        expect(config.ldap_groups_main_attribute).to.equal('cn');
+        expect(config.group_class).to.deep.equal(['top', 'groupOfNames']);
+        expect(config.groups_allow_unexistent_members).to.equal(false);
+        expect(config.group_default_attributes).to.deep.equal({});
+        expect(config.group_dummy_user).to.equal('cn=fakeuser');
+        expect(config.group_schema).to.match(
+          /static\/schemas\/twake\/groups\.json$/
+        );
+        expect(config.external_members_branch).to.equal(
+          'ou=contacts,dc=example,dc=com'
+        );
+        expect(config.ldap_flat_schema).to.deep.equal([]);
+        expect(config.ldap_flat_auto_repair).to.equal(true);
+        expect(config.ldap_raw_max_results).to.equal(200);
+        expect(config.ldap_raw_schema_cache_ttl).to.equal(3600);
+        expect(config.bulk_import_max_file_size).to.equal('10485760');
+        expect(config.bulk_import_batch_size).to.equal('100');
+        expect(config.trash_add_metadata).to.equal('true');
+        expect(config.ppolicy_warn_days).to.equal(14);
+        expect(config.ppolicy_min_length).to.equal(12);
+        expect(config.ppolicy_require_digit).to.equal(true);
+      } finally {
+        for (const [name, value] of Object.entries(saved))
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+      }
+    });
+
+    it('reads the environment and the CLI as before', () => {
+      const saved = {
+        DM_LDAP_ORGANIZATION_CLASSES: process.env.DM_LDAP_ORGANIZATION_CLASSES,
+        DM_LDAP_RAW_HIDDEN_ATTRIBUTES:
+          process.env.DM_LDAP_RAW_HIDDEN_ATTRIBUTES,
+        DM_ALLOW_UNEXISTENT_MEMBERS: process.env.DM_ALLOW_UNEXISTENT_MEMBERS,
+      };
+      process.env.DM_LDAP_ORGANIZATION_CLASSES = 'top;organizationalUnit';
+      process.env.DM_LDAP_RAW_HIDDEN_ATTRIBUTES = 'userPassword;entryUUID';
+      process.env.DM_ALLOW_UNEXISTENT_MEMBERS = 'true';
+      try {
+        const config = parse([
+          'node',
+          'ldap-rest',
+          '--group-dummy-user',
+          'cn=placeholder',
+          '--bulk-import-batch-size',
+          '250',
+          '--ppolicy-min-length',
+          '8',
+        ]);
+        expect(config.ldap_organization_class).to.deep.equal([
+          'top',
+          'organizationalUnit',
+        ]);
+        expect(config.ldap_raw_hidden_attribute).to.deep.equal([
+          'userPassword',
+          'entryUUID',
+        ]);
+        expect(config.group_dummy_user).to.equal('cn=placeholder');
+        expect(config.bulk_import_batch_size).to.equal('250');
+        expect(config.ppolicy_min_length).to.equal(8);
+        expect(config.groups_allow_unexistent_members).to.equal(true);
+      } finally {
+        for (const [name, value] of Object.entries(saved))
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+      }
+    });
+
+    it('refuses a zero where the default used to apply', () => {
+      const cases: [string, () => unknown][] = [
+        [
+          'DM_LDAP_ORGANIZATION_MAX_SUBNODES',
+          () => readOptions(organizationOptions, parse()),
+        ],
+        ['DM_LDAP_RAW_MAX_RESULTS', () => readOptions(rawOptions, parse())],
+        [
+          'DM_PPOLICY_WARN_DAYS',
+          () => readOptions(passwordPolicyOptions, parse()),
+        ],
+        [
+          'DM_PPOLICY_MIN_LENGTH',
+          () => readOptions(passwordPolicyOptions, parse()),
+        ],
       ];
       for (const [name, read] of cases) {
         const saved = process.env[name];

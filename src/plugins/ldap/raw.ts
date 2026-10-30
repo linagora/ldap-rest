@@ -164,7 +164,11 @@ export const RawChildrenQuery = Type.Object({
   children: Type.Optional(Type.String()),
 });
 
+import { rawOptions } from './ldap.options';
+
 export default class LdapRaw extends DmPlugin {
+  static optionDefinitions = rawOptions;
+
   name = 'ldapRaw';
   roles: Role[] = ['api'] as const;
 
@@ -179,8 +183,9 @@ export default class LdapRaw extends DmPlugin {
 
   constructor(server: DM) {
     super(server);
+    const settings = this.options(rawOptions);
 
-    const configured = this.config.ldap_raw_base || [];
+    const configured = settings.ldap_raw_base;
     const bases = configured.filter(b => b && b.length > 0);
     if (bases.length === 0) {
       if (!this.config.ldap_base)
@@ -191,14 +196,14 @@ export default class LdapRaw extends DmPlugin {
     }
     this.bases = bases;
 
-    this.showSecrets = this.config.ldap_raw_show_secrets === true;
+    this.showSecrets = settings.ldap_raw_show_secrets;
     this.hiddenAttributes = new Set([
       ...(this.showSecrets ? [] : SECRET_ATTRIBUTES),
-      ...(this.config.ldap_raw_hidden_attribute || [])
+      ...settings.ldap_raw_hidden_attribute
         .filter(a => a && a.length > 0)
         .map(a => a.toLowerCase()),
     ]);
-    this.maxResults = this.config.ldap_raw_max_results || 200;
+    this.maxResults = settings.ldap_raw_max_results;
 
     this.logger.info(
       `LDAP raw API enabled on ${this.bases.join(', ')} (read-only)`

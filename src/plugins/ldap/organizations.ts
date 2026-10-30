@@ -148,30 +148,36 @@ export const OrganizationSearchQuery = Type.Object({
   q: Type.String({ minLength: 1 }),
 });
 
+import { organizationOptions, type OrganizationOptions } from './ldap.options';
+
 export default class LdapOrganizations extends DmPlugin {
+  static optionDefinitions = organizationOptions;
+
   name = 'ldapOrganizations';
   roles: Role[] = ['api', 'consistency', 'configurable'] as const;
+  private readonly settings: OrganizationOptions;
   pathAttr: string;
   linkAttr: string;
   schema?: Schema;
 
   constructor(dm: DM) {
     super(dm);
-    if (!this.config.ldap_top_organization) {
+    this.settings = this.options(organizationOptions);
+    if (!this.settings.ldap_top_organization) {
       throw new Error('Missing --ldap-top-organization');
     }
 
-    this.pathAttr = this.config.ldap_organization_path_attribute as string;
-    this.linkAttr = this.config.ldap_organization_link_attribute as string;
+    this.pathAttr = this.settings.ldap_organization_path_attribute;
+    this.linkAttr = this.settings.ldap_organization_link_attribute;
     dm.ldap.declareObjectClasses(
-      this.config.ldap_top_organization,
-      this.config.ldap_organization_class || [],
+      this.settings.ldap_top_organization,
+      this.settings.ldap_organization_class,
       true
     );
 
     // Load organization schema if provided
-    if (this.config.organization_schema) {
-      const file = this.config.organization_schema;
+    if (this.settings.organization_schema) {
+      const file = this.settings.organization_schema;
       loadSchemaFileAsync<Schema>(file, { config: this.config })
         .then(schema => {
           this.schema = schema;
@@ -631,7 +637,7 @@ export default class LdapOrganizations extends DmPlugin {
     // description says. Only the flat entities enforced it.
     assertClientMaySet(this.schema, Object.keys(body), 'ou');
     validateDnValue(body.ou, 'ou');
-    const parentDn = body.parentDn || this.config.ldap_top_organization;
+    const parentDn = body.parentDn || this.settings.ldap_top_organization;
     const dn = `ou=${escapeDnValue(body.ou)},${parentDn}`;
     // The classes are the server's, from --ldap-organization-class, as for
     // groups: a body naming them does not choose them
@@ -642,7 +648,7 @@ export default class LdapOrganizations extends DmPlugin {
           ([key]) => key !== 'ou' && key !== 'parentDn'
         )
       ),
-      objectClass: this.config.ldap_organization_class as string[],
+      objectClass: this.settings.ldap_organization_class,
     };
 
     await tryMethod(res, this.addOrganization.bind(this), dn, entry, req);
@@ -839,7 +845,7 @@ export default class LdapOrganizations extends DmPlugin {
       if ((res as SearchResult).searchEntries.length === 0)
         throw new NotFoundError(`Organization ${orgDn} does not exist`);
       if (
-        !new RegExp(`(.*,)?${this.config.ldap_top_organization}`).test(
+        !new RegExp(`(.*,)?${this.settings.ldap_top_organization}`).test(
           (res as SearchResult).searchEntries[0].dn
         )
       )
@@ -864,8 +870,8 @@ export default class LdapOrganizations extends DmPlugin {
       const path = (
         Array.isArray(pathValue) ? pathValue[0] : pathValue
       ) as string;
-      const sep = this.config.ldap_organization_path_separator || ' / ';
-      const topOrg = (this.config.ldap_top_organization as string) || '';
+      const sep = this.settings.ldap_organization_path_separator;
+      const topOrg = this.settings.ldap_top_organization;
 
       // An organization, told from its DN: an `ou=` entry inside the top
       // organization branch. The payload says so too on a creation, and says
@@ -942,7 +948,7 @@ export default class LdapOrganizations extends DmPlugin {
           filter: `(${this.pathAttr}=${escapeLdapFilter(matchingPath)})`,
           attributes: ['dn'],
         },
-        this.config.ldap_top_organization
+        this.settings.ldap_top_organization
       )) as SearchResult;
       if (!entries.searchEntries || entries.searchEntries.length === 0)
         throw new BadRequestError(
@@ -955,7 +961,7 @@ export default class LdapOrganizations extends DmPlugin {
     // As the server: an organization still holding entries is not empty, whoever may read them
     const res = await this.server.ldap.system.search({
       paged: false,
-      filter: `(${this.config.ldap_organization_link_attribute}=${escapeLdapFilter(dn)})`,
+      filter: `(${this.settings.ldap_organization_link_attribute}=${escapeLdapFilter(dn)})`,
     });
     if ((res as SearchResult).searchEntries.length > 0)
       throw new ConflictError(`Organization ${dn} is not empty`);
@@ -972,7 +978,7 @@ export default class LdapOrganizations extends DmPlugin {
     const entryClasses = ([] as unknown[])
       .concat(entry.objectClass)
       .map(c => String(c).toLowerCase());
-    return (this.config.ldap_organization_class as string[])
+    return this.settings.ldap_organization_class
       .filter(c => c.toLowerCase() !== 'top')
       .some(c => entryClasses.includes(c.toLowerCase()));
   }
@@ -980,13 +986,13 @@ export default class LdapOrganizations extends DmPlugin {
   async getOrganisationTop(
     req?: Request
   ): Promise<AttributesList | AttributesList[]> {
-    if (!this.config.ldap_top_organization)
+    if (!this.settings.ldap_top_organization)
       throw new BadRequestError('No top organization configured');
 
     // Get default top organization
     const top = await this.server.ldap.search(
       { paged: false, scope: 'base' },
-      this.config.ldap_top_organization,
+      this.settings.ldap_top_organization,
       req
     );
     if ((top as SearchResult).searchEntries.length !== 1)
@@ -1034,8 +1040,7 @@ export default class LdapOrganizations extends DmPlugin {
     req?: Request
   ): Promise<AttributesList[]> {
     const result: AttributesList[] = [];
-    const MAX_LINKED_ENTITIES =
-      this.config.ldap_organization_max_subnodes || 50;
+    const MAX_LINKED_ENTITIES = this.settings.ldap_organization_max_subnodes;
 
     // Check if objectClass filter is requested via query parameter
     const objectClassFilter = req?.query?.objectClass as string | undefined;
@@ -1055,9 +1060,9 @@ export default class LdapOrganizations extends DmPlugin {
     // 2. Get linked entities (users and groups) - limited to MAX_LINKED_ENTITIES
     // Need to search from LDAP base, not just organization tree
     // (e.g., "dc=example,dc=com" from "ou=organizations,dc=example,dc=com")
-    const topOrg = this.config.ldap_top_organization as string;
+    const topOrg = this.settings.ldap_top_organization;
     const baseDn = getParentDn(topOrg);
-    let filter = `(${this.config.ldap_organization_link_attribute}=${escapeLdapFilter(
+    let filter = `(${this.settings.ldap_organization_link_attribute}=${escapeLdapFilter(
       dn
     )})`;
 
@@ -1510,7 +1515,7 @@ export default class LdapOrganizations extends DmPlugin {
     req?: Request
   ): Promise<AttributesList[]> {
     const result: AttributesList[] = [];
-    const cap = this.config.ldap_organization_max_subnodes || 50;
+    const cap = this.settings.ldap_organization_max_subnodes;
 
     // Search for sub-OUs matching the query
     result.push(
@@ -1523,11 +1528,11 @@ export default class LdapOrganizations extends DmPlugin {
     );
 
     // Search for linked entities (users and groups) matching the query
-    const topOrg = this.config.ldap_top_organization as string;
+    const topOrg = this.settings.ldap_top_organization;
     const baseDn = getParentDn(topOrg);
     const escapedDn = escapeLdapFilter(dn);
     const displayName = this.config.display_name_attribute || 'displayName';
-    const filter = `(&(${this.config.ldap_organization_link_attribute}=${escapedDn})${substringSearchFilter(query, `uid,cn,mail,sn,givenName,${displayName}`)})`;
+    const filter = `(&(${this.settings.ldap_organization_link_attribute}=${escapedDn})${substringSearchFilter(query, `uid,cn,mail,sn,givenName,${displayName}`)})`;
     this.server.logger.debug(
       `Searching for linked entities with filter: ${filter} in ${baseDn}`
     );
@@ -1570,7 +1575,7 @@ export default class LdapOrganizations extends DmPlugin {
     query: string,
     req?: Request
   ): Promise<AttributesList[]> {
-    const cap = this.config.ldap_organization_max_subnodes || 50;
+    const cap = this.settings.ldap_organization_max_subnodes;
     const attrs = this.pathAttr
       ? `ou,description,${this.pathAttr}`
       : 'ou,description';
@@ -1645,21 +1650,18 @@ export default class LdapOrganizations extends DmPlugin {
     const apiPrefix = this.config.api_prefix || '/api';
 
     // Where a static plugin serves the file, whatever its name
-    const schemaUrl = this.config.organization_schema
-      ? staticSchemaUrl(this.server, this.config.organization_schema)
+    const schemaUrl = this.settings.organization_schema
+      ? staticSchemaUrl(this.server, this.settings.organization_schema)
       : undefined;
 
     return {
       enabled: true,
-      topOrganization: this.config.ldap_top_organization || '',
-      organizationClass: this.config.ldap_organization_class || [
-        'top',
-        'organizationalUnit',
-      ],
+      topOrganization: this.settings.ldap_top_organization,
+      organizationClass: this.settings.ldap_organization_class,
       linkAttribute: this.linkAttr || '',
       pathAttribute: this.pathAttr || '',
-      pathSeparator: this.config.ldap_organization_path_separator || ' / ',
-      maxSubnodes: this.config.ldap_organization_max_subnodes || 50,
+      pathSeparator: this.settings.ldap_organization_path_separator,
+      maxSubnodes: this.settings.ldap_organization_max_subnodes,
       schema: this.schema,
       schemaUrl,
       endpoints: {
