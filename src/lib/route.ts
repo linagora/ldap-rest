@@ -31,6 +31,15 @@ export interface RouteInput<
   body: Input<B>;
 }
 
+/**
+ * An answer: its schema, and the sentence the document gives it. A bare
+ * schema is described by its status (`Successful response`, `Bad request`…).
+ */
+export interface RouteResponse {
+  schema: TSchema;
+  description?: string;
+}
+
 /** A route, as declared and as recorded for the OpenAPI document. */
 export interface RouteDefinition<
   P extends TSchema | undefined = undefined,
@@ -45,8 +54,8 @@ export interface RouteDefinition<
   query?: Q;
   /** The parsed body */
   body?: B;
-  /** The schemas of the answers, for the OpenAPI document */
-  responses?: Partial<Record<number, TSchema>>;
+  /** The answers, for the OpenAPI document */
+  responses?: Partial<Record<number, TSchema | RouteResponse>>;
   summary?: string;
   description?: string;
   tags?: string[];

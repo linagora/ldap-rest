@@ -24,7 +24,10 @@ interface Operation {
   };
   responses: Record<
     string,
-    { content?: { 'application/json': { schema: Record<string, unknown> } } }
+    {
+      description?: string;
+      content?: { 'application/json': { schema: Record<string, unknown> } };
+    }
   >;
 }
 
@@ -59,6 +62,10 @@ describe('OpenAPI generator', () => {
       },
       description: 'The item identifier',
     });
+    // A `params` key the path does not carry would make the document invalid.
+    expect(operation.parameters?.some(p => p.name === 'orphan')).to.equal(
+      false
+    );
     expect(operation.parameters?.find(p => p.name === 'verbose')).to.deep.equal(
       {
         name: 'verbose',
@@ -83,6 +90,7 @@ describe('OpenAPI generator', () => {
     const spec = await specOf(path.join(root, 'test', 'fixtures', 'openapi'));
     const operation = spec.paths['/api/items/{id}']?.post;
 
+    expect(operation.responses['200'].description).to.equal('The item created');
     expect(
       operation.responses['200'].content?.['application/json'].schema
     ).to.deep.equal({
@@ -90,6 +98,7 @@ describe('OpenAPI generator', () => {
       properties: { id: { type: 'string' }, name: { type: 'string' } },
       required: ['id', 'name'],
     });
+    expect(operation.responses['409'].description).to.equal('409 response');
     expect(operation.responses['409'].content).to.exist;
     expect(operation.responses['400']).to.deep.equal({
       description: 'Bad request',
@@ -102,6 +111,9 @@ describe('OpenAPI generator', () => {
 
     expect(operation, 'the defineRoute route is in the spec').to.exist;
     expect(operation.summary).to.equal('Demo hello-world endpoint');
+    expect(operation.responses['200'].description).to.equal(
+      'Greeting with hook results.'
+    );
     const schema = operation.responses['200'].content?.['application/json']
       .schema as { properties?: { message?: { type?: string } } };
     expect(schema.properties?.message?.type).to.equal('string');

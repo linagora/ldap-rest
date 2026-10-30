@@ -42,7 +42,12 @@ export default class HelloWorld extends DmPlugin {
     defineRoute(app, {
       method: 'get',
       path: `${this.config.api_prefix}/hello`,
-      responses: { 200: HelloResponse },
+      responses: {
+        200: {
+          schema: HelloResponse,
+          description: 'Greeting with hook results.',
+        },
+      },
       summary: 'Demo hello-world endpoint',
       description:
         'Exists exclusively as a minimal example for plugin ' +

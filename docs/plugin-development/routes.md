@@ -38,7 +38,9 @@ export default class MyPlugin extends DmPlugin {
       params: GroupParams,
       query: GroupQuery,
       body: GroupMembers,
-      responses: { 200: MembersAdded },
+      responses: {
+        200: { schema: MembersAdded, description: 'Members added' },
+      },
       summary: 'Add members to a group',
       tags: ['Groups'],
       handler: async ({ params, query, body, res }) => {
@@ -82,8 +84,22 @@ handler `10`. The body is whatever the registered parser left in `req.body`.
 A part the route declares no schema for is handed to the handler unchecked,
 as before. The declaration feeds the document the same way: `params` becomes
 the path parameters, `query` the query parameters, `body` the JSON request
-body, and `responses` the answer schemas; the standard 400/401/404/500
-entries stay.
+body, and `responses` the answers; the standard 400/401/404/500 entries stay.
+
+An answer is a schema, or `{ schema, description }` when the document needs
+a sentence of its own:
+
+```typescript
+responses: {
+  200: { schema: MembersAdded, description: 'Members added' },
+  409: { schema: AlreadyMember, description: 'Already a member' },
+  500: ErrorSchema,
+}
+```
+
+Only the parameters the path actually carries (`:cn` → `{cn}`) become path
+parameters: a `params` key the path does not name is reported by the
+generator and left out, since OpenAPI refuses it.
 
 ## Refusals
 

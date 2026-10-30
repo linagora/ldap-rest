@@ -266,7 +266,7 @@ export class OpenAPIGenerator {
       localVars
     );
 
-    for (const call of this.definedRouteCalls(apiMethod.body)) {
+    for (const call of this.definedRouteCalls(classNode)) {
       const route = await this.parseDefinedRoute(
         call,
         sourceFile,
@@ -282,21 +282,38 @@ export class OpenAPIGenerator {
   }
 
   /**
-   * The `defineRoute(app, { … })` calls of an `api()` body, in source order.
+   * The `defineRoute(…)` calls of a plugin class, in source order.
+   *
+   * The whole class is walked, not only `api()`: a plugin may declare its
+   * routes in a helper method. The callee is resolved through the checker,
+   * so an aliased import (`import { defineRoute as route }`) is found too.
    */
-  private definedRouteCalls(body: ts.Block): ts.CallExpression[] {
+  private definedRouteCalls(
+    classNode: ts.ClassDeclaration
+  ): ts.CallExpression[] {
     const calls: ts.CallExpression[] = [];
     const visit = (node: ts.Node): void => {
-      if (
-        ts.isCallExpression(node) &&
-        ts.isIdentifier(node.expression) &&
-        node.expression.text === 'defineRoute'
-      )
+      if (ts.isCallExpression(node) && this.isDefineRoute(node.expression))
         calls.push(node);
       ts.forEachChild(node, visit);
     };
-    visit(body);
+    visit(classNode);
     return calls;
+  }
+
+  /** Whether an expression names the `defineRoute` of `src/lib/route.ts`. */
+  private isDefineRoute(expr: ts.Expression): boolean {
+    let symbol = this.checker.getSymbolAtLocation(expr);
+    for (let depth = 0; symbol?.flags && depth < 8; depth++) {
+      if (!(symbol.flags & ts.SymbolFlags.Alias)) break;
+      symbol = this.checker.getAliasedSymbol(symbol);
+    }
+    if (!symbol || symbol.getName() !== 'defineRoute') return false;
+    const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+    return (
+      declaration?.getSourceFile().fileName ===
+      path.join(this.rootDir, 'src', 'lib', 'route.ts')
+    );
   }
 
   /**
@@ -798,7 +815,7 @@ export class OpenAPIGenerator {
         this.generateSummary(method, path),
       description: description || (overrides.description as string | undefined),
       parameters: this.mergeParameters(this.extractPathParameters(path), [
-        ...(await this.parametersOf(property('params'), sourceFile, 'path')),
+        ...(await this.pathParametersOf(property('params'), path, sourceFile)),
         ...(await this.parametersOf(property('query'), sourceFile, 'query')),
       ]),
       responses,
@@ -823,10 +840,26 @@ export class OpenAPIGenerator {
       for (const entry of responsesProp.initializer.properties) {
         if (!ts.isPropertyAssignment(entry)) continue;
         const code = entry.name.getText(sourceFile).replace(/^['"]|['"]$/g, '');
-        const schema = await this.resolveSchema(entry.initializer, sourceFile);
+        // `{ schema, description }` or a bare schema
+        const wrapper = ts.isObjectLiteralExpression(entry.initializer)
+          ? entry.initializer
+          : undefined;
+        const schemaProp = wrapper
+          ? this.propertyOf(wrapper, 'schema', sourceFile)
+          : undefined;
+        const schema = await this.resolveSchema(
+          schemaProp?.initializer ?? entry.initializer,
+          sourceFile
+        );
         if (schema === undefined) continue;
+        const description = wrapper
+          ? this.stringProperty(
+              this.propertyOf(wrapper, 'description', sourceFile)
+            )
+          : undefined;
         responses[code] = {
-          description: responses[code]?.description ?? `${code} response`,
+          description:
+            description ?? responses[code]?.description ?? `${code} response`,
           content: { 'application/json': { schema } },
         };
       }
@@ -902,6 +935,29 @@ export class OpenAPIGenerator {
       description:
         (value as { description?: string }).description ?? `${name} parameter`,
     }));
+  }
+
+  /** The declared path parameters that the path actually carries. */
+  private async pathParametersOf(
+    prop: ts.PropertyAssignment | undefined,
+    routePath: string,
+    sourceFile: ts.SourceFile
+  ): Promise<NonNullable<OpenAPIRoute['parameters']>> {
+    const names = new Set(
+      [...routePath.matchAll(/\{(\w+)\}/g)].map(match => match[1])
+    );
+    const declared = await this.parametersOf(prop, sourceFile, 'path');
+    for (const parameter of declared)
+      if (!names.has(parameter.name)) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(
+          prop?.getStart() ?? 0
+        );
+        console.warn(
+          `⚠️  \`params.${parameter.name}\` is not in the path ${routePath} ` +
+            `(${path.relative(this.rootDir, sourceFile.fileName)}:${line + 1})`
+        );
+      }
+    return declared.filter(parameter => names.has(parameter.name));
   }
 
   /** Declared parameters win over the ones read from the path, by name. */
