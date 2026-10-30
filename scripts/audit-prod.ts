@@ -2,10 +2,10 @@
  * Fail on a high or critical advisory in a production dependency.
  *
  * An allowlist entry names the package npm reports the advisory under, or
- * any of the ids the advisory carries (a GHSA or CVE id), and `until`, the
- * last day (UTC) it applies. An entry past that day, one without a day, and
- * one matching no advisory fail the build as well: none is a decision
- * anyone can rely on. See `CONTRIBUTING.md#dependencies`.
+ * the GHSA id it carries, and `until`, the last day (UTC) it applies. An
+ * entry past that day, one without a day, and one matching no advisory fail
+ * the build as well: none is a decision anyone can rely on. See
+ * `CONTRIBUTING.md#dependencies`.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -39,7 +39,7 @@ export interface Advisory {
 }
 
 export interface AllowlistEntry {
-  /** A package name, or a GHSA or CVE id */
+  /** A package name, or the GHSA id of an advisory */
   id: string;
   /** Last day the entry applies, `YYYY-MM-DD` */
   until: string;
@@ -52,20 +52,35 @@ const isSeverity = (value: unknown): value is Severity =>
     value as string
   );
 
-/** The advisories npm reports, from its `audit --json` report */
-export const advisories = (report: unknown): Advisory[] => {
-  const vulnerabilities = (
-    report as {
-      vulnerabilities?: Record<string, { severity?: unknown; via?: unknown }>;
-    }
-  ).vulnerabilities;
-  if (!vulnerabilities) throw new Error('not an npm audit report');
+type Vulnerability = { severity?: unknown; via?: unknown };
 
-  return Object.entries(vulnerabilities).map(([name, entry]) => {
+const vulnerabilityOf = (report: unknown): Record<string, Vulnerability> => {
+  const vulnerabilities = (report as { vulnerabilities?: unknown })
+    .vulnerabilities;
+  if (
+    typeof vulnerabilities !== 'object' ||
+    vulnerabilities === null ||
+    Array.isArray(vulnerabilities)
+  )
+    throw new Error('not an npm audit report');
+  return vulnerabilities as Record<string, Vulnerability>;
+};
+
+/**
+ * The ids of the advisories a package is reported for, a GHSA among them
+ * taken from its url. A dependant lists the vulnerable package by name
+ * instead of repeating the advisory: it is given that package's ids, so
+ * that an allowlisted advisory covers the whole chain it came with.
+ */
+export const advisories = (report: unknown): Advisory[] => {
+  const vulnerabilities = vulnerabilityOf(report);
+  const chain = new Map<string, string[]>();
+
+  for (const [name, entry] of Object.entries(vulnerabilities)) {
     const ids = new Set<string>();
     for (const source of Array.isArray(entry.via) ? entry.via : []) {
       // A string is the name of a vulnerable package the advisory comes
-      // through; the advisory is reported on that package too
+      // through, added once every package is read
       if (typeof source !== 'object' || source === null) continue;
       const { title, url } = source as { title?: unknown; url?: unknown };
       if (typeof title === 'string') ids.add(title);
@@ -74,12 +89,25 @@ export const advisories = (report: unknown): Advisory[] => {
         if (id) ids.add(id);
       }
     }
-    return {
-      name,
-      severity: isSeverity(entry.severity) ? entry.severity : 'unknown',
-      ids: [...ids],
-    };
-  });
+    chain.set(name, [...ids]);
+  }
+
+  const idsThrough = (from: string, seen: string[] = []): string[] => {
+    if (seen.includes(from)) return [];
+    const entry = vulnerabilities[from];
+    const through = new Set(chain.get(from) ?? []);
+    for (const source of Array.isArray(entry?.via) ? entry.via : []) {
+      if (typeof source !== 'string') continue;
+      for (const id of idsThrough(source, [...seen, from])) through.add(id);
+    }
+    return [...through];
+  };
+
+  return Object.entries(vulnerabilities).map(([name, entry]) => ({
+    name,
+    severity: isSeverity(entry.severity) ? entry.severity : 'unknown',
+    ids: idsThrough(name),
+  }));
 };
 
 const covers = (entry: AllowlistEntry, advisory: Advisory): boolean =>

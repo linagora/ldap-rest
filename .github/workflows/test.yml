@@ -160,11 +160,15 @@ jobs:
 
       # The Dockerfile is generated from src and the build scripts, and the
       # image is built from what is committed: one that drifted builds the
-      # previous commit. A diff here is fixed by committing what
-      # `npm run build:dockerfile` wrote in the runner, not in the Dockerfile.
+      # previous commit. A diff here is fixed by committing what the
+      # generator wrote in the runner, not by editing the Dockerfile.
+      #
+      # The generator is called rather than `npm run build:dockerfile`: that
+      # goes through make, which rebuilds the Dockerfile only when a source
+      # is newer, so a checkout that kept its dates would prove nothing.
       - name: Check the Dockerfile is up to date
         run: |
-          npm run build:dockerfile
+          npx tsx scripts/buildDockerfile.ts
           git diff --exit-code Dockerfile
 
       - name: Setup Helm

@@ -65,10 +65,11 @@ reports everything in `coverage/index.html`.
 Dependabot opens the updates (`.github/dependabot.yml`), grouped for npm.
 `npm run audit:prod`, run by CI, fails on a `high` or `critical` advisory in a
 production dependency, and on an entry of `.github/audit-allowlist.json`
-that is past its day or matches no advisory. An allowlist entry names the
-package or a GHSA/CVE id, `until`, the last day (UTC) it applies, and
-`reason`. Fix the advisory; allow it only where it cannot apply here, and
-remove the entry once it is fixed.
+that is past its day or matches no advisory. An allowlist entry names a
+package or a GHSA id (`npm audit` gives no CVE), `until`, the last day (UTC)
+it applies, and `reason`. An advisory named by its GHSA covers the packages
+that pull the vulnerable one in as well. Fix the advisory; allow it only
+where it cannot apply here, and remove the entry once it is fixed.
 
 ## Submitting changes
 

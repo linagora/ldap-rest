@@ -138,9 +138,9 @@ James's does, is a call like another. A plugin calling a service through
 `this.fetch` has its calls counted under its name; the OpenID Connect
 client's calls to its provider are made by its library, and not timed.
 
-The instruments come from `prom-client` 15, kept while the server supports
-Node 20, which its successor `@prometheus-io/client` dropped: the
-deprecation notice `npm install` prints is expected.
+The instruments come from `prom-client` 15, which `npm install` reports as
+deprecated: its successor `@prometheus-io/client` is the migration to make,
+and the notice is expected until it is done.
 
 The port listens on every interface. What to alert on: `/readyz` for a
 replica out of rotation, `result="error"` in
