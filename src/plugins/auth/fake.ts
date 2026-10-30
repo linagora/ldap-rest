@@ -11,7 +11,11 @@ import type { Response } from 'express';
 import AuthBase, { type DmRequest } from '../../lib/auth/base';
 import type { Role } from '../../abstract/plugin';
 
+import { fakeOptions } from './auth.options';
+
 export default class AuthFake extends AuthBase {
+  static optionDefinitions = fakeOptions;
+
   name = 'authFake';
   roles: Role[] = ['auth'] as const;
   private readonly user: string;
@@ -25,7 +29,7 @@ export default class AuthFake extends AuthBase {
         `${this.name}: refused with NODE_ENV=production — it serves every ` +
           'request without authentication'
       );
-    this.user = ((this.config.auth_fake_user as string) || '').trim();
+    this.user = this.options(fakeOptions).auth_fake_user.trim();
     if (!this.user)
       throw new Error(`${this.name}: --auth-fake-user is required`);
   }

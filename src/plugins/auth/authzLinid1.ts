@@ -17,7 +17,11 @@ interface CachedPermissions {
   timestamp: number;
 }
 
+import { linid1Options } from './auth.options';
+
 export default class AuthzLinid1 extends AuthzBase {
+  static optionDefinitions = linid1Options;
+
   name = 'authzLinid1';
   permissionsCache: Map<string, CachedPermissions> = new Map();
 
@@ -27,8 +31,7 @@ export default class AuthzLinid1 extends AuthzBase {
     // Cache TTL in milliseconds (default: 5 minutes)
     this.cacheTTL = 5 * 60 * 1000;
 
-    const adminAttr =
-      this.config.authz_local_admin_attribute || 'twakeLocalAdminLink';
+    const adminAttr = this.options(linid1Options).authz_local_admin_attribute;
     this.logger.info(
       `AuthzLinid1: Authorization based on ${adminAttr} attribute enabled`
     );
@@ -80,7 +83,7 @@ export default class AuthzLinid1 extends AuthzBase {
   /** The organization holding the global branches */
   private globalOrganization(): string | undefined {
     return (
-      this.config.authz_global_organization ||
+      this.options(linid1Options).authz_global_organization ||
       this.config.ldap_top_organization ||
       undefined
     );
@@ -98,7 +101,7 @@ export default class AuthzLinid1 extends AuthzBase {
   }
 
   protected globalBranches(): string[] {
-    return this.config.authz_global_branch ?? [];
+    return this.options(linid1Options).authz_global_branch;
   }
 
   /**
@@ -111,7 +114,7 @@ export default class AuthzLinid1 extends AuthzBase {
    * tree.
    */
   private globalWriteBranches(): string[] {
-    return this.config.authz_global_write_branch ?? [];
+    return this.options(linid1Options).authz_global_write_branch;
   }
 
   private isGlobalWrite(branch: string): boolean {
@@ -225,8 +228,7 @@ export default class AuthzLinid1 extends AuthzBase {
 
     try {
       // Search for all organizations where this user is in local admin attribute
-      const adminAttr =
-        this.config.authz_local_admin_attribute || 'twakeLocalAdminLink';
+      const adminAttr = this.options(linid1Options).authz_local_admin_attribute;
       const filter = `(${adminAttr}=${escapeLdapFilter(userDn)})`;
       const orgBase =
         this.config.ldap_top_organization || this.config.ldap_base || '';

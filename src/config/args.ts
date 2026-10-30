@@ -9,6 +9,21 @@ import { dirname, join } from 'path';
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
 import { scimOptions } from '../plugins/scim/scim.options';
+import {
+  crowdsecOptions,
+  dynamicOptions,
+  fakeOptions,
+  hmacOptions,
+  linid1Options,
+  llngOptions,
+  openidconnectOptions,
+  perBranchOptions,
+  perRouteOptions,
+  rateLimitOptions,
+  tokenOptions,
+  totpOptions,
+  trustedProxyOptions,
+} from '../plugins/auth/auth.options';
 import { appAccountsOptions } from '../plugins/twake/appAccounts.options';
 import { calendarOptions } from '../plugins/twake/calendar.options';
 import { clouderyOptions } from '../plugins/twake/cloudery.options';
@@ -817,13 +832,7 @@ const configArgs: ConfigTemplate = [
   /* Access control plugins */
 
   // Lemonldap options
-  ['--llng-ini', 'DM_LLNG_INI', '/etc/lemonldap-ng/lemonldap-ng.ini'],
-  // A header LemonLDAP::NG exports carrying the caller's login, published as
-  // `req.userName`. Empty means none, and `whatToTrace` — the value the
-  // handler writes to `Lm-Remote-User` — is then both values. Configure it
-  // when `whatToTrace` traces a mail or a display name and rules are to be
-  // written on logins (`--authz-identity req.userName`).
-  ['--llng-username-header', 'DM_LLNG_USERNAME_HEADER', ''],
+  ...toConfigEntries(llngOptions),
 
   // Common to every authentication plugin: restrict it to path prefixes
   [
@@ -834,29 +843,14 @@ const configArgs: ConfigTemplate = [
     '--auth-path-prefixes',
   ],
 
-  // Auth token plugin
-  ['--auth-token', 'DM_AUTH_TOKENS', [], 'array', '--auth-tokens'],
-
-  // Auth fake plugin
-  ['--auth-fake-user', 'DM_AUTH_FAKE_USER', ''],
-
-  // Auth TOTP plugin
-  ['--auth-totp', 'DM_AUTH_TOTP', [], 'array', '--auth-totps', 'phrases'],
-  ['--auth-totp-window', 'DM_AUTH_TOTP_WINDOW', 1, 'number'],
-  ['--auth-totp-step', 'DM_AUTH_TOTP_STEP', 30, 'number'],
-
-  // Auth HMAC plugin
-  ['--auth-hmac', 'DM_AUTH_HMAC', [], 'array', '--auth-hmacs', 'phrases'],
-  ['--auth-hmac-window', 'DM_AUTH_HMAC_WINDOW', 120000, 'number'],
+  // Auth token, fake, TOTP and HMAC plugins
+  ...toConfigEntries(tokenOptions),
+  ...toConfigEntries(fakeOptions),
+  ...toConfigEntries(totpOptions),
+  ...toConfigEntries(hmacOptions),
 
   // Auth authzPerRoute plugin
-  [
-    '--authz-per-route',
-    'DM_AUTHZ_PER_ROUTES',
-    [],
-    'array',
-    '--authz-per-routes',
-  ],
+  ...toConfigEntries(perRouteOptions),
 
   // Common to every authorization plugin
   //
@@ -899,18 +893,7 @@ const configArgs: ConfigTemplate = [
   ],
   ['--authz-transit-branch', 'DM_AUTHZ_TRANSIT_BRANCH', ''],
   ['--authz-transit-origin-attribute', 'DM_AUTHZ_TRANSIT_ORIGIN_ATTRIBUTE', ''],
-  [
-    '--authz-per-branch-config',
-    'DM_AUTHZ_PER_BRANCH_CONFIG',
-    { default: { read: true, write: false, delete: false } } as AuthConfig,
-    'json',
-  ],
-  [
-    '--authz-per-branch-cache-ttl',
-    'DM_AUTHZ_PER_BRANCH_CACHE_TTL',
-    60,
-    'number',
-  ],
+  ...toConfigEntries(perBranchOptions),
 
   // Auth authzDynamic plugin
   //
@@ -923,98 +906,18 @@ const configArgs: ConfigTemplate = [
   //  - `any-authenticated`: anything another plugin authenticated, which is
   //    what the plugin did until 0.9.0, by accident rather than by decision;
   //  - `trusted-proxy`: a request `core/auth/trustedProxy` vouched for.
-  [
-    '--authz-dynamic-bypass',
-    'DM_AUTHZ_DYNAMIC_BYPASS',
-    [],
-    'array',
-    null,
-    'identifiers',
-  ],
-  ['--authz-dynamic-base', 'DM_AUTHZ_DYNAMIC_BASE', ''],
-  ['--authz-dynamic-cache-ttl', 'DM_AUTHZ_DYNAMIC_CACHE_TTL', 60, 'number'],
-  [
-    '--authz-dynamic-token-attribute',
-    'DM_AUTHZ_DYNAMIC_TOKEN_ATTRIBUTE',
-    'userPassword',
-  ],
-  [
-    '--authz-dynamic-config-attribute',
-    'DM_AUTHZ_DYNAMIC_CONFIG_ATTRIBUTE',
-    'description',
-  ],
-  [
-    '--authz-dynamic-tenant-attribute',
-    'DM_AUTHZ_DYNAMIC_TENANT_ATTRIBUTE',
-    'cn',
-  ],
-  [
-    '--authz-dynamic-reload-endpoint',
-    'DM_AUTHZ_DYNAMIC_RELOAD_ENDPOINT',
-    false,
-    'boolean',
-  ],
+  ...toConfigEntries(dynamicOptions),
 
   // Auth authzLinid1 plugin
-  [
-    '--authz-local-admin-attribute',
-    'DM_AUTHZ_LOCAL_ADMIN_ATTRIBUTE',
-    'twakeLocalAdminLink',
-  ],
-  [
-    '--authz-global-branch',
-    'DM_AUTHZ_GLOBAL_BRANCHES',
-    [],
-    'array',
-    '--authz-global-branches',
-    'dns',
-  ],
-  [
-    '--authz-global-write-branch',
-    'DM_AUTHZ_GLOBAL_WRITE_BRANCHES',
-    [],
-    'array',
-    '--authz-global-write-branches',
-    'dns',
-  ],
-  ['--authz-global-organization', 'DM_AUTHZ_GLOBAL_ORGANIZATION', ''],
+  ...toConfigEntries(linid1Options),
 
   // Auth OpenID Connect plugin
-  ['--oidc-server', 'DM_OIDC_SERVER', ''],
-  // Which claim names the caller for a human reader. The `sub` is what
-  // authorization rules are keyed on by default, and it is an opaque
-  // provider identifier — `auth0|…`, a UUID — that nobody can write a rule
-  // for without looking it up per administrator. This claim is published as
-  // `req.userName`, which `--authz-identity` can key on instead.
-  ['--oidc-username-claim', 'DM_OIDC_USERNAME_CLAIM', 'sub'],
-  ['--oidc-client-id', 'DM_OIDC_CLIENT_ID', ''],
-  ['--oidc-client-secret', 'DM_OIDC_CLIENT_SECRET', ''],
-  ['--base-url', 'DM_BASE_URL', ''],
+  ...toConfigEntries(openidconnectOptions),
 
-  // Rate limiting plugin
-  [
-    '--rate-limit-window-ms',
-    'DM_RATE_LIMIT_WINDOW_MS',
-    15 * 60 * 1000,
-    'number',
-  ],
-  ['--rate-limit-max', 'DM_RATE_LIMIT_MAX', 100, 'number'],
-
-  // CrowdSec plugin
-  ['--crowdsec-url', 'DM_CROWDSEC_URL', 'http://localhost:8080/v1/decisions'],
-  ['--crowdsec-api-key', 'DM_CROWDSEC_API_KEY', ''],
-  ['--crowdsec-cache-ttl', 'DM_CROWDSEC_CACHE_TTL', 60, 'number'],
-
-  // Trusted proxy plugin
-  [
-    '--trusted-proxy',
-    'DM_TRUSTED_PROXIES',
-    [],
-    'array',
-    '--trusted-proxies',
-    'identifiers',
-  ],
-  ['--trusted-proxy-auth-header', 'DM_TRUSTED_PROXY_AUTH_HEADER', 'Auth-User'],
+  // Rate limiting, CrowdSec and trusted proxy plugins
+  ...toConfigEntries(rateLimitOptions),
+  ...toConfigEntries(crowdsecOptions),
+  ...toConfigEntries(trustedProxyOptions),
 
   // Password Policy plugin
   ['--ppolicy-default-dn', 'DM_PPOLICY_DEFAULT_DN', ''],

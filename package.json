@@ -36,6 +36,10 @@
       "types": "./dist/src/lib/ldapActions.d.ts",
       "import": "./dist/lib/ldapActions.js"
     },
+    "./plugin-auth-auth.options": {
+      "types": "./dist/src/plugins/auth/auth.options.d.ts",
+      "import": "./dist/plugins/auth/auth.options.js"
+    },
     "./plugin-auth-authzdynamic": {
       "types": "./dist/src/plugins/auth/authzDynamic.d.ts",
       "import": "./dist/plugins/auth/authzDynamic.js"

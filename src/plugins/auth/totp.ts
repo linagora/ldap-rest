@@ -13,6 +13,8 @@ import { unauthorized } from '../../lib/expressFormatedResponses';
 import AuthBase, { type DmRequest } from '../../lib/auth/base';
 import type { Role } from '../../abstract/plugin';
 
+import { totpOptions } from './auth.options';
+
 interface TotpUser {
   name: string;
   secret: string; // Base32 encoded secret
@@ -20,6 +22,8 @@ interface TotpUser {
 }
 
 export default class AuthTotp extends AuthBase {
+  static optionDefinitions = totpOptions;
+
   protected knownIdentities(): string[] {
     return this.totpUsers.map(user => user.name);
   }
@@ -38,36 +42,35 @@ export default class AuthTotp extends AuthBase {
     super(...args);
 
     // Parse TOTP configuration
-    const totpConfig = this.config.auth_totp as string[];
-    this.window = this.config.auth_totp_window ?? 1;
-    this.step = this.config.auth_totp_step ?? 30;
+    const settings = this.options(totpOptions);
+    const totpConfig = settings.auth_totp;
+    this.window = settings.auth_totp_window;
+    this.step = settings.auth_totp_step;
 
-    if (totpConfig && Array.isArray(totpConfig)) {
-      totpConfig.forEach((entry, index) => {
-        const parts = entry.split(':');
-        // Format: "secret:name" or "secret:name:digits"
-        const [secret, name, digitsField] = parts.map(p => p.trim());
-        const digits = digitsField === undefined ? 6 : Number(digitsField);
-        const fail = (why: string): never => {
-          throw new Error(
-            `Invalid --auth-totp entry at index ${index}: ${why}; entries ` +
-              'are separated by `,`, `;` or newlines'
-          );
-        };
-        if (parts.length < 2 || parts.length > 3 || !secret || !name)
-          fail('expected "secret:name[:digits]"');
-        if (!this.isValidBase32(secret)) fail('the secret is not Base32');
-        if (
-          digitsField === '' ||
-          !Number.isInteger(digits) ||
-          digits < 6 ||
-          digits > 10
-        )
-          fail('digits must be an integer from 6 to 10');
+    totpConfig.forEach((entry, index) => {
+      const parts = entry.split(':');
+      // Format: "secret:name" or "secret:name:digits"
+      const [secret, name, digitsField] = parts.map(p => p.trim());
+      const digits = digitsField === undefined ? 6 : Number(digitsField);
+      const fail = (why: string): never => {
+        throw new Error(
+          `Invalid --auth-totp entry at index ${index}: ${why}; entries ` +
+            'are separated by `,`, `;` or newlines'
+        );
+      };
+      if (parts.length < 2 || parts.length > 3 || !secret || !name)
+        fail('expected "secret:name[:digits]"');
+      if (!this.isValidBase32(secret)) fail('the secret is not Base32');
+      if (
+        digitsField === '' ||
+        !Number.isInteger(digits) ||
+        digits < 6 ||
+        digits > 10
+      )
+        fail('digits must be an integer from 6 to 10');
 
-        this.totpUsers.push({ name, secret, digits });
-      });
-    }
+      this.totpUsers.push({ name, secret, digits });
+    });
 
     if (this.totpUsers.length === 0) {
       this.logger.warn('No valid TOTP users configured');

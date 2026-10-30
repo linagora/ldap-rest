@@ -44,7 +44,11 @@
   `--twake-group-max-page-limit`, `--twake-instance-timeout`,
   `--cloudery-workflow-poll-interval-ms` or
   `--cloudery-workflow-max-attempts` used to be replaced by the default and
-  is now refused ([details](docs/plugin-development/options.md)).
+  is now refused. A zero rate-limit window or maximum, CrowdSec cache TTL or
+  authorization cache TTL used to be replaced by the default and is now
+  refused too; a zero TOTP step or HMAC window was accepted and broke the
+  plugin, and is now refused at startup
+  ([details](docs/plugin-development/options.md)).
 - `TwakePlugin` takes the WebAdmin URL, token and concurrency instead of the
   names of the options holding them: a plugin built outside this repository
   that extends it must update its `super()` call

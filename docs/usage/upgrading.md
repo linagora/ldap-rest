@@ -107,6 +107,14 @@ A zero `--twake-group-max-page-limit`, `--twake-instance-timeout`,
 `--cloudery-workflow-max-attempts` used to be replaced by the default and is
 now refused.
 
+The authentication and authorization options are checked the same way. A zero
+`--rate-limit-window-ms`, `--rate-limit-max`, `--crowdsec-cache-ttl`,
+`--authz-per-branch-cache-ttl` or `--authz-dynamic-cache-ttl` used to be
+replaced by the default and is now refused. A zero `--auth-totp-step` or
+`--auth-hmac-window` was accepted and broke the plugin — every counter was
+`Infinity`, every signature not made in the same millisecond was refused — and
+is now refused at startup.
+
 `ConfigParser` keeps an empty string for a string option. A plugin reads the
 declared default instead when that default is not empty, as its `|| default`
 used to: `DM_COZY_ADMIN_USER=` gives `admin`, `DM_CLOUDERY_OFFER=` gives
