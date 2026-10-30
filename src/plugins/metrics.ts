@@ -45,6 +45,14 @@ export default class Metrics extends DmPlugin {
         waiting.set(this.server.ldap.poolStats().waiting);
       },
     });
+    const opening = new Gauge({
+      name: 'ldap_rest_ldap_pool_opening',
+      help: 'Directory connections being opened, counted in the pool size',
+      registers: [this.own],
+      collect: (): void => {
+        opening.set(this.server.ldap.poolStats().opening);
+      },
+    });
     const max = new Gauge({
       name: 'ldap_rest_ldap_pool_max',
       help: 'Pooled directory connections at most, --ldap-pool-size',
