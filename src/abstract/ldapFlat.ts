@@ -1445,15 +1445,14 @@ export default abstract class LdapFlat extends DmPlugin {
     // Before the checks reading the directory: a pointer leading nowhere, a
     // value already taken, are not for a caller who may not create here
     await this.ldap.authorize('ldapaddrequest', [dn, { ...entry }, req]);
-    const candidate: AttributesList = {
+    const candidate = await this.validateNewEntry(dn, {
       [this.mainAttribute]: id,
       ...additional,
       objectClass: this.objectClass,
-    };
-    await this.validateNewEntry(dn, candidate);
-    // Written from what validation left: `Object.assign` cannot remove a key
-    // the validator dropped. The defaults are built without the request, so
-    // one under a dropped name is kept, as for a key left out
+    });
+    // Written from what validation left: a spread cannot remove a key the
+    // validator dropped. The defaults are built without the request, so one
+    // under a dropped name is kept, as for a key left out
     entry = { ...this.candidateEntry(id, {}), ...candidate };
     toDirectoryEntry(this.schema, entry);
 
@@ -1852,9 +1851,12 @@ export default abstract class LdapFlat extends DmPlugin {
     return await this.listEntries({ filter, attributes: attrs });
   }
 
-  async validateNewEntry(dn: string, entry: AttributesList): Promise<boolean> {
-    await this.validator().validateNew(entry);
-    return true;
+  /** @returns the entry to write, under the schema's spellings */
+  async validateNewEntry(
+    dn: string,
+    entry: AttributesList
+  ): Promise<AttributesList> {
+    return await this.validator().validateNew(entry);
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {

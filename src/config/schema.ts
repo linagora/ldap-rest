@@ -462,6 +462,10 @@ export function modifiedAttributeNames(body: {
  * written as text where the schema declares one, a boolean as LDAP's
  * `TRUE` / `FALSE`, and anything else is refused.
  *
+ * The attribute is read as a request names it, under any case and with or
+ * without a `;binary` option: the value is converted by its type, as the
+ * validator accepted it.
+ *
  * @param schema schema of the entry, if any
  * @param field attribute name
  * @param value value as the client sent it
@@ -479,7 +483,7 @@ export function toDirectoryValue(
     Buffer.isBuffer(value)
   )
     return value;
-  const attr = schema?.attributes[field];
+  const attr = schemaAttribute(schema, field)?.[1];
   const asText = (v: unknown, type: string | undefined): string | Buffer => {
     if (typeof v === 'string' || Buffer.isBuffer(v)) return v;
     if (

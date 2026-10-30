@@ -186,6 +186,89 @@ describe('EntityValidator', () => {
         await refusal(validator().validateNew(entry({ uid: 'Alice' })))
       ).to.equal('Invalid value for attribute "uid": lower-case letters');
     });
+
+    // A fuzzer sent `{"add":{"PWDRESET":true}}` and a creation with `Cn`:
+    // the schema checks read the name, the conversion and the required
+    // check only its own spelling
+    it('reads an attribute under the spelling validateValue accepted', async () => {
+      const people = {
+        attributes: {
+          ...schema.attributes,
+          pwdReset: { type: 'boolean' },
+          cn: { type: 'string', required: true },
+        },
+      } as unknown as Schema;
+      const v = new EntityValidator(people, {
+        entryExists: async dn => dn === bob,
+        loadedPlugins: {},
+        singularName: 'person',
+      });
+      const changes = { add: { PWDRESET: true } } as unknown as ModifyRequest;
+      await v.validateChanges(changes);
+      expect(Object.values(changes.add ?? {})).to.deep.equal(['TRUE']);
+      expect(
+        await refusal(
+          v.validateNew(
+            entry({ BUSINESS_PLACE: 'd', Cn: 'Alice', 'l;binary': 'lyon' })
+          )
+        )
+      ).to.be.undefined;
+    });
+
+    it('writes a declared attribute under the schema spelling, keeping ;binary', async () => {
+      const v = validator();
+      const written = await v.validateNew(
+        entry({ BusinessCategory: 'd', 'manager;binary': bob })
+      );
+      expect(written.businessCategory).to.equal('d');
+      expect(written['manager;binary']).to.equal(bob);
+      expect(written).to.not.have.property('BusinessCategory');
+      expect(written).to.not.have.property('manager');
+    });
+
+    it('converts a value under every spelling of a declared attribute', async () => {
+      const people = {
+        attributes: { ...schema.attributes, pwdReset: { type: 'boolean' } },
+      } as unknown as Schema;
+      for (const field of ['pwdReset;binary', 'PWDRESET;BINARY', 'PWDRESET']) {
+        const written = await new EntityValidator(people, {
+          entryExists: async () => true,
+          loadedPlugins: {},
+          singularName: 'person',
+        }).validateNew(entry({ [field]: true }));
+        const named = field.toLowerCase().includes(';binary')
+          ? 'pwdReset;binary'
+          : 'pwdReset';
+        expect(written[named], field).to.equal('TRUE');
+        expect(Object.keys(written), field).to.deep.equal([
+          'objectClass',
+          'uid',
+          'description',
+          named,
+          'l',
+        ]);
+      }
+    });
+
+    it('refuses two keys naming one attribute', async () => {
+      for (const sent of [
+        { description: 'a', DESCRIPTION: 'b' },
+        { secretary: [bob], SECRETARY: [bob] },
+        // The option names a transfer syntax, not another value
+        { l: 'lyon', 'L;binary': 'paris' },
+      ])
+        expect(
+          await refusal(validator().validateNew(entry(sent))),
+          JSON.stringify(sent)
+        ).to.equal(
+          `"${Object.keys(sent)[0]}" and "${Object.keys(sent)[1]}" name the same attribute`
+        );
+      expect(
+        await refusal(
+          validator().validateChanges({ delete: ['L;binary', 'l'] })
+        )
+      ).to.equal('"L;binary" and "l" name the same attribute');
+    });
   });
 
   describe('validateChanges', () => {
@@ -225,6 +308,37 @@ describe('EntityValidator', () => {
           validator().validateChanges({ delete: { description: ['old'] } })
         )
       ).to.be.undefined;
+      // One value, given as it is or as a list of one
+      expect(
+        await refusal(
+          validator().validateChanges({ delete: { description: 'old' } })
+        )
+      ).to.be.undefined;
+      // The directory applies an `add` and a `replace` before the `delete`:
+      // the value they give is removed by it
+      for (const changes of [
+        { delete: ['description'], add: { DESCRIPTION: 'new' } },
+        { delete: { description: [] }, replace: { Description: 'new' } },
+      ] as any[])
+        expect(
+          await refusal(validator().validateChanges(changes)),
+          JSON.stringify(changes)
+        ).to.equal('Attribute "description" is required');
+      // A `replace` of another attribute leaves the `delete` whole
+      expect(
+        await refusal(
+          validator().validateChanges({
+            delete: ['description'],
+            replace: { businessCategory: 'x' },
+          })
+        )
+      ).to.equal('Attribute "description" is required');
+    });
+
+    it('keeps the parts it was given as they were given', async () => {
+      const changes = { replace: { businessCategory: 'x' } } as ModifyRequest;
+      await validator().validateChanges(changes);
+      expect(Object.keys(changes)).to.deep.equal(['replace']);
     });
 
     it('clears an optional attribute with null, as the directory reads []', async () => {
@@ -431,5 +545,9 @@ describe('EntityValidator', () => {
       .undefined;
     expect(await refusal(validator(null).validateValue('x', ''))).to.be
       .undefined;
+    // No schema declares a name, so none is renamed or converted
+    const changes = { add: { PWDRESET: 'TRUE' } } as unknown as ModifyRequest;
+    await validator(null).validateChanges(changes);
+    expect(changes.add).to.deep.equal({ PWDRESET: 'TRUE' });
   });
 });

@@ -4,6 +4,7 @@ import type {
   ModifyRequest,
 } from '../ldapActions';
 import { BadRequestError } from '../errors';
+import { knownAttributeName } from '../utils';
 import type { Schema, SchemaAttribute } from '../../config/schema';
 import {
   checkDnValues,
@@ -43,42 +44,55 @@ export class EntityValidator {
   ) {}
 
   /**
-   * Check a new entry, then convert it in place for the directory.
+   * Check a new entry, then convert it for the directory. Every attribute
+   * the schema declares is named as the schema does, a form the defaults,
+   * the required check and the conversion all read.
    *
    * @param entry entry as the client sent it, `objectClass` included
+   * @returns the entry to write: the one given, or a copy under the schema's
+   *   spellings
    */
-  async validateNew(entry: AttributesList): Promise<void> {
-    this.dropUndeclaredEmpty(entry);
+  async validateNew(entry: AttributesList): Promise<AttributesList> {
+    const candidate = this.renameDeclared(entry);
+    this.dropUndeclaredEmpty(candidate);
     if (!this.schema) {
-      toDirectoryEntry(undefined, entry);
-      return;
+      toDirectoryEntry(undefined, candidate);
+      return candidate;
     }
     // Checked at the default, not at what was sent
-    applyFixedDefaults(this.schema, entry);
+    applyFixedDefaults(this.schema, candidate);
 
-    await this.checkValues(entry);
+    await this.checkValues(candidate);
     // A `generated` attribute is exempt only when something will fill it,
     // see `missingRequiredAttribute`
     const missing = missingRequiredAttribute(
       this.schema,
-      entry,
+      candidate,
       this.deps.loadedPlugins
     );
     if (missing)
       throw new BadRequestError(`Attribute "${missing}" is required`);
-    toDirectoryEntry(this.schema, entry);
+    toDirectoryEntry(this.schema, candidate);
+    return candidate;
   }
 
   /**
-   * Check the parts of a change, then convert them in place. Under a name
-   * the schema declares, no value becomes the empty list, which clears the
-   * attribute in a `replace` and is refused in an `add`; under a name it
-   * does not declare, a `null` is dropped from an `add` and becomes that
-   * empty list in a `replace`.
+   * Check the parts of a change, then convert them. Under a name the schema
+   * declares, no value becomes the empty list, which clears the attribute
+   * in a `replace` and is refused in an `add`; under a name it does not
+   * declare, a `null` is dropped from an `add` and becomes that empty list
+   * in a `replace`.
    *
    * @param changes change as the client sent it
+   * @returns the same change, under the schema's spellings
    */
-  async validateChanges(changes: ModifyRequest): Promise<void> {
+  async validateChanges(changes: ModifyRequest): Promise<ModifyRequest> {
+    if (changes.add) changes.add = this.renameDeclared(changes.add);
+    if (changes.replace) changes.replace = this.renameDeclared(changes.replace);
+    if (changes.delete)
+      changes.delete = Array.isArray(changes.delete)
+        ? this.renameDeclaredNames(changes.delete)
+        : this.renameDeclared(changes.delete);
     for (const part of ['add', 'replace'] as const) {
       const values = changes[part];
       if (!values) continue;
@@ -87,12 +101,14 @@ export class EntityValidator {
     }
     if (!this.schema) {
       toDirectoryChanges(undefined, changes);
-      return;
+      return changes;
     }
     if (changes.delete) {
       // A required attribute is refused to a delete of the whole attribute:
       // named in the list, or under a name with no value, as the directory
-      // layer reads it. Named with values, some may remain.
+      // layer reads it. Named with values, some may remain. An `add` or a
+      // `replace` of the same change does not save it: the directory applies
+      // them before the `delete`
       const whole = (field: string): boolean => {
         if (Array.isArray(changes.delete)) return true;
         const value = (changes.delete as AttributesList)[field];
@@ -112,6 +128,75 @@ export class EntityValidator {
       }
     }
     toDirectoryChanges(this.schema, changes);
+    return changes;
+  }
+
+  /**
+   * Name every key the schema declares as the schema does, and refuse two
+   * keys naming one attribute. The conversion, the required check and the
+   * defaults look a declared attribute up by its own name: a field they
+   * would leave out is one the client sent under another case or with a
+   * `;binary` option.
+   *
+   * @returns the same attributes, renamed: the map itself when nothing
+   *   changes, a copy renamed otherwise
+   * @throws BadRequestError when two keys name the same attribute
+   */
+  private renameDeclared(values: AttributesList): AttributesList {
+    const keys = Object.keys(values);
+    const names = this.renameDeclaredNames(keys);
+    if (keys.every((key, i) => key === names[i])) return values;
+    // A new object rather than deletes and assignments: the keys are copied
+    // from JSON, `__proto__` among them, and assigning that one would set
+    // the prototype instead
+    const renamed: AttributesList = Object.create(null) as AttributesList;
+    for (const [i, name] of names.entries()) renamed[name] = values[keys[i]];
+    return renamed;
+  }
+
+  /**
+   * {@link renameDeclared} on a list of names, such as a `delete`.
+   *
+   * Two names of one attribute are refused as the routes refuse them: as
+   * the schema declares it, or as this server knows the attribute by its
+   * name, which makes `l;binary` and `L` one attribute.
+   */
+  private renameDeclaredNames(keys: string[]): string[] {
+    const seen = new Map<string, string>();
+    return keys.map(key => {
+      const id = this.attributeIdentity(key);
+      const same = seen.get(id);
+      if (same !== undefined && same !== key)
+        throw new BadRequestError(
+          `"${same}" and "${key}" name the same attribute`
+        );
+      seen.set(id, key);
+      return this.schemaSpelling(key);
+    });
+  }
+
+  /**
+   * The attribute a name holds, case and option aside: the option is a
+   * transfer syntax, and `l;binary` is the `l` a plain `L` names.
+   */
+  private attributeIdentity(field: string): string {
+    const base = split(field)[0];
+    return (
+      schemaAttribute(this.schema, base)?.[0] ??
+      knownAttributeName(base) ??
+      base
+    ).toLowerCase();
+  }
+
+  /**
+   * The schema's spelling of a declared attribute, with the `;binary`
+   * option, the only one a write takes, written as the directory writes it.
+   */
+  private schemaSpelling(field: string): string {
+    const [base, option] = split(field);
+    const named = schemaAttribute(this.schema, base)?.[0];
+    if (named === undefined) return field;
+    return option ? `${named};${option}` : named;
   }
 
   /**
@@ -251,6 +336,16 @@ export function applyFixedDefaults(
     )
       entry[field] = attr.default;
 }
+
+/**
+ * An attribute description split between its type and its option, the
+ * latter lowercased: options are case-insensitive, and `;binary` is the only
+ * one a write takes.
+ */
+const split = (field: string): [string, string | undefined] => {
+  const [base, ...options] = field.split(';');
+  return [base, options.find(Boolean)?.toLowerCase()];
+};
 
 /** No value: what clears an attribute in a `replace` */
 const isNoValue = (value: unknown): value is null | undefined | [] =>

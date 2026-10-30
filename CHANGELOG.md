@@ -11,6 +11,13 @@
 
 ### Fixed
 
+- An attribute the schema declares is checked and written whatever its case
+  or `;binary` option: a boolean sent as `PWDRESET` or `pwdReset;binary` is no
+  longer answered 400 as not a string, a `required` attribute sent as `Cn` no
+  longer counts as missing, and a `fixed` one is written once, at its default;
+  two names of one attribute in an entry or in one part of a change are
+  refused
+  ([#497](https://github.com/linagora/ldap-rest/issues/497)).
 - A creation or an `add` carrying `null` for an attribute the entity's schema
   does not declare, or for every attribute when it has no schema, is no
   longer answered 500: the attribute is written as if the key were left out.
