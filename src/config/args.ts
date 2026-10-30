@@ -8,6 +8,10 @@ import { dirname, join } from 'path';
 
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
+import { bclOptions } from '../plugins/bcl.options';
+import { metricsOptions } from '../plugins/metrics.options';
+import { storageOptions } from '../plugins/storage.options';
+import { staticOptions } from '../plugins/static.options';
 import { scimOptions } from '../plugins/scim/scim.options';
 import {
   crowdsecOptions,
@@ -50,9 +54,7 @@ import { twakeTombstoneOptions } from '../plugins/twake/twakeTombstone.options';
 
 import { toConfigEntries } from './options';
 
-/** The headers `core/static` sends unless told otherwise: no framing by another site */
-export const STATIC_CSP = "frame-ancestors 'self'";
-export const STATIC_FRAME_OPTIONS = 'SAMEORIGIN';
+export { STATIC_CSP, STATIC_FRAME_OPTIONS } from '../plugins/static.options';
 
 export interface BranchPermissions {
   read?: boolean;
@@ -613,64 +615,17 @@ const configArgs: ConfigTemplate = [
   // LDAP enterprise rules plugin
   ...toConfigEntries(enterpriseRulesOptions),
 
-  // Metrics plugin
-  ['--metrics-port', 'DM_METRICS_PORT', 9464, 'number'],
-
-  // Keyed storage
-  //
-  // Which sub-plugin keeps the records: `ldap`, `file`, `postgres` or
-  // `valkey`. Empty means none is loaded, and a consumer asking for one says
-  // so.
-  ['--storage-backend', 'DM_STORAGE_BACKEND', ''],
-  // Reads enforce expiry whatever the sweeper has done, so a long interval
-  // costs storage rather than correctness — with one exception: `file` will
-  // not sweep a temporary younger than this, so an interval shorter than a
-  // write takes would make it take one in flight.
-  ['--storage-sweep-interval', 'DM_STORAGE_SWEEP_INTERVAL', 600, 'number'],
-  // The branch `storage/ldap` writes to. It holds records and nothing else,
-  // so it belongs outside the branches the directory serves.
-  ['--storage-ldap-base', 'DM_STORAGE_LDAP_BASE', ''],
-  [
-    '--storage-ldap-object-class',
-    'DM_STORAGE_LDAP_OBJECT_CLASS',
-    'applicationProcess',
-  ],
-  // The directory `storage/file` writes to, one file per record, so nothing
-  // else should be writing there.
-  ['--storage-file-directory', 'DM_STORAGE_FILE_DIRECTORY', ''],
-  ['--storage-postgres-url', 'DM_STORAGE_POSTGRES_URL', ''],
-  [
-    '--storage-postgres-table',
-    'DM_STORAGE_POSTGRES_TABLE',
-    'ldap_rest_storage',
-  ],
-  // The instance must not evict: see docs/usage/plugins/utilities/storage.md.
-  ['--storage-valkey-url', 'DM_STORAGE_VALKEY_URL', ''],
-  ['--storage-valkey-prefix', 'DM_STORAGE_VALKEY_PREFIX', 'ldap-rest:'],
-
-  // Back-Channel Logout
-  //
-  // How long a tombstone is kept. It has to outlive the session it kills, or
-  // a cookie older than the mark would be honoured again; the default matches
-  // express-openid-connect's own 7-day session. Where the marks live, and how
-  // often expired ones are reclaimed, is core/storage's business.
-  ['--bcl-retention', 'DM_BCL_RETENTION', 604800, 'number'],
+  // Metrics, keyed storage and Back-Channel Logout plugins
+  ...toConfigEntries(metricsOptions),
+  ...toConfigEntries(storageOptions),
+  ...toConfigEntries(bclOptions),
 
   // LDAP groups and external users plugins
   ...toConfigEntries(groupsOptions),
   ...toConfigEntries(externalUsersOptions),
 
   // static
-  [
-    '--static-path',
-    'DM_STATIC_PATH',
-    join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'static'),
-  ],
-  ['--static-name', 'DM_STATIC_NAME', 'static'],
-  // An administration page is not to be framed by another site
-  // (clickjacking): see core/static, `off` sends no header
-  ['--static-csp', 'DM_STATIC_CSP', STATIC_CSP],
-  ['--static-frame-options', 'DM_STATIC_FRAME_OPTIONS', STATIC_FRAME_OPTIONS],
+  ...toConfigEntries(staticOptions),
 
   // LDAP flat, raw and bulk import plugins
   ...toConfigEntries(flatGenericOptions),

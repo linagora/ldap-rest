@@ -114,8 +114,8 @@ replaced by the default and is now refused. A zero `--auth-totp-step` or
 `--auth-hmac-window` was accepted and broke the plugin — every counter was
 `Infinity`, every signature not made in the same millisecond was refused — and
 is now refused at startup. A zero `--ldap-organization-max-subnodes`,
-`--ldap-raw-max-results`, `--ppolicy-warn-days` or `--ppolicy-min-length` used
-to be replaced by the default and is now refused.
+`--ldap-raw-max-results`, `--ppolicy-warn-days`, `--ppolicy-min-length` or
+`--bcl-retention` used to be replaced by the default and is now refused.
 
 `ConfigParser` keeps an empty string for a string option. A plugin reads the
 declared default instead when that default is not empty, as its `|| default`

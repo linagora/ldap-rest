@@ -16,7 +16,11 @@ import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import { registry } from '../lib/metrics';
 
+import { metricsOptions } from './metrics.options';
+
 export default class Metrics extends DmPlugin {
+  static optionDefinitions = metricsOptions;
+
   name = 'metrics';
   /** The gauges read at scrape time and the process metrics */
   private readonly own = new Registry();
@@ -69,7 +73,7 @@ export default class Metrics extends DmPlugin {
     const listener = createServer((req, res) => void this.answer(req, res));
     await new Promise<void>((resolve, reject) => {
       listener.once('error', reject);
-      listener.listen(this.config.metrics_port as number, () => {
+      listener.listen(this.options(metricsOptions).metrics_port, () => {
         listener.off('error', reject);
         resolve();
       });

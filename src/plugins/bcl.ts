@@ -22,11 +22,14 @@ import type { OidcLogoutToken, OidcSessionClaims } from '../hooks';
 import type Store from '../lib/storage/store';
 
 import type Storage from './storage';
+import { bclOptions } from './bcl.options';
 
 /** One namespace, so nothing else in the store can answer for a logout. */
 const NAMESPACE = 'bcl';
 
 export default class Bcl extends DmPlugin {
+  static optionDefinitions = bclOptions;
+
   name = 'bcl';
   dependencies = { storage: 'core/storage' };
   private storage?: Storage;
@@ -35,7 +38,7 @@ export default class Bcl extends DmPlugin {
 
   constructor(server: DM) {
     super(server);
-    this.retention = ((server.config.bcl_retention as number) || 604800) * 1000;
+    this.retention = this.options(bclOptions).bcl_retention * 1000;
   }
 
   /**

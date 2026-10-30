@@ -100,6 +100,10 @@
       "types": "./dist/src/plugins/auth/trustedProxy.d.ts",
       "import": "./dist/plugins/auth/trustedProxy.js"
     },
+    "./plugin-bcl.options": {
+      "types": "./dist/src/plugins/bcl.options.d.ts",
+      "import": "./dist/plugins/bcl.options.js"
+    },
     "./plugin-bcl": {
       "types": "./dist/src/plugins/bcl.d.ts",
       "import": "./dist/plugins/bcl.js"
@@ -168,6 +172,10 @@
       "types": "./dist/src/plugins/ldap/trash.d.ts",
       "import": "./dist/plugins/ldap/trash.js"
     },
+    "./plugin-metrics.options": {
+      "types": "./dist/src/plugins/metrics.options.d.ts",
+      "import": "./dist/plugins/metrics.options.js"
+    },
     "./plugin-metrics": {
       "types": "./dist/src/plugins/metrics.d.ts",
       "import": "./dist/plugins/metrics.js"
@@ -232,9 +240,17 @@
       "types": "./dist/src/plugins/scim/users.d.ts",
       "import": "./dist/plugins/scim/users.js"
     },
+    "./plugin-static.options": {
+      "types": "./dist/src/plugins/static.options.d.ts",
+      "import": "./dist/plugins/static.options.js"
+    },
     "./plugin-static": {
       "types": "./dist/src/plugins/static.d.ts",
       "import": "./dist/plugins/static.js"
+    },
+    "./plugin-storage.options": {
+      "types": "./dist/src/plugins/storage.options.d.ts",
+      "import": "./dist/plugins/storage.options.js"
     },
     "./plugin-storage": {
       "types": "./dist/src/plugins/storage.d.ts",

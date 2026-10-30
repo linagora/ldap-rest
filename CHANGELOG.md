@@ -49,8 +49,8 @@
   refused too; a zero TOTP step or HMAC window was accepted and broke the
   plugin, and is now refused at startup. A zero
   `--ldap-organization-max-subnodes`, `--ldap-raw-max-results`,
-  `--ppolicy-warn-days` or `--ppolicy-min-length` used to be replaced by the
-  default and is now refused ([details](docs/plugin-development/options.md)).
+  `--ppolicy-warn-days`, `--ppolicy-min-length` or `--bcl-retention` used to be
+  replaced by the default and is now refused ([details](docs/plugin-development/options.md)).
 - `--group-allow-unexistent-members` is gone: it was stored under a key the
   groups plugin never read. Use `--groups-allow-unexistent-members` or
   `DM_ALLOW_UNEXISTENT_MEMBERS`, which the plugin now reads

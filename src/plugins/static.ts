@@ -26,6 +26,7 @@ import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
 
 import DmPlugin, { type Role } from '../abstract/plugin';
+import type { DM } from '../bin';
 import { STATIC_CSP, STATIC_FRAME_OPTIONS } from '../config/args';
 import { notFound, serverError } from '../lib/expressFormatedResponses';
 import {
@@ -34,6 +35,8 @@ import {
   schemaUrl,
   staticName,
 } from '../lib/schemaFile';
+
+import { staticOptions, type StaticOptions } from './static.options';
 
 /**
  * The path of a request as the configuration writes it: `schemaUrl` puts
@@ -118,14 +121,21 @@ const headerValue = (
  *         required: true
  */
 export default class Static extends DmPlugin {
+  static optionDefinitions = staticOptions;
+
   name: string = 'static';
   roles: Role[] = ['api', 'configurable'] as const;
   /** The configuration's schema files it serves outside its directory, by URL */
   private configured = new Map<string, string>();
+  private readonly settings: StaticOptions;
+
+  constructor(server: DM) {
+    super(server);
+    this.settings = this.options(staticOptions);
+  }
 
   api(app: Express): void {
-    const rep = this.config.static_path;
-    if (!rep) throw new Error('--static-path is not defined');
+    const rep = this.settings.static_path;
     try {
       const stat = fs.statSync(rep);
       if (!stat.isDirectory()) throw new Error(`${rep} isn't a directory`);
@@ -134,9 +144,6 @@ export default class Static extends DmPlugin {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Bad directory ${rep}: ${e}`);
     }
-    const given: unknown = this.config.static_name;
-    if (given !== undefined && given !== null && typeof given !== 'string')
-      throw new Error('--static-name: a text is expected, such as static');
     const name = staticName(this.config);
     // Each segment a path that Express matches as written: no `.` or `..`,
     // none empty, none holding its route syntax (`:`, `*`, braces…) or what
@@ -163,13 +170,13 @@ export default class Static extends DmPlugin {
     const csp = headerValue(
       '--static-csp',
       'Content-Security-Policy',
-      this.config.static_csp,
+      this.settings.static_csp,
       STATIC_CSP
     );
     const frameOptions = headerValue(
       '--static-frame-options',
       'X-Frame-Options',
-      this.config.static_frame_options,
+      this.settings.static_frame_options,
       STATIC_FRAME_OPTIONS
     );
     app.use(prefix, (_req, res, next) => {
@@ -408,7 +415,7 @@ export default class Static extends DmPlugin {
           continue;
         return url(segments);
       }
-    const rep = this.config.static_path;
+    const rep = this.settings.static_path;
     if (!rep) return undefined;
     // From the resolved paths, then the real ones for a directory reached
     // through a link: no `..` is left to take the URL out of its prefix,
@@ -481,7 +488,7 @@ export default class Static extends DmPlugin {
           continue;
         return url(segments);
       }
-    const rep = this.config.static_path;
+    const rep = this.settings.static_path;
     if (!rep) return undefined;
     const schemasDir = join(rep, 'schemas');
     // What follows a `schemas` directory of its path, as given or real, or
