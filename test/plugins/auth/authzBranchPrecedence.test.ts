@@ -12,6 +12,7 @@ import type { SearchResult } from 'ldapts';
 
 import { DM } from '../../../src/bin';
 import type { DmRequest } from '../../../src/lib/auth/base';
+import { isAuthzRefusal } from '../../../src/lib/errors';
 import { mostSpecificBranchRule } from '../../../src/lib/authz/base';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
@@ -202,7 +203,7 @@ describe('Branch rule precedence', function () {
             req
           )
           .catch((err: unknown) => (refused = err));
-        expect(String(refused), spelled).to.match(/forbidden/i);
+        expect(isAuthzRefusal(refused), spelled).to.equal(true);
         for (const write of [
           () =>
             server.ldap.modify(
@@ -214,7 +215,7 @@ describe('Branch rule precedence', function () {
         ]) {
           let error: unknown;
           await write().catch((err: unknown) => (error = err));
-          expect(String(error), spelled).to.match(/forbidden/i);
+          expect(isAuthzRefusal(error), spelled).to.equal(true);
         }
       }
     });
@@ -243,7 +244,7 @@ describe('Branch rule precedence', function () {
       ]) {
         let error: unknown;
         await write().catch((err: unknown) => (error = err));
-        expect(String(error)).to.match(/forbidden/i);
+        expect(isAuthzRefusal(error)).to.equal(true);
       }
       // Nor by carrying the organization link along
       const link = server.config.ldap_organization_link_attribute as string;
@@ -258,7 +259,7 @@ describe('Branch rule precedence', function () {
           req
         )
         .catch((err: unknown) => (error = err));
-      expect(String(error)).to.match(/forbidden/i);
+      expect(isAuthzRefusal(error)).to.equal(true);
       // Judged by attachment as well: `departmentSync` would relink the
       // accounts attached there, out of the rule
       const previousMode = server.config.authz_filter_attached_entries;
@@ -271,7 +272,7 @@ describe('Branch rule precedence', function () {
       } finally {
         server.config.authz_filter_attached_entries = previousMode;
       }
-      expect(String(error)).to.match(/forbidden/i);
+      expect(isAuthzRefusal(error)).to.equal(true);
       // A rule naming nothing below it does not get in the way
       await server.ldap.rename(
         `uid=prec-sales,${acme}`,
@@ -359,7 +360,7 @@ describe('Branch rule precedence', function () {
             { user: USER, headers: {} } as unknown as DmRequest
           )
           .catch((err: unknown) => (error = err));
-        expect(String(error)).to.match(/forbidden/i);
+        expect(isAuthzRefusal(error)).to.equal(true);
         // The link alone is what a move between organizations writes
         await Promise.resolve(
           plugin.hooks.ldapmodifyrequest!([
@@ -398,7 +399,7 @@ describe('Branch rule precedence', function () {
         ]) {
           let error: unknown;
           await judge().catch((err: unknown) => (error = err));
-          expect(String(error)).to.match(/forbidden/i);
+          expect(isAuthzRefusal(error)).to.equal(true);
         }
       });
 
@@ -437,7 +438,7 @@ describe('Branch rule precedence', function () {
               req,
             ])
           ).catch((err: unknown) => (error = err));
-          expect(String(error)).to.match(/forbidden/i);
+          expect(isAuthzRefusal(error)).to.equal(true);
           await Promise.resolve(
             plugin.hooks.ldapmodifyrequest!([
               linked,
@@ -482,7 +483,7 @@ describe('Branch rule precedence', function () {
               { user: USER, headers: {} } as unknown as DmRequest,
             ])
           ).catch((err: unknown) => (error = err));
-          expect(String(error), rdn).to.match(/forbidden/i);
+          expect(isAuthzRefusal(error), rdn).to.equal(true);
         }
       });
 
@@ -525,7 +526,7 @@ describe('Branch rule precedence', function () {
             { user: USER, headers: {} } as unknown as DmRequest,
           ])
         ).catch((err: unknown) => (error = err));
-        expect(String(error)).to.match(/forbidden/i);
+        expect(isAuthzRefusal(error)).to.equal(true);
       });
 
       it('lets a group grant what the user rule refuses', async () => {

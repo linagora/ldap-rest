@@ -11,6 +11,7 @@
  */
 import type { Hooks } from '../hooks';
 
+import { isAuthzRefusal } from './errors';
 import { getLogger } from './expressFormatedResponses';
 import { hookFailures } from './metrics';
 import { outsideRequest, runAsPlugin } from './requestContext';
@@ -118,15 +119,6 @@ export const runAsHookOwner = <T>(hook: HookFn, fn: () => T): T => {
   const owner = hookOwner(hook);
   return runAsPlugin(owner?.plugin, owner?.hook, fn);
 };
-
-/**
- * Whether a hook's failure is an authorization plugin's refusal, by the
- * marker its message carries: a plain `Error` wrapping it keeps the message
- * only. Its message names the branch, so the client is told `AUTHZ_REFUSED`
- * instead.
- */
-export const isAuthzRefusal = (err: unknown): boolean =>
-  /\[authz-forbidden\]/.test(String((err as Error)?.message ?? ''));
 
 /**
  * Whether an error is a refusal: an authorization plugin's, or any 403.

@@ -17,14 +17,11 @@ import {
   AUTHZ_REFUSED,
   HttpError,
   errorBody,
+  isAuthzRefusal,
   type Refusal,
 } from '../../lib/errors';
 import { loadSchemaFile } from '../../lib/schemaFile';
-import {
-  escapeDnValue,
-  isAuthzRefusal,
-  validateDnValue,
-} from '../../lib/utils';
+import { escapeDnValue, validateDnValue } from '../../lib/utils';
 
 interface BulkImportSchema {
   base?: string;

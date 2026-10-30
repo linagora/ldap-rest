@@ -21,6 +21,7 @@ import type {
   SearchResult,
 } from '../../../src/lib/ldapActions';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
+import { statusCodeOf } from '../../../src/lib/errors';
 import type { Role } from '../../../src/abstract/plugin';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
@@ -282,9 +283,7 @@ describe('Delegated administration bypasses (#325)', function () {
             req
           );
         } catch (err) {
-          status =
-            (err as { statusCode?: number }).statusCode ??
-            (/authz-forbidden/.test(String(err)) ? 403 : 500);
+          status = statusCodeOf(err);
         }
         expect(status).to.be.oneOf([400, 403]);
         expect(await read(userDn(IN_A2), 'twakeDepartmentLink')).to.deep.equal([

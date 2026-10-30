@@ -3,6 +3,7 @@ import type { SearchOptions } from 'ldapts';
 import type winston from 'winston';
 
 import HookBus, { recordHookOwner } from '../../src/lib/hookBus';
+import { AuthzRefusedError } from '../../src/lib/errors';
 import type { Hooks } from '../../src/hooks';
 import { getLogger, setLogger } from '../../src/lib/expressFormatedResponses';
 
@@ -62,7 +63,7 @@ describe('HookBus', () => {
       const bus = new HookBus({
         ldapaddrequest: [
           () => {
-            throw new Error('[authz-forbidden] not yours');
+            throw new AuthzRefusedError('not yours');
           },
         ],
       });
@@ -78,7 +79,7 @@ describe('HookBus', () => {
 
       expect(refused).to.equal(true);
       expect(warned).to.deep.equal([
-        'a hook no plugin registered (anonymous) refused: [authz-forbidden] not yours',
+        'a hook no plugin registered (anonymous) refused: not yours',
       ]);
     });
 

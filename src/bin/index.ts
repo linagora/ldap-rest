@@ -30,7 +30,8 @@ import ldapActions from '../lib/ldapActions';
 import type DmPlugin from '../abstract/plugin';
 import { buildLogger } from '../logger/winston';
 import {
-  serverErrorBody,
+  errorResponse,
+  messageOf,
   setDebug,
   setLogger,
 } from '../lib/expressFormatedResponses';
@@ -40,7 +41,6 @@ import {
   assertEnforceable,
   LDAP_JUDGING_HOOKS,
 } from '../lib/authz/composition';
-import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
 import { registerAttributeTypes } from '../lib/utils';
 import HookBus, { recordHookOwner, type HookFn } from '../lib/hookBus';
 import { runForRequest, runWithLogContext } from '../lib/requestContext';
@@ -99,6 +99,7 @@ export {
   BadRequestError,
   UnauthorizedError,
   ForbiddenError,
+  AuthzRefusedError,
   NotFoundError,
   ConflictError,
   UriTooLongError,
@@ -648,47 +649,30 @@ export class DM {
       res: Response,
       _next: NextFunction
     ): void => {
-      let statusCode =
-        'statusCode' in err ? (err as { statusCode: number }).statusCode : 500;
+      // The same serializer `serverError` answers through: a handler that
+      // throws and one that calls the helper answer alike.
+      const { status, body } = errorResponse(err, this.config.debug);
 
-      // Recognise the authz-forbidden marker embedded by authz plugins so a
-      // 403 survives being wrapped into a plain Error by downstream callers
-      // (which otherwise drops `statusCode` and surfaces as a 500).
-      let clientMessage = err.message;
-      if (statusCode === 500 && /\[authz-forbidden\]/.test(err.message)) {
-        statusCode = 403;
-        clientMessage = AUTHZ_REFUSED;
-      } else if (
-        statusCode === 403 &&
-        /\[authz-forbidden\]/.test(err.message)
-      ) {
-        clientMessage = AUTHZ_REFUSED;
-      }
-
-      // Client error (4xx) - log as warning and return error message
-      if (statusCode >= 400 && statusCode < 500) {
+      if (status < 500) {
         this.logger.warn(
-          `Client error ${statusCode} in request ${req.method} ${req.path}: ${clientMessage}`
+          `Client error ${status} in request ${req.method} ${req.path}: ${body.error}`
         );
         // `res.json` answers the response object; the middleware answers
         // nothing, which is what lets the signature say so.
-        if (!res.headersSent)
-          res.status(statusCode).json(errorBody(err, clientMessage));
+        if (!res.headersSent) res.status(status).json(body);
         return;
       }
 
-      // Server error (5xx): logged, named in the answer only under --debug
       this.logger.error(
-        `Server error ${statusCode} in request ${req.method} ${req.path}: ${err.message}`,
+        `Server error ${status} in request ${req.method} ${req.path}: ${messageOf(err)}`,
         {
-          stack: err.stack,
+          stack: err instanceof Error ? err.stack : undefined,
           url: req.url,
           method: req.method,
         }
       );
 
-      if (!res.headersSent)
-        res.status(statusCode).json(serverErrorBody(err, this.config.debug));
+      if (!res.headersSent) res.status(status).json(body);
     };
 
     this.app.use(this._errorMiddleware);

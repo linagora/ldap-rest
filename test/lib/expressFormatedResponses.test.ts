@@ -4,7 +4,14 @@ import bodyParser from 'body-parser';
 import supertest from 'supertest';
 import type winston from 'winston';
 
-import { AUTHZ_REFUSED, ConflictError } from '../../src/lib/errors';
+import {
+  AUTHZ_REFUSED,
+  AuthzRefusedError,
+  ConflictError,
+  ForbiddenError,
+  GatewayTimeoutError,
+  NotFoundError,
+} from '../../src/lib/errors';
 import {
   getLogger,
   jsonBody,
@@ -132,15 +139,81 @@ describe('serverError', () => {
   it('codes an authorization refusal without naming its branch', () => {
     const { res, sent } = fakeResponse();
 
-    // Wrapped into a plain Error: only the marker is left
     serverError(
       res,
-      new Error('[authz-forbidden] User bob may not write ou=Sales,dc=x')
+      new AuthzRefusedError(
+        'User bob does not have write permission for branch ou=Sales,dc=x'
+      )
     );
 
     expect(sent).to.deep.equal({
       status: 403,
       body: { error: AUTHZ_REFUSED, code: 'forbidden' },
+    });
+  });
+
+  it('keeps an authorization refusal its 403 through the wrappers around it', () => {
+    const { res, sent } = fakeResponse();
+
+    serverError(
+      res,
+      new Error('Failed to add group cn=g,ou=groups,dc=x: refuse', {
+        cause: new Error('Failed to find member(s)', {
+          cause: new ForbiddenError('User bob administers no branch'),
+        }),
+      })
+    );
+    // A plain 403 is not an authorization plugin's refusal: the wrapper's
+    // sentence stands, without the code the plugin's own gets.
+    expect(sent).to.deep.equal({
+      status: 403,
+      body: { error: 'Failed to add group cn=g,ou=groups,dc=x: refuse' },
+    });
+
+    const refused = fakeResponse();
+    serverError(
+      refused.res,
+      new Error('Failed to add group cn=g,ou=groups,dc=x: refused', {
+        cause: new AuthzRefusedError(
+          'User bob does not have write permission for branch ou=Sales,dc=x'
+        ),
+      })
+    );
+    expect(refused.sent).to.deep.equal({
+      status: 403,
+      body: { error: AUTHZ_REFUSED, code: 'forbidden' },
+    });
+  });
+
+  it('keeps an inner server status through a wrapper', () => {
+    const { res, sent } = fakeResponse();
+
+    serverError(
+      res,
+      new Error('Failed to reach the other service', {
+        cause: new GatewayTimeoutError('upstream timed out'),
+      })
+    );
+
+    expect(sent).to.deep.equal({
+      status: 504,
+      body: { error: 'Internal Server Error', message: 'An error occurred' },
+    });
+  });
+
+  it('keeps the status of an inner client error the wrapper does not name', () => {
+    const { res, sent } = fakeResponse();
+
+    serverError(
+      res,
+      new Error('Failed to fetch organization dc=x: no such object', {
+        cause: new NotFoundError('dc=x not found'),
+      })
+    );
+
+    expect(sent).to.deep.equal({
+      status: 404,
+      body: { error: 'Failed to fetch organization dc=x: no such object' },
     });
   });
 });

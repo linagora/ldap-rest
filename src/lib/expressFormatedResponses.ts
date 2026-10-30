@@ -5,7 +5,13 @@
 import type { Request, Response } from 'express';
 import type winston from 'winston';
 
-import { AUTHZ_REFUSED, errorBody } from './errors';
+import {
+  AUTHZ_REFUSED,
+  errorBody,
+  isAuthzRefusal,
+  statusCodeOf,
+  type Refusal,
+} from './errors';
 
 /**
  * The server's logger, once the `DM` constructor has installed it.
@@ -43,9 +49,59 @@ export const setDebug = (debug: boolean): void => {
 };
 
 /**
- * The body of a 5xx answer, for the error middleware of `DM` and
- * `serverError` alike. The failure is for the logs: the message names it
- * only under `--debug`.
+ * The sentence a client is told of a client error: an authorization
+ * plugin's refusal says nothing of the branch it judged.
+ *
+ * Any other client error keeps the sentence of the outermost error, the one
+ * the route threw when it gave up: it says what the caller's request was
+ * about, which the `HttpError` several layers down does not.
+ *
+ * @param err what was thrown
+ * @returns the sentence to answer
+ */
+export const clientMessageOf = (err: unknown): string =>
+  isAuthzRefusal(err) ? AUTHZ_REFUSED : messageOf(err);
+
+/**
+ * The message of a thrown thing, read the way the log reads it.
+ *
+ * @param err what was thrown
+ * @returns its message, or the value as a string
+ */
+export const messageOf = (err: unknown): string =>
+  err instanceof Error ? err.message : String(err);
+
+/**
+ * What an error is answered with, for the error middleware of `DM` and
+ * `serverError` alike: one status and one body, wherever the handler called
+ * a helper or threw.
+ *
+ * An authorization plugin's refusal loses its status when a plugin wraps it
+ * as a plain `Error`; it is still a 403, whatever the wrapper says. The
+ * failure of a 5xx is for the logs, and is named in the body only under
+ * `--debug`.
+ *
+ * @param err what failed
+ * @param debug whether to name a failure in the answer
+ * @returns the status and body to answer
+ */
+export const errorResponse = (
+  err: unknown,
+  debug = _debug
+): { status: number; body: { error: string } & Partial<Refusal> } => {
+  const refusal = isAuthzRefusal(err);
+  const status = refusal ? 403 : statusCodeOf(err);
+  if (status >= 400 && status < 500)
+    return { status, body: errorBody(err, clientMessageOf(err)) };
+  return {
+    status,
+    body: serverErrorBody(err, debug) as { error: string } & Partial<Refusal>,
+  };
+};
+
+/**
+ * The body of a 5xx answer, for every status answered when the failure is
+ * the server's: the message names the failure only under `--debug`.
  *
  * @param err what failed
  * @param debug whether to name the failure; `serverError`'s setting by default
@@ -55,11 +111,7 @@ export const serverErrorBody = (
   debug = _debug
 ): { error: string; message: string } => ({
   error: 'Internal Server Error',
-  message: debug
-    ? err instanceof Error
-      ? err.message
-      : String(err)
-    : 'An error occurred',
+  message: debug ? messageOf(err) : 'An error occurred',
 });
 
 // Utility that generates standard responses depending on the success of the method
@@ -163,32 +215,14 @@ export const tooManyRequests = (
 // undefined` from inside the error path, and the response it owes would
 // never be sent.
 export const serverError = (res: Response, err: unknown): void => {
-  const message = err instanceof Error ? err.message : String(err);
-  let statusCode =
-    err instanceof Error && 'statusCode' in err
-      ? (err as { statusCode: number }).statusCode
-      : 500;
+  const { status, body } = errorResponse(err, _debug);
 
-  // Upstream plugins sometimes wrap errors as `new Error(\`...: ${err}\`)`,
-  // dropping any `statusCode` the original carried. Authz plugins can embed
-  // `[authz-forbidden]` in the thrown message so the final serializer still
-  // knows to emit a proper 403 instead of falling back to 500.
-  if (statusCode === 500 && /\[authz-forbidden\]/.test(message)) {
-    statusCode = 403;
-  }
-
-  // Client error (4xx) - log as warning and return error message
-  if (statusCode >= 400 && statusCode < 500) {
-    const clientMessage =
-      statusCode === 403 && /\[authz-forbidden\]/.test(message)
-        ? AUTHZ_REFUSED
-        : message;
-    _logger?.warn(`Client error ${statusCode}: ${clientMessage}`);
-    res.status(statusCode).json(errorBody(err, clientMessage));
+  if (status < 500) {
+    _logger?.warn(`Client error ${status}: ${body.error}`);
+    res.status(status).json(body);
     return;
   }
 
-  // Server error (5xx): logged, named in the answer only under --debug
   if (err instanceof Error) {
     _logger?.error(err.message, err);
   } else if (typeof err === 'string') {
@@ -196,7 +230,7 @@ export const serverError = (res: Response, err: unknown): void => {
   } else {
     _logger?.error('Server error', err);
   }
-  res.status(statusCode).json(serverErrorBody(err));
+  res.status(status).json(body);
 };
 export const badGateway = (res: Response, message = 'Bad Gateway'): void =>
   _rejectResponse(502, res, message);

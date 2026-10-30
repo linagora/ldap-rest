@@ -9,6 +9,7 @@ import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Role } from '../../../src/abstract/plugin';
 import type { SearchResult } from '../../../src/lib/ldapActions';
+import { isAuthzRefusal } from '../../../src/lib/errors';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 
 /** Takes the caller from X-Test-User */
@@ -65,7 +66,7 @@ describe('AuthzLinid1: global write branches', () => {
     try {
       await write;
     } catch (err) {
-      expect(String(err)).to.match(/\[authz-forbidden\]/);
+      expect(isAuthzRefusal(err)).to.equal(true);
       return;
     }
     throw new Error('the write was accepted');

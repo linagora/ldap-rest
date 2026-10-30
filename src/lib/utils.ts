@@ -45,12 +45,7 @@ export function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export {
-  hookOwner,
-  isAuthzRefusal,
-  recordHookOwner,
-  runAsHookOwner,
-} from './hookBus';
+export { hookOwner, recordHookOwner, runAsHookOwner } from './hookBus';
 
 export const transformSchemas = (
   schemas: string | Buffer,

@@ -630,9 +630,9 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
           displayName: 'should-not-exist',
         })
         .expect(403);
-      // Neither the tenant name nor the internal marker should leak.
+      // Neither the tenant name nor the branch should leak.
       const payload = JSON.stringify(res.body);
-      expect(payload).to.not.match(/\[authz-forbidden\]/);
+      expect(payload).to.not.match(/permission for .*branch/);
     });
   });
 

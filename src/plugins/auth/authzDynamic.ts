@@ -32,7 +32,7 @@ import { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import AuthBase, { type DmRequest } from '../../lib/auth/base';
 import { runTogether } from '../../lib/authz/composition';
-import { ForbiddenError } from '../../lib/errors';
+import { AuthzRefusedError } from '../../lib/errors';
 import type {
   AttributesList,
   AttributeValue,
@@ -141,12 +141,6 @@ export default class AuthzDynamic extends AuthBase {
   api(app: Express): void {
     // Register the AuthBase middleware (runs authMethod per request).
     super.api(app);
-
-    // The `serverError()` helper and DM's core error middleware both check
-    // for the `[authz-forbidden]` marker (added to ForbiddenError messages
-    // thrown by our hooks). Downstream plugins that wrap LDAP errors into
-    // plain `new Error(...)` drop the original `statusCode`; the marker
-    // preserves the semantic 403 across those wraps.
 
     if (this.reloadEndpoint) {
       const prefix = this.config.api_prefix || '/api';
@@ -657,7 +651,7 @@ export default class AuthzDynamic extends AuthBase {
   }
 
   /**
-   * Throw a ForbiddenError (403) if the token cannot perform `permission` on
+   * Throw an AuthzRefusedError (403) if the token cannot perform `permission` on
    * the branch containing `branchOrDn`. Any ACL entry that is `branchOrDn`
    * itself or a parent of it (sub-branch match) qualifies.
    *
@@ -677,12 +671,11 @@ export default class AuthzDynamic extends AuthBase {
     this.logger.debug(
       `authzDynamic: token "${token.tenant}" denied ${permission} on ${branchOrDn}`
     );
-    // A marker in the message lets our Express error middleware recognise
-    // this failure even after intermediate plugins (e.g. ldapGroups) wrap
-    // the error into a plain `new Error(...)` — which would otherwise drop
-    // `statusCode` and surface as a 500.
-    throw new ForbiddenError(
-      `[authz-forbidden] Token does not have ${permission} permission on this branch`
+    // Its class lets the error serializer recognise the refusal even after
+    // intermediate plugins (e.g. ldapGroups) wrap the error, which would
+    // otherwise drop `statusCode` and surface as a 500.
+    throw new AuthzRefusedError(
+      `Token does not have ${permission} permission on this branch`
     );
   }
 

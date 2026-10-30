@@ -35,7 +35,6 @@ import {
   assertedRdnValue,
   escapeDnValue,
   escapeLdapFilter,
-  isAuthzRefusal,
   getRdn,
   isDnInBranch,
   isDnSyntax,
@@ -52,6 +51,7 @@ import {
   BadRequestError,
   ConflictError,
   HttpError,
+  isAuthzRefusal,
   NotFoundError,
 } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
@@ -868,9 +868,10 @@ export default class LdapGroups extends DmPlugin {
       // A rule that refused the write chose its own status: wrapping it in a
       // plain Error turned a 409 into a 500. The schema now carries `unique`
       // and `mailDomainScope`, so this is the ordinary path, not the rare one.
-      if (err instanceof HttpError) throw err;
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Failed to add group ${dn}: ${err}`);
+      if (err instanceof HttpError || isAuthzRefusal(err)) throw err;
+      throw new Error(`Failed to add group ${dn}: ${String(err)}`, {
+        cause: err,
+      });
     }
     this.hookBus.notify('ldapgroupadddone', dn, entry);
     return res;
@@ -1044,8 +1045,10 @@ export default class LdapGroups extends DmPlugin {
         req
       )
       .catch(err => {
-        if (err instanceof HttpError) throw err;
-        throw new Error(`Failed to add member(s) to ${dn}: ${err}`);
+        if (err instanceof HttpError || isAuthzRefusal(err)) throw err;
+        throw new Error(`Failed to add member(s) to ${dn}: ${String(err)}`, {
+          cause: err,
+        });
       });
   }
 
@@ -1074,8 +1077,11 @@ export default class LdapGroups extends DmPlugin {
     return await this.removeMember(dn, member, req).catch(err => {
       if (extractLdapCode(err) === 16)
         throw new NotFoundError(`${member} is not a member of ${dn}`);
-      if (err instanceof HttpError) throw err;
-      throw new Error(`Failed to delete member ${member} from ${dn}: ${err}`);
+      if (err instanceof HttpError || isAuthzRefusal(err)) throw err;
+      throw new Error(
+        `Failed to delete member ${member} from ${dn}: ${String(err)}`,
+        { cause: err }
+      );
     });
   }
 
@@ -1124,7 +1130,10 @@ export default class LdapGroups extends DmPlugin {
         this.base as string
       )
       .catch(err => {
-        throw new Error(`Failed to search groups from ${this.base}: ${err}`);
+        throw new Error(
+          `Failed to search groups from ${this.base}: ${String(err)}`,
+          { cause: err }
+        );
       })) as SearchResult;
 
     await Promise.all(
@@ -1288,7 +1297,10 @@ export default class LdapGroups extends DmPlugin {
         req
       )
       .catch(err => {
-        throw new Error(`Failed to list groups from ${this.base}: ${err}`);
+        throw new Error(
+          `Failed to list groups from ${this.base}: ${String(err)}`,
+          { cause: err }
+        );
       })) as AsyncGenerator<SearchResult>;
     let entries: LdapList = {};
     for await (const r of _res) {
@@ -1497,8 +1509,9 @@ export default class LdapGroups extends DmPlugin {
       );
     } catch (err) {
       if (err instanceof HttpError || isAuthzRefusal(err)) throw err;
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Failed to find member(s): ${err}`);
+      throw new Error(`Failed to find member(s): ${String(err)}`, {
+        cause: err,
+      });
     }
   }
 

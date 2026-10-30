@@ -435,8 +435,9 @@ export default class LdapDepartmentSync extends DmPlugin {
       );
       return orgDn;
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Failed to fetch organization ${orgDn}: ${err}`);
+      throw new Error(`Failed to fetch organization ${orgDn}: ${String(err)}`, {
+        cause: err,
+      });
     }
   }
 }

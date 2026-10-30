@@ -21,8 +21,8 @@ import type {
 } from '../ldapActions';
 import {
   AmbiguousIdentityError,
+  AuthzRefusedError,
   BadRequestError,
-  ForbiddenError,
   ServiceUnavailableError,
 } from '../errors';
 import {
@@ -623,7 +623,7 @@ export default abstract class AuthzBase extends DmPlugin {
    *
    * @param req the request being authorized, which carries an identity
    * @returns the resolved user, or null when the policy is to allow it
-   * @throws ForbiddenError when the policy is to deny it
+   * @throws AuthzRefusedError when the policy is to deny it
    */
   /** Said once: a rule keyed on a value the authenticator did not publish. */
   private fallbackWarned = false;
@@ -672,10 +672,8 @@ export default abstract class AuthzBase extends DmPlugin {
       );
       return null;
     }
-    // The marker is what the error middleware turns into a 403 whose body
-    // says nothing about the model — see `setupErrorMiddleware`.
-    throw new ForbiddenError(
-      `[authz-forbidden] User ${identity} could not be resolved by ` +
+    throw new AuthzRefusedError(
+      `User ${identity} could not be resolved by ` +
         `${this.name}, so no permission can be read for them`
     );
   }
@@ -817,8 +815,8 @@ export default abstract class AuthzBase extends DmPlugin {
     if (foreign.length === 0) return;
 
     if (await this.mayLinkAnyDomain(user)) return;
-    throw new Error(
-      `[authz-forbidden] User ${req.user} may not link ${dn} to domain ` +
+    throw new AuthzRefusedError(
+      `User ${req.user} may not link ${dn} to domain ` +
         `${foreign[0]}: no organization above it is linked to it`
     );
   }
@@ -960,8 +958,8 @@ export default abstract class AuthzBase extends DmPlugin {
             sourceBranch
           );
           if (!sourcePermissions[needed]) {
-            throw new Error(
-              `[authz-forbidden] User ${req!.user} does not have ${needed} permission for source branch ${sourceBranch}`
+            throw new AuthzRefusedError(
+              `User ${req!.user} does not have ${needed} permission for source branch ${sourceBranch}`
             );
           }
         }
@@ -972,8 +970,8 @@ export default abstract class AuthzBase extends DmPlugin {
             destBranch
           );
           if (!destPermissions.write) {
-            throw new Error(
-              `[authz-forbidden] User ${req!.user} does not have write permission for destination branch ${destBranch}`
+            throw new AuthzRefusedError(
+              `User ${req!.user} does not have write permission for destination branch ${destBranch}`
             );
           }
         } else if (fromTransit) {
@@ -982,8 +980,8 @@ export default abstract class AuthzBase extends DmPlugin {
           // entries in transit, and nobody else does.
           const branches = await this.getAuthorizedBranches(user);
           if (branches.length === 0) {
-            throw new Error(
-              `[authz-forbidden] User ${req!.user} administers no branch`
+            throw new AuthzRefusedError(
+              `User ${req!.user} administers no branch`
             );
           }
         }
@@ -996,8 +994,8 @@ export default abstract class AuthzBase extends DmPlugin {
             ? sourceBranch
             : this.extractBranchDn(judged);
           if (!(await this.getUserPermissions(user, branch)).write)
-            throw new Error(
-              `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branch}`
+            throw new AuthzRefusedError(
+              `User ${req!.user} does not have write permission for branch ${branch}`
             );
         }
       } else {
@@ -1006,8 +1004,8 @@ export default abstract class AuthzBase extends DmPlugin {
         const permissions = await this.getUserPermissions(user, branchToCheck);
 
         if (!permissions.write) {
-          throw new Error(
-            `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branchToCheck}`
+          throw new AuthzRefusedError(
+            `User ${req!.user} does not have write permission for branch ${branchToCheck}`
           );
         }
       }
@@ -1015,8 +1013,8 @@ export default abstract class AuthzBase extends DmPlugin {
       // Whichever path judged it, the write lands on the entry itself
       const named = await this.refusingRule(user, judged, ['write'], false);
       if (named)
-        throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`
+        throw new AuthzRefusedError(
+          `User ${req!.user} does not have write permission for branch ${named}`
         );
 
       const domainAttr = this.domainLinkAttribute();
@@ -1076,15 +1074,15 @@ export default abstract class AuthzBase extends DmPlugin {
 
       // Check write permission
       if (!permissions.write) {
-        throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branchToCheck}`
+        throw new AuthzRefusedError(
+          `User ${req!.user} does not have write permission for branch ${branchToCheck}`
         );
       }
       // Nor where a rule refuses it, at the very DN created
       const named = await this.refusingRule(user, judged, ['write'], false);
       if (named)
-        throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`
+        throw new AuthzRefusedError(
+          `User ${req!.user} does not have write permission for branch ${named}`
         );
 
       const domainAttr = this.domainLinkAttribute();
@@ -1128,8 +1126,7 @@ export default abstract class AuthzBase extends DmPlugin {
       // below holds the accounts to the caller's branches: refusing it here
       // would take the tree and the reference data with it.
       const refusal = await this.searchRefusal(user, base);
-      if (refusal)
-        throw new Error(`[authz-forbidden] User ${req!.user} ${refusal}`);
+      if (refusal) throw new AuthzRefusedError(`User ${req!.user} ${refusal}`);
 
       if (this.filtersAttachedEntries()) {
         // Granting the broad read also means supplying the means to enforce
@@ -1404,8 +1401,8 @@ export default abstract class AuthzBase extends DmPlugin {
       );
       const needed = this.sourcePermission(sourceBranch);
       if (!sourcePermissions[needed]) {
-        throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have ${needed} permission for source branch ${sourceBranch}`
+        throw new AuthzRefusedError(
+          `User ${req!.user} does not have ${needed} permission for source branch ${sourceBranch}`
         );
       }
 
@@ -1419,22 +1416,22 @@ export default abstract class AuthzBase extends DmPlugin {
         true
       );
       if (named)
-        throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have read and write permission for branch ${named}`
+        throw new AuthzRefusedError(
+          `User ${req!.user} does not have read and write permission for branch ${named}`
         );
 
       // Check write permission on destination
       const destPermissions = await this.getUserPermissions(user, destBranch);
       if (!destPermissions.write) {
-        throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have write permission for destination branch ${destBranch}`
+        throw new AuthzRefusedError(
+          `User ${req!.user} does not have write permission for destination branch ${destBranch}`
         );
       }
       // Nor where a rule refuses it, at the very DN the entry takes
       const target = await this.refusingRule(user, to, ['write'], false);
       if (target)
-        throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${target}`
+        throw new AuthzRefusedError(
+          `User ${req!.user} does not have write permission for branch ${target}`
         );
 
       return [oldDn, newDn, req];
@@ -1460,14 +1457,14 @@ export default abstract class AuthzBase extends DmPlugin {
         const branchToCheck = await this.effectiveBranch(target);
         const permissions = await this.getUserPermissions(user, branchToCheck);
         if (!permissions.delete) {
-          throw new Error(
-            `[authz-forbidden] User ${req!.user} does not have delete permission for branch ${branchToCheck}`
+          throw new AuthzRefusedError(
+            `User ${req!.user} does not have delete permission for branch ${branchToCheck}`
           );
         }
         const named = await this.refusingRule(user, target, ['delete'], true);
         if (named)
-          throw new Error(
-            `[authz-forbidden] User ${req!.user} does not have delete permission for branch ${named}`
+          throw new AuthzRefusedError(
+            `User ${req!.user} does not have delete permission for branch ${named}`
           );
       }
 

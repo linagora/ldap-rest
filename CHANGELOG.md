@@ -33,6 +33,10 @@
 
 ### Fixed
 
+- A plugin that wrapped an error keeps the answer it deserved: the status and
+  the class of what was thrown are read through the `cause` chain, so a
+  refusal stays a 403 and a timeout a 504, where both surfaced as a 500
+  ([details](docs/client-development/api/rest-api.md#error-handling)).
 - An attribute the schema declares is checked and written whatever its case
   or `;binary` option: a boolean sent as `PWDRESET` or `pwdReset;binary` is no
   longer answered 400 as not a string, a `required` attribute sent as `Cn` no

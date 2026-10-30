@@ -15,7 +15,12 @@ import type { SearchOptions } from 'ldapts';
 import type { DM } from '../../bin';
 import type { Schema, SchemaAttribute } from '../../config/schema';
 import type { Hooks } from '../../hooks';
-import { AUTHZ_REFUSED, BadRequestError, HttpError } from '../../lib/errors';
+import {
+  AUTHZ_REFUSED,
+  BadRequestError,
+  HttpError,
+  isAuthzRefusal,
+} from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
 import type {
   AttributesList,
@@ -28,7 +33,6 @@ import {
   escapeLdapFilter,
   fillPattern,
   isDummyMemberDn,
-  isAuthzRefusal,
   normalizeDn,
   parseDn,
   rdnValue,
