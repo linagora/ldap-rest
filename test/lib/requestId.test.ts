@@ -11,7 +11,8 @@ import WebLogs from '../../src/plugins/weblogs';
 import PostgresStore from '../../src/plugins/storage/postgres';
 import ValkeyStore from '../../src/plugins/storage/valkey';
 import { changeContext, requestId } from '../../src/lib/changeContext';
-import { launchHooks, launchHooksChained } from '../../src/lib/utils';
+import HookBus, { type ChainedName } from '../../src/lib/hookBus';
+import type { Hooks } from '../../src/hooks';
 import {
   currentLogContext,
   outsideAnyRequest,
@@ -57,17 +58,22 @@ describe('Request id', () => {
     server.logger.level = 'info';
     class Probe extends DmPlugin {
       name = 'probe';
-      hooks = {
+      hooks: Hooks & {
+        probedone: () => Promise<void>;
+        proberequest: (dn: string) => string;
+      } = {
         probedone: async (): Promise<void> => {
           this.logger.info('in the hook');
           this.logger.info({ message: 'as another plugin', plugin: 'other' });
           this.logger.info({ message: 'as itself', plugin: 'probe' });
           this.logger.info({ message: 'on its own op', op: 'mine' });
-          await launchHooks([
-            function unregistered(): void {
-              server.logger.info('in a hook no plugin registered');
-            },
-          ]);
+          await new HookBus({
+            ldapadddone: [
+              function unregistered(): void {
+                server.logger.info('in a hook no plugin registered');
+              },
+            ],
+          }).notifyAndWait('ldapadddone', 'cn=x', {}, {});
           throw new Error('a hook failing');
         },
         proberequest: (dn: string): string => {
@@ -82,13 +88,10 @@ describe('Request id', () => {
           );
           // As the server, the line is still the request's
           outsideRequest(() => this.logger.info('as the server'));
-          await launchHooks(
-            (server.hooks as Record<string, unknown[]>).probedone as never,
-            []
-          );
-          await launchHooksChained(
-            (server.hooks as Record<string, unknown[]>).proberequest as never,
-            'cn=x'
+          await server.hookBus.notifyAndWait('ldapadddone', 'cn=x', {}, {});
+          await server.hookBus.chain(
+            'proberequest' as ChainedName,
+            'cn=x' as never
           );
           res.json({
             id: requestId(req),

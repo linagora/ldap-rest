@@ -419,8 +419,8 @@ describe('LDAP Organizations Plugin', function () {
           0,
           req,
         ]);
-        // The request must come back out: `launchHooksChained` feeds this
-        // return value to the next hook, and an authorization plugin that
+        // The request must come back out: the chain feeds this return value
+        // to the next hook, and an authorization plugin that
         // does not see it skips its check.
         expect(result).to.deep.equal([dn, changes, 0, req]);
       });

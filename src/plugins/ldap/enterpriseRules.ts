@@ -618,7 +618,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
       }
     },
 
-    ldaprenamedone: async ([oldDn, newDn], context) => {
+    ldaprenamedone: async (oldDn, newDn, context) => {
       if (movedToTrash(this.config.trash_base, oldDn, newDn))
         await this.removeReferences(oldDn, context);
     },

@@ -60,7 +60,8 @@ export default class MyPlugin extends DmPlugin {
 - **this.server**: DM server instance
 - **this.config**: Complete configuration object
 - **this.logger**: Winston logger instance
-- **this.registeredHooks**: Access to global hook registry
+- **this.hookBus**: The server's hooks: chain, notify and wait on them, see
+  [hooks](hooks.md#the-bus)
 - **this.fetch**: `fetch` timed into the
   [outbound metrics](../usage/operations.md#metrics) under the plugin's
   name; the lint refuses a bare `fetch` or `node-fetch` under `src`, and a

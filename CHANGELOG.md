@@ -19,6 +19,17 @@
   starts without `DM_PLUGINS`
   ([details](docs/usage/operations.md#health-and-readiness)).
 
+### Changed
+
+- A plugin raises hooks through `this.hookBus` (`chain`, `notify`,
+  `notifyAndWait`, `notifyStrict`, `has`, `subscribers`, `settled`) instead
+  of `launchHooks` / `launchHooksChained`, every hook is declared in
+  `src/hooks.ts`, and every LDAP "done" hook gets its arguments one by one,
+  where it used to get them as a tuple — a subscriber still reading a tuple
+  receives the DN instead. A test waits on `settled()` rather than sleeping.
+  See [hooks](docs/plugin-development/hooks.md#the-bus)
+  ([#415](https://github.com/linagora/ldap-rest/issues/415)).
+
 ### Fixed
 
 - An attribute the schema declares is checked and written whatever its case

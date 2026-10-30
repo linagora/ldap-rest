@@ -40,10 +40,8 @@ import {
   isDnInBranch,
   isDnSyntax,
   isDummyMemberDn,
-  launchHooks,
   namesByDn,
   normalizeDn,
-  launchHooksChained,
   movedToTrash,
   organizationLink,
   parseDn,
@@ -862,10 +860,7 @@ export default class LdapGroups extends DmPlugin {
       ...candidate,
     };
     toDirectoryEntry(this.schema, entry);
-    [dn, entry] = await launchHooksChained(this.registeredHooks.ldapgroupadd, [
-      dn,
-      entry,
-    ]);
+    [dn, entry] = await this.hookBus.chain('ldapgroupadd', [dn, entry]);
     let res;
     try {
       res = await this.ldap.add(dn, entry, req);
@@ -877,7 +872,7 @@ export default class LdapGroups extends DmPlugin {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add group ${dn}: ${err}`);
     }
-    void launchHooks(this.registeredHooks.ldapgroupadddone, [dn, entry]);
+    this.hookBus.notify('ldapgroupadddone', dn, entry);
     return res;
   }
 
@@ -942,10 +937,11 @@ export default class LdapGroups extends DmPlugin {
     await this.server.ldap.canonicalChanges(changes);
     let dn = this.toGroupDn(cn);
     const op = this.opNumber();
-    [dn, changes] = await launchHooksChained(
-      this.registeredHooks.ldapgroupmodify,
-      [dn, changes, op]
-    );
+    [dn, changes] = await this.hookBus.chain('ldapgroupmodify', [
+      dn,
+      changes,
+      op,
+    ]);
     if (changes.add) {
       if (changes.add.member)
         throw new BadRequestError('Use dedicated API to add members');
@@ -979,11 +975,7 @@ export default class LdapGroups extends DmPlugin {
     await this.ldap.authorize('ldapmodifyrequest', [dn, changes, op, req]);
     changes = await this.validateChanges(dn, changes);
     const res = await this.ldap.modify(dn, changes, req);
-    void launchHooks(this.registeredHooks.ldapgroupmodifydone, [
-      dn,
-      changes,
-      op,
-    ]);
+    this.hookBus.notify('ldapgroupmodifydone', dn, changes, op);
     return res;
   }
 
@@ -1000,20 +992,17 @@ export default class LdapGroups extends DmPlugin {
     }
     let dn = this.toGroupDn(cn);
     let newDn = this.toGroupDn(newCn);
-    [dn, newDn] = await launchHooksChained(
-      this.registeredHooks.ldapgrouprename,
-      [dn, newDn]
-    );
+    [dn, newDn] = await this.hookBus.chain('ldapgrouprename', [dn, newDn]);
     const res = await this.ldap.rename(dn, newDn, req);
-    void launchHooks(this.registeredHooks.ldapgrouprenamedone, [dn, newDn]);
+    this.hookBus.notify('ldapgrouprenamedone', dn, newDn);
     return res;
   }
 
   async deleteGroup(cn: string, req?: Request): Promise<boolean> {
     let dn = this.toGroupDn(cn);
-    dn = await launchHooksChained(this.registeredHooks.ldapgroupdelete, dn);
+    dn = await this.hookBus.chain('ldapgroupdelete', dn);
     const res = await this.ldap.delete(dn, req);
-    void launchHooks(this.registeredHooks.ldapgroupdeletedone, dn);
+    this.hookBus.notify('ldapgroupdeletedone', dn);
     return res;
   }
 
@@ -1037,10 +1026,7 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<boolean> {
     const dn = this.toGroupDn(cn);
     if (!Array.isArray(member)) member = [member];
-    [cn, member] = await launchHooksChained(
-      this.registeredHooks.ldapgroupaddmember,
-      [cn, member]
-    );
+    [cn, member] = await this.hookBus.chain('ldapgroupaddmember', [cn, member]);
     // Before the members are looked for, and the external ones created
     await this.ldap.authorize('ldapmodifyrequest', [
       dn,
@@ -1077,10 +1063,10 @@ export default class LdapGroups extends DmPlugin {
     req?: Request
   ): Promise<boolean> {
     const dn = this.toGroupDn(cn);
-    [cn, member] = await launchHooksChained(
-      this.registeredHooks.ldapgroupdeletemember,
-      [cn, member]
-    );
+    [cn, [member]] = await this.hookBus.chain('ldapgroupdeletemember', [
+      cn,
+      [member],
+    ]);
     // Refusing the placeholder is an answer to the client, not a fault:
     // a plain Error made it a 500.
     if (this.isDummyMember(member))
@@ -1304,7 +1290,7 @@ export default class LdapGroups extends DmPlugin {
       .catch(err => {
         throw new Error(`Failed to list groups from ${this.base}: ${err}`);
       })) as AsyncGenerator<SearchResult>;
-    let entries: LdapList = {};
+    const entries: LdapList = {};
     for await (const r of _res) {
       for (const entry of r.searchEntries) {
         // An entry under the group base holding no main attribute is not a
@@ -1323,9 +1309,9 @@ export default class LdapGroups extends DmPlugin {
       }
     }
 
-    entries = await launchHooksChained(
-      this.registeredHooks._ldapgrouplist,
-      entries
+    await this.hookBus.chain(
+      '_ldapgrouplist',
+      entries as unknown as AsyncGenerator<SearchResult>
     );
     return entries;
   }
@@ -1474,10 +1460,10 @@ export default class LdapGroups extends DmPlugin {
     members: string[],
     req?: Request
   ): Promise<void> {
-    [dn, members] = await launchHooksChained(
-      this.server.hooks.ldapgroupvalidatemembers,
-      [dn, members]
-    );
+    [dn, members] = await this.hookBus.chain('ldapgroupvalidatemembers', [
+      dn,
+      members,
+    ]);
     const allowMissing = Boolean(this.config.groups_allow_unexistent_members);
     if (allowMissing && !req) return;
     if (!members || !members.length) return;
@@ -1530,10 +1516,7 @@ export default class LdapGroups extends DmPlugin {
     dn: string,
     entry: AttributesList
   ): Promise<AttributesList> {
-    [dn, entry] = await launchHooksChained(
-      this.server.hooks.ldapgroupvalidatenew,
-      [dn, entry]
-    );
+    [dn, entry] = await this.hookBus.chain('ldapgroupvalidatenew', [dn, entry]);
     return await this.validator().validateNew(entry);
   }
 
@@ -1547,10 +1530,10 @@ export default class LdapGroups extends DmPlugin {
     dn: string,
     changes: ModifyRequest
   ): Promise<ModifyRequest> {
-    [dn, changes] = await launchHooksChained(
-      this.server.hooks.ldapgroupvalidatechanges,
-      [dn, changes]
-    );
+    [dn, changes] = await this.hookBus.chain('ldapgroupvalidatechanges', [
+      dn,
+      changes,
+    ]);
     await this.validator().validateChanges(changes);
     return changes;
   }

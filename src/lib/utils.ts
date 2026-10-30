@@ -2,7 +2,6 @@
  * Utility functions
  * @author Xavier Guimard <xguimard@linagora.com>
  */
-/* eslint-disable @typescript-eslint/no-unsafe-function-type */
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
@@ -10,9 +9,6 @@ import type { Config } from '../bin';
 
 import type { AttributeValue } from './ldapActions';
 import { BadRequestError } from './errors';
-import { getLogger } from './expressFormatedResponses';
-import { hookFailures } from './metrics';
-import { outsideRequest, runAsPlugin } from './requestContext';
 
 // Regex caching utilities - shared across plugins to avoid duplication
 // NOTE: This cache is designed for static patterns from schemas, NOT for user input.
@@ -49,217 +45,12 @@ export function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * What to write about a value a hook threw that is not an `Error`.
- *
- * The shape the rest of the codebase uses — the store's failed sweeps, for
- * one — with the guard: `JSON.stringify` refuses a circular value, and
- * throwing from inside the catch that exists to swallow is how #182's
- * failure would come back wearing a different message.
- *
- * @param e - the value the hook threw
- * @returns something to print
- */
-const describeThrown = (e: unknown): string => {
-  try {
-    return JSON.stringify(e) ?? String(e);
-  } catch {
-    return String(e);
-  }
-};
-
-/**
- * Where a failing hook comes from, for the report.
- *
- * @param hook the hook function
- * @returns ` in <plugin> (<hook>)` when `registerPlugin` recorded it, the
- *          function's own name otherwise, or nothing for an anonymous one
- */
-const hookLabel = (hook: Function): string => {
-  const owner = hookOwner(hook);
-  if (owner) return ` in ${owner.plugin} (${owner.hook})`;
-  return hook.name ? ` in ${hook.name}` : '';
-};
-
-/**
- * Run a hook under its plugin's name and its own, for the lines it logs:
- * what `launchHooks` does, for a caller walking the hooks itself.
- *
- * @param hook the registered function
- * @param fn its run
- * @returns what `fn` returns
- */
-export const runAsHookOwner = <T>(hook: Function, fn: () => T): T => {
-  const owner = hookOwner(hook);
-  return runAsPlugin(owner?.plugin, owner?.hook, fn);
-};
-
-// launchHooks launches hooks asynchroniously, errors are reported and ignored.
-//
-// Calling convention: VARIADIC. The trailing args are spread into each hook:
-//     launchHooks(hooks, a, b)   →   hook(a, b)
-//
-// Do NOT pre-pack arguments into an array — `launchHooks(hooks, [a, b])`
-// becomes `hook([a, b])` and any hook reading `a.foo` silently no-ops.
-// (See PR #66 for the SCIM bug this caused.)
-//
-// Mirror the hook's declared signature:
-//     VoidHook<[A, B]>           (variadic)        → launchHooks(hooks, a, b)
-//     (args: [A, B]) => void     (packed-tuple)    → launchHooks(hooks, [a, b])
-// LDAP "*done" hooks still use the packed-tuple form; SCIM "*done" hooks use
-// VoidHook. Check src/hooks.ts before adding a new call site.
-//
-// What these hooks are told of has happened, and was judged: they react as
-// the server — synchronizing, publishing, keeping invariants — whoever's
-// request caused it, and run outside that request (#385), as the chained
-// hooks do. They are handed the change's context, not the request.
-export const launchHooks = async (
-  hooks: Function[] | undefined,
-  ...args: unknown[]
-): Promise<void> => {
-  if (hooks) {
-    for (const hook of hooks) {
-      if (!hook) continue;
-      await runAsHookOwner(hook, async () => {
-        try {
-          await outsideRequest(() =>
-            (hook as (...a: unknown[]) => unknown)(...args)
-          );
-        } catch (e: unknown) {
-          // Resolved at call time, not captured when this module was
-          // evaluated: `setLogger` runs in the `DM` constructor, and this
-          // module is loaded before it through `ldapActions`, so a captured
-          // logger is `undefined` here — the report would throw
-          // `Cannot read properties of undefined` instead of naming the
-          // hook's error, and the catch would propagate what it exists to
-          // swallow.
-          //
-          // The Error goes as the second argument, which is where winston
-          // keeps its stack; a thrown value of any other kind is dropped
-          // there — measured with the repository's own logger, `throw 'x'`
-          // printed `{"level":"error","message":"Hook error"}` and nothing
-          // else — so it goes into the message instead.
-          //
-          // The line names the hook and its plugin when `registerPlugin`
-          // recorded them: the `.catch` blocks #182 removed from
-          // `ldapActions` each named their hook, and a bare `Hook error`
-          // left the reader to guess among every plugin subscribed.
-          const where = hookLabel(hook);
-          const owner = hookOwner(hook);
-          hookFailures.inc({
-            hook: owner?.hook ?? (hook.name || 'anonymous'),
-            plugin: owner?.plugin ?? 'none',
-          });
-          if (e instanceof Error) {
-            getLogger()?.error(`Hook error${where}`, e);
-          } else {
-            getLogger()?.error(`Hook error${where}: ${describeThrown(e)}`);
-          }
-        }
-      });
-    }
-  }
-};
-
-/**
- * Which plugin registered a hook function, and under which hook name.
- *
- * Beside the hook arrays rather than inside them: `launchHooks`,
- * `launchHooksChained` and `AuthBase.authenticate` all take those arrays as
- * plain lists of functions, and a registry keyed on the function leaves them
- * as they are.
- */
-const hookOwners = new WeakMap<Function, { plugin: string; hook: string }>();
-
-/**
- * Record the plugin a hook function belongs to.
- *
- * @param fn the registered function
- * @param plugin the plugin's instance name
- * @param hook the hook it is registered under
- */
-export const recordHookOwner = (
-  fn: Function,
-  plugin: string,
-  hook: string
-): void => {
-  hookOwners.set(fn, { plugin, hook });
-};
-
-/**
- * The plugin a hook function belongs to, and the hook it is registered
- * under, when `registerPlugin` registered it.
- *
- * @param fn a hook function
- * @returns its plugin's instance name and hook name, or undefined
- */
-export const hookOwner = (
-  fn: Function
-): { plugin: string; hook: string } | undefined => hookOwners.get(fn);
-
-/**
- * Whether an error is an authorization plugin's refusal, by the marker its
- * message carries: a plain `Error` wrapping it keeps the message only. Its
- * message names the branch, so the client is told `AUTHZ_REFUSED` instead.
- */
-export const isAuthzRefusal = (err: unknown): boolean =>
-  /\[authz-forbidden\]/.test(String((err as Error)?.message ?? ''));
-
-/**
- * Whether an error is a refusal: an authorization plugin's, or any 403.
- */
-const isRefusal = (err: unknown): boolean =>
-  (err as { statusCode?: number })?.statusCode === 403 || isAuthzRefusal(err);
-
-// launchHooksChained threads a single value through each hook, collecting the
-// returned (possibly modified) value. Any error stops the chain.
-//
-// A refusal is logged with the plugin that made it. Every authorization
-// plugin registers the same LDAP hooks and the first refusal wins, so the
-// 403 alone does not say which of them decided — and it must not: the body
-// stays what the error middleware makes of it, and the name goes to the log.
-//
-// Calling convention: SINGLE PACKED ARG. If a chained hook needs several
-// inputs, pack them in a tuple — that is what `ChainedHook<[A, B]>` declares.
-// Unlike launchHooks, the arg is NOT spread; passing `[a, b]` is correct here.
-//
-// Hooks run outside the request being served, as the notifications do: what
-// a hook reads or writes to validate, complete or keep track of an operation
-// is the server's (#385). The request is in the arguments of the hooks that
-// judge, which judge by it; a hook acting as the caller names it.
-export const launchHooksChained = async <T>(
-  hooks: Function[] | undefined,
-  args: T
-): Promise<T> => {
-  if (hooks) {
-    for (const hook of hooks) {
-      if (!hook) continue;
-      args = await runAsHookOwner(hook, async () => {
-        try {
-          return await outsideRequest(() =>
-            (hook as (a: T) => T | Promise<T>)(args)
-          );
-        } catch (err) {
-          // A hook pushed onto the list directly — through
-          // `registeredHooks`, or replaced by a wrapper — has no owner on
-          // record. Its refusal is still said, with what can be said of it.
-          if (isRefusal(err)) {
-            const owner = hookOwner(hook);
-            getLogger()?.warn(
-              `${
-                owner
-                  ? `${owner.plugin} refused ${owner.hook}`
-                  : `a hook no plugin registered (${hook.name || 'anonymous'}) refused`
-              }: ${(err as Error).message}`
-            );
-          }
-          throw err;
-        }
-      });
-    }
-  }
-  return args;
-};
+export {
+  hookOwner,
+  isAuthzRefusal,
+  recordHookOwner,
+  runAsHookOwner,
+} from './hookBus';
 
 export const transformSchemas = (
   schemas: string | Buffer,

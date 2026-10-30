@@ -124,7 +124,7 @@ describe('ClouderyProvision plugin', () => {
   // Drive a full create: awaited pre-hook then the (normally fire-and-forget)
   // done hook, both awaited here so assertions see the finished work.
   async function create(user: ScimUser, req: unknown): Promise<void> {
-    const pre = plugin.hooks?.scimusercreate as (
+    const pre = plugin.hooks?.scimusercreate as unknown as (
       a: [ScimUser, unknown]
     ) => Promise<unknown>;
     await pre([user, req]);
@@ -135,7 +135,7 @@ describe('ClouderyProvision plugin', () => {
   }
 
   async function remove(id: string, req: unknown): Promise<void> {
-    const pre = plugin.hooks?.scimuserdelete as (
+    const pre = plugin.hooks?.scimuserdelete as unknown as (
       a: [string, unknown]
     ) => Promise<[string, unknown]>;
     // The core deletes the id the hook returns, not the raw one.

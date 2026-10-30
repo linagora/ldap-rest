@@ -7,6 +7,7 @@ import type winston from 'winston';
 
 import type { Config, DM } from '../bin';
 import type { Hooks, MaybePromise } from '../hooks';
+import type HookBus from '../lib/hookBus';
 import type { HealthStatus } from '../lib/health';
 import { timedOutbound } from '../lib/metrics';
 import {
@@ -57,6 +58,8 @@ export default abstract class DmPlugin {
   server: DM;
   /* Global configuration */
   config: Config;
+  /* The server's hooks, typed */
+  hookBus: HookBus;
   /* Logger */
   logger: winston.Logger;
 
@@ -151,6 +154,7 @@ export default abstract class DmPlugin {
   constructor(server: DM) {
     this.server = server;
     this.config = server.config;
+    this.hookBus = server.hookBus;
     this.logger = server.logger;
     this.registeredHooks = server.hooks;
   }

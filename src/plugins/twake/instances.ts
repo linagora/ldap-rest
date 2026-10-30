@@ -164,7 +164,7 @@ export default class TwakeInstances extends DmPlugin {
       }
       return [dn, entry, req];
     },
-    ldapaddafter: async ([dn, entry]) => {
+    ldapaddafter: async (dn, entry) => {
       const account = this.account(dn, entry);
       if (!account) return;
       await this.serialized(dn, async () => {

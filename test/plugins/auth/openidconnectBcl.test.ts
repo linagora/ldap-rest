@@ -59,8 +59,8 @@ describe('OpenID Connect, the Back-Channel Logout configuration', function () {
   });
 
   it('should let a store that could not record reach the provider', async () => {
-    // `launchHooks` reports and swallows, by contract. Routing the token
-    // through it would leave the provider told 204 about a logout nothing
+    // A notification reports and swallows, by contract. Routing the token
+    // through one would leave the provider told 204 about a logout nothing
     // kept — the fail-open this feature exists to close. The failure has to
     // come back out of `onLogoutToken` so the library answers 400 and the
     // provider retries.

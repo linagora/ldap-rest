@@ -14,13 +14,12 @@ import type {
 } from '../../lib/ldapActions';
 import type { Config } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
+import type HookBus from '../../lib/hookBus';
 import {
   escapeDnValue,
   escapeLdapFilter,
   isChildOf,
   isDummyMemberDn,
-  launchHooks,
-  launchHooksChained,
   parseDn,
   rdnValue,
   validateDnValue,
@@ -74,8 +73,7 @@ export interface ScimGroupsOptions {
   logger: winston.Logger;
   baseResolver: BaseResolver;
   users: ScimUsers;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  hooks: { [K: string]: Function[] | undefined };
+  hookBus: HookBus;
 }
 
 export class ScimGroups {
@@ -84,8 +82,7 @@ export class ScimGroups {
   private readonly logger: winston.Logger;
   private readonly baseResolver: BaseResolver;
   private readonly users: ScimUsers;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  private readonly hooks: { [K: string]: Function[] | undefined };
+  private readonly hookBus: HookBus;
   private readonly mapping: ResourceMapping;
   private readonly attributes: string[];
   private readonly rdnAttribute: string;
@@ -101,7 +98,7 @@ export class ScimGroups {
     this.logger = opts.logger;
     this.baseResolver = opts.baseResolver;
     this.users = opts.users;
-    this.hooks = opts.hooks;
+    this.hookBus = opts.hookBus;
 
     this.rdnAttribute =
       (this.config.scim_group_rdn_attribute as string) || 'cn';
@@ -312,12 +309,11 @@ export class ScimGroups {
       this.mapping,
       this.objectClass
     );
-    const hookInput = await launchHooksChained(this.hooks.scimgroupcreate, [
+    const [group] = await this.hookBus.chain('scimgroupcreate', [
       { ...resource, id: undefined },
       req,
       base,
-    ] as [ScimGroup, DmRequest, string]);
-    const group = hookInput[0];
+    ]);
 
     const { rdn: named, attributes } = scimGroupToLdap(
       group,
@@ -363,7 +359,7 @@ export class ScimGroups {
     }
 
     const created = await this.get(req, rdn);
-    void launchHooks(this.hooks.scimgroupcreatedone, created);
+    this.hookBus.notify('scimgroupcreatedone', created);
     return created;
   }
 
@@ -373,11 +369,11 @@ export class ScimGroups {
     resource: ScimGroup
   ): Promise<ScimGroup> {
     await this.get(req, id); // ensure exists
-    const hookInput = await launchHooksChained(this.hooks.scimgroupupdate, [
+    const hookInput = await this.hookBus.chain('scimgroupupdate', [
       id,
       resource,
       req,
-    ] as [string, ScimGroup, DmRequest]);
+    ]);
     const incoming = hookInput[1];
 
     const { attributes } = scimGroupToLdap(
@@ -414,7 +410,7 @@ export class ScimGroups {
     await this.ldap.forRequest(req).modify(dn, changes);
 
     const updated = await this.get(req, id);
-    void launchHooks(this.hooks.scimgroupupdatedone, id, updated);
+    this.hookBus.notify('scimgroupupdatedone', id, updated);
     return updated;
   }
 
@@ -470,7 +466,7 @@ export class ScimGroups {
       await this.ldap.forRequest(req).modify(dn, changes, { permissive: true });
     });
     const updated = await this.get(req, id);
-    void launchHooks(this.hooks.scimgroupupdatedone, id, updated);
+    this.hookBus.notify('scimgroupupdatedone', id, updated);
     return updated;
   }
 
@@ -504,14 +500,10 @@ export class ScimGroups {
 
   async delete(req: DmRequest, id: string): Promise<void> {
     await this.get(req, id); // ensure exists
-    const hookInput = await launchHooksChained(this.hooks.scimgroupdelete, [
-      id,
-      req,
-    ] as [string, DmRequest]);
-    const finalId = hookInput[0];
+    const [finalId] = await this.hookBus.chain('scimgroupdelete', [id, req]);
     const dn = this.dnForId(finalId, req);
     await this.ldap.forRequest(req).delete(dn);
-    void launchHooks(this.hooks.scimgroupdeletedone, finalId);
+    this.hookBus.notify('scimgroupdeletedone', finalId);
   }
 
   /** Used internally and by Bulk to resolve a Group SCIM reference to a DN. */

@@ -10,6 +10,7 @@ import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import { currentRequest } from '../../../src/lib/requestContext';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
+import type { Hooks } from '../../../src/hooks';
 import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
 
 describe('authzDynamic behavioural regressions', function () {
@@ -52,9 +53,9 @@ describe('authzDynamic behavioural regressions', function () {
     if (plugin.hooks) {
       for (const [name, fn] of Object.entries(plugin.hooks)) {
         if (!fn) continue;
-        const list = (server.hooks[name] =
-          server.hooks[name] || ([] as unknown[] as never));
-        (list as unknown as Array<unknown>).push(fn as unknown);
+        const hook = name as keyof Hooks;
+        const list = (server.hooks[hook] = server.hooks[hook] || []);
+        list.push(fn as unknown as never);
       }
     }
     groupsPlugin = new LdapGroups(server);
@@ -62,9 +63,9 @@ describe('authzDynamic behavioural regressions', function () {
     if (groupsPlugin.hooks) {
       for (const [name, fn] of Object.entries(groupsPlugin.hooks)) {
         if (!fn) continue;
-        const list = (server.hooks[name] =
-          server.hooks[name] || ([] as unknown[] as never));
-        (list as unknown as Array<unknown>).push(fn as unknown);
+        const hook = name as keyof Hooks;
+        const list = (server.hooks[hook] = server.hooks[hook] || []);
+        list.push(fn as unknown as never);
       }
     }
     server.loadedPlugins['authzDynamic'] = plugin;

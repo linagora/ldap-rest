@@ -41,7 +41,8 @@ import {
   LDAP_JUDGING_HOOKS,
 } from '../lib/authz/composition';
 import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
-import { recordHookOwner, registerAttributeTypes } from '../lib/utils';
+import { registerAttributeTypes } from '../lib/utils';
+import HookBus, { recordHookOwner } from '../lib/hookBus';
 import { runForRequest, runWithLogContext } from '../lib/requestContext';
 import { requestId } from '../lib/changeContext';
 import { HEALTH_PATHS, mountHealth } from '../lib/health';
@@ -125,6 +126,8 @@ export class DM {
   }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   hooks: { [K in keyof Hooks]?: Function[] } = {};
+  /** `hooks`, typed: what plugins chain, notify and wait on */
+  readonly hookBus: HookBus = new HookBus(this.hooks);
   loadedPlugins: { [key: string]: DmPlugin } = {};
   ldap: ldapActions;
   operationSequence: number;
@@ -1025,12 +1028,12 @@ export class DM {
         this.setupErrorMiddleware();
       }
     }
-    if (obj.hooks as Hooks) {
-      for (const hookName in obj.hooks as Hooks) {
+    if (obj.hooks) {
+      for (const hookName in obj.hooks) {
         this.logger.debug(
           `Plugin ${obj.name} has hook ${hookName}, registering it`
         );
-        const hook = (obj.hooks as Hooks)[hookName as keyof Hooks];
+        const hook = obj.hooks[hookName as keyof Hooks];
         if (!this.hooks[hookName as keyof Hooks]) {
           this.hooks[hookName as keyof Hooks] = [];
         }

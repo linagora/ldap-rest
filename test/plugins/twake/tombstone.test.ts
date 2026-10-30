@@ -144,17 +144,18 @@ describe('Twake tombstone plugin', function () {
     const events = new TwakeLifecycleEvents(dm);
     // Count the events plugin's work, so a test waits for it rather than for
     // a guessed delay.
-    for (const name of ['onLdapEntryChange', 'twakedeletionreplay']) {
-      const hook = events.hooks[name] as (
-        dn: string,
-        ...a: unknown[]
-      ) => unknown;
-      events.hooks[name] = (dn: string, ...args: unknown[]) => {
-        const done = Promise.resolve(hook(dn, ...args));
-        handled.push({ dn, done, args });
-        return done;
-      };
-    }
+    const entryChange = events.hooks.onLdapEntryChange!;
+    events.hooks.onLdapEntryChange = (dn, ...args) => {
+      const done = Promise.resolve(entryChange(dn, ...args));
+      handled.push({ dn, done, args });
+      return done;
+    };
+    const replay = events.hooks.twakedeletionreplay!;
+    events.hooks.twakedeletionreplay = (dn, ...args) => {
+      const done = Promise.resolve(replay(dn, ...args));
+      handled.push({ dn, done, args });
+      return done;
+    };
     await dm.registerPlugin('core/twake/lifecycleEvents', events);
     plugin = new TwakeTombstone(dm);
     await dm.registerPlugin('core/twake/tombstone', plugin);

@@ -35,8 +35,6 @@ import {
   getCompiledRegex,
   getParentDn,
   isDummyMemberDn,
-  launchHooks,
-  launchHooksChained,
   normalizeDn,
   assertedRdnValue,
   namesByDn,
@@ -62,6 +60,7 @@ import {
   UnprocessableEntityError,
 } from '../lib/errors';
 import { extractLdapCode } from '../lib/ldapCodes';
+import type { FlatHookBus } from '../lib/hookBus';
 import { loadSchemaFile } from '../lib/schemaFile';
 
 import DmPlugin from './plugin';
@@ -350,8 +349,16 @@ export default abstract class LdapFlat extends DmPlugin {
   singularName: string;
   pluralName: string;
   hookPrefix: string;
+  /** `hookBus`, raising this entity's own hooks */
+  private readonly ownHooks: FlatHookBus;
 
-  constructor(server: DM, config: LdapFlatConfig) {
+  /**
+   * @param server the server
+   * @param config the entity, its hook prefix included
+   * @param hookPrefix the prefix its hooks are named under, when it differs
+   *   from the one it was configured with
+   */
+  constructor(server: DM, config: LdapFlatConfig, hookPrefix?: string) {
     super(server);
     this.ldap = server.ldap;
     this.base = config.base;
@@ -360,7 +367,10 @@ export default abstract class LdapFlat extends DmPlugin {
     this.defaultAttributes = config.defaultAttributes || {};
     this.singularName = config.singularName;
     this.pluralName = config.pluralName;
-    this.hookPrefix = config.hookPrefix;
+    this.hookPrefix = hookPrefix ?? config.hookPrefix;
+    // Built here, where a subclass can name its prefix: one set at
+    // construction would be too late for a class field
+    this.ownHooks = this.hookBus.prefixed(this.hookPrefix);
 
     if (!this.base) {
       throw new Error(`LDAP base is not defined for ${this.singularName}`);
@@ -1468,10 +1478,7 @@ export default abstract class LdapFlat extends DmPlugin {
       this.logger.warn('No schema available');
     }
 
-    [dn, entry] = await launchHooksChained(
-      this.registeredHooks[`${this.hookPrefix}add`],
-      [dn, entry]
-    );
+    [dn, entry] = await this.ownHooks.chain('add', [dn, entry]);
 
     // Debug log entry before sending to LDAP
     this.logger.debug('Adding LDAP entry:', {
@@ -1506,10 +1513,7 @@ export default abstract class LdapFlat extends DmPlugin {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add ${this.singularName} ${dn}: ${err}`);
     }
-    void launchHooks(this.registeredHooks[`${this.hookPrefix}adddone`], [
-      dn,
-      entry,
-    ]);
+    this.ownHooks.notify('adddone', dn, entry);
     return res;
   }
 
@@ -1523,10 +1527,7 @@ export default abstract class LdapFlat extends DmPlugin {
     await this.ldap.canonicalChanges(changes);
     let dn = this.resolveDn(id);
     const op = this.opNumber();
-    [dn, changes] = await launchHooksChained(
-      this.registeredHooks[`${this.hookPrefix}modify`],
-      [dn, changes, op]
-    );
+    [dn, changes] = await this.ownHooks.chain('modify', [dn, changes, op]);
     if (changes.add) {
       if (changes.add[this.mainAttribute])
         throw new ConflictError(
@@ -1558,11 +1559,7 @@ export default abstract class LdapFlat extends DmPlugin {
     await this.ldap.authorize('ldapmodifyrequest', [dn, changes, op, req]);
     await this.validateChanges(dn, changes);
     const res = await this.ldap.modify(dn, changes, req);
-    void launchHooks(this.registeredHooks[`${this.hookPrefix}modifydone`], [
-      dn,
-      changes,
-      op,
-    ]);
+    this.ownHooks.notify('modifydone', dn, changes, op);
     return res;
   }
 
@@ -1592,26 +1589,17 @@ export default abstract class LdapFlat extends DmPlugin {
     }
     let dn = this.resolveDn(id);
     let newDn = this.resolveDn(newId);
-    [dn, newDn] = await launchHooksChained(
-      this.registeredHooks[`${this.hookPrefix}rename`],
-      [dn, newDn]
-    );
+    [dn, newDn] = await this.ownHooks.chain('rename', [dn, newDn]);
     const res = await this.ldap.rename(dn, newDn, req);
-    void launchHooks(this.registeredHooks[`${this.hookPrefix}renamedone`], [
-      dn,
-      newDn,
-    ]);
+    this.ownHooks.notify('renamedone', dn, newDn);
     return res;
   }
 
   async deleteEntry(id: string, req?: Request): Promise<boolean> {
     let dn = this.resolveDn(id);
-    dn = await launchHooksChained(
-      this.registeredHooks[`${this.hookPrefix}delete`],
-      dn
-    );
+    dn = await this.ownHooks.chain('delete', dn);
     const res = await this.ldap.delete(dn, req);
-    void launchHooks(this.registeredHooks[`${this.hookPrefix}deletedone`], dn);
+    this.ownHooks.notify('deletedone', dn);
     return res;
   }
 
@@ -1668,10 +1656,7 @@ export default abstract class LdapFlat extends DmPlugin {
     const departmentPath = await this.getDepartmentPath(targetOrgDn, req);
 
     // Launch pre-move hook (chained - can modify targetOrgDn or cancel)
-    [, targetOrgDn] = await launchHooksChained(
-      this.registeredHooks[`${this.hookPrefix}move`],
-      [dn, targetOrgDn, req]
-    );
+    [, targetOrgDn] = await this.ownHooks.chain('move', [dn, targetOrgDn, req]);
 
     // Prepare LDAP modify request
     const changes: ModifyRequest = {

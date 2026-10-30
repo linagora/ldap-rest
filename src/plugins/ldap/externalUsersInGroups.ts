@@ -11,13 +11,7 @@ import { Hooks } from '../../hooks';
 import { HttpError } from '../../lib/errors';
 import ldapActions, { AttributesList } from '../../lib/ldapActions';
 import { declaredMailDomains } from '../../lib/mailDomains';
-import {
-  launchHooks,
-  launchHooksChained,
-  normalizeDn,
-  parseDn,
-  unescapeDnValue,
-} from '../../lib/utils';
+import { normalizeDn, parseDn, unescapeDnValue } from '../../lib/utils';
 
 /**
  * The domain of an address, as the managed domains are compared: after its
@@ -84,19 +78,15 @@ export default class ExternalUsersInGroups extends DmPlugin {
                 [this.config.ldap_groups_main_attribute as string]: mail,
                 sn: mail,
               };
-              [m, entry] = await launchHooksChained(
-                this.registeredHooks.externaluserentry,
-                [m, entry]
-              );
+              [m, entry] = await this.hookBus.chain('externaluserentry', [
+                m,
+                entry,
+              ]);
 
               try {
                 // As the server: the group write was judged first; its external members are the server's bookkeeping
                 await this.ldap.system.add(m, entry);
-                void launchHooks(
-                  this.registeredHooks.externaluseradded,
-                  m,
-                  entry
-                );
+                this.hookBus.notify('externaluseradded', m, entry);
                 return true;
               } catch (e) {
                 if (e instanceof HttpError) throw e;

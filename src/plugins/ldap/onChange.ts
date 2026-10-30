@@ -11,7 +11,6 @@ import type { Request } from 'express';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { Hooks } from '../../hooks';
 import type { AttributeValue, SearchResult } from '../../lib/ldapActions';
-import { launchHooks } from '../../lib/utils';
 import type { Config } from '../../bin';
 import type { ChangeContext } from '../../lib/changeContext';
 import { currentOperation } from '../../lib/operation';
@@ -66,16 +65,15 @@ export function diffEntries(
   return res;
 }
 
-const events: {
-  [configParam: keyof Config]: keyof Hooks;
-} = {
+const events = {
   mail_attribute: 'onLdapMailChange',
   quota_attribute: 'onLdapQuotaChange',
   alias_attribute: 'onLdapAliasChange',
   forward_attribute: 'onLdapForwardChange',
-  display_name_attribute: 'onLdapDisplayNameChange',
   drive_quota_attribute: 'onLdapDriveQuotaChange',
-};
+} as const satisfies { [configParam in keyof Config]?: keyof Hooks };
+
+type AttributeHook = (typeof events)[keyof typeof events];
 
 class OnLdapChange extends DmPlugin {
   name = 'onLdapChange';
@@ -92,14 +90,14 @@ class OnLdapChange extends DmPlugin {
   pendingRenames: Map<number, { dn: string; entry: Entry }> = new Map();
 
   hooks: Hooks = {
-    ldapadddone: async ([dn, attributes], context) => {
+    ldapadddone: async (dn, attributes, context) => {
       const after = (await this.read(dn)) || { dn, ...attributes };
       this.publish(dn, null, after, context);
     },
 
-    // The request travels with the tuple: `launchHooksChained` feeds each
-    // hook's return value to the next, so dropping it here would blind every
-    // authorization plugin registered after this one.
+    // The request travels with the tuple: the chain feeds each hook's return
+    // value to the next, so dropping it here would blind every authorization
+    // plugin registered after this one.
     ldapmodifyrequest: async ([dn, attributes, op, req]) => {
       const entry = await this.read(dn);
       if (entry) {
@@ -110,7 +108,7 @@ class OnLdapChange extends DmPlugin {
       return [dn, attributes, op, req];
     },
 
-    ldapmodifydone: async ([dn, changes, op], context) => {
+    ldapmodifydone: async (dn, changes, op, context) => {
       const before = this.stack[op];
       delete this.stack[op];
       if (!before) {
@@ -139,7 +137,7 @@ class OnLdapChange extends DmPlugin {
       return [dn, newDn, req];
     },
 
-    ldaprenamedone: async ([dn, newDn], context) => {
+    ldaprenamedone: async (dn, newDn, context) => {
       const op = currentOperation();
       const pending =
         op === undefined ? undefined : this.pendingRenames.get(op);
@@ -234,13 +232,7 @@ class OnLdapChange extends DmPlugin {
   ): void {
     const changes = diffEntries(before, after);
     if (Object.keys(changes).length === 0 && before?.dn === after?.dn) return;
-    void launchHooks(
-      this.server.hooks.onLdapEntryChange,
-      dn,
-      before,
-      after,
-      context
-    );
+    this.hookBus.notify('onLdapEntryChange', dn, before, after, context);
     this.notify(dn, changes, before, after);
   }
 
@@ -250,7 +242,7 @@ class OnLdapChange extends DmPlugin {
     before: Entry | null,
     after: Entry | null
   ): void {
-    void launchHooks(this.server.hooks.onLdapChange, dn, changes);
+    this.hookBus.notify('onLdapChange', dn, changes);
     // A deleted entry has no value left to apply anywhere, and a subscriber
     // reading it back would find nothing. Of the attribute hooks, only the
     // mail one fires: it says the address is gone, and appAccountsConsistency
@@ -279,7 +271,7 @@ class OnLdapChange extends DmPlugin {
           // Only mail change uses the simple notification
           this.notifyAttributeChange(
             this.config[configParam] as string,
-            hookName,
+            'onLdapMailChange',
             dn,
             changes
           );
@@ -290,8 +282,8 @@ class OnLdapChange extends DmPlugin {
           const oldQuota = oldValue ? Number(oldValue) : null;
           const newQuota = newValue ? Number(newValue) : null;
           if (oldQuota !== newQuota) {
-            void launchHooks(
-              this.server.hooks.onLdapDriveQuotaChange,
+            this.hookBus.notify(
+              'onLdapDriveQuotaChange',
               dn,
               oldQuota,
               newQuota
@@ -303,8 +295,8 @@ class OnLdapChange extends DmPlugin {
     const oldDisplayName = this.reconstructDisplayName(before);
     const newDisplayName = this.reconstructDisplayName(after);
     if (!deleted && oldDisplayName !== newDisplayName) {
-      void launchHooks(
-        this.server.hooks.onLdapDisplayNameChange,
+      this.hookBus.notify(
+        'onLdapDisplayNameChange',
         dn,
         oldDisplayName,
         newDisplayName
@@ -314,7 +306,7 @@ class OnLdapChange extends DmPlugin {
 
   notifyAttributeChange(
     attribute: string,
-    hookName: keyof Hooks,
+    hookName: AttributeHook,
     dn: string,
     changes: ChangesToNotify,
     stringOnly: boolean = false
@@ -328,13 +320,13 @@ class OnLdapChange extends DmPlugin {
       return;
     }
     if (oldValue !== newValue) {
-      void launchHooks(this.server.hooks[hookName], dn, oldValue, newValue);
+      this.hookBus.notify('onLdapMailChange', dn, oldValue, newValue);
     }
   }
 
   notifyAttributeChangeWithMail(
     attribute: string,
-    hookName: keyof Hooks,
+    hookName: AttributeHook,
     dn: string,
     changes: ChangesToNotify,
     after: Entry | null
@@ -375,13 +367,7 @@ class OnLdapChange extends DmPlugin {
       const oldQuota = oldValue ? Number(oldValue) : 0;
       const newQuota = newValue ? Number(newValue) : 0;
       if (oldQuota !== newQuota) {
-        void launchHooks(
-          this.server.hooks[hookName],
-          dn,
-          mail,
-          oldQuota,
-          newQuota
-        );
+        this.hookBus.notify(hookName, dn, mail, oldQuota, newQuota);
       }
     } else if (
       hookName === 'onLdapForwardChange' ||
@@ -400,13 +386,7 @@ class OnLdapChange extends DmPlugin {
         : [];
 
       if (oldArray.length > 0 || newArray.length > 0) {
-        void launchHooks(
-          this.server.hooks[hookName],
-          dn,
-          mail,
-          oldArray,
-          newArray
-        );
+        this.hookBus.notify(hookName, dn, mail, oldArray, newArray);
       }
     }
   }

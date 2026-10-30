@@ -3,7 +3,6 @@ import type { Express, Request, Response } from 'express';
 import DmPlugin from '../../abstract/plugin';
 import type { Config } from '../../config/args';
 import { serverError } from '../../lib/expressFormatedResponses';
-import { launchHooksChained } from '../../lib/utils';
 
 /**
  * A request as the authentication plugins leave it.
@@ -275,10 +274,7 @@ export default abstract class AuthBase extends DmPlugin {
     next: () => void
   ): Promise<void> {
     try {
-      [req, res] = await launchHooksChained(this.server.hooks.beforeAuth, [
-        req,
-        res,
-      ]);
+      [req, res] = await this.server.hookBus.chain('beforeAuth', [req, res]);
     } catch (err) {
       return serverError(res, err as Error);
     }
@@ -291,10 +287,7 @@ export default abstract class AuthBase extends DmPlugin {
         // documented extension point never fired for anyone: the auth
         // README's worked example, the OIDC page's, and `rateLimit`'s own
         // description of how it tracks failed attempts.
-        [req, res] = await launchHooksChained(this.server.hooks.afterAuth, [
-          req,
-          res,
-        ]);
+        [req, res] = await this.server.hookBus.chain('afterAuth', [req, res]);
         next();
       } catch (err) {
         serverError(res, err as Error);

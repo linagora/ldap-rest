@@ -5,8 +5,8 @@
  * How authorization plugins loaded together compose, and the configurations
  * where that composition is nobody's decision.
  *
- * Every plugin judging LDAP operations registers the same hooks, and
- * `launchHooksChained` runs them all: two of them compose as an AND, the
+ * Every plugin judging LDAP operations registers the same hooks, and the
+ * chain runs them all: two of them compose as an AND, the
  * first refusal winning. That is a sound rule when it is meant. It is a
  * refusal nobody can explain when it is not — `authzPerBranch` beside
  * `authzDynamic` judges a machine token by a branch configuration written

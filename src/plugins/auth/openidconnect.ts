@@ -16,7 +16,6 @@ const { auth, requiresAuth } = oidc;
 
 import AuthBase, { DmRequest } from '../../lib/auth/base';
 import { type Role } from '../../abstract/plugin';
-import { launchHooksChained, runAsHookOwner } from '../../lib/utils';
 import { serverError, unauthorized } from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
@@ -84,45 +83,6 @@ const subjectOf = (idToken: unknown): string | undefined => {
   } catch {
     return undefined;
   }
-};
-
-/**
- * A hook list as `DM` holds it: whichever plugins registered under that name.
- *
- * The `Hooks` interface declares each of these as a single function, and
- * `registerPlugin` pushes every one of them onto an array — which is the
- * shape the call sites read.
- */
-type Subscribers<T> = ((arg: T) => Promise<void> | void)[] | undefined;
-
-/**
- * Hand a payload to every subscriber, and raise the first failure once they
- * have all run.
- *
- * Not `launchHooks`: its contract is to report and swallow, and both callers
- * here need the failure to travel — to the library, which answers a logout
- * token with a 400 and lets the provider retry, or out of the login
- * callback, which refuses a session whose marks could not be cleared.
- *
- * Every subscriber runs even when one fails. Stopping at the first would
- * cost the others their turn: a session the provider considers closed would
- * keep working against the store that would have killed it, and a login
- * would keep the marks of the plugins that never got to run.
- */
-const walkSubscribers = async <T>(
-  subscribers: Subscribers<T>,
-  payload: T
-): Promise<void> => {
-  let firstError: Error | undefined;
-  for (const subscriber of subscribers ?? []) {
-    if (!subscriber) continue;
-    try {
-      await runAsHookOwner(subscriber, () => subscriber(payload));
-    } catch (err) {
-      firstError ??= err instanceof Error ? err : new Error(String(err));
-    }
-  }
-  if (firstError) throw firstError;
 };
 
 export default class OpenIDConnect extends AuthBase {
@@ -221,11 +181,10 @@ export default class OpenIDConnect extends AuthBase {
             return;
           }
           // The failure has to reach the library, which answers 400 and lets
-          // the provider retry, where `launchHooks` would leave it told 204
+          // the provider retry, where a notification would leave it told 204
           // about a logout nothing kept.
-          await walkSubscribers(
-            this.server.hooks
-              .oidclogouttoken as unknown as Subscribers<OidcLogoutToken>,
+          await this.hookBus.notifyStrict(
+            'oidclogouttoken',
             decoded as OidcLogoutToken
           );
         },
@@ -244,7 +203,7 @@ export default class OpenIDConnect extends AuthBase {
             req as unknown as { oidc: { idTokenClaims: OidcSessionClaims } }
           ).oidc?.idTokenClaims;
           if (!claims) return;
-          // Not `launchHooks` either, and not for the provider's benefit:
+          // Not a notification either, and not for the provider's benefit:
           // what these subscribers do is clear what would refuse the session
           // just established. `bcl` deletes the mark its logout token set on
           // the `sub`, and a mark left in place kills every session of that
@@ -253,11 +212,7 @@ export default class OpenIDConnect extends AuthBase {
           // that works and a next request already refused, which behind a
           // provider that logs back in on its own is a loop of the two.
           try {
-            await walkSubscribers(
-              this.server.hooks
-                .oidclogin as unknown as Subscribers<OidcSessionClaims>,
-              claims
-            );
+            await this.hookBus.notifyStrict('oidclogin', claims);
           } catch (err) {
             // The session is already in `req.appSession` by the time this
             // runs — the library's `callback()` fills it before calling the
@@ -484,10 +439,10 @@ export default class OpenIDConnect extends AuthBase {
   private async loggedOut(req: DmRequest): Promise<boolean> {
     if (!this.server.hooks.oidcsessionvalid) return false;
     const claims = sessionClaims(req) as OidcSessionClaims;
-    const [, valid] = await launchHooksChained(
-      this.server.hooks.oidcsessionvalid,
-      [claims, true]
-    );
+    const [, valid] = await this.hookBus.chain('oidcsessionvalid', [
+      claims,
+      true,
+    ]);
     return !valid;
   }
 
@@ -577,11 +532,7 @@ export default class OpenIDConnect extends AuthBase {
       return;
     }
     try {
-      await walkSubscribers(
-        this.server.hooks
-          .oidclogouttoken as unknown as Subscribers<OidcLogoutToken>,
-        dead
-      );
+      await this.hookBus.notifyStrict('oidclogouttoken', dead);
     } catch (err) {
       this.logger.error(
         `${this.name}: /logout could not record the session it ends, so a ` +

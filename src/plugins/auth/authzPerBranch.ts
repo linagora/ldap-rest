@@ -75,7 +75,7 @@ export default class AuthzPerBranch extends AuthzBase {
     this.hooks = {
       ...inherited,
       ldapadddone: forget,
-      ldapmodifydone: ([, changes]): void => {
+      ldapmodifydone: (_dn, changes): void => {
         if (this.touchesMembership(changes)) forget();
       },
       ldapdeletedone: (): void => {

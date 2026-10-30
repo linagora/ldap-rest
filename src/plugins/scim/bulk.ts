@@ -14,7 +14,7 @@ import type winston from 'winston';
 
 import type { Config } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
-import { launchHooks } from '../../lib/utils';
+import type HookBus from '../../lib/hookBus';
 
 import type { ScimUsers } from './users';
 import type { ScimGroups } from './groups';
@@ -41,8 +41,7 @@ export interface ScimBulkOptions {
   users: ScimUsers;
   groups: ScimGroups;
   scimPrefix: string;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  hooks: { [K: string]: Function[] | undefined };
+  hookBus: HookBus;
 }
 
 const BULK_REF_RE = /^bulkId:([A-Za-z0-9_-]+)$/;
@@ -55,8 +54,7 @@ export class ScimBulk {
   private readonly users: ScimUsers;
   private readonly groups: ScimGroups;
   private readonly scimPrefix: string;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  private readonly hooks: { [K: string]: Function[] | undefined };
+  private readonly hookBus: HookBus;
 
   constructor(opts: ScimBulkOptions) {
     this.config = opts.config;
@@ -64,7 +62,7 @@ export class ScimBulk {
     this.users = opts.users;
     this.groups = opts.groups;
     this.scimPrefix = opts.scimPrefix;
-    this.hooks = opts.hooks;
+    this.hookBus = opts.hookBus;
   }
 
   async execute(req: DmRequest, body: BulkRequest): Promise<BulkResponse> {
@@ -96,7 +94,7 @@ export class ScimBulk {
       schemas: [SCHEMA_BULK_RESPONSE],
       Operations: responses,
     };
-    void launchHooks(this.hooks.scimbulkdone, bulkResp);
+    this.hookBus.notify('scimbulkdone', bulkResp);
     return bulkResp;
   }
 

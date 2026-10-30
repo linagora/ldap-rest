@@ -190,10 +190,10 @@ describe('Twake Calendar Plugin', function () {
       .post('/resources')
       .reply(201);
 
-    await calendar.hooks.ldapcalendarResourceadddone!([
+    await calendar.hooks.ldapcalendarResourceadddone!(
       `cn=Conference Room A,ou=elsewhere,${process.env.DM_LDAP_BASE}`,
-      { cn: 'Conference Room A', description: 'Large meeting room' },
-    ]);
+      { cn: 'Conference Room A', description: 'Large meeting room' }
+    );
 
     expect(apiScope.isDone()).to.be.false;
     nock.cleanAll();
@@ -220,10 +220,10 @@ describe('Twake Calendar Plugin', function () {
     it('does not take a sibling branch whose name starts with the base for the resource branch', async () => {
       const apiScope = nock(calendarUrl).post('/resources').reply(201);
 
-      await calendar.hooks.ldapcalendarResourceadddone!([
+      await calendar.hooks.ldapcalendarResourceadddone!(
         `cn=Conference Room A,ou=resourcesArchive,${process.env.DM_LDAP_BASE}`,
-        { cn: 'Conference Room A', description: 'Archived room' },
-      ]);
+        { cn: 'Conference Room A', description: 'Archived room' }
+      );
 
       expect(apiScope.isDone()).to.be.false;
       nock.cleanAll();
@@ -235,10 +235,10 @@ describe('Twake Calendar Plugin', function () {
       const partial = calendarWithBase('ou=resources');
       const apiScope = nock(calendarUrl).post('/resources').reply(201);
 
-      await partial.hooks.ldapcalendarResourceadddone!([
+      await partial.hooks.ldapcalendarResourceadddone!(
         `cn=Conference Room A,ou=resourcesArchive,${process.env.DM_LDAP_BASE}`,
-        { cn: 'Conference Room A', description: 'Archived room' },
-      ]);
+        { cn: 'Conference Room A', description: 'Archived room' }
+      );
 
       expect(apiScope.isDone()).to.be.false;
       nock.cleanAll();
@@ -253,10 +253,10 @@ describe('Twake Calendar Plugin', function () {
         })
         .reply(201);
 
-      await calendar.hooks.ldapcalendarResourceadddone!([
+      await calendar.hooks.ldapcalendarResourceadddone!(
         `cn=Conference Room A, ou=resources, ${process.env.DM_LDAP_BASE}`,
-        { cn: 'Conference Room A', description: 'Large meeting room' },
-      ]);
+        { cn: 'Conference Room A', description: 'Large meeting room' }
+      );
 
       expect(apiScope.isDone()).to.be.true;
       expect(createdName).to.equal('Conference Room A');
@@ -268,11 +268,11 @@ describe('Twake Calendar Plugin', function () {
         .patch(/^\/resources\//)
         .reply(204);
 
-      await calendar.hooks.ldapcalendarResourcemodifydone!([
+      await calendar.hooks.ldapcalendarResourcemodifydone!(
         `cn=Conference Room A,ou=elsewhere,${process.env.DM_LDAP_BASE}`,
         { replace: { description: 'Updated description' } },
-        1,
-      ]);
+        1
+      );
 
       expect(apiScope.isDone()).to.be.false;
       nock.cleanAll();
@@ -300,11 +300,11 @@ describe('Twake Calendar Plugin', function () {
           return [204];
         });
 
-      await calendar.hooks.ldapcalendarResourcemodifydone!([
+      await calendar.hooks.ldapcalendarResourcemodifydone!(
         `cn=Salle A/B,ou=resources,${process.env.DM_LDAP_BASE}`,
         { replace: { description: 'Updated description' } },
-        1,
-      ]);
+        1
+      );
 
       expect(apiScope.isDone()).to.be.true;
       expect(patchPath).to.equal('/resources/Salle%20A%2FB');
@@ -339,11 +339,11 @@ describe('Twake Calendar Plugin', function () {
         });
 
       // cn=zone is the parent's RDN, not this entry's
-      await calendar.hooks.ldapcalendarResourcemodifydone!([
+      await calendar.hooks.ldapcalendarResourcemodifydone!(
         `o=Room 12,cn=zone,ou=resources,${process.env.DM_LDAP_BASE}`,
         { replace: { description: 'Updated description' } },
-        1,
-      ]);
+        1
+      );
 
       expect(patchPath).to.not.equal('/resources/zone');
       expect(decodeURIComponent(patchPath)).to.equal('/resources/Room 12');
@@ -375,15 +375,15 @@ describe('Twake Calendar Plugin', function () {
 
       // The name is not the RDN value, so an id derived from one is not the
       // id derived from the other
-      await calendar.hooks.ldapcalendarResourceadddone!([
-        dn,
-        { cn: 'Salle Rouge', description: 'Large meeting room' },
-      ]);
-      await calendar.hooks.ldapcalendarResourcemodifydone!([
+      await calendar.hooks.ldapcalendarResourceadddone!(dn, {
+        cn: 'Salle Rouge',
+        description: 'Large meeting room',
+      });
+      await calendar.hooks.ldapcalendarResourcemodifydone!(
         dn,
         { replace: { description: 'Updated description' } },
-        1,
-      ]);
+        1
+      );
       await calendar.hooks.ldapcalendarResourcedeletedone!(dn);
 
       expect(apiScope.isDone()).to.be.true;

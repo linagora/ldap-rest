@@ -2,7 +2,7 @@
  * Two authorization plugins loaded together (#189).
  *
  * Every plugin judging LDAP operations registers the same hooks and
- * `launchHooksChained` runs them all, so two of them compose as an AND: the
+ * the chain runs them all, so two of them compose as an AND: the
  * first refusal wins. `authzPerBranch` beside `authzDynamic` judged a machine
  * token by a branch configuration written for administrators, found no key
  * for the tenant, and refused a write the token's own ACLs grant — with
@@ -22,7 +22,8 @@ import type { Hooks } from '../../../src/hooks';
 import { DM, type Config } from '../../../src/bin';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import { assertAuthzComposition } from '../../../src/lib/authz/composition';
-import { asyncHandler, launchHooksChained } from '../../../src/lib/utils';
+import { asyncHandler } from '../../../src/lib/utils';
+import HookBus from '../../../src/lib/hookBus';
 import {
   getLogger,
   setLogger,
@@ -283,23 +284,24 @@ describe('Authorization plugins loaded together', function () {
     });
 
     it('should say a refusal from a hook no plugin registered', async () => {
-      // Pushed straight onto the list, as a suite does through
-      // `registeredHooks`: there is no owner on record, and the refusal
-      // must still reach the log rather than vanish into a bare 403.
+      // Pushed straight onto a hook list, as a suite does: there is no owner
+      // on record, and the refusal must still reach the log rather than
+      // vanish into a bare 403.
       const warned: string[] = [];
       const installed = getLogger();
       setLogger({
         warn: (message: string) => warned.push(String(message)),
       } as unknown as winston.Logger);
       try {
-        await launchHooksChained(
-          [
+        await new HookBus({
+          ldapsearchrequest: [
             function pushedByHand(): never {
               throw new Error('[authz-forbidden] not yours');
             },
           ],
-          []
-        ).catch(() => undefined);
+        })
+          .chain('ldapsearchrequest', ['', {}, undefined])
+          .catch(() => undefined);
       } finally {
         setLogger(installed);
       }
@@ -534,7 +536,7 @@ describe('Authorization plugins loaded together', function () {
         )
       );
       const write = (req: Partial<DmRequest>): Promise<unknown> =>
-        launchHooksChained(server.hooks.ldapmodifyrequest, [
+        server.hookBus.chain('ldapmodifyrequest', [
           targetDn,
           { replace: { description: 'x' } },
           0,

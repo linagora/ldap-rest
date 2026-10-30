@@ -474,10 +474,7 @@ export default class Scim extends DmPlugin {
       config: this.config,
       logger: this.logger,
       baseResolver: this.baseResolver,
-      hooks: this.registeredHooks as {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-        [K: string]: Function[] | undefined;
-      },
+      hookBus: this.hookBus,
     });
 
     this.groups = new ScimGroups({
@@ -486,10 +483,7 @@ export default class Scim extends DmPlugin {
       logger: this.logger,
       baseResolver: this.baseResolver,
       users: this.users,
-      hooks: this.registeredHooks as {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-        [K: string]: Function[] | undefined;
-      },
+      hookBus: this.hookBus,
     });
 
     this.bulk = new ScimBulk({
@@ -498,10 +492,7 @@ export default class Scim extends DmPlugin {
       users: this.users,
       groups: this.groups,
       scimPrefix: this.scimPrefix,
-      hooks: this.registeredHooks as {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-        [K: string]: Function[] | undefined;
-      },
+      hookBus: this.hookBus,
     });
 
     const schemaDir =
