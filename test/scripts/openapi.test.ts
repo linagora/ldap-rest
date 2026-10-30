@@ -114,6 +114,12 @@ describe('OpenAPI generator', () => {
     });
   });
 
+  it('resolves a path held in a local and a class deriving from a listed base', async () => {
+    const spec = await specOf(path.join(root, 'test', 'fixtures', 'openapi'));
+    expect(spec.paths['/api/v1/things']?.get, 'local path').to.exist;
+    expect(spec.paths['/api/v1/derived']?.get, 'derived base').to.exist;
+  });
+
   it('documents the demo route from its declaration', async () => {
     const spec = await specOf(path.join(root, 'src', 'plugins', 'demo'));
     const operation = spec.paths['/api/hello']?.get;

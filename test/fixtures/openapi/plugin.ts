@@ -34,6 +34,17 @@ export default class FixturePlugin extends DmPlugin {
 
   api(app: Express): void {
     this.declare(app);
+
+    // The path is held in a local, as the Twake routes do
+    const base = `${this.config.api_prefix}/v1/things`;
+    declare(app, {
+      method: 'get',
+      path: base,
+      query: ItemQuery,
+      handler: ({ res }) => {
+        res.sendStatus(204);
+      },
+    });
   }
 
   private declare(app: Express): void {
@@ -50,6 +61,29 @@ export default class FixturePlugin extends DmPlugin {
       summary: 'Create an item',
       description: 'Creates the item the path names.',
       tags: ['Fixture'],
+      handler: ({ res }) => {
+        res.sendStatus(204);
+      },
+    });
+  }
+}
+
+/** A base the generator knows by name, as `LdapGroups` is. */
+abstract class LdapGroups extends DmPlugin {
+  name = 'groupsBase';
+  roles: Role[] = ['api'] as const;
+}
+
+/** A plugin deriving from a listed base rather than `DmPlugin`. */
+export class DerivedFixture extends LdapGroups {
+  name = 'derived';
+  roles: Role[] = ['api'] as const;
+
+  api(app: Express): void {
+    declare(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/v1/derived`,
+      summary: 'A derived route',
       handler: ({ res }) => {
         res.sendStatus(204);
       },

@@ -576,196 +576,219 @@ export default class TwakeSpaces extends DmPlugin {
       res.json({ success: true });
     };
     const spaceId = (req: Request): string => req.params.spaceId as string;
+    const listingSpaces = route('listing spaces', (q, r, o) =>
+      this.listRoute(q, r, o)
+    );
     defineRoute(app, {
       method: 'get',
       path: base,
       params: SpaceOrganizationParams,
-      handler: async ({ req, res }) =>
-        route('listing spaces', (q, r, o) => this.listRoute(q, r, o))(req, res),
+      handler: ({ req, res }) => listingSpaces(req, res),
     });
+    const creatingSpace = route('creating space', (q, r, o) =>
+      this.createRoute(q, r, o)
+    );
     defineRoute(app, {
       method: 'post',
       path: base,
       params: SpaceOrganizationParams,
-      handler: async ({ req, res }) =>
-        route('creating space', (q, r, o) => this.createRoute(q, r, o))(
-          req,
-          res
-        ),
+      handler: ({ req, res }) => creatingSpace(req, res),
+    });
+    const gettingSpace = route('getting space', async (req, res, org) => {
+      res.json(this.spaceOf(org, await this.space(org, spaceId(req), req)));
     });
     defineRoute(app, {
       method: 'get',
       path: `${base}/:spaceId`,
       params: SpaceParams,
-      handler: async ({ req, res }) =>
-        route('getting space', async (req, res, org) => {
-          res.json(this.spaceOf(org, await this.space(org, spaceId(req), req)));
-        })(req, res),
+      handler: ({ req, res }) => gettingSpace(req, res),
+    });
+    const renamingSpace = route('renaming space', async (req, res, org) => {
+      const body = bodyOf(req);
+      const unsupported = Object.keys(body).filter(k => k !== 'name');
+      if (unsupported.length)
+        throw invalid(
+          `Only "name" can be updated; unsupported field(s): ${unsupported.join(', ')}`
+        );
+      if (!isDisplayName(body.name)) throw invalid(NAME_RULE);
+      await this.write(
+        org,
+        spaceId(req),
+        { replace: { [this.displayName]: body.name } },
+        req
+      );
+      done(res);
     });
     defineRoute(app, {
       method: 'patch',
       path: `${base}/:spaceId`,
       params: SpaceParams,
-      handler: async ({ req, res }) =>
-        route('renaming space', async (req, res, org) => {
-          const body = bodyOf(req);
-          const unsupported = Object.keys(body).filter(k => k !== 'name');
-          if (unsupported.length)
-            throw invalid(
-              `Only "name" can be updated; unsupported field(s): ${unsupported.join(', ')}`
-            );
-          if (!isDisplayName(body.name)) throw invalid(NAME_RULE);
-          await this.write(
+      handler: ({ req, res }) => renamingSpace(req, res),
+    });
+    const deletingSpace = route('deleting space', async (req, res, org) => {
+      try {
+        await this.server.ldap.delete(this.spaceDn(org, spaceId(req)), req);
+      } catch (err) {
+        if (extractLdapCode(err) === 32) throw notFound('space');
+        throw err;
+      }
+      done(res);
+    });
+    defineRoute(app, {
+      method: 'delete',
+      path: `${base}/:spaceId`,
+      params: SpaceParams,
+      handler: ({ req, res }) => deletingSpace(req, res),
+    });
+    const listingSpaceMembers = route(
+      'listing space members',
+      async (req, res, org) => {
+        const p = this.groups.page(req, MEMBER_SORT);
+        const space = await this.space(org, spaceId(req), req);
+        const members = space.holders.filter(h => h.kind === 'member');
+        const roles = new Map(members.map(m => [m.name.toLowerCase(), m.role]));
+        res.json({
+          organizationId: org,
+          id: space.id,
+          ...(await this.groups.memberPage(
+            p,
             org,
-            spaceId(req),
-            { replace: { [this.displayName]: body.name } },
+            members.map(m => m.name),
+            username => ({ role: roles.get(username.toLowerCase()) }),
             req
-          );
-          done(res);
-        })(req, res),
-    });
-    defineRoute(app, {
-      method: 'delete',
-      path: `${base}/:spaceId`,
-      params: SpaceParams,
-      handler: async ({ req, res }) =>
-        route('deleting space', async (req, res, org) => {
-          try {
-            await this.server.ldap.delete(this.spaceDn(org, spaceId(req)), req);
-          } catch (err) {
-            if (extractLdapCode(err) === 32) throw notFound('space');
-            throw err;
-          }
-          done(res);
-        })(req, res),
-    });
+          )),
+        });
+      }
+    );
     defineRoute(app, {
       method: 'get',
       path: `${base}/:spaceId/members`,
       params: SpaceParams,
-      handler: async ({ req, res }) =>
-        route('listing space members', async (req, res, org) => {
-          const p = this.groups.page(req, MEMBER_SORT);
-          const space = await this.space(org, spaceId(req), req);
-          const members = space.holders.filter(h => h.kind === 'member');
-          const roles = new Map(
-            members.map(m => [m.name.toLowerCase(), m.role])
-          );
-          res.json({
-            organizationId: org,
-            id: space.id,
-            ...(await this.groups.memberPage(
-              p,
+      handler: ({ req, res }) => listingSpaceMembers(req, res),
+    });
+    const addingSpaceMembers = route(
+      'adding space members',
+      async (req, res, org) => {
+        const body = bodyOf(req);
+        const usernames = namesOf(
+          body.usernames,
+          'usernames',
+          this.groups.maxPage
+        );
+        await this.add(req, org, 'member', roleOf(body), () =>
+          this.liveUsers(org, usernames, req)
+        );
+        done(res);
+      }
+    );
+    defineRoute(app, {
+      method: 'post',
+      path: `${base}/:spaceId/members`,
+      params: SpaceParams,
+      handler: ({ req, res }) => addingSpaceMembers(req, res),
+    });
+    const changingSpaceMemberRole = route(
+      'changing space member role',
+      async (req, res, org) => {
+        await this.change(req, org, 'member', roleOf(bodyOf(req)));
+        done(res);
+      }
+    );
+    defineRoute(app, {
+      method: 'patch',
+      path: `${base}/:spaceId/members/:userId`,
+      params: SpaceMemberParams,
+      handler: ({ req, res }) => changingSpaceMemberRole(req, res),
+    });
+    const removingSpaceMember = route(
+      'removing space member',
+      async (req, res, org) => {
+        await this.change(req, org, 'member');
+        done(res);
+      }
+    );
+    defineRoute(app, {
+      method: 'delete',
+      path: `${base}/:spaceId/members/:userId`,
+      params: SpaceMemberParams,
+      handler: ({ req, res }) => removingSpaceMember(req, res),
+    });
+    const listingSpaceGroups = route(
+      'listing space groups',
+      async (req, res, org) => {
+        const space = await this.space(org, spaceId(req), req);
+        const linked = space.holders.filter(h => h.kind === 'group');
+        const names = new Map(
+          (
+            await this.orgGroups(
               org,
-              members.map(m => m.name),
-              username => ({ role: roles.get(username.toLowerCase()) }),
+              linked.map(g => g.name),
+              [],
               req
-            )),
-          });
-        })(req, res),
-    });
-    defineRoute(app, {
-      method: 'post',
-      path: `${base}/:spaceId/members`,
-      params: SpaceParams,
-      handler: async ({ req, res }) =>
-        route('adding space members', async (req, res, org) => {
-          const body = bodyOf(req);
-          const usernames = namesOf(
-            body.usernames,
-            'usernames',
-            this.groups.maxPage
-          );
-          await this.add(req, org, 'member', roleOf(body), () =>
-            this.liveUsers(org, usernames, req)
-          );
-          done(res);
-        })(req, res),
-    });
-    defineRoute(app, {
-      method: 'patch',
-      path: `${base}/:spaceId/members/:userId`,
-      params: SpaceMemberParams,
-      handler: async ({ req, res }) =>
-        route('changing space member role', async (req, res, org) => {
-          await this.change(req, org, 'member', roleOf(bodyOf(req)));
-          done(res);
-        })(req, res),
-    });
-    defineRoute(app, {
-      method: 'delete',
-      path: `${base}/:spaceId/members/:userId`,
-      params: SpaceMemberParams,
-      handler: async ({ req, res }) =>
-        route('removing space member', async (req, res, org) => {
-          await this.change(req, org, 'member');
-          done(res);
-        })(req, res),
-    });
+            )
+          ).map(e => [
+            dnKey(e.dn as string),
+            this.groups.groupOf(org, e).displayName as string,
+          ])
+        );
+        const groups = linked
+          .map(({ name: id, role, dn }) => ({
+            id,
+            name: names.get(dnKey(dn)) ?? id,
+            role,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        res.json({ organizationId: org, id: space.id, groups });
+      }
+    );
     defineRoute(app, {
       method: 'get',
       path: `${base}/:spaceId/groups`,
       params: SpaceParams,
-      handler: async ({ req, res }) =>
-        route('listing space groups', async (req, res, org) => {
-          const space = await this.space(org, spaceId(req), req);
-          const linked = space.holders.filter(h => h.kind === 'group');
-          const names = new Map(
-            (
-              await this.orgGroups(
-                org,
-                linked.map(g => g.name),
-                [],
-                req
-              )
-            ).map(e => [
-              dnKey(e.dn as string),
-              this.groups.groupOf(org, e).displayName as string,
-            ])
-          );
-          const groups = linked
-            .map(({ name: id, role, dn }) => ({
-              id,
-              name: names.get(dnKey(dn)) ?? id,
-              role,
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-          res.json({ organizationId: org, id: space.id, groups });
-        })(req, res),
+      handler: ({ req, res }) => listingSpaceGroups(req, res),
     });
+    const linkingSpaceGroups = route(
+      'linking space groups',
+      async (req, res, org) => {
+        const body = bodyOf(req);
+        const ids = namesOf(body.groupIds, 'groupIds', this.groups.maxPage);
+        await this.add(req, org, 'group', roleOf(body), () =>
+          this.groupDns(org, ids, req)
+        );
+        done(res);
+      }
+    );
     defineRoute(app, {
       method: 'post',
       path: `${base}/:spaceId/groups`,
       params: SpaceParams,
-      handler: async ({ req, res }) =>
-        route('linking space groups', async (req, res, org) => {
-          const body = bodyOf(req);
-          const ids = namesOf(body.groupIds, 'groupIds', this.groups.maxPage);
-          await this.add(req, org, 'group', roleOf(body), () =>
-            this.groupDns(org, ids, req)
-          );
-          done(res);
-        })(req, res),
+      handler: ({ req, res }) => linkingSpaceGroups(req, res),
     });
+    const changingSpaceGroupRole = route(
+      'changing space group role',
+      async (req, res, org) => {
+        await this.change(req, org, 'group', roleOf(bodyOf(req)));
+        done(res);
+      }
+    );
     defineRoute(app, {
       method: 'patch',
       path: `${base}/:spaceId/groups/:groupId`,
       params: SpaceGroupParams,
-      handler: async ({ req, res }) =>
-        route('changing space group role', async (req, res, org) => {
-          await this.change(req, org, 'group', roleOf(bodyOf(req)));
-          done(res);
-        })(req, res),
+      handler: ({ req, res }) => changingSpaceGroupRole(req, res),
     });
+    const unlinkingSpaceGroup = route(
+      'unlinking space group',
+      async (req, res, org) => {
+        await this.change(req, org, 'group');
+        done(res);
+      }
+    );
     defineRoute(app, {
       method: 'delete',
       path: `${base}/:spaceId/groups/:groupId`,
       params: SpaceGroupParams,
-      handler: async ({ req, res }) =>
-        route('unlinking space group', async (req, res, org) => {
-          await this.change(req, org, 'group');
-          done(res);
-        })(req, res),
+      handler: ({ req, res }) => unlinkingSpaceGroup(req, res),
     });
     await this.rabbitmq?.subscribe(
       this.exchange,
