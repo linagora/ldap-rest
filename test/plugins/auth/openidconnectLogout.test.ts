@@ -72,7 +72,10 @@ describe('OpenID Connect, RP-Initiated Logout', function () {
     const res = await request.get('/logout');
 
     expect(res.status).to.equal(302);
-    expect(res.headers.location).to.equal(`${issuer}/logout`);
+    // openid-client v6 always names the client in the logout URL
+    const target = new URL(res.headers.location);
+    expect(`${target.origin}${target.pathname}`).to.equal(`${issuer}/logout`);
+    expect(target.searchParams.get('client_id')).to.equal('client');
   });
 
   it('should end the session here when the provider has no endpoint', async () => {

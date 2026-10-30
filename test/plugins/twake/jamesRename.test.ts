@@ -28,7 +28,7 @@ describe('James Plugin - rename leftovers', () => {
     for (const method of ['GET', 'PUT', 'POST', 'DELETE'])
       scope
         .intercept(() => true, method)
-        .reply(function (uri, body) {
+        .reply(function (uri: string, body: unknown) {
           calls.push({ call: `${method} ${uri}`, body });
           if (method !== 'GET') return [204, ''];
           return james[uri] ?? [404, { statusCode: 404 }];

@@ -464,7 +464,7 @@ describe('OpenID Connect Plugin', () => {
       nock(oidcServer)
         .get('/authorize')
         .query(true) // Match any query parameters
-        .reply(uri => {
+        .reply((uri: string) => {
           const url = new URL(uri, oidcServer);
           capturedState = url.searchParams.get('state') || '';
 

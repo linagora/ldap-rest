@@ -108,7 +108,7 @@ describe('James and groups', () => {
       process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
     ).persist();
     for (const method of ['GET', 'PUT', 'POST', 'DELETE'])
-      scope.intercept(/.*/, method).reply(uri => {
+      scope.intercept(/.*/, method).reply((uri: string) => {
         calls.push(`${method} ${decodeURIComponent(uri)}`);
         return method === 'GET' ? [200, []] : [204];
       });

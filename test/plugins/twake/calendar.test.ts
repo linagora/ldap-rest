@@ -295,7 +295,7 @@ describe('Twake Calendar Plugin', function () {
       let patchPath = '';
       const apiScope = nock(calendarUrl)
         .patch(/^\/resources\//)
-        .reply(function (uri) {
+        .reply(function (uri: string) {
           patchPath = uri;
           return [204];
         });
@@ -315,7 +315,7 @@ describe('Twake Calendar Plugin', function () {
       let deletePath = '';
       const apiScope = nock(calendarUrl)
         .delete(/^\/resources\//)
-        .reply(function (uri) {
+        .reply(function (uri: string) {
           deletePath = uri;
           return [204];
         });
@@ -333,7 +333,7 @@ describe('Twake Calendar Plugin', function () {
       let patchPath = '';
       const apiScope = nock(calendarUrl)
         .patch(/^\/resources\//)
-        .reply(function (uri) {
+        .reply(function (uri: string) {
           patchPath = uri;
           return [204];
         });
@@ -363,12 +363,12 @@ describe('Twake Calendar Plugin', function () {
         })
         .reply(201)
         .patch(/^\/resources\//)
-        .reply(function (uri) {
+        .reply(function (uri: string) {
           patchPath = uri;
           return [204];
         })
         .delete(/^\/resources\//)
-        .reply(function (uri) {
+        .reply(function (uri: string) {
           deletePath = uri;
           return [204];
         });
@@ -492,7 +492,7 @@ describe('Twake Calendar Plugin', function () {
           return true;
         })
         .query(true)
-        .reply(function (uri) {
+        .reply(function (uri: string) {
           patchUri = uri;
           return [204];
         });
@@ -525,7 +525,7 @@ describe('Twake Calendar Plugin', function () {
           return true;
         })
         .query(true)
-        .reply(function (uri) {
+        .reply(function (uri: string) {
           patchUri = uri;
           return [204];
         });
@@ -639,7 +639,7 @@ describe('Twake Calendar Plugin', function () {
         ])
         .patch('/registeredUsers')
         .query(true)
-        .reply(function (uri) {
+        .reply(function (uri: string) {
           patchUri = uri;
           return [204];
         });
@@ -699,7 +699,7 @@ describe('Twake Calendar Plugin', function () {
           return true;
         })
         .query(true)
-        .reply(function (uri) {
+        .reply(function (uri: string) {
           patchUri = uri;
           return [204];
         });

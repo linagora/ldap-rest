@@ -36,7 +36,7 @@ const OWN_ROUTES = ['/login', '/logout', '/callback', '/backchannel-logout'];
  * How `openid-client` refuses to build a logout URL for a provider whose
  * discovery document names no `end_session_endpoint`.
  */
-const NO_END_SESSION = /^end_session_endpoint must be configured/;
+const NO_END_SESSION = /end_session_endpoint/;
 
 /** `/logout` as express matches a route: any case, trailing slash or not. */
 const LOGOUT = /^\/logout\/?$/i;
