@@ -1,7 +1,8 @@
 import type { SearchResult } from 'ldapts';
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import { DM } from '../../bin';
 import { Hooks } from '../../hooks';
 import {
@@ -17,7 +18,6 @@ import {
   wantJson,
 } from '../../lib/expressFormatedResponses';
 import {
-  asyncHandler,
   escapeDnValue,
   escapeLdapFilter,
   getParentDn,
@@ -139,6 +139,16 @@ import {
  *   example:
  *     description: Updated description for Marketing
  */
+export const WriteResponse = Type.Object({ success: Type.Boolean() });
+
+export const OrganizationParams = Type.Object({
+  dn: Type.String({ minLength: 1 }),
+});
+
+export const OrganizationSearchQuery = Type.Object({
+  q: Type.String({ minLength: 1 }),
+});
+
 export default class LdapOrganizations extends DmPlugin {
   name = 'ldapOrganizations';
   roles: Role[] = ['api', 'consistency', 'configurable'] as const;
@@ -207,14 +217,15 @@ export default class LdapOrganizations extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Simple method to get top organization
-    app.get(
-      `${this.config.api_prefix}/v1/ldap/organizations/top`,
-      async (req, res) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/v1/ldap/organizations/top`,
+      handler: async ({ req, res }) => {
         await tryMethodData(res, async () =>
           this.hideNeverReturn(await this.getOrganisationTop(req))
         );
-      }
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -247,15 +258,17 @@ export default class LdapOrganizations extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Get organization by DN
-    app.get(
-      `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
-      async (req, res) => {
-        const dn = decodeURIComponent(req.params.dn);
+    defineRoute(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
+      params: OrganizationParams,
+      handler: async ({ req, params, res }) => {
+        const dn = decodeURIComponent(params.dn);
         await tryMethodData(res, async () =>
           this.hideNeverReturn(await this.getOrganisationByDn(dn, req))
         );
-      }
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -312,15 +325,17 @@ export default class LdapOrganizations extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Get subnodes of an organization
-    app.get(
-      `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes`,
-      async (req, res) => {
-        const dn = decodeURIComponent(req.params.dn);
+    defineRoute(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes`,
+      params: OrganizationParams,
+      handler: async ({ req, params, res }) => {
+        const dn = decodeURIComponent(params.dn);
         await tryMethodData(res, async () =>
           this.hideNeverReturn(await this.getOrganisationSubnodes(dn, req))
         );
-      }
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -362,20 +377,20 @@ export default class LdapOrganizations extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Search in organization subnodes
-    app.get(
-      `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes/search`,
-      asyncHandler(async (req, res) => {
-        const dn = decodeURIComponent(req.params.dn as string);
-        const query = req.query.q as string;
-        if (!query)
-          throw new BadRequestError('query parameter "q" is required');
+    defineRoute(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes/search`,
+      params: OrganizationParams,
+      query: OrganizationSearchQuery,
+      handler: async ({ req, params, query, res }) => {
+        const dn = decodeURIComponent(params.dn);
         await tryMethodData(res, async () =>
           this.hideNeverReturn(
-            await this.searchOrganisationSubnodes(dn, query, req)
+            await this.searchOrganisationSubnodes(dn, query.q, req)
           )
         );
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -427,20 +442,20 @@ export default class LdapOrganizations extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Search organizations in a whole subtree
-    app.get(
-      `${this.config.api_prefix}/v1/ldap/organizations/:dn/search`,
-      asyncHandler(async (req, res) => {
-        const dn = decodeURIComponent(req.params.dn as string);
-        const query = req.query.q as string;
-        if (!query)
-          throw new BadRequestError('query parameter "q" is required');
+    defineRoute(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/v1/ldap/organizations/:dn/search`,
+      params: OrganizationParams,
+      query: OrganizationSearchQuery,
+      handler: async ({ req, params, query, res }) => {
+        const dn = decodeURIComponent(params.dn);
         await tryMethodData(res, async () =>
           this.hideNeverReturn(
-            await this.searchOrganisationTree(dn, query, req)
+            await this.searchOrganisationTree(dn, query.q, req)
           )
         );
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -472,10 +487,12 @@ export default class LdapOrganizations extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Add organization
-    app.post(
-      `${this.config.api_prefix}/v1/ldap/organizations`,
-      asyncHandler(async (req, res) => this.apiAdd(req, res))
-    );
+    defineRoute(app, {
+      method: 'post',
+      path: `${this.config.api_prefix}/v1/ldap/organizations`,
+      responses: { 200: WriteResponse },
+      handler: async ({ req, res }) => this.apiAdd(req, res),
+    });
 
     /**
      * @openapi
@@ -507,10 +524,13 @@ export default class LdapOrganizations extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Modify organization
-    app.put(
-      `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
-      asyncHandler(async (req, res) => this.apiModify(req, res))
-    );
+    defineRoute(app, {
+      method: 'put',
+      path: `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
+      responses: { 200: WriteResponse },
+      params: OrganizationParams,
+      handler: async ({ req, res }) => this.apiModify(req, res),
+    });
 
     /**
      * @openapi
@@ -538,10 +558,13 @@ export default class LdapOrganizations extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Delete organization
-    app.delete(
-      `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
-      asyncHandler(async (req, res) => this.apiDelete(req, res))
-    );
+    defineRoute(app, {
+      method: 'delete',
+      path: `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
+      responses: { 200: WriteResponse },
+      params: OrganizationParams,
+      handler: async ({ req, res }) => this.apiDelete(req, res),
+    });
 
     /**
      * @openapi
@@ -586,10 +609,13 @@ export default class LdapOrganizations extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Move organization to a different parent
-    app.post(
-      `${this.config.api_prefix}/v1/ldap/organizations/:dn/move`,
-      asyncHandler(async (req, res) => this.apiMove(req, res))
-    );
+    defineRoute(app, {
+      method: 'post',
+      path: `${this.config.api_prefix}/v1/ldap/organizations/:dn/move`,
+      responses: { 200: WriteResponse },
+      params: OrganizationParams,
+      handler: async ({ req, res }) => this.apiMove(req, res),
+    });
   }
 
   async apiAdd(req: Request, res: Response): Promise<void> {

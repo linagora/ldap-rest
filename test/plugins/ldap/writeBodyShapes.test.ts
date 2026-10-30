@@ -235,6 +235,44 @@ describe('Write bodies the directory cannot take as they are', function () {
       expect(res.status, JSON.stringify(res.body)).to.equal(400);
     });
 
+    it('should refuse a match given twice', async () => {
+      const res = await request.get('/api/v1/ldap/groups?match=a&match=b');
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Invalid request: query.match: Expected string'
+      );
+    });
+
+    it('should refuse a member that is not text or a list of text', async () => {
+      const res = await request
+        .post('/api/v1/ldap/groups/shapes-guild/members')
+        .send({ member: 5 });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Invalid request: body.member: Expected union value'
+      );
+    });
+
+    it('should refuse a move whose target is not a DN', async () => {
+      const res = await request
+        .post('/api/v1/ldap/groups/shapes-guild/move')
+        .send({ targetOrgDn: 5 });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Invalid request: body.targetOrgDn: Expected string'
+      );
+    });
+
+    it('should refuse a rename whose name is not text', async () => {
+      const res = await request
+        .post('/api/v1/ldap/groups/shapes-guild/rename')
+        .send({ newCn: 5 });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Invalid request: body.newCn: Expected string'
+      );
+    });
+
     it('should still apply a well-formed modification', async () => {
       const res = await request
         .put('/api/v1/ldap/users/shapes.alice')
