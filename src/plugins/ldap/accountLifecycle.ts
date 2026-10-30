@@ -259,7 +259,7 @@ export default class LdapAccountLifecycle extends DmPlugin {
     // undefined, and a plain `=== undefined` guard would let one through into
     // an LDAP modify. Ask for an own property, which is what the error message
     // below already claims to be checking.
-    if (!Object.prototype.hasOwnProperty.call(states, body.state)) {
+    if (!Object.hasOwn(states, body.state)) {
       throw new BadRequestError(
         `Unknown state "${body.state}" for ${entity.singularName}; known states: ${Object.keys(states).join(', ')}`
       );

@@ -5,6 +5,7 @@ import { join } from 'path';
 import { expect } from 'chai';
 
 import type { Config } from '../../src/bin';
+import { type Schema, schemaAttribute } from '../../src/config/schema';
 import {
   configuredSchemaFiles,
   loadSchemaFile,
@@ -168,6 +169,45 @@ describe('lib/schemaFile', () => {
     it('returns a file without "extends" as it is', () => {
       const file = write('plain.json', { attributes: { a: null } });
       expect(loadSchemaFile(file)).to.deep.equal({ attributes: { a: null } });
+    });
+
+    it('makes an attribute lookup read own keys only', () => {
+      const file = write('plain.json', {
+        attributes: { a: { type: 'string' } },
+      });
+      const schema = loadSchemaFile<Schema>(file);
+      expect(Object.getPrototypeOf(schema.attributes)).to.equal(null);
+      for (const name of [
+        'constructor',
+        'toString',
+        'hasOwnProperty',
+        '__proto__',
+      ])
+        expect(schemaAttribute(schema, name), name).to.be.undefined;
+    });
+
+    it('keeps a name the schema declares, even an Object.prototype one', () => {
+      const file = write(
+        'declared.json',
+        JSON.parse(
+          '{"attributes":{"constructor":{"type":"string"},"__proto__":{"type":"string"}}}'
+        )
+      );
+      const schema = loadSchemaFile<Schema>(file);
+      expect(schemaAttribute(schema, 'constructor')?.[0]).to.equal(
+        'constructor'
+      );
+      expect(schemaAttribute(schema, '__proto__')?.[0]).to.equal('__proto__');
+      expect(schemaAttribute(schema, 'toString')).to.be.undefined;
+    });
+
+    it('gives the asynchronous loader the same attribute map', async () => {
+      const file = write('plain.json', {
+        attributes: { a: { type: 'string' } },
+      });
+      const schema = await loadSchemaFileAsync<Schema>(file);
+      expect(Object.getPrototypeOf(schema.attributes)).to.equal(null);
+      expect(schemaAttribute(schema, 'constructor')).to.be.undefined;
     });
 
     it('merges a relative base and drops "extends"', () => {

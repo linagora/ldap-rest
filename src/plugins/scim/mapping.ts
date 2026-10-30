@@ -714,9 +714,7 @@ export function scimPathToLdapAttribute(
   for (const m of mapping.entries) {
     if (m.scim !== top) continue;
     if (m.sub && sub) {
-      return Object.prototype.hasOwnProperty.call(m.sub, sub)
-        ? m.sub[sub]
-        : undefined;
+      return Object.hasOwn(m.sub, sub) ? m.sub[sub] : undefined;
     }
     // Multi-valued: emails.value → primary attr
     if ((m.ldapPrimary || m.ldapSecondary) && (sub === 'value' || !sub)) {

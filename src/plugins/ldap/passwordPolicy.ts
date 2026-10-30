@@ -81,7 +81,7 @@ const ALL_POLICY_ATTRS = [
 ];
 
 const isWritablePolicyAttribute = (name: string): boolean =>
-  Object.prototype.hasOwnProperty.call(POLICY_ATTRIBUTE_TYPES, name);
+  Object.hasOwn(POLICY_ATTRIBUTE_TYPES, name);
 
 type RawEntry = Record<string, unknown> & { dn: string };
 
@@ -1626,7 +1626,7 @@ export default class PasswordPolicy extends DmPlugin {
           name === 'dn'
             ? typeof value === 'string' &&
               normalizeDn(value) === normalizeDn(current.dn)
-            : Object.prototype.hasOwnProperty.call(current, name) &&
+            : Object.hasOwn(current, name) &&
               isDeepStrictEqual(current[name], value);
         if (same) continue;
         throw new BadRequestError(`${name} cannot be written`);
