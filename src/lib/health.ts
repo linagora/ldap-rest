@@ -1,6 +1,8 @@
-import type { Express, Request, Response } from 'express';
+import type { Express } from 'express';
 
 import type { MaybePromise } from '../hooks';
+
+import { defineRoute } from './route';
 
 /** What a plugin answers about the resources it depends on */
 export type HealthStatus = 'ok' | 'degraded';
@@ -127,14 +129,24 @@ export function readiness(
  */
 export function mountHealth(app: Express, server: Probed): void {
   const [live, ready] = HEALTH_PATHS;
-  app.get(live, (_req: Request, res: Response) => {
-    res.setHeader('Cache-Control', 'no-store');
-    res.json({ status: 'ok' });
+  defineRoute(app, {
+    method: 'get',
+    path: live,
+    json: false,
+    handler: ({ res }) => {
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ status: 'ok' });
+    },
   });
-  app.get(ready, async (_req: Request, res: Response) => {
-    const answer = await readiness(server);
-    res.setHeader('Cache-Control', 'no-store');
-    const serving = answer.status === 'ok' || answer.status === 'degraded';
-    res.status(serving ? 200 : 503).json(answer);
+  defineRoute(app, {
+    method: 'get',
+    path: ready,
+    json: false,
+    handler: async ({ res }) => {
+      const answer = await readiness(server);
+      res.setHeader('Cache-Control', 'no-store');
+      const serving = answer.status === 'ok' || answer.status === 'degraded';
+      res.status(serving ? 200 : 503).json(answer);
+    },
   });
 }

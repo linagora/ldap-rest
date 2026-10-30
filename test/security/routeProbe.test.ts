@@ -39,6 +39,7 @@ import type { Response } from 'express';
 
 import { DM } from '../../src/bin';
 import AuthBase, { type DmRequest } from '../../src/lib/auth/base';
+import { unregisteredRoutes } from '../../src/lib/route';
 import type DmPlugin from '../../src/abstract/plugin';
 import type { Role } from '../../src/abstract/plugin';
 import type { SearchResult } from '../../src/lib/ldapActions';
@@ -1020,6 +1021,13 @@ for (const model of MODELS)
       }
       return { differing, unplaced, unexercised };
     };
+
+    it('declares every route it registers', () => {
+      expect(
+        unregisteredRoutes(server.app),
+        'an Express route is outside defineRoute'
+      ).to.deep.equal([]);
+    });
 
     it('tells the targets apart for a caller who may read them', async function () {
       // The probe sees a difference where there is one: an administrator

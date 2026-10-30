@@ -25,7 +25,7 @@ import { validateHeaderValue } from 'http';
 import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
 
-import DmPlugin, { type Role } from '../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../abstract/plugin';
 import type { DM } from '../bin';
 import { STATIC_CSP, STATIC_FRAME_OPTIONS } from '../config/args';
 import { notFound, serverError } from '../lib/expressFormatedResponses';
@@ -227,9 +227,13 @@ export default class Static extends DmPlugin {
      *   '500':
      *     description: A schema it extends is missing or invalid.
      */
-    app.get(`${prefix}/schemas/:name`, (req, res, next) =>
-      serve([req.params.name], req, res, next)
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/schemas/:name`,
+      json: false,
+      handler: ({ req, res, next }) =>
+        serve([req.params.name as string], req, res, next),
+    });
     /**
      * @openapi
      * summary: Get JSON schema from subdirectory
@@ -269,9 +273,18 @@ export default class Static extends DmPlugin {
      *   '500':
      *     description: A schema it extends is missing or invalid.
      */
-    app.get(`${prefix}/schemas/:dir/:name`, (req, res, next) =>
-      serve([req.params.dir, req.params.name], req, res, next)
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/schemas/:dir/:name`,
+      json: false,
+      handler: ({ req, res, next }) =>
+        serve(
+          [req.params.dir as string, req.params.name as string],
+          req,
+          res,
+          next
+        ),
+    });
     /**
      * @openapi
      * path: /static/schemas/{dir}/{subdir}/{name}
@@ -304,9 +317,13 @@ export default class Static extends DmPlugin {
      *   '500':
      *     description: A schema it extends is missing or invalid.
      */
-    app.get(`${prefix}/schemas/*path`, (req, res, next) =>
-      serve(req.params.path as unknown as string[], req, res, next)
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/schemas/*path`,
+      json: false,
+      handler: ({ req, res, next }) =>
+        serve(req.params.path as unknown as string[], req, res, next),
+    });
     app.use(prefix, express.static(rep));
   }
 
