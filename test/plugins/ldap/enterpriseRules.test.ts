@@ -142,9 +142,6 @@ describe('Enterprise rules', () => {
     });
 
     it('should accept the offsets RFC 4517 allows', () => {
-      expect(parseDirectoryDate('20240930000000+1330')).to.be.null;
-      expect(parseDirectoryDate('20240930000000+1260')).to.be.null;
-      expect(parseDirectoryDate('20240930000000+00')).to.be.null;
       expect(parseDirectoryDate('20240930000000-1300')?.toISOString()).to.equal(
         '2024-09-30T13:00:00.000Z'
       );
@@ -154,6 +151,20 @@ describe('Enterprise rules', () => {
       expect(parseDirectoryDate('20240930000000+12')?.toISOString()).to.equal(
         '2024-09-29T12:00:00.000Z'
       );
+    });
+
+    it('should refuse an offset no zone lies at', () => {
+      for (const zone of [
+        '+00',
+        '-00',
+        '+1330',
+        '+1260',
+        '+13',
+        '-13',
+        '+23',
+        '+25',
+      ])
+        expect(parseDirectoryDate(`20240930000000${zone}`), zone).to.be.null;
     });
   });
 

@@ -37,6 +37,16 @@ its own copy, unbounded only if it declares no `maxLength`; the patterns to
 use are in the
 [schema reference](../../docs/client-development/schemas/README.md#test-optional).
 
+### Lifecycle dates whose zone is not one in use
+
+**Who is affected:** a deployment whose clients write a lifecycle date
+checked as not already past (`accountExpiry`, `twakeDeletionDate`) with a
+zone `±00`, `±13` in two digits, or past `±1300`.
+
+Such a date is answered 400 as invalid. Entries already holding one stay as
+they are; the value is refused the next time that attribute is written
+([details](plugins/ldap/enterprise-rules.md#scheduled-removal)).
+
 ## From 1.2.0 to 1.2.1
 
 ### `{org}` once in a Twake branch pattern

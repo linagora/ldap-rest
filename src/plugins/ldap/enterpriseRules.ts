@@ -375,12 +375,14 @@ export function parseDirectoryDate(raw: AttributeValue): Date | null {
     const digits = zone.slice(1).replace(':', '');
     const offsetHours = Number(digits.slice(0, 2));
     const offsetMinutes = digits.length > 2 ? Number(digits.slice(2, 4)) : 0;
-    // RFC 4517 reads the difference of UTC as HHMM: 1 to 12 hours, or 1300,
-    // the offset of UTC+13:00 that is still in use
+    // RFC 4517 spells the difference of UTC as a time-hour, 00 to 23, with
+    // optional minutes. No zone lies that far: 1 to 12 hours, or 1300, the
+    // offset of UTC+13:00 still in use, is what a value may say.
     if (
       offsetHours < 1 ||
       offsetMinutes > 59 ||
-      (offsetHours > 12 && !(offsetHours === 13 && offsetMinutes === 0))
+      (offsetHours > 12 &&
+        !(offsetHours === 13 && offsetMinutes === 0 && digits.length === 4))
     )
       return null;
     const sign = zone[0] === '-' ? -1 : 1;
