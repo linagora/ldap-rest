@@ -611,6 +611,10 @@ describe('Twake instances plugin', function () {
         await ensure().send({}).expect(400);
         await ensure().send({ mail: '' }).expect(400);
         await ensure().send({ dn: 'not a dn' }).expect(400);
+        const wrong = await ensure().send({ dn: 5 }).expect(400);
+        expect(wrong.body.error).to.equal(
+          'Invalid request: body.dn: Expected string'
+        );
       });
 
       it('reads and writes the account with the caller’s rights', async () => {

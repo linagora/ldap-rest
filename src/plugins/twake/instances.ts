@@ -61,6 +61,10 @@ export const EnsureInstanceBody = Type.Object({
   mail: Type.Optional(Type.String()),
 });
 
+export const EnsureInstanceResponse = Type.Object({
+  state: Type.Union([Type.Literal('ready'), Type.Literal('pending')]),
+});
+
 export default class TwakeInstances extends DmPlugin {
   name = 'twakeInstances';
   roles: Role[] = ['consistency', 'api'] as const;
@@ -278,15 +282,15 @@ export default class TwakeInstances extends DmPlugin {
       method: 'post',
       path: `${this.config.api_prefix}/v1/twake/instances/ensure`,
       body: EnsureInstanceBody,
+      responses: { 200: EnsureInstanceResponse },
       handler: async ({ req, res, body }) => {
-        let dn: unknown = body.dn;
+        let dn = body.dn;
         if (dn === undefined && body.mail) {
           const found = await this.findByMail(body.mail, req);
           if (!found) throw new NotFoundError(`No account for ${body.mail}`);
-          dn = found.dn;
+          dn = found.dn as string;
         }
-        if (typeof dn !== 'string' || !dn)
-          throw new BadRequestError('Give the account as dn or mail');
+        if (!dn) throw new BadRequestError('Give the account as dn or mail');
         res.json({ state: await this.ensureInstance(dn, req) });
       },
     });

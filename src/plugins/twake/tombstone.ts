@@ -46,6 +46,10 @@ export const EraseTombstoneBody = Type.Object({
   force: Type.Optional(Type.Boolean()),
 });
 
+export const EraseTombstoneResponse = Type.Object({
+  success: Type.Boolean(),
+});
+
 export default class TwakeTombstone extends DmPlugin {
   name = 'twakeTombstone';
   roles: Role[] = ['consistency', 'api'] as const;
@@ -179,6 +183,7 @@ export default class TwakeTombstone extends DmPlugin {
       method: 'post',
       path: `${this.config.api_prefix}/v1/twake/tombstones/erase`,
       body: EraseTombstoneBody,
+      responses: { 200: EraseTombstoneResponse },
       handler: async ({ req, res, body }) => {
         await this.erase(body.dn, { force: body.force === true, req });
         res.json({ success: true });

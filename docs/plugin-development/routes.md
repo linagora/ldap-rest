@@ -112,6 +112,9 @@ failing path:
 }
 ```
 
+A caller whose `Accept` excludes JSON is answered `400 Bad request` before
+the handler runs.
+
 `Type.Object` accepts unknown keys unless the schema says
 `{ additionalProperties: false }`. A route migrated from hand-written checks
 starts without that option, so it refuses no client it accepted before;

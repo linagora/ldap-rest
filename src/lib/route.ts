@@ -11,6 +11,7 @@ import { Value } from '@sinclair/typebox/value';
 import type { Express, Request, RequestHandler, Response } from 'express';
 
 import { BadRequestError } from './errors';
+import { wantJson } from './expressFormatedResponses';
 import { asyncHandler } from './utils';
 
 export type RouteMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
@@ -213,6 +214,7 @@ export const defineRoute = <
   route: RouteDefinition<P, Q, B>
 ): void => {
   const handler = asyncHandler(async (req, res) => {
+    if (!wantJson(req, res)) return;
     const invalid: string[] = [];
     const params = route.params
       ? check('params', route.params, req.params, true, invalid)

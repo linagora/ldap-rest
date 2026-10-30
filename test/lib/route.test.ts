@@ -112,6 +112,27 @@ describe('defineRoute', () => {
     );
   });
 
+  it('refuses a caller that does not accept JSON, before the handler', async () => {
+    const app = appWith();
+    let called = false;
+    defineRoute(app, {
+      method: 'get',
+      path: '/things',
+      handler: ({ res }) => {
+        called = true;
+        res.sendStatus(200);
+      },
+    });
+    serveErrors(app);
+
+    const res = await supertest(app)
+      .get('/things')
+      .set('Accept', 'text/html')
+      .expect(400);
+    expect(res.body.error).to.equal('Bad request');
+    expect(called).to.equal(false);
+  });
+
   it('names every failing part at once', async () => {
     const app = appWith();
     defineRoute(app, {

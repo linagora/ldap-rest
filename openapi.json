@@ -100,6 +100,120 @@
             "description": "Scope of the current user.",
             "content": {
               "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "user",
+                    "unrestricted",
+                    "described",
+                    "source",
+                    "sources",
+                    "branches",
+                    "linksAnyDomain",
+                    "entities"
+                  ],
+                  "properties": {
+                    "user": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "unrestricted": {
+                      "type": "boolean"
+                    },
+                    "described": {
+                      "type": "boolean"
+                    },
+                    "source": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "branches": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "dn"
+                        ],
+                        "properties": {
+                          "dn": {
+                            "type": "string"
+                          },
+                          "read": {
+                            "type": "boolean"
+                          },
+                          "write": {
+                            "type": "boolean"
+                          },
+                          "delete": {
+                            "type": "boolean"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "transit": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "linksAnyDomain": {
+                      "type": "boolean"
+                    },
+                    "passwordPolicies": {
+                      "type": "boolean"
+                    },
+                    "entities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "base",
+                          "create"
+                        ],
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "base": {
+                            "type": "string"
+                          },
+                          "create": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
                 "example": {
                   "user": "uid=alice,ou=users,dc=example,dc=com",
                   "unrestricted": false,
@@ -5459,6 +5573,26 @@
             "description": "Done or under way.",
             "content": {
               "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "state"
+                  ],
+                  "properties": {
+                    "state": {
+                      "anyOf": [
+                        {
+                          "const": "ready",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pending",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                },
                 "example": {
                   "state": "ready"
                 }
@@ -5678,6 +5812,17 @@
             "description": "Erased.",
             "content": {
               "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
+                },
                 "example": {
                   "success": true
                 }

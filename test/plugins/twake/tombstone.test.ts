@@ -378,6 +378,23 @@ describe('Twake tombstone plugin', function () {
         .send({ dn: flat('plain-bob'), force: true })
         .expect(404);
     });
+
+    it('refuses a body whose fields are not of the declared types', async () => {
+      const erase = () =>
+        supertest(dm.app).post('/api/v1/twake/tombstones/erase');
+
+      const dn = await erase().send({ dn: 5, force: true }).expect(400);
+      expect(dn.body.error).to.equal(
+        'Invalid request: body.dn: Expected string'
+      );
+
+      const force = await erase()
+        .send({ dn: flat('plain-bob'), force: 'yes' })
+        .expect(400);
+      expect(force.body.error).to.equal(
+        'Invalid request: body.force: Expected boolean'
+      );
+    });
   });
 
   describe('SCIM', () => {
