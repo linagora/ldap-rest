@@ -1,6 +1,5 @@
 [
   "src/abstract/ldapFlat.ts",
-  "src/plugins/ldap/accountLifecycle.ts",
   "src/plugins/ldap/bulkImport.ts",
   "src/plugins/ldap/groups.ts",
   "src/plugins/ldap/organizations.ts",
@@ -8,7 +7,6 @@
   "src/plugins/ldap/raw.ts",
   "src/plugins/scim/scim.ts",
   "src/plugins/static.ts",
-  "src/plugins/twake/appAccountsApi.ts",
   "src/plugins/twake/groups.ts",
   "src/plugins/twake/spaces.ts"
 ]

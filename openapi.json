@@ -402,7 +402,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "state"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  }
                 },
                 "example": {
                   "success": true,
@@ -477,7 +489,26 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "generated",
+                    "forceChange"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "generated": {
+                      "type": "boolean"
+                    },
+                    "forceChange": {
+                      "type": "boolean"
+                    },
+                    "password": {
+                      "type": "string"
+                    }
+                  }
                 },
                 "example": {
                   "success": true,
@@ -511,7 +542,6 @@
           "Entities"
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -5355,6 +5385,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "user parameter"
@@ -5417,6 +5448,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "user parameter"
@@ -5428,7 +5460,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/AppAccountCreated"
                 },
                 "example": {
@@ -5474,7 +5505,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/AppAccountCreate"
               },
               "example": {
@@ -5495,6 +5525,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "user parameter"
@@ -5504,6 +5535,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "uid parameter"
@@ -5621,6 +5653,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "description": "The account, by DN or by mail.",
                 "properties": {
                   "dn": {
                     "type": "string"
@@ -5628,8 +5661,7 @@
                   "mail": {
                     "type": "string"
                   }
-                },
-                "description": "The account, by DN or by mail."
+                }
               }
             }
           }

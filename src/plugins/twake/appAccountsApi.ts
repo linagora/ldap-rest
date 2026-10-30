@@ -6,12 +6,12 @@
  */
 import { randomInt } from 'crypto';
 
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
-import { wantJson } from '../../lib/expressFormatedResponses';
 import {
   AUTHZ_REFUSED,
   HttpError,
@@ -24,6 +24,19 @@ import {
   appAccountsOptions,
   type AppAccountsOptions,
 } from './appAccounts.options';
+
+export const AppAccountsParams = Type.Object({
+  user: Type.String({ minLength: 1 }),
+});
+
+export const AppAccountParams = Type.Object({
+  user: Type.String({ minLength: 1 }),
+  uid: Type.String({ minLength: 1 }),
+});
+
+export const AppAccountCreateBody = Type.Object({
+  name: Type.Optional(Type.String()),
+});
 
 /**
  * @openapi-component
@@ -185,10 +198,12 @@ export default class AppAccountsApi extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // List applicative accounts for a user
-    app.get(
-      `${apiPrefix}/v1/users/:user/app-accounts`,
-      (req: Request, res: Response) => this.listAccounts(req, res)
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${apiPrefix}/v1/users/:user/app-accounts`,
+      params: AppAccountsParams,
+      handler: async ({ req, res }) => this.listAccounts(req, res),
+    });
 
     /**
      * @openapi
@@ -243,10 +258,13 @@ export default class AppAccountsApi extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Create a new applicative account
-    app.post(
-      `${apiPrefix}/v1/users/:user/app-accounts`,
-      (req: Request, res: Response) => this.createAccount(req, res)
-    );
+    defineRoute(app, {
+      method: 'post',
+      path: `${apiPrefix}/v1/users/:user/app-accounts`,
+      params: AppAccountsParams,
+      body: AppAccountCreateBody,
+      handler: async ({ req, res }) => this.createAccount(req, res),
+    });
 
     /**
      * @openapi
@@ -295,10 +313,12 @@ export default class AppAccountsApi extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Delete an applicative account
-    app.delete(
-      `${apiPrefix}/v1/users/:user/app-accounts/:uid`,
-      (req: Request, res: Response) => this.deleteAccount(req, res)
-    );
+    defineRoute(app, {
+      method: 'delete',
+      path: `${apiPrefix}/v1/users/:user/app-accounts/:uid`,
+      params: AppAccountParams,
+      handler: async ({ req, res }) => this.deleteAccount(req, res),
+    });
 
     this.logger.info(
       `AppAccounts API registered at ${apiPrefix}/v1/users/:user/app-accounts`
@@ -377,8 +397,6 @@ export default class AppAccountsApi extends DmPlugin {
    * List applicative accounts for a user
    */
   private async listAccounts(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
-
     const principal = req.params.user as string;
 
     try {
@@ -450,8 +468,6 @@ export default class AppAccountsApi extends DmPlugin {
    * Create a new applicative account
    */
   private async createAccount(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
-
     const principal = req.params.user as string;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { name } = req.body || {};
@@ -646,8 +662,6 @@ export default class AppAccountsApi extends DmPlugin {
    * Delete an applicative account
    */
   private async deleteAccount(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
-
     const principal = req.params.user as string;
     const uid = req.params.uid as string;
 

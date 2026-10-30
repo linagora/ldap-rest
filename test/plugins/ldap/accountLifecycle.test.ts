@@ -131,6 +131,17 @@ describe('Account lifecycle', () => {
         );
       });
 
+      it('should refuse a state that is not a name', async () => {
+        const res = await request
+          .post('/api/v1/ldap/users/lifecycle.user/status')
+          .type('json')
+          .send({ state: 5 });
+        expect(res.status).to.equal(400);
+        expect(res.body.error).to.equal(
+          'Invalid request: body.state: Expected string'
+        );
+      });
+
       it('should name the states it knows when given an unknown one', async () => {
         const res = await request
           .post('/api/v1/ldap/users/lifecycle.user/status')
@@ -257,6 +268,9 @@ describe('Account lifecycle', () => {
             .type('json')
             .send({ forceChange });
           expect(res.status, JSON.stringify(res.body)).to.equal(400);
+          expect(res.body.error).to.equal(
+            'Invalid request: body.forceChange: Expected boolean'
+          );
           expect(res.body).not.to.have.property('password');
         }
       });

@@ -28,15 +28,33 @@
  */
 import { randomBytes } from 'crypto';
 
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { Schema } from '../../config/schema';
 import { roleAttribute } from '../../config/schema';
 import type { AttributesList, ModifyRequest } from '../../lib/ldapActions';
-import { asyncHandler } from '../../lib/utils';
-import { jsonBody } from '../../lib/expressFormatedResponses';
 import { BadRequestError, NotFoundError } from '../../lib/errors';
+
+export const StatusBody = Type.Object({ state: Type.String() });
+
+export const PasswordBody = Type.Object({
+  password: Type.Optional(Type.String()),
+  forceChange: Type.Optional(Type.Boolean()),
+});
+
+export const StatusResponse = Type.Object({
+  success: Type.Boolean(),
+  state: Type.String(),
+});
+
+export const PasswordResponse = Type.Object({
+  success: Type.Boolean(),
+  generated: Type.Boolean(),
+  forceChange: Type.Boolean(),
+  password: Type.Optional(Type.String()),
+});
 
 /** The part of a flat entity this plugin drives. */
 interface FlatEntity {
@@ -147,12 +165,14 @@ export default class LdapAccountLifecycle extends DmPlugin {
          *       application/json:
          *         schema: { $ref: '#/components/schemas/Error' }
          */
-        app.post(
-          `${prefix}/${entity.pluralName}/:id/status`,
-          asyncHandler(async (req: Request, res: Response) =>
-            this.setStatus(entity, statusAttr, states, req, res)
-          )
-        );
+        defineRoute(app, {
+          method: 'post',
+          path: `${prefix}/${entity.pluralName}/:id/status`,
+          body: StatusBody,
+          responses: { 200: StatusResponse },
+          handler: async ({ req, res }) =>
+            this.setStatus(entity, statusAttr, states, req, res),
+        });
         this.logger.info(
           `accountLifecycle: ${entity.pluralName} states = ${Object.keys(states).join(', ')}`
         );
@@ -205,12 +225,14 @@ export default class LdapAccountLifecycle extends DmPlugin {
          *       application/json:
          *         schema: { $ref: '#/components/schemas/Error' }
          */
-        app.post(
-          `${prefix}/${entity.pluralName}/:id/password`,
-          asyncHandler(async (req: Request, res: Response) =>
-            this.resetPassword(entity, passwordAttr, req, res)
-          )
-        );
+        defineRoute(app, {
+          method: 'post',
+          path: `${prefix}/${entity.pluralName}/:id/password`,
+          body: PasswordBody,
+          responses: { 200: PasswordResponse },
+          handler: async ({ req, res }) =>
+            this.resetPassword(entity, passwordAttr, req, res),
+        });
       }
     }
   }
@@ -231,8 +253,7 @@ export default class LdapAccountLifecycle extends DmPlugin {
     req: Request,
     res: Response
   ): Promise<void> {
-    const body = jsonBody(req, res, 'state') as { state: string } | false;
-    if (!body) return;
+    const body = req.body as { state: string };
     // `states` is read from a JSON schema, so it carries Object.prototype on
     // its chain: `states.constructor` and `states.toString` are functions, not
     // undefined, and a plain `=== undefined` guard would let one through into
@@ -264,25 +285,21 @@ export default class LdapAccountLifecycle extends DmPlugin {
     req: Request,
     res: Response
   ): Promise<void> {
-    const body = jsonBody(req, res) as
-      | { password?: unknown; forceChange?: unknown }
-      | false;
-    if (!body) return;
+    const body = req.body as { password?: string; forceChange?: boolean };
 
     // A `password` the body does not carry asks for a generated one; a
     // `password` it does carry is the one to set. An empty string is falsy,
     // so it used to mean "generate one": the answer said `success` after
     // writing a random credential the caller never saw, and a client that
     // emptied the field by accident believed it had set the password it
-    // typed. `null` and anything that is not text are refused for the same
-    // reason — they are a value the client meant to send, not an absence.
+    // typed. Anything that is not text is refused by `PasswordBody`.
     const given = body.password;
-    if (given !== undefined && (typeof given !== 'string' || given === '')) {
+    if (given === '') {
       throw new BadRequestError(
         'Field password must be a non-empty string; omit it to have one generated'
       );
     }
-    if (typeof given === 'string') {
+    if (given !== undefined) {
       if ([...given].length > PASSWORD_MAX_LENGTH)
         throw new BadRequestError(
           `Field password must be at most ${PASSWORD_MAX_LENGTH} characters`
@@ -293,9 +310,6 @@ export default class LdapAccountLifecycle extends DmPlugin {
           'Field password must not contain control characters'
         );
     }
-    if (body.forceChange !== undefined && typeof body.forceChange !== 'boolean')
-      throw new BadRequestError('Field forceChange must be a boolean');
-
     const generated = given === undefined;
     const password = generated ? generatePassword() : given;
 

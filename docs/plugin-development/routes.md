@@ -79,7 +79,9 @@ properties a `description`, or rely on what TypeBox emits.
 
 Path and query values always arrive as strings, so they are converted before
 being checked: a `Type.Number()` query accepts `?limit=10` and hands the
-handler `10`. The body is whatever the registered parser left in `req.body`.
+handler `10`. The body is whatever the registered parser left in `req.body`;
+a request carrying none is checked as an empty object, so an all-optional
+schema accepts it and a required field is refused by name.
 
 A part the route declares no schema for is handed to the handler unchecked,
 as before. The declaration feeds the document the same way: `params` becomes

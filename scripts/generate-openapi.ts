@@ -824,10 +824,17 @@ export class OpenAPIGenerator {
         : [this.pluginTags.get(pluginName) || pluginName],
     };
 
+    // An `@openapi` block describing the body wins whole: merging the two
+    // schemas would leave a `$ref` next to the keys of the other.
+    const documentedSchema = (
+      overrides.requestBody as
+        | { content?: Record<string, { schema?: unknown }> }
+        | undefined
+    )?.content?.['application/json']?.schema;
     const body = await this.schemaOf(property('body'), sourceFile);
-    if (body !== undefined) {
+    if (body !== undefined && documentedSchema === undefined) {
       route.requestBody = {
-        required: true,
+        required: ((body as { required?: string[] }).required?.length ?? 0) > 0,
         content: { 'application/json': { schema: body } },
       };
     }

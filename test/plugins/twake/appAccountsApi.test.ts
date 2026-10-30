@@ -264,6 +264,33 @@ describe('App Accounts API Plugin', function () {
       expect(entry.description).to.equal('My Device');
     });
 
+    it('should create an account when no body is sent', async () => {
+      await dm.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: testUser,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `${testUser}@example.com`,
+      });
+      await waitForEntry(dm, `uid=${principalEmail},${applicativeBase}`);
+
+      const res = await request(dm.app)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`);
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    });
+
+    it('should refuse a name that is not a string', async () => {
+      const res = await request(dm.app)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 5 });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Invalid request: body.name: Expected string'
+      );
+    });
+
     it('should create account without description if not provided', async () => {
       await dm.ldap.add(testUserDN, {
         objectClass: 'inetOrgPerson',
