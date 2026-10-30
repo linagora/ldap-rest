@@ -20,6 +20,7 @@ Create and extend LDAP-Rest with custom plugins.
 
 - **[Development Guide](plugin-development/README.md)** - Architecture and plugin creation
 - **[Hooks](plugin-development/hooks.md)** - LDAP hooks system
+- **[Routes](plugin-development/routes.md)** - Declaring routes and their input schemas
 - **[Testing](plugin-development/testing.md)** - Testing with embedded LDAP
 - **[Dependencies](plugin-development/dependencies.md)** - Plugin dependencies matrix
 

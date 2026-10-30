@@ -24,6 +24,7 @@ export {
   escapeLdapFilter,
   validateDnValue,
 } from '../lib/utils';
+export { defineRoute, registeredRoutes } from '../lib/route';
 export {
   HttpError,
   BadRequestError,
