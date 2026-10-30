@@ -15,6 +15,11 @@
   2⁵³ − 1 bytes (`53687 TB`, a too large `default`), where it was stored as
   `53687000000000000`, `1e+21` or `Infinity`
   ([#493](https://github.com/linagora/ldap-rest/issues/493)).
+- A date checked as not already past, such as `twakeDeletionDate`, is read
+  as written: a year below 100 is no longer taken for a year of the 1900s,
+  and a leap second (`20991231235960Z`) no longer makes the date 400 as
+  invalid
+  ([details](docs/usage/plugins/ldap/enterprise-rules.md#scheduled-removal)).
 
 ### Security
 

@@ -147,6 +147,12 @@ An `accountExpiry` attribute must not carry a date already past. The comparison
 is against the start of the current day, so scheduling something for today is
 allowed.
 
+The date is an LDAP generalized time, read as written: the year keeps its
+four digits (`0029123123` is a date of year 29, not 1929), and a leap second
+(`20991231235960Z`) is the instant that follows the day. The zone is `Z` or a
+difference of hours and minutes from UTC (`+00`, `+02`, `-0530`, `+14:00`); a
+value past 23 hours or 59 minutes is answered 400 as invalid.
+
 ### Deletion and references
 
 ```json

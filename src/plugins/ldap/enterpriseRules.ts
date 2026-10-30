@@ -351,10 +351,16 @@ export function parseDirectoryDate(raw: AttributeValue): Date | null {
   );
   if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 60)
     return null;
-  let time = Date.UTC(year, month - 1, day, hour, minute, second);
-  const check = new Date(time);
-  if (check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day)
+  // Date.UTC() reads a year below 100 as 19xx, and setUTCFullYear() over a
+  // zeroed date re-reads the normalized day and month, so the day is checked
+  // once it has been set, before the hour: a leap second (RFC 4517 allows
+  // 60) then carries over to the next day instead of failing the check.
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day)
     return null;
+  date.setUTCHours(hour, minute, second);
+  let time = date.getTime();
 
   if (fraction !== undefined) {
     const unit = s !== undefined ? 1000 : mi !== undefined ? 60000 : 3600000;
