@@ -27,7 +27,7 @@ describe('LDAP Test Server Integration', function () {
   });
 
   it('should have set environment variables', function () {
-    expect(process.env.DM_LDAP_URI).to.exist;
+    expect(process.env.DM_TEST_LDAP_URI).to.exist;
     expect(process.env.DM_LDAP_DN).to.exist;
     expect(process.env.DM_LDAP_PWD).to.exist;
     expect(process.env.DM_LDAP_BASE).to.equal('dc=example,dc=com');

@@ -137,7 +137,7 @@ describe('audit-directory', () => {
         withEnv({ DM_LDAP_URL: 'ldap://host' }, () => parseOptions([]))
       ).to.throw(/--schema/);
       expect(() =>
-        withEnv({ DM_LDAP_URL: undefined, DM_LDAP_URI: undefined }, () =>
+        withEnv({ DM_LDAP_URL: undefined }, () =>
           parseOptions(['--schema', 'a.json'])
         )
       ).to.throw(/--url/);

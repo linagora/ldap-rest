@@ -46,6 +46,12 @@ export type ConfigEntry = [
 
 export class ConfigParser {
   private config: ConfigTemplate;
+  /** CLI arguments no entry declared, kept in `Config` by the parser */
+  private unknownArgs: string[] = [];
+
+  get unknownOptions(): string[] {
+    return [...this.unknownArgs];
+  }
 
   constructor(config: ConfigTemplate) {
     this.config = config;
@@ -150,10 +156,12 @@ export class ConfigParser {
     }
 
     // Store additional arguments
+    this.unknownArgs = [];
     cliArgs.forEach((v, k) => {
       if (result[k]) {
         throw new Error(`Error in command line: ${k} redefined`);
       }
+      this.unknownArgs.push(k);
       result[k.replace(/^-+/, '').replace(/-/g, '_')] = v;
     });
 
@@ -230,7 +238,7 @@ export class ConfigParser {
 
 // The separator depends on what the option holds and on where the value
 // comes from, see ArrayKind. Items are trimmed and empty ones dropped
-function splitValue(
+export function splitValue(
   value: string,
   kind: ArrayKind | undefined,
   form: 'singular' | 'plural'
@@ -252,7 +260,7 @@ function splitValue(
 }
 
 // An integer only: parseInt would read 1e3 as 1 and 80abc as 80
-function parseNumber(value: string): number {
+export function parseNumber(value: string): number {
   const trimmed = value.trim();
   return /^-?\d+$/.test(trimmed) ? Number(trimmed) : NaN;
 }

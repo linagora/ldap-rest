@@ -22,7 +22,8 @@ import bodyParser from 'body-parser';
 import type winston from 'winston';
 import type { Request, Response, NextFunction } from 'express';
 
-import { parseConfig } from '../lib/parseConfig';
+import { ConfigParser } from '../lib/parseConfig';
+import { unknownEnvironmentOptions, type OptionSet } from '../config/options';
 import { keepRawBody } from '../lib/rawBody';
 import configArgs, { type Config } from '../config/args';
 import type { Hooks } from '../hooks';
@@ -213,6 +214,8 @@ export class DM {
    * whose name is taken. A Map, so that `withConfig` views share it.
    */
   private readonly pluginLoads = new Map<string, Promise<boolean>>();
+  /** CLI arguments no declared option matched, reported after the logger exists */
+  private readonly unknownCliOptions: string[];
   /**
    * The request hooks of the authorization plugins, which `registerPlugin`
    * keeps ahead of every other plugin's. See {@link AUTHZ_FIRST_HOOKS}.
@@ -220,7 +223,9 @@ export class DM {
   private readonly authzHooks = new WeakSet<object>();
 
   constructor() {
-    this.config = parseConfig(configArgs);
+    const parser = new ConfigParser(configArgs);
+    this.config = parser.parse();
+    this.unknownCliOptions = parser.unknownOptions;
 
     this.app = express();
     // Nothing tells which framework answers, and no script or style is
@@ -354,6 +359,7 @@ export class DM {
             assertEnforceable(this);
             await this.learnAttributeTypes();
             this._composed = true;
+            this.reportUnknownOptions();
             this.afterLoad();
             resolve();
           })
@@ -424,6 +430,37 @@ export class DM {
       this,
       { config }
     );
+  }
+
+  /**
+   * Name the CLI arguments and `DM_*` variables nothing declares, among the
+   * plugins `--plugins` loaded and their `optionDefinitions`. A host that
+   * registers its own plugins after `ready` is not covered.
+   */
+  private reportUnknownOptions(): void {
+    const definitions = Object.values(this.loadedPlugins).map(
+      plugin =>
+        (plugin.constructor as typeof DmPlugin).optionDefinitions ??
+        ({} as OptionSet)
+    );
+    const declared = new Set(
+      definitions.flatMap(optionSet => Object.keys(optionSet))
+    );
+    const unknownCli = this.unknownCliOptions.filter(
+      name => !declared.has(name.replace(/^--?/, '').replace(/-/g, '_'))
+    );
+    const unknown = [
+      ...unknownCli.map(name => `option ${name}`),
+      ...unknownEnvironmentOptions(configArgs, process.env, definitions).map(
+        name => `environment variable ${name}`
+      ),
+    ];
+    if (unknown.length === 0) return;
+    const message =
+      `Unknown configuration: ${unknown.join(', ')} — no declared option ` +
+      'reads it';
+    if (this.config.strict_options) throw new Error(message);
+    this.logger.warn(message);
   }
 
   /**

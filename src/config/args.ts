@@ -9,6 +9,7 @@ import { dirname, join } from 'path';
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
 import { bclOptions } from '../plugins/bcl.options';
+import { rabbitmqOptions } from '../plugins/rabbitmq.options';
 import { metricsOptions } from '../plugins/metrics.options';
 import { storageOptions } from '../plugins/storage.options';
 import { staticOptions } from '../plugins/static.options';
@@ -89,6 +90,7 @@ export interface Config {
   log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
   shutdown_timeout?: number;
   debug: boolean;
+  strict_options?: boolean;
   logger: 'console' | 'file';
   log_file?: string;
   api_prefix: string;
@@ -544,6 +546,7 @@ const configArgs: ConfigTemplate = [
   ['--log-level', 'DM_LOG_LEVEL', 'notice'],
   ['--logger', 'DM_LOGGER', 'console'],
   ['--debug', 'DM_DEBUG', false, 'boolean'],
+  ['--strict-options', 'DM_STRICT_OPTIONS', false, 'boolean'],
   ['--log-file', 'DM_LOG_FILE', 'error.log'],
   ['--api-prefix', 'DM_API_PREFIX', '/api'],
   [
@@ -660,7 +663,7 @@ const configArgs: ConfigTemplate = [
   // twake/instances plugin
   ...toConfigEntries(twakeInstancesOptions),
 
-  ['--rabbitmq-url', 'DM_RABBITMQ_URL', ''],
+  ...toConfigEntries(rabbitmqOptions),
 
   // Applicative Accounts plugin
   ...toConfigEntries(appAccountsOptions),

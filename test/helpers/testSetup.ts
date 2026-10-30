@@ -39,7 +39,7 @@ export default async function mochaGlobalSetup() {
       process.env.DM_JAMES_WEBADMIN_TOKEN || 'test-token';
 
     console.log('✓ LDAP server ready');
-    console.log(`  URL: ${envVars.DM_LDAP_URI}`);
+    console.log(`  URL: ${envVars.DM_TEST_LDAP_URI}`);
     console.log(`  Base DN: ${envVars.DM_LDAP_BASE}`);
     console.log('');
   } catch (err) {

@@ -24,6 +24,7 @@ ENV NODE_ENV=production \
  DM_LOG_LEVEL="notice" \
  DM_LOGGER="console" \
  DM_DEBUG=false \
+ DM_STRICT_OPTIONS=false \
  DM_LOG_FILE="error.log" \
  DM_API_PREFIX="/api" \
  DM_MAIL_DOMAIN= \

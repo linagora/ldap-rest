@@ -6,6 +6,7 @@ import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 
+import noConfigCast from './eslint-rules/no-config-cast.mjs';
 import noRawRoute from './eslint-rules/no-raw-route.mjs';
 
 export default [
@@ -80,10 +81,13 @@ export default [
   {
     files: ['src/plugins/**/*.ts', 'src/abstract/**/*.ts'],
     plugins: {
-      local: { rules: { 'no-raw-route': noRawRoute } },
+      local: {
+        rules: { 'no-raw-route': noRawRoute, 'no-config-cast': noConfigCast },
+      },
     },
     rules: {
       'local/no-raw-route': 'error',
+      'local/no-config-cast': 'error',
     },
   },
 

@@ -58,8 +58,6 @@ function directoryEnvVars(config: {
     DM_APPLICATIVE_ACCOUNT_BASE: `ou=applicative,${config.baseDn}`,
     // Calendar resources branch, where the calendar tests create them
     DM_CALENDAR_RESOURCE_BASE: `ou=resources,${config.baseDn}`,
-    // Trash branch
-    DM_TRASH_BRANCH: `ou=trash,${config.baseDn}`,
   };
 }
 
@@ -578,7 +576,7 @@ export class LdapTestServer {
       // DM uses these env vars (with DM_ prefix)
       DM_LDAP_URL: `ldap://localhost:${this.port}`,
       // Legacy name
-      DM_LDAP_URI: `ldap://localhost:${this.port}`,
+      DM_TEST_LDAP_URI: `ldap://localhost:${this.port}`,
     };
   }
 }
