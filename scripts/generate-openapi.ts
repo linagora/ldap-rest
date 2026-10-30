@@ -179,7 +179,7 @@ export class OpenAPIGenerator {
   }
 
   private analyzeDirectory(dir: string): void {
-    const files = fs.readdirSync(dir);
+    const files = fs.readdirSync(dir).sort();
     for (const file of files) {
       const fullPath = path.join(dir, file);
       const stat = fs.statSync(fullPath);
@@ -1344,7 +1344,7 @@ export class OpenAPIGenerator {
    */
   public writeSpec(outputPath: string): void {
     const spec = this.generateSpec();
-    fs.writeFileSync(outputPath, JSON.stringify(spec, null, 2), 'utf-8');
+    fs.writeFileSync(outputPath, JSON.stringify(spec, null, 2) + '\n', 'utf-8');
     console.log(`✅ OpenAPI spec generated: ${outputPath}`);
     console.log(`   Found ${this.routes.size} plugins`);
     console.log(`   Generated ${Object.keys(spec.paths).length} paths`);

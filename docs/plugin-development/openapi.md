@@ -146,6 +146,11 @@ npm run generate:openapi   # writes openapi.json
 npm run build:pages        # rebuilds the static site under _site/
 ```
 
+`openapi.json` is committed: it is what the site publishes, so a change to a
+route or to a schema it declares must come with a regenerated document. CI
+runs `npm run check:openapi`, which builds the spec and fails when the file
+differs, naming the first line at fault.
+
 Open `_site/api/index.html` to preview the Redoc rendering. The published
 site at <https://linagora.github.io/ldap-rest/api/> is rebuilt automatically
 on every `v*` tag push.
