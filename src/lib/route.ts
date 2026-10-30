@@ -8,7 +8,13 @@
  */
 import type { Static, TSchema } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
-import type { Express, Request, RequestHandler, Response } from 'express';
+import type {
+  Express,
+  NextFunction,
+  Request,
+  RequestHandler,
+  Response,
+} from 'express';
 
 import { BadRequestError } from './errors';
 import { wantJson } from './expressFormatedResponses';
@@ -27,6 +33,8 @@ export interface RouteInput<
 > {
   req: Request;
   res: Response;
+  /** Express's own, for a handler that answers a failure itself */
+  next: NextFunction;
   params: Input<P>;
   query: Input<Q>;
   body: Input<B>;
@@ -55,6 +63,11 @@ export interface RouteDefinition<
   query?: Q;
   /** The parsed body */
   body?: B;
+  /**
+   * Whether a caller that does not accept JSON is refused before the handler
+   * (default). A route answering another media type sets it false.
+   */
+  json?: boolean;
   /** The answers, for the OpenAPI document */
   responses?: Partial<Record<number, TSchema | RouteResponse>>;
   summary?: string;
@@ -232,8 +245,8 @@ export const defineRoute = <
   app: Express,
   route: RouteDefinition<P, Q, B>
 ): void => {
-  const handler = asyncHandler(async (req, res) => {
-    if (!wantJson(req, res)) return;
+  const handler = asyncHandler(async (req, res, next) => {
+    if (route.json !== false && !wantJson(req, res)) return;
     const invalid: string[] = [];
     const params = route.params
       ? check('params', route.params, req.params, true, invalid)
@@ -250,6 +263,7 @@ export const defineRoute = <
     await route.handler({
       req,
       res,
+      next,
       params,
       query,
       body,
@@ -265,6 +279,7 @@ export const defineRoute = <
     query: route.query,
     body: route.body,
     responses: route.responses,
+    json: route.json,
     summary: route.summary,
     description: route.description,
     tags: route.tags,

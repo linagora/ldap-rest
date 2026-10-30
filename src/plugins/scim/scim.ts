@@ -9,9 +9,10 @@
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, RequestHandler } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type ldapActions from '../../lib/ldapActions';
 import type { DmRequest } from '../../lib/auth/base';
@@ -448,6 +449,12 @@ export function scimBodyParser(options: ScimOptions): RequestHandler {
   });
 }
 
+export const ScimIdParams = Type.Object({ id: Type.String({ minLength: 1 }) });
+
+export const ScimNameParams = Type.Object({
+  name: Type.String({ minLength: 1 }),
+});
+
 export default class Scim extends DmPlugin {
   static optionDefinitions = scimOptions;
 
@@ -619,6 +626,12 @@ export default class Scim extends DmPlugin {
     );
 
     /** Users */
+    const listUsers = scimAsyncHandler(async (req, res) => {
+      const q = this.parseListQuery(req);
+      assertProjection(q);
+      const list = await this.users.list(req as DmRequest, q);
+      this.scimJson(res, 200, projectList(list, q));
+    });
     /**
      * @openapi
      * summary: List users
@@ -702,15 +715,22 @@ export default class Scim extends DmPlugin {
      *           scimType: invalidFilter
      *           detail: 'Filter parse error: unexpected token near "eq"'
      */
-    app.get(
-      `${prefix}/Users`,
-      scimAsyncHandler(async (req, res) => {
-        const q = this.parseListQuery(req);
-        assertProjection(q);
-        const list = await this.users.list(req as DmRequest, q);
-        this.scimJson(res, 200, projectList(list, q));
-      })
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/Users`,
+      json: false,
+      handler: ({ req, res, next }) => {
+        listUsers(req, res, next);
+      },
+    });
+    const getUser = scimAsyncHandler(async (req, res) => {
+      const projection = this.parseProjection(req);
+      const user = await this.users.get(
+        req as DmRequest,
+        req.params.id as string
+      );
+      this.scimJson(res, 200, projectResource(user, projection));
+    });
     /**
      * @openapi
      * summary: Get user by ID
@@ -769,17 +789,23 @@ export default class Scim extends DmPlugin {
      *           status: '404'
      *           detail: Resource 2819c223-7f76-453a-919d-413861904646 not found.
      */
-    app.get(
-      `${prefix}/Users/:id`,
-      scimAsyncHandler(async (req, res) => {
-        const projection = this.parseProjection(req);
-        const user = await this.users.get(
-          req as DmRequest,
-          req.params.id as string
-        );
-        this.scimJson(res, 200, projectResource(user, projection));
-      })
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/Users/:id`,
+      json: false,
+      params: ScimIdParams,
+      handler: ({ req, res, next }) => {
+        getUser(req, res, next);
+      },
+    });
+    const createUser = scimAsyncHandler(async (req, res) => {
+      const body = this.readScimBody(req);
+      if (!body || typeof body !== 'object') {
+        return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
+      }
+      const user = await this.users.create(req as DmRequest, body as ScimUser);
+      this.scimResource(res, 201, user, 'Users', this.parseProjection(req));
+    });
     /**
      * @openapi
      * summary: Create user
@@ -847,20 +873,26 @@ export default class Scim extends DmPlugin {
      *           scimType: uniqueness
      *           detail: 'User bjensen already exists'
      */
-    app.post(
-      `${prefix}/Users`,
-      scimAsyncHandler(async (req, res) => {
-        const body = this.readScimBody(req);
-        if (!body || typeof body !== 'object') {
-          return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
-        }
-        const user = await this.users.create(
-          req as DmRequest,
-          body as ScimUser
-        );
-        this.scimResource(res, 201, user, 'Users', this.parseProjection(req));
-      })
-    );
+    defineRoute(app, {
+      method: 'post',
+      path: `${prefix}/Users`,
+      json: false,
+      handler: ({ req, res, next }) => {
+        createUser(req, res, next);
+      },
+    });
+    const replaceUser = scimAsyncHandler(async (req, res) => {
+      const body = this.readScimBody(req);
+      if (!body || typeof body !== 'object') {
+        return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
+      }
+      const user = await this.users.replace(
+        req as DmRequest,
+        req.params.id as string,
+        body as ScimUser
+      );
+      this.scimResource(res, 200, user, 'Users', this.parseProjection(req));
+    });
     /**
      * @openapi
      * summary: Replace user
@@ -913,21 +945,27 @@ export default class Scim extends DmPlugin {
      *           status: '404'
      *           detail: Resource 2819c223-7f76-453a-919d-413861904646 not found.
      */
-    app.put(
-      `${prefix}/Users/:id`,
-      scimAsyncHandler(async (req, res) => {
-        const body = this.readScimBody(req);
-        if (!body || typeof body !== 'object') {
-          return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
-        }
-        const user = await this.users.replace(
-          req as DmRequest,
-          req.params.id as string,
-          body as ScimUser
-        );
-        this.scimResource(res, 200, user, 'Users', this.parseProjection(req));
-      })
-    );
+    defineRoute(app, {
+      method: 'put',
+      path: `${prefix}/Users/:id`,
+      json: false,
+      params: ScimIdParams,
+      handler: ({ req, res, next }) => {
+        replaceUser(req, res, next);
+      },
+    });
+    const patchUser = scimAsyncHandler(async (req, res) => {
+      const body = this.readScimBody(req);
+      if (!body || typeof body !== 'object') {
+        return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
+      }
+      const user = await this.users.patch(
+        req as DmRequest,
+        req.params.id as string,
+        body as PatchRequest
+      );
+      this.scimResource(res, 200, user, 'Users', this.parseProjection(req));
+    });
     /**
      * @openapi
      * summary: Patch user
@@ -972,21 +1010,19 @@ export default class Scim extends DmPlugin {
      *       application/scim+json:
      *         schema: { $ref: '#/components/schemas/ScimError' }
      */
-    app.patch(
-      `${prefix}/Users/:id`,
-      scimAsyncHandler(async (req, res) => {
-        const body = this.readScimBody(req);
-        if (!body || typeof body !== 'object') {
-          return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
-        }
-        const user = await this.users.patch(
-          req as DmRequest,
-          req.params.id as string,
-          body as PatchRequest
-        );
-        this.scimResource(res, 200, user, 'Users', this.parseProjection(req));
-      })
-    );
+    defineRoute(app, {
+      method: 'patch',
+      path: `${prefix}/Users/:id`,
+      json: false,
+      params: ScimIdParams,
+      handler: ({ req, res, next }) => {
+        patchUser(req, res, next);
+      },
+    });
+    const deleteUser = scimAsyncHandler(async (req, res) => {
+      await this.users.delete(req as DmRequest, req.params.id as string);
+      res.status(204).end();
+    });
     /**
      * @openapi
      * summary: Delete user
@@ -1006,15 +1042,23 @@ export default class Scim extends DmPlugin {
      *           status: '404'
      *           detail: Resource 2819c223-7f76-453a-919d-413861904646 not found.
      */
-    app.delete(
-      `${prefix}/Users/:id`,
-      scimAsyncHandler(async (req, res) => {
-        await this.users.delete(req as DmRequest, req.params.id as string);
-        res.status(204).end();
-      })
-    );
+    defineRoute(app, {
+      method: 'delete',
+      path: `${prefix}/Users/:id`,
+      json: false,
+      params: ScimIdParams,
+      handler: ({ req, res, next }) => {
+        deleteUser(req, res, next);
+      },
+    });
 
     /** Groups */
+    const listGroups = scimAsyncHandler(async (req, res) => {
+      const q = this.parseListQuery(req);
+      assertProjection(q);
+      const list = await this.groups.list(req as DmRequest, q);
+      this.scimJson(res, 200, projectList(list, q));
+    });
     /**
      * @openapi
      * summary: List groups
@@ -1083,15 +1127,22 @@ export default class Scim extends DmPlugin {
      *       application/scim+json:
      *         schema: { $ref: '#/components/schemas/ScimError' }
      */
-    app.get(
-      `${prefix}/Groups`,
-      scimAsyncHandler(async (req, res) => {
-        const q = this.parseListQuery(req);
-        assertProjection(q);
-        const list = await this.groups.list(req as DmRequest, q);
-        this.scimJson(res, 200, projectList(list, q));
-      })
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/Groups`,
+      json: false,
+      handler: ({ req, res, next }) => {
+        listGroups(req, res, next);
+      },
+    });
+    const getGroup = scimAsyncHandler(async (req, res) => {
+      const projection = this.parseProjection(req);
+      const group = await this.groups.get(
+        req as DmRequest,
+        req.params.id as string
+      );
+      this.scimJson(res, 200, projectResource(group, projection));
+    });
     /**
      * @openapi
      * summary: Get group by ID
@@ -1140,17 +1191,26 @@ export default class Scim extends DmPlugin {
      *           status: '404'
      *           detail: Resource e9e30dba-f08f-4109-8486-d5c6a331660a not found.
      */
-    app.get(
-      `${prefix}/Groups/:id`,
-      scimAsyncHandler(async (req, res) => {
-        const projection = this.parseProjection(req);
-        const group = await this.groups.get(
-          req as DmRequest,
-          req.params.id as string
-        );
-        this.scimJson(res, 200, projectResource(group, projection));
-      })
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/Groups/:id`,
+      json: false,
+      params: ScimIdParams,
+      handler: ({ req, res, next }) => {
+        getGroup(req, res, next);
+      },
+    });
+    const createGroup = scimAsyncHandler(async (req, res) => {
+      const body = this.readScimBody(req);
+      if (!body || typeof body !== 'object') {
+        return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
+      }
+      const group = await this.groups.create(
+        req as DmRequest,
+        body as ScimGroup
+      );
+      this.scimResource(res, 201, group, 'Groups', this.parseProjection(req));
+    });
     /**
      * @openapi
      * summary: Create group
@@ -1208,20 +1268,26 @@ export default class Scim extends DmPlugin {
      *           scimType: uniqueness
      *           detail: 'Group Tour Guides already exists'
      */
-    app.post(
-      `${prefix}/Groups`,
-      scimAsyncHandler(async (req, res) => {
-        const body = this.readScimBody(req);
-        if (!body || typeof body !== 'object') {
-          return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
-        }
-        const group = await this.groups.create(
-          req as DmRequest,
-          body as ScimGroup
-        );
-        this.scimResource(res, 201, group, 'Groups', this.parseProjection(req));
-      })
-    );
+    defineRoute(app, {
+      method: 'post',
+      path: `${prefix}/Groups`,
+      json: false,
+      handler: ({ req, res, next }) => {
+        createGroup(req, res, next);
+      },
+    });
+    const replaceGroup = scimAsyncHandler(async (req, res) => {
+      const body = this.readScimBody(req);
+      if (!body || typeof body !== 'object') {
+        return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
+      }
+      const group = await this.groups.replace(
+        req as DmRequest,
+        req.params.id as string,
+        body as ScimGroup
+      );
+      this.scimResource(res, 200, group, 'Groups', this.parseProjection(req));
+    });
     /**
      * @openapi
      * summary: Replace group
@@ -1266,21 +1332,27 @@ export default class Scim extends DmPlugin {
      *       application/scim+json:
      *         schema: { $ref: '#/components/schemas/ScimError' }
      */
-    app.put(
-      `${prefix}/Groups/:id`,
-      scimAsyncHandler(async (req, res) => {
-        const body = this.readScimBody(req);
-        if (!body || typeof body !== 'object') {
-          return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
-        }
-        const group = await this.groups.replace(
-          req as DmRequest,
-          req.params.id as string,
-          body as ScimGroup
-        );
-        this.scimResource(res, 200, group, 'Groups', this.parseProjection(req));
-      })
-    );
+    defineRoute(app, {
+      method: 'put',
+      path: `${prefix}/Groups/:id`,
+      json: false,
+      params: ScimIdParams,
+      handler: ({ req, res, next }) => {
+        replaceGroup(req, res, next);
+      },
+    });
+    const patchGroup = scimAsyncHandler(async (req, res) => {
+      const body = this.readScimBody(req);
+      if (!body || typeof body !== 'object') {
+        return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
+      }
+      const group = await this.groups.patch(
+        req as DmRequest,
+        req.params.id as string,
+        body as PatchRequest
+      );
+      this.scimResource(res, 200, group, 'Groups', this.parseProjection(req));
+    });
     /**
      * @openapi
      * summary: Patch group
@@ -1327,21 +1399,19 @@ export default class Scim extends DmPlugin {
      *       application/scim+json:
      *         schema: { $ref: '#/components/schemas/ScimError' }
      */
-    app.patch(
-      `${prefix}/Groups/:id`,
-      scimAsyncHandler(async (req, res) => {
-        const body = this.readScimBody(req);
-        if (!body || typeof body !== 'object') {
-          return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
-        }
-        const group = await this.groups.patch(
-          req as DmRequest,
-          req.params.id as string,
-          body as PatchRequest
-        );
-        this.scimResource(res, 200, group, 'Groups', this.parseProjection(req));
-      })
-    );
+    defineRoute(app, {
+      method: 'patch',
+      path: `${prefix}/Groups/:id`,
+      json: false,
+      params: ScimIdParams,
+      handler: ({ req, res, next }) => {
+        patchGroup(req, res, next);
+      },
+    });
+    const deleteGroup = scimAsyncHandler(async (req, res) => {
+      await this.groups.delete(req as DmRequest, req.params.id as string);
+      res.status(204).end();
+    });
     /**
      * @openapi
      * summary: Delete group
@@ -1361,15 +1431,49 @@ export default class Scim extends DmPlugin {
      *           status: '404'
      *           detail: Resource e9e30dba-f08f-4109-8486-d5c6a331660a not found.
      */
-    app.delete(
-      `${prefix}/Groups/:id`,
-      scimAsyncHandler(async (req, res) => {
-        await this.groups.delete(req as DmRequest, req.params.id as string);
-        res.status(204).end();
-      })
-    );
+    defineRoute(app, {
+      method: 'delete',
+      path: `${prefix}/Groups/:id`,
+      json: false,
+      params: ScimIdParams,
+      handler: ({ req, res, next }) => {
+        deleteGroup(req, res, next);
+      },
+    });
 
     /** Bulk */
+    const bulk = scimAsyncHandler(async (req, res) => {
+      const body = this.readScimBody(req);
+      if (!body || typeof body !== 'object') {
+        return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
+      }
+      const maxPayload = this.settings.scim_bulk_max_payload_size;
+      let size: number;
+      try {
+        size = JSON.stringify(body).length;
+      } catch {
+        // Deeper than the serializer's stack: no resource is
+        return writeScimError(
+          res,
+          400,
+          'Body nested too deeply',
+          'invalidValue'
+        );
+      }
+      if (size > maxPayload) {
+        return writeScimError(
+          res,
+          413,
+          `Bulk payload too large: ${size} > ${maxPayload}`,
+          'invalidValue'
+        );
+      }
+      const response = await this.bulk.execute(
+        req as DmRequest,
+        body as BulkRequest
+      );
+      this.scimJson(res, 200, response);
+    });
     /**
      * @openapi
      * summary: Execute bulk operations
@@ -1437,43 +1541,23 @@ export default class Scim extends DmPlugin {
      *           scimType: invalidValue
      *           detail: 'Bulk payload too large: 2097152 > 1048576'
      */
-    app.post(
-      `${prefix}/Bulk`,
-      scimAsyncHandler(async (req, res) => {
-        const body = this.readScimBody(req);
-        if (!body || typeof body !== 'object') {
-          return writeScimError(res, 400, 'Missing body', 'invalidSyntax');
-        }
-        const maxPayload = this.settings.scim_bulk_max_payload_size;
-        let size: number;
-        try {
-          size = JSON.stringify(body).length;
-        } catch {
-          // Deeper than the serializer's stack: no resource is
-          return writeScimError(
-            res,
-            400,
-            'Body nested too deeply',
-            'invalidValue'
-          );
-        }
-        if (size > maxPayload) {
-          return writeScimError(
-            res,
-            413,
-            `Bulk payload too large: ${size} > ${maxPayload}`,
-            'invalidValue'
-          );
-        }
-        const response = await this.bulk.execute(
-          req as DmRequest,
-          body as BulkRequest
-        );
-        this.scimJson(res, 200, response);
-      })
-    );
+    defineRoute(app, {
+      method: 'post',
+      path: `${prefix}/Bulk`,
+      json: false,
+      handler: ({ req, res, next }) => {
+        bulk(req, res, next);
+      },
+    });
 
     /** Discovery */
+    const serviceProviderConfig = scimAsyncHandler((req, res) => {
+      this.scimJson(
+        res,
+        200,
+        this.discovery.serviceProviderConfig(req as DmRequest)
+      );
+    });
     /**
      * @openapi
      * summary: Get service provider configuration
@@ -1507,16 +1591,24 @@ export default class Scim extends DmPlugin {
      *             resourceType: ServiceProviderConfig
      *             location: 'https://example.com/scim/v2/ServiceProviderConfig'
      */
-    app.get(
-      `${prefix}/ServiceProviderConfig`,
-      scimAsyncHandler((req, res) => {
-        this.scimJson(
-          res,
-          200,
-          this.discovery.serviceProviderConfig(req as DmRequest)
-        );
-      })
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/ServiceProviderConfig`,
+      json: false,
+      handler: ({ req, res, next }) => {
+        serviceProviderConfig(req, res, next);
+      },
+    });
+    const resourceTypes = scimAsyncHandler((req, res) => {
+      const types = this.discovery.resourceTypes(req as DmRequest);
+      this.scimJson(res, 200, {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+        totalResults: types.length,
+        Resources: types,
+        startIndex: 1,
+        itemsPerPage: types.length,
+      });
+    });
     /**
      * @openapi
      * summary: List resource types
@@ -1555,19 +1647,22 @@ export default class Scim extends DmPlugin {
      *                 resourceType: ResourceType
      *                 location: 'https://example.com/scim/v2/ResourceTypes/Group'
      */
-    app.get(
-      `${prefix}/ResourceTypes`,
-      scimAsyncHandler((req, res) => {
-        const types = this.discovery.resourceTypes(req as DmRequest);
-        this.scimJson(res, 200, {
-          schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
-          totalResults: types.length,
-          Resources: types,
-          startIndex: 1,
-          itemsPerPage: types.length,
-        });
-      })
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/ResourceTypes`,
+      json: false,
+      handler: ({ req, res, next }) => {
+        resourceTypes(req, res, next);
+      },
+    });
+    const resourceType = scimAsyncHandler((req, res) => {
+      const rt = this.discovery.resourceType(
+        req.params.name as string,
+        req as DmRequest
+      );
+      if (!rt) return writeScimError(res, 404, 'ResourceType not found');
+      this.scimJson(res, 200, rt);
+    });
     /**
      * @openapi
      * summary: Get resource type by name
@@ -1600,17 +1695,25 @@ export default class Scim extends DmPlugin {
      *           status: '404'
      *           detail: ResourceType not found
      */
-    app.get(
-      `${prefix}/ResourceTypes/:name`,
-      scimAsyncHandler((req, res) => {
-        const rt = this.discovery.resourceType(
-          req.params.name as string,
-          req as DmRequest
-        );
-        if (!rt) return writeScimError(res, 404, 'ResourceType not found');
-        this.scimJson(res, 200, rt);
-      })
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/ResourceTypes/:name`,
+      json: false,
+      params: ScimNameParams,
+      handler: ({ req, res, next }) => {
+        resourceType(req, res, next);
+      },
+    });
+    const schemas = scimAsyncHandler((req, res) => {
+      const schemas = this.discovery.schemas(req as DmRequest);
+      this.scimJson(res, 200, {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+        totalResults: schemas.length,
+        Resources: schemas,
+        startIndex: 1,
+        itemsPerPage: schemas.length,
+      });
+    });
     /**
      * @openapi
      * summary: List schemas
@@ -1648,19 +1751,22 @@ export default class Scim extends DmPlugin {
      *                 resourceType: Schema
      *                 location: 'https://example.com/scim/v2/Schemas/urn:ietf:params:scim:schemas:core:2.0:Group'
      */
-    app.get(
-      `${prefix}/Schemas`,
-      scimAsyncHandler((req, res) => {
-        const schemas = this.discovery.schemas(req as DmRequest);
-        this.scimJson(res, 200, {
-          schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
-          totalResults: schemas.length,
-          Resources: schemas,
-          startIndex: 1,
-          itemsPerPage: schemas.length,
-        });
-      })
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/Schemas`,
+      json: false,
+      handler: ({ req, res, next }) => {
+        schemas(req, res, next);
+      },
+    });
+    const schema = scimAsyncHandler((req, res) => {
+      const s = this.discovery.schema(
+        req.params.id as string,
+        req as DmRequest
+      );
+      if (!s) return writeScimError(res, 404, 'Schema not found');
+      this.scimJson(res, 200, s);
+    });
     /**
      * @openapi
      * summary: Get schema by ID
@@ -1703,17 +1809,15 @@ export default class Scim extends DmPlugin {
      *           status: '404'
      *           detail: Schema not found
      */
-    app.get(
-      `${prefix}/Schemas/:id`,
-      scimAsyncHandler((req, res) => {
-        const s = this.discovery.schema(
-          req.params.id as string,
-          req as DmRequest
-        );
-        if (!s) return writeScimError(res, 404, 'Schema not found');
-        this.scimJson(res, 200, s);
-      })
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/Schemas/:id`,
+      json: false,
+      params: ScimIdParams,
+      handler: ({ req, res, next }) => {
+        schema(req, res, next);
+      },
+    });
   }
 
   private parseListQuery(req: Request): {

@@ -3293,11 +3293,6 @@
           "200": {
             "description": "User list.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimListResponse"
@@ -3388,14 +3383,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
+            "description": "Successful response"
           },
           "201": {
             "description": "User created.",
@@ -3481,11 +3469,6 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            },
             "application/scim+json": {
               "schema": {
                 "$ref": "#/components/schemas/ScimUser"
@@ -3534,6 +3517,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -3561,11 +3545,6 @@
           "200": {
             "description": "User resource.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimUser"
@@ -3652,6 +3631,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -3661,11 +3641,6 @@
           "200": {
             "description": "User replaced.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimUser"
@@ -3722,11 +3697,6 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            },
             "application/scim+json": {
               "schema": {
                 "$ref": "#/components/schemas/ScimUser"
@@ -3773,6 +3743,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -3782,11 +3753,6 @@
           "200": {
             "description": "User patched.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimUser"
@@ -3835,11 +3801,6 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            },
             "application/scim+json": {
               "schema": {
                 "$ref": "#/components/schemas/ScimPatchOp"
@@ -3883,6 +3844,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -3890,14 +3852,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
+            "description": "Successful response"
           },
           "204": {
             "description": "User deleted."
@@ -4017,11 +3972,6 @@
           "200": {
             "description": "Group list.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimListResponse"
@@ -4100,14 +4050,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
+            "description": "Successful response"
           },
           "201": {
             "description": "Group created.",
@@ -4189,11 +4132,6 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            },
             "application/scim+json": {
               "schema": {
                 "$ref": "#/components/schemas/ScimGroup"
@@ -4234,6 +4172,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -4261,11 +4200,6 @@
           "200": {
             "description": "Group resource.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimGroup"
@@ -4345,6 +4279,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -4354,11 +4289,6 @@
           "200": {
             "description": "Group replaced.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimGroup"
@@ -4412,11 +4342,6 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            },
             "application/scim+json": {
               "schema": {
                 "$ref": "#/components/schemas/ScimGroup"
@@ -4460,6 +4385,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -4469,11 +4395,6 @@
           "200": {
             "description": "Group patched.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimGroup"
@@ -4527,11 +4448,6 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            },
             "application/scim+json": {
               "schema": {
                 "$ref": "#/components/schemas/ScimPatchOp"
@@ -4579,6 +4495,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -4586,14 +4503,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
+            "description": "Successful response"
           },
           "204": {
             "description": "Group deleted."
@@ -4649,11 +4559,6 @@
           "200": {
             "description": "Bulk operations completed (may include per-operation errors).",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimBulkResponse"
@@ -4722,11 +4627,6 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            },
             "application/scim+json": {
               "schema": {
                 "$ref": "#/components/schemas/ScimBulkRequest"
@@ -4782,11 +4682,6 @@
           "200": {
             "description": "Service provider configuration.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "example": {
                   "schemas": [
@@ -4866,11 +4761,6 @@
           "200": {
             "description": "Resource types list.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimListResponse"
@@ -4953,6 +4843,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "name parameter"
@@ -4962,11 +4853,6 @@
           "200": {
             "description": "Resource type definition.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimResourceType"
@@ -5039,11 +4925,6 @@
           "200": {
             "description": "Schema list.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimListResponse"
@@ -5124,6 +5005,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -5133,11 +5015,6 @@
           "200": {
             "description": "Schema definition.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/scim+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScimSchema"

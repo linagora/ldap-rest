@@ -115,7 +115,8 @@ failing path:
 ```
 
 A caller whose `Accept` excludes JSON is answered `400 Bad request` before
-the handler runs.
+the handler runs. A route serving another media type sets `json: false` and
+answers it itself; SCIM does, for `application/scim+json`.
 
 `Type.Object` accepts unknown keys unless the schema says
 `{ additionalProperties: false }`. A route migrated from hand-written checks
