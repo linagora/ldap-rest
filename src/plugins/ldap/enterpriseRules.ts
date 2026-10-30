@@ -357,11 +357,7 @@ export function parseDirectoryDate(raw: AttributeValue): Date | null {
   // 60) then carries over to the next day instead of failing the check.
   const date = new Date(0);
   date.setUTCFullYear(year, month - 1, day);
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  )
+  if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day)
     return null;
   date.setUTCHours(hour, minute, second);
   let time = date.getTime();
@@ -375,16 +371,7 @@ export function parseDirectoryDate(raw: AttributeValue): Date | null {
     const digits = zone.slice(1).replace(':', '');
     const offsetHours = Number(digits.slice(0, 2));
     const offsetMinutes = digits.length > 2 ? Number(digits.slice(2, 4)) : 0;
-    // RFC 4517 spells the difference of UTC as a time-hour, 00 to 23, with
-    // optional minutes. No zone lies that far: 1 to 12 hours, or 1300, the
-    // offset of UTC+13:00 still in use, is what a value may say.
-    if (
-      offsetHours < 1 ||
-      offsetMinutes > 59 ||
-      (offsetHours > 12 &&
-        !(offsetHours === 13 && offsetMinutes === 0 && digits.length === 4))
-    )
-      return null;
+    if (offsetHours > 23 || offsetMinutes > 59) return null;
     const sign = zone[0] === '-' ? -1 : 1;
     time -= sign * (offsetHours * 60 + offsetMinutes) * 60000;
   }

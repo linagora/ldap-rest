@@ -142,29 +142,30 @@ describe('Enterprise rules', () => {
     });
 
     it('should accept the offsets RFC 4517 allows', () => {
-      expect(parseDirectoryDate('20240930000000-1300')?.toISOString()).to.equal(
-        '2024-09-30T13:00:00.000Z'
+      // UTC as tools spell it: `strftime('%z')`, Java's `Z`, ISO 8601
+      for (const zone of ['+0000', '-0000', '+00', '+00:00']) {
+        expect(
+          parseDirectoryDate(`20240930000000${zone}`)?.toISOString(),
+          zone
+        ).to.equal('2024-09-30T00:00:00.000Z');
+      }
+      // Zones in use today: the Line Islands all year, the Chatham Islands in
+      // summer and in winter
+      expect(
+        parseDirectoryDate('20240930000000+14:00')?.toISOString()
+      ).to.equal('2024-09-29T10:00:00.000Z');
+      expect(parseDirectoryDate('20240930000000+1345')?.toISOString()).to.equal(
+        '2024-09-29T10:15:00.000Z'
       );
-      expect(parseDirectoryDate('20240930000000-1230')?.toISOString()).to.equal(
-        '2024-09-30T12:30:00.000Z'
+      expect(parseDirectoryDate('20240930000000+1245')?.toISOString()).to.equal(
+        '2024-09-29T11:15:00.000Z'
       );
       expect(parseDirectoryDate('20240930000000+12')?.toISOString()).to.equal(
         '2024-09-29T12:00:00.000Z'
       );
-    });
-
-    it('should refuse an offset no zone lies at', () => {
-      for (const zone of [
-        '+00',
-        '-00',
-        '+1330',
-        '+1260',
-        '+13',
-        '-13',
-        '+23',
-        '+25',
-      ])
-        expect(parseDirectoryDate(`20240930000000${zone}`), zone).to.be.null;
+      expect(parseDirectoryDate('20240930000000-1300')?.toISOString()).to.equal(
+        '2024-09-30T13:00:00.000Z'
+      );
     });
   });
 

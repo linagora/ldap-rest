@@ -18,9 +18,7 @@
 - A date checked as not already past, such as `twakeDeletionDate`, is read
   as written: a year below 100 is no longer taken for a year of the 1900s,
   and a leap second (`20991231235960Z`) no longer makes the date 400 as
-  invalid. The zone a value may carry is narrowed to the ones in use, `Z`, 1
-  to 12 hours from UTC, or `±1300`: `±00`, `±13` written in two digits, and
-  anything past `±1300` are now answered 400
+  invalid
   ([details](docs/usage/plugins/ldap/enterprise-rules.md#scheduled-removal)).
 
 ### Security

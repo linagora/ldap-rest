@@ -150,9 +150,8 @@ allowed.
 The date is an LDAP generalized time, read as written: the year keeps its
 four digits (`0029123123` is a date of year 29, not 1929), and a leap second
 (`20991231235960Z`) is the instant that follows the day. The zone is `Z` or a
-difference of 1 to 12 hours from UTC (`+02`, `-0530`), or `+1300`/`-1300` for
-UTC±13:00. Any other value, such as `+25`, `+1260`, `+13` or `±00`, is
-answered 400 as invalid.
+difference of hours and minutes from UTC (`+00`, `+02`, `-0530`, `+14:00`); a
+value past 23 hours or 59 minutes is answered 400 as invalid.
 
 ### Deletion and references
 
