@@ -12,9 +12,10 @@
  * by asking the authorization plugin in force, whichever one that is.
  * @group Plugins
  */
+import { Type } from '@sinclair/typebox';
 import type { Express, Response } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import { identityFor, type DmRequest } from '../../lib/auth/base';
 import {
   authzFor,
@@ -24,7 +25,6 @@ import {
 } from '../../lib/authz/composition';
 import type { BranchPermissions } from '../../config/args';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
-import { asyncHandler } from '../../lib/utils';
 import { UnauthorizedError } from '../../lib/errors';
 import { roleAttribute, type Schema } from '../../config/schema';
 
@@ -59,6 +59,34 @@ interface EntityInfo {
    */
   linkable: boolean;
 }
+
+export const ScopeResponse = Type.Object({
+  user: Type.Union([Type.String(), Type.Null()]),
+  unrestricted: Type.Boolean(),
+  described: Type.Boolean(),
+  source: Type.Union([Type.String(), Type.Null()]),
+  sources: Type.Array(Type.String()),
+  branches: Type.Array(
+    Type.Object({
+      dn: Type.String(),
+      read: Type.Optional(Type.Boolean()),
+      write: Type.Optional(Type.Boolean()),
+      delete: Type.Optional(Type.Boolean()),
+      name: Type.Optional(Type.String()),
+      path: Type.Optional(Type.String()),
+    })
+  ),
+  transit: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  linksAnyDomain: Type.Boolean(),
+  passwordPolicies: Type.Optional(Type.Boolean()),
+  entities: Type.Array(
+    Type.Object({
+      name: Type.String(),
+      base: Type.String(),
+      create: Type.Boolean(),
+    })
+  ),
+});
 
 export default class AuthzScope extends DmPlugin {
   name = 'authzScope';
@@ -147,12 +175,12 @@ export default class AuthzScope extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.get(
-      `${this.config.api_prefix}/v1/authz/scope`,
-      asyncHandler(async (req: DmRequest, res: Response) =>
-        this.scope(req, res)
-      )
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/v1/authz/scope`,
+      responses: { 200: ScopeResponse },
+      handler: async ({ req, res }) => this.scope(req as DmRequest, res),
+    });
   }
 
   /**

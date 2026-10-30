@@ -12,10 +12,11 @@
  *
  * See `docs/usage/plugins/integrations/tombstone.md`.
  */
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import {
@@ -23,11 +24,10 @@ import {
   ConflictError,
   NotFoundError,
 } from '../../lib/errors';
-import { jsonBody } from '../../lib/expressFormatedResponses';
 import { changeContext } from '../../lib/changeContext';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import { asyncHandler, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+import { escapeLdapFilter, isDnInBranch } from '../../lib/utils';
 
 import {
   first,
@@ -40,6 +40,15 @@ import {
 } from './lifecycleAttributes';
 
 const REASON = /^[A-Za-z0-9_.-]{1,64}$/;
+
+export const EraseTombstoneBody = Type.Object({
+  dn: Type.String(),
+  force: Type.Optional(Type.Boolean()),
+});
+
+export const EraseTombstoneResponse = Type.Object({
+  success: Type.Boolean(),
+});
 
 export default class TwakeTombstone extends DmPlugin {
   name = 'twakeTombstone';
@@ -170,19 +179,16 @@ export default class TwakeTombstone extends DmPlugin {
      *   '409':
      *     description: The deletion is too recent and `force` is not set.
      */
-    app.post(
-      `${this.config.api_prefix}/v1/twake/tombstones/erase`,
-      asyncHandler(async (req: Request, res: Response) => {
-        const body = jsonBody(req, res, 'dn') as
-          | { dn: unknown; force?: unknown }
-          | false;
-        if (!body) return;
-        if (typeof body.dn !== 'string')
-          throw new BadRequestError('Field dn must be a string');
+    defineRoute(app, {
+      method: 'post',
+      path: `${this.config.api_prefix}/v1/twake/tombstones/erase`,
+      body: EraseTombstoneBody,
+      responses: { 200: EraseTombstoneResponse },
+      handler: async ({ req, res, body }) => {
         await this.erase(body.dn, { force: body.force === true, req });
         res.json({ success: true });
-      })
-    );
+      },
+    });
   }
 
   /**

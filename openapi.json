@@ -84,16 +84,6 @@
         "tags": [
           "Authorization (Dynamic)"
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        },
         "security": [
           {
             "BearerAuth": []
@@ -111,7 +101,118 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "user",
+                    "unrestricted",
+                    "described",
+                    "source",
+                    "sources",
+                    "branches",
+                    "linksAnyDomain",
+                    "entities"
+                  ],
+                  "properties": {
+                    "user": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "unrestricted": {
+                      "type": "boolean"
+                    },
+                    "described": {
+                      "type": "boolean"
+                    },
+                    "source": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "branches": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "dn"
+                        ],
+                        "properties": {
+                          "dn": {
+                            "type": "string"
+                          },
+                          "read": {
+                            "type": "boolean"
+                          },
+                          "write": {
+                            "type": "boolean"
+                          },
+                          "delete": {
+                            "type": "boolean"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "transit": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "linksAnyDomain": {
+                      "type": "boolean"
+                    },
+                    "passwordPolicies": {
+                      "type": "boolean"
+                    },
+                    "entities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "base",
+                          "create"
+                        ],
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "base": {
+                            "type": "string"
+                          },
+                          "create": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
                 },
                 "example": {
                   "user": "uid=alice,ou=users,dc=example,dc=com",
@@ -178,7 +279,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/Config"
                 },
                 "example": {
@@ -5474,7 +5574,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "state"
+                  ],
+                  "properties": {
+                    "state": {
+                      "anyOf": [
+                        {
+                          "const": "ready",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pending",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
                 },
                 "example": {
                   "state": "ready"
@@ -5504,7 +5621,6 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "description": "The account, by DN or by mail.",
                 "properties": {
                   "dn": {
                     "type": "string"
@@ -5512,7 +5628,8 @@
                   "mail": {
                     "type": "string"
                   }
-                }
+                },
+                "description": "The account, by DN or by mail."
               }
             }
           }
@@ -5529,6 +5646,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "user parameter"
@@ -5540,7 +5658,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/JamesQuotaUsage"
                 },
                 "example": {
@@ -5624,6 +5741,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "user parameter"
@@ -5635,7 +5753,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/MailMigrationStatus"
                 },
                 "example": {
@@ -5696,7 +5813,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true

@@ -9,10 +9,11 @@
  *
  * See `docs/usage/plugins/integrations/mail-migration.md`.
  */
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
 import TwakePlugin from '../../abstract/twakePlugin';
-import { type Role, asyncHandler } from '../../abstract/plugin';
+import { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import type { HealthStatus } from '../../lib/health';
@@ -38,6 +39,10 @@ const HEAD_TIMEOUT_MS = 10_000;
  *           type: boolean
  *           description: Whether the proxy routes the user to the new backend
  */
+export const MailMigrationParams = Type.Object({
+  user: Type.String({ minLength: 1 }),
+});
+
 export default class MigrationProxy extends TwakePlugin {
   name = 'migrationProxy';
   roles: Role[] = ['consistency', 'api'] as const;
@@ -116,12 +121,12 @@ export default class MigrationProxy extends TwakePlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.get(
-      `${apiPrefix}/v1/users/:user/mail-migration`,
-      asyncHandler((req: Request, res: Response) =>
-        this.getMigrationStatus(req, res)
-      )
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${apiPrefix}/v1/users/:user/mail-migration`,
+      params: MailMigrationParams,
+      handler: async ({ req, res }) => this.getMigrationStatus(req, res),
+    });
   }
 
   hooks: Hooks = {
