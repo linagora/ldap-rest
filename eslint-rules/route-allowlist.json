@@ -1,8 +1,5 @@
 [
   "src/abstract/ldapFlat.ts",
-  "src/plugins/auth/authzDynamic.ts",
-  "src/plugins/auth/authzScope.ts",
-  "src/plugins/configApi.ts",
   "src/plugins/ldap/accountLifecycle.ts",
   "src/plugins/ldap/bulkImport.ts",
   "src/plugins/ldap/groups.ts",
@@ -13,9 +10,5 @@
   "src/plugins/static.ts",
   "src/plugins/twake/appAccountsApi.ts",
   "src/plugins/twake/groups.ts",
-  "src/plugins/twake/instances.ts",
-  "src/plugins/twake/james.ts",
-  "src/plugins/twake/migrationProxy.ts",
-  "src/plugins/twake/spaces.ts",
-  "src/plugins/twake/tombstone.ts"
+  "src/plugins/twake/spaces.ts"
 ]

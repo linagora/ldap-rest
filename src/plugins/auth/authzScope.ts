@@ -14,7 +14,7 @@
  */
 import type { Express, Response } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import { identityFor, type DmRequest } from '../../lib/auth/base';
 import {
   authzFor,
@@ -24,7 +24,6 @@ import {
 } from '../../lib/authz/composition';
 import type { BranchPermissions } from '../../config/args';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
-import { asyncHandler } from '../../lib/utils';
 import { UnauthorizedError } from '../../lib/errors';
 import { roleAttribute, type Schema } from '../../config/schema';
 
@@ -147,12 +146,11 @@ export default class AuthzScope extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.get(
-      `${this.config.api_prefix}/v1/authz/scope`,
-      asyncHandler(async (req: DmRequest, res: Response) =>
-        this.scope(req, res)
-      )
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/v1/authz/scope`,
+      handler: async ({ req, res }) => this.scope(req as DmRequest, res),
+    });
   }
 
   /**

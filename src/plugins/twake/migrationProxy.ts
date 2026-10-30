@@ -9,10 +9,11 @@
  *
  * See `docs/usage/plugins/integrations/mail-migration.md`.
  */
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
 import TwakePlugin from '../../abstract/twakePlugin';
-import { type Role, asyncHandler } from '../../abstract/plugin';
+import { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import type { HealthStatus } from '../../lib/health';
@@ -116,12 +117,12 @@ export default class MigrationProxy extends TwakePlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.get(
-      `${apiPrefix}/v1/users/:user/mail-migration`,
-      asyncHandler((req: Request, res: Response) =>
-        this.getMigrationStatus(req, res)
-      )
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${apiPrefix}/v1/users/:user/mail-migration`,
+      params: Type.Object({ user: Type.String({ minLength: 1 }) }),
+      handler: async ({ req, res }) => this.getMigrationStatus(req, res),
+    });
   }
 
   hooks: Hooks = {

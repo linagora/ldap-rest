@@ -1,8 +1,9 @@
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
 import TwakePlugin from '../../abstract/twakePlugin';
 import type { HealthStatus } from '../../lib/health';
-import { type Role, asyncHandler } from '../../abstract/plugin';
+import { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type {
   AttributesList,
@@ -314,10 +315,12 @@ export default class James extends TwakePlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Get quota usage and limits for a user
-    app.get(
-      `${apiPrefix}/v1/users/:user/quota-usage`,
-      asyncHandler((req: Request, res: Response) => this.getUserQuota(req, res))
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${apiPrefix}/v1/users/:user/quota-usage`,
+      params: Type.Object({ user: Type.String({ minLength: 1 }) }),
+      handler: async ({ req, res }) => this.getUserQuota(req, res),
+    });
 
     this.logger.info(
       `James API registered at ${apiPrefix}/v1/users/:user/quota-usage`

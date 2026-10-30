@@ -8,9 +8,9 @@
  * Uses autodiscovery pattern: plugins with 'configurable' role automatically
  * expose their configuration via getConfigApiData() method
  */
-import type { Express, Request, Response } from 'express';
+import type { Express } from 'express';
 
-import DmPlugin, { type Role, asyncHandler } from '../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../abstract/plugin';
 import { wantJson } from '../lib/expressFormatedResponses';
 import { SERVER_VERSION } from '../lib/version';
 
@@ -144,9 +144,10 @@ export default class ConfigApi extends DmPlugin {
      *                 schema: /static/schemas/:name
      *                 schemaInSubdir: /static/schemas/:dir/:name
      */
-    app.get(
-      `${apiPrefix}/v1/config`,
-      asyncHandler(async (req: Request, res: Response) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${apiPrefix}/v1/config`,
+      handler: async ({ req, res }) => {
         if (!wantJson(req, res)) return;
 
         res.json(
@@ -157,8 +158,8 @@ export default class ConfigApi extends DmPlugin {
             SERVER_VERSION
           )
         );
-      })
-    );
+      },
+    });
 
     this.logger.info(`Configuration API registered at ${apiPrefix}/v1/config`);
   }

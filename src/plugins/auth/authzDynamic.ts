@@ -28,7 +28,7 @@
 import type { Express, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
 
-import { type Role } from '../../abstract/plugin';
+import { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import AuthBase, { type DmRequest } from '../../lib/auth/base';
 import { runTogether } from '../../lib/authz/composition';
@@ -41,7 +41,7 @@ import type {
 } from '../../lib/ldapActions';
 import type { Hooks } from '../../hooks';
 import { ok, unauthorized } from '../../lib/expressFormatedResponses';
-import { asyncHandler, getParentDn } from '../../lib/utils';
+import { getParentDn } from '../../lib/utils';
 
 import { verifyLdapPassword } from './authzDynamicHash';
 
@@ -189,9 +189,10 @@ export default class AuthzDynamic extends AuthBase {
        *   '401':
        *     description: Missing, invalid, or unrecognised bearer token.
        */
-      app.post(
-        `${prefix}/v1/authz-dynamic/reload`,
-        asyncHandler(async (req, res) => {
+      defineRoute(app, {
+        method: 'post',
+        path: `${prefix}/v1/authz-dynamic/reload`,
+        handler: async ({ req, res }) => {
           // Only an already-authenticated token may trigger reload.
           const typed = req as AuthzDynamicRequest;
           if (!typed.authzToken) {
@@ -200,8 +201,8 @@ export default class AuthzDynamic extends AuthBase {
           }
           await this.reload();
           ok(res, { success: true, tokens: this.tokens.length });
-        })
-      );
+        },
+      });
       this.logger.info(
         `authzDynamic reload endpoint registered at ${prefix}/v1/authz-dynamic/reload`
       );

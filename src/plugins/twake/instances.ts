@@ -8,13 +8,13 @@
  *
  * See `docs/usage/plugins/integrations/instances.md`.
  */
+import { Type } from '@sinclair/typebox';
 import type { Express, Request } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import { BadRequestError, NotFoundError } from '../../lib/errors';
-import { jsonBody } from '../../lib/expressFormatedResponses';
 import {
   ClouderyProvider,
   CozyStackProvider,
@@ -25,7 +25,7 @@ import {
 } from '../../lib/instanceProviders';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import { asyncHandler, escapeLdapFilter, rdnValue } from '../../lib/utils';
+import { escapeLdapFilter, rdnValue } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
 import {
@@ -269,15 +269,16 @@ export default class TwakeInstances extends DmPlugin {
      *   '404':
      *     description: No such account the caller can read.
      */
-    app.post(
-      `${this.config.api_prefix}/v1/twake/instances/ensure`,
-      asyncHandler(async (req, res) => {
-        const body = jsonBody(req, res) as
-          | { dn?: unknown; mail?: unknown }
-          | false;
-        if (!body) return;
-        let dn = body.dn;
-        if (dn === undefined && typeof body.mail === 'string' && body.mail) {
+    defineRoute(app, {
+      method: 'post',
+      path: `${this.config.api_prefix}/v1/twake/instances/ensure`,
+      body: Type.Object({
+        dn: Type.Optional(Type.String()),
+        mail: Type.Optional(Type.String()),
+      }),
+      handler: async ({ req, res, body }) => {
+        let dn: unknown = body.dn;
+        if (dn === undefined && body.mail) {
           const found = await this.findByMail(body.mail, req);
           if (!found) throw new NotFoundError(`No account for ${body.mail}`);
           dn = found.dn;
@@ -285,8 +286,8 @@ export default class TwakeInstances extends DmPlugin {
         if (typeof dn !== 'string' || !dn)
           throw new BadRequestError('Give the account as dn or mail');
         res.json({ state: await this.ensureInstance(dn, req) });
-      })
-    );
+      },
+    });
     if (!(this.provider instanceof ClouderyProvider)) return;
     await rabbitmq.subscribe(
       this.config.twake_instance_auth_exchange || 'auth',
