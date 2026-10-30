@@ -84,16 +84,6 @@
         "tags": [
           "Authorization (Dynamic)"
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        },
         "security": [
           {
             "BearerAuth": []
@@ -110,9 +100,6 @@
             "description": "Scope of the current user.",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object"
-                },
                 "example": {
                   "user": "uid=alice,ou=users,dc=example,dc=com",
                   "unrestricted": false,
@@ -178,7 +165,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/Config"
                 },
                 "example": {
@@ -5473,9 +5459,6 @@
             "description": "Done or under way.",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object"
-                },
                 "example": {
                   "state": "ready"
                 }
@@ -5540,7 +5523,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/JamesQuotaUsage"
                 },
                 "example": {
@@ -5635,7 +5617,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/MailMigrationStatus"
                 },
                 "example": {
@@ -5695,9 +5676,6 @@
             "description": "Erased.",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object"
-                },
                 "example": {
                   "success": true
                 }
