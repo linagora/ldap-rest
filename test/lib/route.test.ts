@@ -215,6 +215,23 @@ describe('defineRoute', () => {
       .expect(400);
   });
 
+  it('continues to the next route when the handler calls next', async () => {
+    const app = appWith();
+    defineRoute(app, {
+      method: 'get',
+      path: '/fallthrough',
+      json: false,
+      handler: ({ next }) => next(),
+    });
+    app.get('/fallthrough', (_req, res) => {
+      res.status(200).json({ next: true });
+    });
+    serveErrors(app);
+
+    const res = await supertest(app).get('/fallthrough').expect(200);
+    expect(res.body).to.deep.equal({ next: true });
+  });
+
   it('hands the handler Express next, whose error reaches the middleware', async () => {
     const app = appWith();
     defineRoute(app, {
