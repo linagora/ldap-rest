@@ -29,9 +29,35 @@ import {
   ForbiddenError,
   isAuthzRefusal,
   NotFoundError,
+  ServiceUnavailableError,
 } from '../../lib/errors';
 import type { LdapSchema, SchemaIndex } from '../../lib/ldapSchema';
 import { outsideRequest } from '../../lib/requestContext';
+
+/**
+ * The attribute names a parsed filter tests, at any depth. An extensible
+ * match carries its attribute in `matchType`.
+ *
+ * @param filter filter tree returned by `FilterParser.parseString`
+ * @returns attribute descriptions, in no particular order
+ */
+function filterAttributeNames(filter: unknown): string[] {
+  const names: string[] = [];
+  const stack: unknown[] = [filter];
+  const seen = new Set<unknown>();
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (!node || typeof node !== 'object' || seen.has(node)) continue;
+    seen.add(node);
+    const record = node as Record<string, unknown>;
+    if (typeof record.attribute === 'string') names.push(record.attribute);
+    if (typeof record.matchType === 'string') names.push(record.matchType);
+    if (Array.isArray(record.filters))
+      stack.push(...(record.filters as unknown[]));
+    if (record.filter) stack.push(record.filter);
+  }
+  return names;
+}
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by
@@ -176,6 +202,18 @@ export default class LdapRaw extends DmPlugin {
   bases: string[];
   /** Attributes never returned, whatever the request (lowercase) */
   hiddenAttributes: Set<string>;
+  /**
+   * The hidden attributes resolved to their directory types: OID and every
+   * name the schema gives them, once it has been read. Undefined until then,
+   * when only the configured names are compared.
+   */
+  private hiddenTypeNames?: Set<string>;
+  /**
+   * The hidden types plus their supertypes, which a filter assertion also
+   * tests (RFC 4511 §4.5.1.7.1). A result still answers under the subtype's
+   * own name, so only the filter check reads this set.
+   */
+  private hiddenFilterNames?: Set<string>;
   /** True when credential attributes are served instead of being hidden */
   showSecrets: boolean;
   /** Maximum entries returned by a search or a children listing */
@@ -233,23 +271,98 @@ export default class LdapRaw extends DmPlugin {
   }
 
   /**
+   * Resolve the hidden attribute names to the directory's attribute types: a
+   * type answers under its OID and under each of its names, so comparing the
+   * configured spelling alone would let an alias or an OID through.
+   *
+   * @returns the names to compare, configured spellings included
+   */
+  private async hiddenNames(): Promise<ReadonlySet<string>> {
+    if (this.hiddenAttributes.size === 0) return this.hiddenAttributes;
+    if (this.hiddenTypeNames) return this.hiddenTypeNames;
+    const names = new Set(this.hiddenAttributes);
+    let index: SchemaIndex;
+    try {
+      index = await this.getSchemaIndex();
+    } catch (err) {
+      // Serving an entry without resolving the type could answer a hidden
+      // value under an alias or an OID: refuse instead of guessing
+      throw new ServiceUnavailableError(
+        'The directory schema is needed to hide attributes by type: ' +
+          `${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+    const filterNames = new Set(names);
+    for (const hidden of this.hiddenAttributes) {
+      const type = index.getAttributeType(hidden.replace(/^oid\./i, ''));
+      if (!type) continue;
+      let current: typeof type | undefined = type;
+      const seen = new Set<string>();
+      while (current && !seen.has(current.oid)) {
+        seen.add(current.oid);
+        for (const set of [names, filterNames]) {
+          set.add(current.oid.toLowerCase());
+          for (const name of current.names) set.add(name.toLowerCase());
+        }
+        current = current.sup ? index.getAttributeType(current.sup) : undefined;
+      }
+    }
+    this.hiddenTypeNames = names;
+    this.hiddenFilterNames = filterNames;
+    return names;
+  }
+
+  /** Whether an attribute description names one of the hidden types */
+  private isHidden(name: string, hidden: ReadonlySet<string>): boolean {
+    const base = name
+      .replace(/^oid\./i, '')
+      .split(';')[0]
+      .trim()
+      .toLowerCase();
+    // A name added after the types were resolved still hides what it names
+    return this.hiddenAttributes.has(base) || hidden.has(base);
+  }
+
+  /**
    * Reject a malformed LDAP filter before it reaches the directory. Parsing
    * it here turns what would surface as an opaque server error into a 400
    * naming the offending expression — a search box hands us whatever the
    * user typed, and `gov` is a filter typo, not a server fault.
    *
+   * The filter is also the way a client could ask whether a hidden value
+   * matches without it being served, since the search runs with the service
+   * account's rights: an assertion on a hidden type is refused.
+   *
    * @param filter filter to validate
-   * @throws BadRequestError when the filter cannot be parsed
+   * @param hidden hidden types, the configured names when not resolved yet
+   * @throws BadRequestError when the filter cannot be parsed or tests a
+   *   hidden attribute
    */
-  checkFilter(filter: string): void {
+  checkFilter(filter: string, hidden: ReadonlySet<string>): void {
+    let parsed: unknown;
     try {
-      FilterParser.parseString(filter);
+      parsed = FilterParser.parseString(filter);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       throw new BadRequestError(
         `Invalid LDAP filter ${JSON.stringify(filter)}: ${detail}. ` +
           'A filter must be parenthesised, e.g. (cn=foo) or (|(cn=*foo*)(ou=*foo*))'
       );
+    }
+    for (const name of filterAttributeNames(parsed)) {
+      // An extensible match without an attribute runs over every attribute
+      if (name === '') {
+        if (hidden.size > 0)
+          throw new BadRequestError(
+            'The filter matches on every attribute, which the raw API does ' +
+              'not expose while attributes are hidden'
+          );
+        continue;
+      }
+      if (this.isHidden(name, hidden))
+        throw new BadRequestError(
+          'The filter tests an attribute the raw API does not expose'
+        );
     }
   }
 
@@ -267,9 +380,10 @@ export default class LdapRaw extends DmPlugin {
    */
   formatEntry(entry: Record<string, unknown> & { dn: string }): RawEntry {
     const attributes: Record<string, RawAttribute> = {};
+    const hidden = this.hiddenTypeNames ?? this.hiddenAttributes;
     for (const [name, value] of Object.entries(entry)) {
       if (name === 'dn') continue;
-      if (this.hiddenAttributes.has(name.split(';')[0].toLowerCase())) continue;
+      if (this.isHidden(name, hidden)) continue;
 
       const rawValues = Array.isArray(value) ? value : [value];
       const binary = rawValues.some(v => Buffer.isBuffer(v));
@@ -322,6 +436,16 @@ export default class LdapRaw extends DmPlugin {
    * @returns root DSE as a JSON entry (its `dn` is the empty string)
    */
   async getRootDse(): Promise<RawEntry> {
+    try {
+      await this.hiddenNames();
+    } catch (err) {
+      // The root DSE carries no entry values, and it is how a UI finds the
+      // schema it could not read: answer it with the configured names only
+      this.logger.warn(
+        'LDAP raw API: root DSE served without resolving hidden attribute ' +
+          `types: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
     // As the server: the root DSE describes the server, not its data
     const result = await outsideRequest(() =>
       this.searchDirectory('', {
@@ -374,6 +498,7 @@ export default class LdapRaw extends DmPlugin {
    */
   async getEntry(dn: string, req?: Request): Promise<RawEntry> {
     this.checkDn(dn);
+    await this.hiddenNames();
     const read = async (attributes: string[]): Promise<SearchResult> =>
       this.searchDirectory(
         dn,
@@ -506,11 +631,15 @@ export default class LdapRaw extends DmPlugin {
     req?: Request
   ): Promise<RawSearchResult> {
     this.checkDn(options.base);
-    this.checkFilter(options.filter);
     // The base itself first: what is found below it, even nothing, would
     // say it is there to a caller who may not read it
     if (!(await this.server.ldap.readableBy(options.base, req)))
       throw new NotFoundError(`Entry ${options.base} not found`);
+    await this.hiddenNames();
+    this.checkFilter(
+      options.filter,
+      this.hiddenFilterNames ?? this.hiddenAttributes
+    );
     const limit = Math.min(options.limit || this.maxResults, this.maxResults);
 
     // Ask for one entry more than the limit to detect truncation
@@ -681,9 +810,19 @@ export default class LdapRaw extends DmPlugin {
      *             truncated: { type: boolean }
      *   '400':
      *     description: |
-     *       Invalid scope, invalid limit, or unparseable LDAP filter. The
-     *       message names the offending filter and recalls the expected
+     *       Invalid scope, invalid limit, unparseable LDAP filter, or a
+     *       filter testing a hidden attribute — including an extensible
+     *       match without an attribute, which runs over every attribute.
+     *       The message names an unparseable filter and recalls the expected
      *       form, e.g. `Invalid LDAP filter "gov"`.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '503':
+     *     description: |
+     *       The directory schema could not be read, so a hidden attribute
+     *       cannot be matched under its OID or aliases; the search is
+     *       refused rather than answered unmasked.
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
@@ -801,6 +940,14 @@ export default class LdapRaw extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      *   '404':
      *     description: Entry not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '503':
+     *     description: |
+     *       The directory schema could not be read, so a hidden attribute
+     *       cannot be matched under its OID or aliases; the entry is not
+     *       served rather than answered unmasked.
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }

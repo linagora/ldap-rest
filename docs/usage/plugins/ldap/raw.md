@@ -181,6 +181,22 @@ Site-specific attributes are added with `--ldap-raw-hidden-attribute`, which sta
 --ldap-raw-hidden-attribute twakeApiKey --ldap-raw-hidden-attribute employeeNumber
 ```
 
+A hidden attribute is resolved to its directory type, so the type's OID and
+every alias it declares are hidden too — asking for `2.5.4.35` or
+`homePhone` does not serve `userPassword` or a configured
+`homeTelephoneNumber`. A search filter that tests a hidden type, at any
+depth and under any of its names, is refused with a 400: the search runs with
+the service account's rights, so leaving it through would answer the same
+question one match at a time. An assertion on a supertype of a hidden type is
+refused as well, since the directory evaluates an attribute's subtypes. An
+extensible match without an attribute (`(:octetStringMatch:=…)`) runs over
+every attribute and is refused too while attributes are hidden.
+
+When the directory schema cannot be read, an entry read or a search is
+refused with a 503 rather than answered with only the configured names
+compared, which could serve an alias or an OID. The root DSE still answers:
+it carries no entry values and is how a client discovers the schema.
+
 Note that hiding an attribute here keeps it out of the API, not out of the directory: an account able to bind to LDAP directly still reads it. This is a guard against casual exposure through the browsing UI, not an access control — use [authz-per-branch](../auth/authz-per-branch.md) or directory ACLs for that.
 
 ## Security
@@ -189,7 +205,7 @@ Access is restricted in three independent layers:
 
 1. **Exposed bases** — any DN outside `--ldap-raw-base` is refused with a 403, whatever the caller's rights.
 2. **Authorization hooks** — every entry read, children listing and search goes through `server.ldap`, so the authorization plugins ([authz-per-branch](../auth/authz-per-branch.md), authz-dynamic, …) apply exactly as on the high-level APIs.
-3. **Hidden attributes** — credential attributes, plus anything in `--ldap-raw-hidden-attribute`, are removed from every response, including searches. See [Hidden attributes](#hidden-attributes).
+3. **Hidden attributes** — credential attributes, plus anything in `--ldap-raw-hidden-attribute`, are removed from every response, including searches, under every name their type answers to; a filter that tests one is refused with a 400. See [Hidden attributes](#hidden-attributes).
 
 Two exceptions, both deliberate: the **root DSE** and the **schema** are read with the service account, not with the caller's rights. They are directory metadata and carry no user data; reading them with a restricted account would leave the UI unable to name and type attributes. Do not expose this plugin publicly if your directory publishes sensitive information in its root DSE.
 
