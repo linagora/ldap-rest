@@ -209,7 +209,7 @@ describe('Object class repair on modify', function () {
     }
     dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages'], true);
     dm.ldap.declareObjectClasses(usersBase, ['posixAccount']);
-    expect((dm.ldap as any).declaredClasses.size).to.equal(3);
+    expect((dm.ldap as any).schema.declaredClasses.size).to.equal(3);
   });
 
   it('should take classes a schema file gives as a single string', async () => {
@@ -265,7 +265,7 @@ describe('Object class repair on modify', function () {
   it('should answer the refusal, warned once, when the schema cannot be read', async () => {
     const dm = bare();
     dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
-    (dm.ldap as any).schemaIndex = async (): Promise<never> => {
+    (dm.ldap as any).schema.schemaIndex = async (): Promise<never> => {
       throw new Error('cn=Subschema unreadable');
     };
     const warned: string[] = [];
