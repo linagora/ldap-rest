@@ -259,21 +259,24 @@ describe('Writes the directory refuses for their content', function () {
     /** Every write the directory receives fails with `message`. */
     const failWith = (message: string): void => {
       const fail = (): Promise<never> => Promise.reject(new Error(message));
-      ldap().acquireConnection = () =>
+      const pool = ldap().pool as Record<string, unknown>;
+      pool.acquire = () =>
         Promise.resolve({
           client: { add: fail, modify: fail, modifyDN: fail },
         });
-      ldap().releaseConnection = () => undefined;
+      pool.release = () => undefined;
     };
 
     beforeEach(() => {
       saved = {
-        acquireConnection: ldap().acquireConnection,
-        releaseConnection: ldap().releaseConnection,
+        acquire: (ldap().pool as Record<string, unknown>).acquire,
+        release: (ldap().pool as Record<string, unknown>).release,
       };
     });
 
-    afterEach(() => Object.assign(ldap(), saved));
+    afterEach(() =>
+      Object.assign(ldap().pool as Record<string, unknown>, saved)
+    );
 
     it('should still answer 400 to a schema refusal', async () => {
       failWith(

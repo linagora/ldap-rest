@@ -307,7 +307,7 @@ describe('Object class repair on modify', function () {
     // A repair waiting for the connection its write holds would wait 30s.
     this.timeout(10000);
     const dm = bare();
-    (dm.ldap as any).poolSize = 1;
+    (dm.ldap as any).pool.poolSize = 1;
     dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
     await dm.ldap.modify(accountDn, {
       replace: { twakeDepartmentLink: orgDn },
