@@ -33,12 +33,8 @@ import {
   timedLdap,
 } from './metrics';
 import DirectorySchema from './ldap/schema';
-import {
-  BadRequestError,
-  ConflictError,
-  isAuthzRefusal,
-  NotFoundError,
-} from './errors';
+import CallerView from './ldap/callerView';
+import { BadRequestError, ConflictError, NotFoundError } from './errors';
 import { extractLdapCode, isSchemaRefusal } from './ldapCodes';
 import type { SchemaIndex } from './ldapSchema';
 
@@ -519,6 +515,7 @@ class ldapActions {
   private opening = 0;
   private isCleaningUp = false;
   private schema: DirectorySchema;
+  private caller: CallerView;
 
   constructor(server: DM) {
     this.parent = server;
@@ -531,6 +528,19 @@ class ldapActions {
       autoRepair: (): boolean => this.config.ldap_flat_auto_repair !== false,
       schemaCacheTtl: (): number =>
         (this.config.ldap_raw_schema_cache_ttl ?? 3600) * 1000,
+    });
+    this.caller = new CallerView({
+      search: (options, base, req): ReturnType<ldapActions['search']> =>
+        this.search(options, base, req),
+      hasFilter: (): boolean => this.parent.hookBus.has('ldapsearchfilter'),
+      filter: async (chunk, req, opts): Promise<SearchResult> => {
+        const [filtered] = await this.parent.hookBus.chain('ldapsearchfilter', [
+          chunk,
+          req,
+          opts,
+        ]);
+        return filtered ?? chunk;
+      },
     });
     // The attribute names the options give: the plugins compare with these
     for (const [key, value] of Object.entries(this.config))
@@ -1109,39 +1119,9 @@ class ldapActions {
     };
   }
 
-  /**
-   * Whether the caller of a request can read an entry.
-   *
-   * For a route that finds an entry as the server — by an attribute, across
-   * branches — and then answers about it: an entry the caller cannot read
-   * must get the answer an entry that is not there gets, or the route tells
-   * them what the directory holds where they cannot read. Refused or
-   * filtered out by an authorization plugin, the entry reads as absent.
-   * Without a request, as for any operation, nobody judges.
-   *
-   * @param dn the entry
-   * @param req the request whose caller asks
-   * @returns whether a read of the entry, as that caller, finds it
-   */
+  /** See {@link CallerView.readableBy}. */
   async readableBy(dn: string, req?: Request): Promise<boolean> {
-    req ??= currentRequest();
-    if (!req) return true;
-    try {
-      const found = (await this.search(
-        { paged: false, scope: 'base', attributes: ['1.1'] },
-        dn,
-        req
-      )) as SearchResult;
-      return (found.searchEntries?.length ?? 0) > 0;
-    } catch (err) {
-      if (
-        isAuthzRefusal(err) ||
-        (err as { statusCode?: number })?.statusCode === 403 ||
-        extractLdapCode(err) === 32
-      )
-        return false;
-      throw err;
-    }
+    return this.caller.readableBy(dn, req);
   }
 
   /**
@@ -1230,40 +1210,13 @@ class ldapActions {
     await this.schema.canonicalChanges(changes);
   }
 
-  /**
-   * Hand a search result to `ldapsearchfilter`, which may drop entries the
-   * caller is not allowed to see.
-   *
-   * Applied on every return path of `search`, and deliberately after the
-   * cache: `ldapsearchresult` fires before caching and knows no request, so
-   * what it removed for one caller would be served to the next. A paginated
-   * search is filtered chunk by chunk, as it is consumed.
-   */
+  /** See {@link CallerView.filter}. */
   private filterForCaller(
     value: SearchResult | AsyncGenerator<SearchResult>,
     req?: Request,
     opts?: SearchOptions
   ): SearchResult | AsyncGenerator<SearchResult> | Promise<SearchResult> {
-    if (!this.parent.hookBus.has('ldapsearchfilter')) return value;
-    const one = async (chunk: SearchResult): Promise<SearchResult> => {
-      const [filtered] = await this.parent.hookBus.chain('ldapsearchfilter', [
-        chunk,
-        req,
-        opts,
-      ]);
-      // A subscriber that returns nothing must not turn the answer into one.
-      return filtered ?? chunk;
-    };
-    if (
-      typeof (value as AsyncGenerator<SearchResult>)[Symbol.asyncIterator] ===
-      'function'
-    ) {
-      const source = value as AsyncGenerator<SearchResult>;
-      return (async function* (): AsyncGenerator<SearchResult> {
-        for await (const chunk of source) yield await one(chunk);
-      })();
-    }
-    return one(value as SearchResult);
+    return this.caller.filter(value, req, opts);
   }
 
   async search(
