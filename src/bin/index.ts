@@ -44,6 +44,7 @@ import {
 } from '../lib/authz/composition';
 import { registerAttributeTypes } from '../lib/utils';
 import { errorChain } from '../lib/errors';
+import { type ServiceMap, type ServiceToken } from '../lib/services';
 import HookBus, { recordHookOwner, type HookFn } from '../lib/hookBus';
 import { runForRequest, runWithLogContext } from '../lib/requestContext';
 import { requestId } from '../lib/changeContext';
@@ -149,6 +150,13 @@ export class DM {
   hooks: Hooks = {};
   readonly hookBus: HookBus = new HookBus(this.hooks);
   loadedPlugins: { [key: string]: DmPlugin } = {};
+  /**
+   * The services plugins provide, keyed by their token. Shared by `withConfig`
+   * views as the plugin registry is; `registerPlugin` fills it.
+   */
+  readonly services: ServiceMap = new Map();
+  /** The plugin that provided each service, for the duplicate warning. */
+  private readonly serviceOwners = new Map<ServiceToken<unknown>, string>();
   ldap: ldapActions;
   operationSequence: number;
   logger: winston.Logger;
@@ -1090,6 +1098,29 @@ export class DM {
       }
     }
     this.loadedPlugins[obj.name] = obj;
+    this.registerServices(obj);
     return true;
+  }
+
+  /**
+   * Record the services a plugin provides. The first provider of a token
+   * wins: a second one would answer for the same interface and leave the
+   * choice to the load order, so it is ignored and named in a warning.
+   *
+   * @param obj the plugin just registered
+   */
+  private registerServices(obj: DmPlugin): void {
+    for (const provided of obj.provides ?? []) {
+      const owner = this.serviceOwners.get(provided.token);
+      if (owner !== undefined) {
+        this.logger.warn(
+          `Plugin ${obj.name}: service '${provided.token.name}' is already ` +
+            `provided by ${owner}; this one is ignored`
+        );
+        continue;
+      }
+      this.services.set(provided.token, provided.service);
+      this.serviceOwners.set(provided.token, obj.name);
+    }
   }
 }

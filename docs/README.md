@@ -20,6 +20,7 @@ Create and extend LDAP-Rest with custom plugins.
 
 - **[Development Guide](plugin-development/README.md)** - Architecture and plugin creation
 - **[Hooks](plugin-development/hooks.md)** - LDAP hooks system
+- **[Services](plugin-development/services.md)** - Typed interfaces between plugins
 - **[Routes](plugin-development/routes.md)** - Declaring routes and their input schemas
 - **[Testing](plugin-development/testing.md)** - Testing with embedded LDAP
 - **[Dependencies](plugin-development/dependencies.md)** - Plugin dependencies matrix
@@ -44,8 +45,10 @@ API, which a minor or a patch release does not break:
   [REST API](client-development/api/rest-api.md) and the plugin pages,
   their statuses and their error `code`s.
 - **Plugin API**: what `ldap-rest/plugin` exports — `DmPlugin` and its
-  roles (`auth`, `authz`, …), `asyncHandler`, the DN and filter escaping
-  helpers and the error classes —, the `DM` type of `ldap-rest` and the
+  roles (`auth`, `authz`, …), `serviceToken`, `ServiceToken` and
+  `ServiceProvider`, `asyncHandler`, the DN and filter escaping helpers and
+  the error classes —,
+  the `DM` type of `ldap-rest` and the
   `Hooks` of `ldap-rest/hooks`, whose arguments are those typed in
   `src/hooks.ts` ([hooks](plugin-development/hooks.md)), and the directory
   operations of [the development guide](plugin-development/README.md):
