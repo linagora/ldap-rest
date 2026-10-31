@@ -1,0 +1,218 @@
+import { expect } from 'chai';
+import type { SearchOptions, SearchResult } from 'ldapts';
+
+import SearchCache, {
+  digestKey,
+  membersNamed,
+  type CacheLogger,
+} from '../../../src/lib/ldap/searchCache';
+
+const silentLogger: CacheLogger = { info: () => undefined };
+
+const cacheFor = (ttl = 60_000): SearchCache =>
+  new SearchCache({ max: 100, ttl, logger: silentLogger });
+
+const answer = (...entries: Array<Record<string, unknown>>): SearchResult => ({
+  searchEntries: entries.map(entry => ({
+    dn: 'dc=example,dc=com',
+    ...entry,
+  })) as unknown as SearchResult['searchEntries'],
+  searchReferences: [],
+});
+
+const baseSearch = (base: string): SearchOptions => ({
+  scope: 'base',
+  filter: '(objectClass=*)',
+  attributes: ['*'],
+});
+
+describe('SearchCache', () => {
+  describe('keys', () => {
+    it('keys a search by the base and by what changes its answer', () => {
+      const cache = cacheFor();
+      const key = cache.key('uid=alice,dc=example,dc=com', {
+        ...baseSearch('uid=alice,dc=example,dc=com'),
+        attributes: ['cn', 'mail'],
+      });
+      expect(
+        cache.key('uid=alice,dc=example,dc=com', {
+          ...baseSearch('uid=alice,dc=example,dc=com'),
+          attributes: ['mail', 'cn'],
+        })
+      ).to.equal(key);
+      expect(
+        cache.key('uid=bob,dc=example,dc=com', baseSearch('uid=bob'))
+      ).to.not.equal(key);
+      expect(
+        cache.key('uid=alice,dc=example,dc=com', {
+          ...baseSearch('uid=alice'),
+          scope: 'sub',
+        })
+      ).to.not.equal(key);
+      expect(
+        cache.key('uid=alice,dc=example,dc=com', {
+          ...baseSearch('uid=alice'),
+          filter: '(uid=alice)',
+        })
+      ).to.not.equal(key);
+    });
+
+    it('digests a key without carrying its content', () => {
+      expect(digestKey('uid=alice,dc=example,dc=com')).to.have.length(12);
+      expect(digestKey('uid=alice,dc=example,dc=com')).to.equal(
+        digestKey('uid=alice,dc=example,dc=com')
+      );
+      expect(digestKey('uid=alice,dc=example,dc=com')).to.not.equal(
+        digestKey('uid=bob,dc=example,dc=com')
+      );
+    });
+  });
+
+  describe('answers', () => {
+    it('stores and returns copies the caller may edit', () => {
+      const cache = cacheFor();
+      const key = 'a-key';
+      const stored = answer({ member: ['uid=alice,dc=example,dc=com'] });
+      cache.set(key, stored);
+      const first = cache.get(key);
+      expect(first?.searchEntries[0].member).to.deep.equal([
+        'uid=alice,dc=example,dc=com',
+      ]);
+      (first!.searchEntries[0].member as string[]).push(
+        'uid=bob,dc=example,dc=com'
+      );
+      expect(cache.get(key)?.searchEntries[0].member).to.deep.equal([
+        'uid=alice,dc=example,dc=com',
+      ]);
+      (stored.searchEntries[0].member as string[]).push(
+        'uid=carol,dc=example,dc=com'
+      );
+      expect(cache.get(key)?.searchEntries[0].member).to.deep.equal([
+        'uid=alice,dc=example,dc=com',
+      ]);
+    });
+
+    it('keeps the generation moving with each invalidation', () => {
+      const cache = cacheFor();
+      expect(cache.generation).to.equal(0);
+      cache.invalidate('uid=alice,dc=example,dc=com');
+      expect(cache.generation).to.equal(1);
+      cache.invalidateReferences('uid=alice,dc=example,dc=com');
+      expect(cache.generation).to.equal(2);
+      cache.invalidateMembership('cn=sales,dc=example,dc=com', {
+        add: { member: ['uid=alice,dc=example,dc=com'] },
+      });
+      expect(cache.generation).to.equal(4);
+    });
+
+    it('does not move the generation while the cache is off', () => {
+      const cache = cacheFor(0);
+      expect(cache.enabled).to.equal(false);
+      cache.invalidate('uid=alice,dc=example,dc=com');
+      expect(cache.generation).to.equal(0);
+    });
+  });
+
+  describe('invalidation', () => {
+    it('drops the base and its subtree, however the DN is spelled', () => {
+      const cache = cacheFor();
+      const alice = 'uid=Alice,ou=People,dc=Example,dc=Com';
+      const child = 'cn=Child,uid=Alice,ou=People,dc=Example,dc=Com';
+      const bob = 'uid=Bob,ou=People,dc=Example,dc=Com';
+      cache.set(cache.key(alice, baseSearch(alice)), answer({}));
+      cache.set(cache.key(child, baseSearch(child)), answer({}));
+      cache.set(cache.key(bob, baseSearch(bob)), answer({}));
+
+      cache.invalidate('uid=alice, ou=people, dc=example, dc=com');
+
+      expect(cache.get(cache.key(alice, baseSearch(alice)))).to.equal(
+        undefined
+      );
+      expect(cache.get(cache.key(child, baseSearch(child)))).to.equal(
+        undefined
+      );
+      expect(cache.get(cache.key(bob, baseSearch(bob)))).to.not.equal(
+        undefined
+      );
+    });
+
+    it('drops reads that name a written DN, or an entry below it', () => {
+      const cache = cacheFor();
+      const group = 'cn=Sales,ou=Groups,dc=Example,dc=Com';
+      const child = 'cn=EMEA,cn=Sales,ou=Groups,dc=Example,dc=Com';
+      const alice = 'uid=Alice,ou=People,dc=Example,dc=Com';
+      const bob = 'uid=Bob,ou=People,dc=Example,dc=Com';
+      cache.set(
+        cache.key(alice, baseSearch(alice)),
+        answer({ memberOf: [group] })
+      );
+      cache.set(cache.key(bob, baseSearch(bob)), answer({ memberOf: [child] }));
+
+      cache.invalidateReferences(group);
+
+      expect(cache.get(cache.key(alice, baseSearch(alice)))).to.equal(
+        undefined
+      );
+      expect(cache.get(cache.key(bob, baseSearch(bob)))).to.equal(undefined);
+    });
+  });
+
+  describe('membership invalidation (#374)', () => {
+    const group = 'cn=Sales,ou=Groups,dc=Example,dc=Com';
+    const alice = 'uid=Alice,ou=People,dc=Example,dc=Com';
+
+    it('drops the read of a member a change adds', () => {
+      const cache = cacheFor();
+      cache.set(cache.key(alice, baseSearch(alice)), answer({ memberOf: [] }));
+
+      cache.invalidateMembership(group, { add: { member: [alice] } });
+
+      expect(cache.get(cache.key(alice, baseSearch(alice)))).to.equal(
+        undefined
+      );
+    });
+
+    it('drops the reads of members a replace no longer names', () => {
+      const cache = cacheFor();
+      cache.set(
+        cache.key(alice, baseSearch(alice)),
+        answer({ memberOf: [group] })
+      );
+
+      cache.invalidateMembership(group, { replace: { member: [] } });
+
+      expect(cache.get(cache.key(alice, baseSearch(alice)))).to.equal(
+        undefined
+      );
+    });
+
+    it('leaves reads alone when the change touches no membership', () => {
+      const cache = cacheFor();
+      cache.set(
+        cache.key(alice, baseSearch(alice)),
+        answer({ memberOf: [group] })
+      );
+
+      cache.invalidateMembership(group, { replace: { description: 'x' } });
+
+      expect(cache.get(cache.key(alice, baseSearch(alice)))).to.not.equal(
+        undefined
+      );
+    });
+  });
+
+  describe('members named by a change', () => {
+    it('reads member and uniqueMember, in any case', () => {
+      expect(
+        membersNamed({
+          Member: ['uid=alice,dc=example,dc=com'],
+          UNIQUEMEMBER: 'uid=bob,dc=example,dc=com',
+          description: 'not a member',
+        })
+      ).to.deep.equal([
+        'uid=alice,dc=example,dc=com',
+        'uid=bob,dc=example,dc=com',
+      ]);
+    });
+  });
+});
