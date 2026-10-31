@@ -52,6 +52,9 @@ block merges, corrupt the codebase or make the maintainers unhappy.
 - The `Unreleased` section describes the difference with the last
   release, not the intermediate steps taken during development.
   Rewrite entries rather than appending corrections.
+- A breaking change goes under a `### Breaking Changes` heading: a
+  non-major release cannot contain one, see
+  [docs/development/contracts.md](docs/development/contracts.md).
 - Released sections are never modified.
 - Keep entries short; link to the documentation for details.
 

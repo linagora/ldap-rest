@@ -42,22 +42,109 @@ export type ConfigEntry = [
   (string | null | undefined)?, // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
   ArrayKind?, // for array type, what the values hold: see ArrayKind
   boolean?, // whether an empty environment value is refused instead of read as unset: for a default that is a guess, not a safe fallback
+  (string[] | null | undefined)?, // CLI names kept as deprecated aliases, with their leading --
+  (string[] | null | undefined)?, // environment variables kept as deprecated aliases
 ];
 
 export class ConfigParser {
   private config: ConfigTemplate;
   /** CLI arguments no entry declared, kept in `Config` by the parser */
   private unknownArgs: string[] = [];
+  /** Deprecated names the configuration used, reported once each */
+  private readonly deprecated: string[] = [];
 
   get unknownOptions(): string[] {
     return [...this.unknownArgs];
   }
 
+  /** Names read through a deprecated alias, for the server to warn about */
+  get deprecationWarnings(): string[] {
+    return [...this.deprecated];
+  }
+
+  private warnOnce(message: string): void {
+    if (!this.deprecated.includes(message)) this.deprecated.push(message);
+  }
+
+  /** The entry a CLI name stands for, whether canonical or a deprecated alias */
+  private findEntry(arg: string): ConfigEntry | undefined {
+    const canonical = this.config.find(entry => entry[0] === arg);
+    if (canonical) return canonical;
+    const aliased = this.config.find(entry => entry[7]?.includes(arg));
+    if (aliased)
+      this.warnOnce(`Configuration: ${arg} is deprecated, use ${aliased[0]}`);
+    return aliased;
+  }
+
+  /**
+   * The environment variable an entry reads: its own, or a deprecated alias
+   * when that one is set and its own is not.
+   */
+  private envNameOf(
+    entry: ConfigEntry,
+    cliArgs: Map<string, ConfigResultValue>
+  ): string | undefined {
+    const primary = entry[1] || undefined;
+    if (!primary) return undefined;
+    if (this.environmentIsSet(entry, process.env[primary])) return primary;
+    // A singular CLI value replaces the environment one; an array one
+    // combines with it, so its deprecated variable is still read
+    if (entry[3] !== 'array' && cliArgs.has(entry[0])) return primary;
+    for (const alias of entry[8] ?? []) {
+      if (alias && this.environmentIsSet(entry, process.env[alias])) {
+        this.warnOnce(`Configuration: ${alias} is deprecated, use ${primary}`);
+        return alias;
+      }
+    }
+    return primary;
+  }
+
+  /**
+   * Whether a variable value counts as set. An empty value is unset for the
+   * types that read it as nothing: a compose file expands an unset
+   * `${VAR:-}` to one. For a string or a boolean, an empty value means
+   * something and stays set.
+   */
+  private environmentIsSet(
+    entry: ConfigEntry,
+    value: string | undefined
+  ): boolean {
+    if (value === undefined) return false;
+    if (entry[3] === 'array')
+      return splitValue(value, entry[5], 'plural').length > 0;
+    if (entry[3] === 'number' || entry[3] === 'json')
+      return value.trim() !== '';
+    return true;
+  }
+
   constructor(config: ConfigTemplate) {
     this.config = config;
+    this.checkAliases();
+  }
+
+  /** A deprecated name must not shadow a declared one, or be declared twice */
+  private checkAliases(): void {
+    const declared = new Set<string>();
+    for (const entry of this.config)
+      for (const name of [entry[0], entry[4], entry[1]])
+        if (name) declared.add(name);
+    const aliases = new Set<string>();
+    for (const entry of this.config)
+      for (const alias of [...(entry[7] ?? []), ...(entry[8] ?? [])]) {
+        if (declared.has(alias))
+          throw new Error(
+            `Configuration: alias ${alias} of ${entry[0]} is already a declared name`
+          );
+        if (aliases.has(alias))
+          throw new Error(
+            `Configuration: alias ${alias} of ${entry[0]} is declared twice`
+          );
+        aliases.add(alias);
+      }
   }
 
   parse(argv: string[] = process.argv): Config {
+    this.deprecated.length = 0;
     // @ts-expect-error: missing port
     const result: Config = {};
     const cliArgs = this.parseCliArgs(argv);
@@ -67,8 +154,9 @@ export class ConfigParser {
       let fromDefault = true;
 
       // Override with env value if exists
-      if (entry[1] !== undefined) {
-        const envValue = process.env[entry[1]];
+      const envName = this.envNameOf(entry, cliArgs);
+      if (envName !== undefined) {
+        const envValue = process.env[envName];
         // An empty value, or an array one without any item, is unset: a
         // compose file expands an unset `${VAR:-}` to one, and it would
         // replace the default with nothing (or NaN for a number)
@@ -83,7 +171,7 @@ export class ConfigParser {
               envValue.trim() === ''));
         if (empty && entry[6])
           throw new Error(
-            `Error in environment variable ${entry[1]}: the value is empty. ` +
+            `Error in environment variable ${envName}: the value is empty. ` +
               'Set it, or leave the variable out'
           );
         if (envValue !== undefined && !empty) {
@@ -94,7 +182,7 @@ export class ConfigParser {
             value = parseNumber(envValue);
             if (Number.isNaN(value))
               throw new Error(
-                `Error in environment variable ${entry[1]}: "${envValue}" is not a number`
+                `Error in environment variable ${envName}: "${envValue}" is not a number`
               );
           } else if (entry[3] === 'array') {
             value = items;
@@ -104,7 +192,7 @@ export class ConfigParser {
             } catch (e) {
               throw new Error(
                 // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-                `Error parsing JSON from environment variable ${entry[1]}: ${e}`
+                `Error parsing JSON from environment variable ${envName}: ${e}`
               );
             }
           } else {
@@ -178,10 +266,13 @@ export class ConfigParser {
       const arg = argv[i];
 
       if (arg.startsWith('--') || arg.startsWith('-')) {
-        const configEntry = this.config.find(entry => entry[0] === arg);
+        const configEntry = this.findEntry(arg);
+        // A deprecated alias is read as the name it stands for, so the
+        // configuration and the unknown-option report see one name only
+        const name = configEntry ? configEntry[0] : arg;
 
         if (configEntry && configEntry[3] === 'boolean') {
-          args.set(arg, true);
+          args.set(name, true);
         } else if (configEntry && configEntry[3] === 'number') {
           if (!argv[i + 1]?.trim())
             throw new Error(
@@ -194,13 +285,13 @@ export class ConfigParser {
               `Error in command line: ${arg} takes a number, got ` +
                 `"${argv[i + 1]}"`
             );
-          args.set(arg, number);
+          args.set(name, number);
           i++; // The value may start with `-`, as -1 does
         } else if (configEntry && configEntry[3] === 'array') {
-          const tmp = args.get(arg) || [];
+          const tmp = args.get(name) || [];
           const nextArg = argv[i + 1];
           (tmp as string[]).push(nextArg);
-          args.set(arg, tmp);
+          args.set(name, tmp);
           // One value per occurrence, and a second word after it used to be
           // skipped in silence: `--authz-for oidc authToken` read as
           // `["oidc"]`, a population smaller than the command line says —
@@ -219,7 +310,7 @@ export class ConfigParser {
             );
         } else {
           const nextArg = argv[i + 1];
-          args.set(arg, nextArg);
+          args.set(name, nextArg);
           i++; // Skip la valeur qu'on vient de traiter
         }
       }

@@ -33,6 +33,17 @@ export interface OptionSpec<T> {
    * reading the declared default, as an empty environment or CLI value does.
    */
   readonly emptyIsValue?: boolean;
+  /**
+   * Former CLI names still accepted, without the leading `--`: the parser
+   * reads them as the canonical name and warns at startup. An alias takes one
+   * value per occurrence, as the singular form does.
+   */
+  readonly aliases?: readonly string[];
+  /**
+   * Former environment variables still accepted, read when `env` is unset or
+   * holds an empty value the type reads as nothing
+   */
+  readonly envAliases?: readonly string[];
 }
 
 export interface StringOption extends OptionSpec<string> {
@@ -147,15 +158,25 @@ export function toConfigEntries(options: OptionSet): ConfigEntry[] {
         ? array.plural
         : `--${array.plural}`
       : undefined;
-    return [
+    const aliases = spec.aliases?.map(alias =>
+      alias.startsWith('--') ? alias : `--${alias}`
+    );
+    const entry: ConfigEntry = [
       cliName(key),
       spec.env ?? '',
-      value,
+      value as ConfigEntry[2],
       spec.type,
       plural,
       array.kind,
       Boolean(spec.required),
-    ] as ConfigEntry;
+    ];
+    if (aliases?.length) {
+      entry[7] = aliases;
+      if (spec.envAliases?.length) entry[8] = [...spec.envAliases];
+    } else if (spec.envAliases?.length) {
+      entry[8] = [...spec.envAliases];
+    }
+    return entry;
   });
 }
 
@@ -234,12 +255,13 @@ export function unknownEnvironmentOptions(
 ): string[] {
   const known = new Set(
     entries
-      .map(entry => entry[1])
+      .flatMap(entry => [entry[1], ...(entry[8] ?? [])])
       .filter((name): name is string => Boolean(name))
   );
   for (const definitions of extra)
     for (const spec of Object.values(definitions))
-      if (spec.env) known.add(spec.env);
+      for (const name of [spec.env, ...(spec.envAliases ?? [])])
+        if (name) known.add(name);
   return Object.keys(env).filter(
     name =>
       name.startsWith('DM_') && !name.startsWith('DM_TEST_') && !known.has(name)
@@ -278,6 +300,19 @@ function valueFromEnvironment(
   return raw;
 }
 
+/** Whether a variable value counts as set for an option, as the parser reads it */
+function environmentIsSet(
+  spec: OptionSpec<unknown>,
+  value: string | undefined
+): boolean {
+  if (value === undefined) return false;
+  if (spec.type === 'number' || spec.type === 'json')
+    return value.trim() !== '';
+  if (spec.type === 'array')
+    return splitValue(value, (spec as ArrayOption).kind, 'plural').length > 0;
+  return true;
+}
+
 /**
  * Read a plugin's options from a parsed configuration, applying the declared
  * defaults and checking the values. Called once per instance by
@@ -291,13 +326,13 @@ export function readOptions<T extends OptionSet>(
   const source = config as Record<string, unknown>;
   const result: Record<string, unknown> = {};
   for (const [key, spec] of Object.entries(options)) {
+    const envName = [spec.env, ...(spec.envAliases ?? [])].find(
+      name => name !== undefined && environmentIsSet(spec, process.env[name])
+    );
     const configured =
       source[key] ??
-      (!parsedKeys.has(key) &&
-      !(key in source) &&
-      spec.env &&
-      process.env[spec.env] !== undefined
-        ? valueFromEnvironment(key, spec, process.env[spec.env] as string)
+      (!parsedKeys.has(key) && !(key in source) && envName
+        ? valueFromEnvironment(key, spec, process.env[envName] as string)
         : undefined);
     const emptyString =
       spec.type === 'string' &&

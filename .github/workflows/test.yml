@@ -117,6 +117,11 @@ jobs:
         if: matrix.node-version == '24.x'
         run: npm run check:openapi
 
+      # See docs/development/contracts.md
+      - name: Check the options snapshot
+        if: matrix.node-version == '24.x'
+        run: npm run check:options
+
       # Runs the suite once and gates on coverage at the same time, rather
       # than running it twice. The threshold covers server code only: the
       # browser libraries have no DOM in the suite, so a global number would
@@ -127,6 +132,42 @@ jobs:
           DM_TEST_POSTGRES_URL: postgres://postgres:postgres@localhost:5432/postgres
           DM_TEST_VALKEY_URL: redis://localhost:6379
           DM_TEST_LDAP_IMAGE: mirror.gcr.io/osixia/openldap:1.5.0
+
+  # A pull request shows what it does to the published contracts: the
+  # snapshots committed on the base branch are compared with what the pull
+  # request generates. See docs/development/contracts.md.
+  contracts:
+    runs-on: ubuntu-latest
+    name: Published contracts
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compare the published contracts
+        run: |
+          git fetch origin "$BASE_REF"
+          base=$(git merge-base HEAD "origin/$BASE_REF")
+          if [ "$BREAKING" = 'true' ]; then
+            npx tsx scripts/contracts.ts --base "$base" --breaking
+          else
+            npx tsx scripts/contracts.ts --base "$base"
+          fi
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BREAKING: ${{ contains(github.event.pull_request.labels.*.name, 'breaking') }}
 
   lsc-plugin-test:
     runs-on: ubuntu-latest

@@ -4,6 +4,7 @@ build/
 helm/
 package.json
 openapi.json
+docs/usage/options.snapshot.json
 
 # Dependencies
 node_modules/

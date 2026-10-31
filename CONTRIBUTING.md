@@ -41,7 +41,7 @@ npm run start:dev
 ```bash
 npm run test:dev                  # build, then the whole suite
 npm run test:one test/foo.test.ts # a subset
-npm run check                     # types, ESLint, Prettier, no client values
+npm run check                     # types, ESLint, Prettier, hooks, OpenAPI document, options snapshot, no client values
 npm run check:ts                  # types, with the TypeScript 5 compiler
 npm run check:ts7                 # types, with TypeScript 7
 npm run fix                       # ESLint and Prettier fixes
@@ -111,6 +111,31 @@ patched. An override no dependency resolves any more is stale: remove it.
    `fix(authz): …`, `docs(upgrading): …`.
 4. Open a pull request on GitHub, filling the template: it records the
    reviews below.
+
+## Deprecating a published contract
+
+A published contract is the configuration, the REST API or the plugin types
+listed in [API stability](./docs/README.md#api-stability). Removing or
+narrowing one is a breaking change: the pull request carries the `breaking`
+label and the release is a major one. Prefer deprecating first, so the users
+have a release to move:
+
+- **A renamed option** keeps its old CLI name and environment variable as an
+  alias for two minor releases. The parser reads them as the canonical name
+  and the server warns at startup; the alias leaves in a major release. An
+  array option's plural form cannot be aliased, so renaming it is a breaking
+  change.
+- **A route or response field** is marked `deprecated: true` in its OpenAPI
+  declaration, and the `CHANGELOG.md` entry names the release that removes it.
+  The removal waits for a major release.
+- **A default behaviour change** goes behind a new option first, defaulting to
+  the old behaviour. The default flips in a major release.
+- **A plugin type** that moves or is renamed keeps its old export for one
+  version, re-exported from the previous sub-path, and the removal waits for a
+  major release.
+
+[Published contracts](./docs/development/contracts.md) describes how CI
+detects a break and how the snapshots are regenerated.
 
 ## Reviewing changes
 
