@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Plugins can provide a typed service under a token and reach another plugin's
+  service with `this.service(token)`, which returns the provided instance or
+  `null` ([details](docs/plugin-development/services.md)).
+
 ### Fixed
 
 - A password policy whose `pwdMaxAge` sets an expiry beyond the representable

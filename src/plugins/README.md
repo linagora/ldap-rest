@@ -23,6 +23,7 @@ See [abstract class](../abstract/plugin.ts) for more
     Note that this config maybe a modified config. Example:
     `npx ldap-rest --plugin core/hello:myhello:{"api_prefix":"/myapi"}`
 - It may have a **dependencies** property: _`Record<uniqname, path>`_ of plugins that needs to be loaded before this one.
+- It may have a **provides** property: the typed services it offers to other plugins, see [plugin services](../../docs/plugin-development/services.md).
 
 ### Examples to expose an API _(or any [express](https://www.npmjs.com/package/express) hook)_
 
