@@ -45,6 +45,16 @@ field, getter or method named `service`.
 provides under a service token. Rename the plugin's own `service` member. See
 [plugin services](../plugin-development/services.md).
 
+### A plugin with its own `provides` member
+
+**Who is affected:** a plugin built outside this repository that declares a
+field named `provides`.
+
+`DmPlugin` now has `provides`, the services a plugin offers to others. Rename
+the plugin's own `provides` member, or it becomes the list of services the
+plugin declares. See
+[plugin services](../plugin-development/services.md#providing-a-service).
+
 ### A plugin extending `TwakePlugin`
 
 **Who is affected:** a plugin built outside this repository whose class extends

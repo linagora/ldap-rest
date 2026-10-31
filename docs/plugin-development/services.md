@@ -4,16 +4,20 @@ A plugin sometimes needs what another plugin holds: the group operations, the
 entity schemas, the trash. A service is a typed interface a plugin provides
 under a token, and another plugin reaches with `this.service(token)`.
 
-The token carries the interface. The compiler checks that the provider answers
-it and that the consumer reads it, so a renamed plugin or a changed shape
-fails at build time rather than silently skipping work at runtime. The plugin
+The token carries the interface. The compiler checks that an instance bound
+with `with()` answers it, and gives a consumer the type it declared. Whether a
+provider exists is a runtime question: a plugin that stops declaring the token
+still compiles, and its consumers get `null` and a warning. The plugin
 registry name stays what it is for: loading a plugin and naming it in the
 logs.
 
 ## Declaring a service
 
-Put the token and its interface in a module both sides import — a core service
-in `src/lib/services/`, a plugin family's own service in its own module.
+Put the token and its interface in a module both sides import — a plugin
+family's own service in its own module. A service shared between families is
+declared in `src/lib/services/` and re-exported from `ldap-rest/plugin`, one
+of the package's entry points; a module under `src/lib/` has no export path of
+its own.
 
 ```typescript
 import { serviceToken } from 'ldap-rest/plugin';
@@ -46,15 +50,23 @@ export default class LdapGroups extends DmPlugin {
 }
 ```
 
-`with(this)` refuses an instance that does not answer the interface. A plugin
-can provide several services. A service is registered once its plugin's
-registration completes, so a consumer loaded afterwards finds it; a plugin
-needing another one declares it in [`dependencies`](dependencies.md#explicit-dependencies)
-so that it loads first.
+`with(this)` is checked by the compiler: an instance that does not answer the
+interface does not compile. A plugin can provide several services. A service
+is registered once its plugin's registration completes — after `api()` and
+the hooks — so a consumer loaded afterwards finds it, and a provider does not
+find its own service there. A plugin needing another one declares it in
+[`dependencies`](dependencies.md#explicit-dependencies) so that it loads
+first.
 
 The first provider to register wins. A second one offering the same token is
-ignored and named in a startup warning: which one answered would otherwise
-depend on load order.
+ignored and named in a warning: which one answered would otherwise depend on
+load order. Loading the same module twice under two names gives two instances
+but one module-level token, so the second instance cannot provide it either.
+
+When a host registers a plugin after startup, its `assertComposition` runs
+before the service is registered, so a provider does not find its own service
+there; the configuration's plugins are all registered before their
+`assertComposition` runs.
 
 ## Consuming a service
 

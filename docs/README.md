@@ -45,8 +45,9 @@ API, which a minor or a patch release does not break:
   [REST API](client-development/api/rest-api.md) and the plugin pages,
   their statuses and their error `code`s.
 - **Plugin API**: what `ldap-rest/plugin` exports — `DmPlugin` and its
-  roles (`auth`, `authz`, …), `serviceToken` and the service types,
-  `asyncHandler`, the DN and filter escaping helpers and the error classes —,
+  roles (`auth`, `authz`, …), `serviceToken`, `ServiceToken` and
+  `ServiceProvider`, `asyncHandler`, the DN and filter escaping helpers and
+  the error classes —,
   the `DM` type of `ldap-rest` and the
   `Hooks` of `ldap-rest/hooks`, whose arguments are those typed in
   `src/hooks.ts` ([hooks](plugin-development/hooks.md)), and the directory
