@@ -148,7 +148,7 @@ export class LdapBrowser {
 
     searchButton?.addEventListener('click', () => void this.runSearch());
     filter?.addEventListener('keydown', event => {
-      if ((event as KeyboardEvent).key === 'Enter') void this.runSearch();
+      if (event.key === 'Enter') void this.runSearch();
     });
     refreshButton?.addEventListener('click', () => {
       this.tree?.invalidate();

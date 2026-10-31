@@ -154,7 +154,7 @@ export class ScimBulk {
             : await this.groups.create(req, op.data as ScimGroup);
           base.status = '201';
           base.location = this.buildLocation(resource, created.id!, req);
-          base.version = (created.meta?.version as string) || undefined;
+          base.version = created.meta?.version || undefined;
           if (op.bulkId) {
             refs.set(op.bulkId, {
               id: created.id!,
@@ -192,9 +192,7 @@ export class ScimBulk {
           return base;
         }
         default:
-          throw scimInvalidValue(
-            `Unsupported method '${String(op.method as unknown)}'`
-          );
+          throw scimInvalidValue(`Unsupported method '${String(op.method)}'`);
       }
     } catch (err) {
       // The same translation the single-resource routes apply. Reading only

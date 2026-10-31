@@ -306,7 +306,7 @@ export default class TwakeInstances extends DmPlugin {
       this.settings.twake_instance_auth_exchange,
       this.settings.twake_instance_workplace_created_key,
       this.settings.twake_instance_queue,
-      message => this.onWorkplaceCreated(message as WorkplaceCreated)
+      message => this.onWorkplaceCreated(message)
     );
   }
 
@@ -735,7 +735,7 @@ export default class TwakeInstances extends DmPlugin {
       },
       base
     )) as SearchResult;
-    return res.searchEntries[0] as AttributesList | undefined;
+    return res.searchEntries[0];
   }
 
   private async read(
@@ -748,7 +748,7 @@ export default class TwakeInstances extends DmPlugin {
         dn,
         req
       )) as SearchResult;
-      return res.searchEntries[0] as AttributesList | undefined;
+      return res.searchEntries[0];
     } catch (err) {
       const code = extractLdapCode(err);
       if (code === 32) return undefined;
@@ -858,8 +858,6 @@ export default class TwakeInstances extends DmPlugin {
       this.config.ldap_base,
       req
     )) as SearchResult;
-    return res.searchEntries.find(e =>
-      this.patterns.some(p => p.test(e.dn))
-    ) as AttributesList | undefined;
+    return res.searchEntries.find(e => this.patterns.some(p => p.test(e.dn)));
   }
 }

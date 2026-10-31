@@ -122,6 +122,15 @@ export default [
     },
   },
 
+  // Reported as a warning: the rule treats assertions that other rules need
+  // as unnecessary, so failing the build on it blocks correct changes.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
+    },
+  },
+
   // JavaScript-specific config
   {
     files: ['*.js', '*.mjs'],

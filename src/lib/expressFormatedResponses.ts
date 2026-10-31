@@ -96,7 +96,7 @@ export const errorResponse = (
     return { status, body: errorBody(err, clientMessageOf(err)) };
   return {
     status,
-    body: serverErrorBody(err, debug) as { error: string } & Partial<Refusal>,
+    body: serverErrorBody(err, debug),
   };
 };
 

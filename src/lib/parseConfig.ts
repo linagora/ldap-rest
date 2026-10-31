@@ -119,7 +119,7 @@ export class ConfigParser {
         if (entry[3] === 'boolean') {
           value = true;
         } else if (entry[3] === 'number') {
-          value = cliValue as number;
+          value = cliValue;
         } else if (entry[3] === 'array') {
           value = (fromDefault ? [] : (value as string[])).concat(
             (cliValue as string[]).flatMap(v =>
@@ -140,7 +140,7 @@ export class ConfigParser {
             );
           }
         } else {
-          value = cliValue as string;
+          value = cliValue;
         }
         cliArgs.delete(entry[0]);
       }

@@ -75,7 +75,7 @@ export async function pagedSearch(opts: PagedSearch): Promise<PagedResult> {
     for await (const page of generator) {
       for (const entry of page.searchEntries || []) {
         if (scanned >= first && entries.length < opts.count) {
-          entries.push(entry as AttributesList);
+          entries.push(entry);
         }
         scanned++;
         if (scanned > opts.maxScanned) {

@@ -820,12 +820,7 @@ export default class LdapGroups extends DmPlugin {
     if (!cn) throw new BadRequestError('cn is required');
     const dn = this.routeGroupDn(cn);
     await this.server.ldap.canonicalChanges(body);
-    assertClientMaySet(
-      this.schema,
-      modifiedAttributeNames(
-        body as Parameters<typeof modifiedAttributeNames>[0]
-      )
-    );
+    assertClientMaySet(this.schema, modifiedAttributeNames(body));
     await this.judgedGroup(dn, () =>
       this.ldap.authorize('ldapmodifyrequest', [dn, body, this.opNumber(), req])
     );

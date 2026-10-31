@@ -221,7 +221,7 @@ export class ScimGroups {
       throw scimNotFound(`Group ${id} not found`);
     }
     return ldapToScimGroup(
-      result.searchEntries[0] as AttributesList,
+      result.searchEntries[0],
       this.mapping,
       this.ctx(req),
       this.buildMemberResolver(req)
@@ -494,7 +494,7 @@ export class ScimGroups {
     if (!result.searchEntries?.length) {
       throw scimNotFound(`Group ${id} not found`);
     }
-    return result.searchEntries[0] as AttributesList;
+    return result.searchEntries[0];
   }
 
   async delete(req: DmRequest, id: string): Promise<void> {

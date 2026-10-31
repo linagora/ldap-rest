@@ -23,7 +23,7 @@ import type winston from 'winston';
 import type { Request, Response, NextFunction } from 'express';
 
 import { ConfigParser } from '../lib/parseConfig';
-import { unknownEnvironmentOptions, type OptionSet } from '../config/options';
+import { unknownEnvironmentOptions } from '../config/options';
 import { keepRawBody } from '../lib/rawBody';
 import configArgs, { type Config } from '../config/args';
 import type { Hooks } from '../hooks';
@@ -439,9 +439,7 @@ export class DM {
    */
   private reportUnknownOptions(): void {
     const definitions = Object.values(this.loadedPlugins).map(
-      plugin =>
-        (plugin.constructor as typeof DmPlugin).optionDefinitions ??
-        ({} as OptionSet)
+      plugin => (plugin.constructor as typeof DmPlugin).optionDefinitions ?? {}
     );
     const declared = new Set(
       definitions.flatMap(optionSet => Object.keys(optionSet))

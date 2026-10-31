@@ -1387,7 +1387,7 @@ class ldapActions {
         },
         dn
       )) as SearchResult;
-      entry = result.searchEntries[0] as AttributesList | undefined;
+      entry = result.searchEntries[0];
     } catch {
       return [];
     }

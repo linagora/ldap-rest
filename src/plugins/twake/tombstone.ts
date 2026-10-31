@@ -14,7 +14,6 @@
  */
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
-import type { SearchOptions } from 'ldapts';
 
 import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
@@ -149,7 +148,7 @@ export default class TwakeTombstone extends DmPlugin {
         {
           ...opts,
           filter: `(&${String(filter).startsWith('(') ? String(filter) : `(${String(filter)})`}${hidden})`,
-        } as SearchOptions,
+        },
         req,
       ];
     },
@@ -399,7 +398,7 @@ export default class TwakeTombstone extends DmPlugin {
         { paged: false, scope: 'base', attributes: ['*', this.attrs.lock] },
         dn
       )) as SearchResult;
-      return res.searchEntries[0] as AttributesList | undefined;
+      return res.searchEntries[0];
     } catch (err) {
       if (extractLdapCode(err) === 32) return undefined;
       throw err;

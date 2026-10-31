@@ -1031,7 +1031,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     )) as SearchResult;
     const domains: string[] = [];
     for (const entry of result.searchEntries || [])
-      domains.push(...valueList(entry[domainNameAttr] as AttributeValue));
+      domains.push(...valueList(entry[domainNameAttr]));
     return domains;
   }
 
@@ -1291,7 +1291,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
         }
         return { searchEntries: [] };
       })) as SearchResult;
-    return (result.searchEntries || []) as Record<string, unknown>[];
+    return result.searchEntries || [];
   }
 
   /**
@@ -1501,7 +1501,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
       dn
     )) as SearchResult;
     const entry = result.searchEntries?.[0];
-    return entry ? entryValues(entry as Record<string, unknown>, name) : [];
+    return entry ? entryValues(entry, name) : [];
   }
 
   /**
@@ -1568,7 +1568,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
         { paged: false, scope: 'base' },
         dn
       )) as SearchResult;
-      return (result?.searchEntries?.[0] as AttributesList) || null;
+      return result?.searchEntries?.[0] || null;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       return null;

@@ -180,11 +180,7 @@ export class ScimUsers {
     if (!result.searchEntries || result.searchEntries.length === 0) {
       throw scimNotFound(`User ${id} not found`);
     }
-    return ldapToScimUser(
-      result.searchEntries[0] as AttributesList,
-      this.mapping,
-      this.ctx(req)
-    );
+    return ldapToScimUser(result.searchEntries[0], this.mapping, this.ctx(req));
   }
 
   async list(
@@ -509,7 +505,7 @@ export class ScimUsers {
     if (!result.searchEntries?.length) {
       throw scimNotFound(`User ${id} not found`);
     }
-    return result.searchEntries[0] as AttributesList;
+    return result.searchEntries[0];
   }
 
   async delete(req: DmRequest, id: string): Promise<void> {

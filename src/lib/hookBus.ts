@@ -231,7 +231,7 @@ export default class HookBus implements FlatHookBus {
    * @param fn what to run, none to unsubscribe every subscriber
    */
   set<K extends keyof Hooks>(name: K, ...fn: NonNullable<Hooks[K]>[]): void {
-    this.store(name, fn as unknown as HookFn[]);
+    this.store(name, fn);
   }
 
   /**
@@ -241,7 +241,7 @@ export default class HookBus implements FlatHookBus {
    * @param fn what to run
    */
   subscribe<K extends keyof Hooks>(name: K, fn: NonNullable<Hooks[K]>): void {
-    this.store(name, [...asHooks(this.hooks[name]), fn as unknown as HookFn]);
+    this.store(name, [...asHooks(this.hooks[name]), fn]);
   }
 
   /**

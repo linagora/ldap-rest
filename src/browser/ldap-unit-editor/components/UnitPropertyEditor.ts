@@ -284,10 +284,7 @@ export class UnitPropertyEditor {
     }
 
     try {
-      const replace = changedAttributes(
-        this.unit as unknown as Record<string, unknown>,
-        updates
-      );
+      const replace = changedAttributes(this.unit, updates);
       if (Object.keys(replace).length)
         await this.api.updateUnit(this.unitDn, replace);
       alert('Organizational unit updated successfully!');

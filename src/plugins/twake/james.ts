@@ -720,17 +720,11 @@ export default class James extends TwakePlugin {
     onLdapEntryChange: async (dn, before, after) => {
       // ldapadddone provisions an entry added with its mail
       if (before && after && !before[this.mailAttr] && after[this.mailAttr])
-        await this.provisionAccount(dn, after as AttributesList);
-      await this.followTeamMailbox(
-        before as AttributesList | null,
-        after as AttributesList | null
-      );
+        await this.provisionAccount(dn, after);
+      await this.followTeamMailbox(before, after);
       // Here only, not from ldapadddone too: this fires once for an add, a
       // modify, a rename and a delete alike
-      await this.followDomains(
-        before as AttributesList | null,
-        after as AttributesList | null
-      );
+      await this.followDomains(before, after);
     },
   };
 
@@ -907,7 +901,7 @@ export default class James extends TwakePlugin {
       )) as AsyncGenerator<SearchResult>;
       for await (const page of pages)
         for (const entry of page.searchEntries || [])
-          if (test(entry as AttributesList)) return entry as AttributesList;
+          if (test(entry)) return entry;
       return null;
     } catch (err) {
       if (extractLdapCode(err) === 32) return null;
@@ -1998,8 +1992,8 @@ export default class James extends TwakePlugin {
     const [oldDelegated, newDelegated] = changes[delegationAttr] || [];
 
     // Normalize values to arrays of DNs
-    const oldDNs = this._normalizeToArray(oldDelegated as string);
-    const newDNs = this._normalizeToArray(newDelegated as string);
+    const oldDNs = this._normalizeToArray(oldDelegated);
+    const newDNs = this._normalizeToArray(newDelegated);
 
     // Find added and removed delegations
     const addedDNs = newDNs.filter(delegateDN => !oldDNs.includes(delegateDN));
