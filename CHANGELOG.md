@@ -4,6 +4,9 @@
 
 ### Added
 
+- Plugins can provide a typed service under a token and reach another plugin's
+  with `this.service(token)`, which returns the provided instance or `null`
+  ([details](docs/plugin-development/services.md)).
 - `GET /v1/config` answers the server's `version`, so a client can tell an
   administrator the server is older than it supports. Only an installation
   that moved the `package.json` outside the package leaves the field out

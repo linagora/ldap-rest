@@ -1,9 +1,10 @@
 # Plugin Dependency Graph
 
-This document describes the dependencies between LDAP-Rest plugins. There are two types of dependencies:
+This document describes the dependencies between LDAP-Rest plugins. There are three types of dependencies:
 
 1. **Explicit Dependencies**: Defined in the `dependencies` property of a plugin class
-2. **Hook Dependencies**: Implicit dependencies through hooks (one plugin provides a hook, another consumes it)
+2. **Service Dependencies**: A plugin reaches a typed interface another one provides, see [plugin services](services.md)
+3. **Hook Dependencies**: Implicit dependencies through hooks (one plugin provides a hook, another consumes it)
 
 ## Dependency Types
 
@@ -23,6 +24,16 @@ name already is. A module requested again under the same name and without
 overrides — a dependency also given to `--plugin`, or an entry listed twice —
 is loaded once: the second request waits for the first. Only an entry with
 overrides builds a second instance, and it needs a name of its own.
+
+### Service Dependencies
+
+A plugin provides a typed interface under a token, and a consumer reaches it
+with `this.service(token)`. The token replaces the registry name as the way to
+find another plugin's code; `dependencies` still decides what loads first. A
+consumer whose provider is absent gets `null` and a single warning.
+
+See [plugin services](services.md) for the token, the provided interface and
+the registration rules.
 
 ### Hook Dependencies
 

@@ -36,6 +36,15 @@ field, getter or method named `options`, or a static field named
 through `optionDefinitions`. Rename the plugin's own `options` member; a
 plugin that does not declare options keeps reading `this.config` as before.
 
+### A plugin with its own `service` member
+
+**Who is affected:** a plugin built outside this repository that declares a
+field, getter or method named `service`.
+
+`DmPlugin` now has `service(token)`, which returns the instance another plugin
+provides under a service token. Rename the plugin's own `service` member. See
+[plugin services](../plugin-development/services.md).
+
 ### A plugin extending `TwakePlugin`
 
 **Who is affected:** a plugin built outside this repository whose class extends
