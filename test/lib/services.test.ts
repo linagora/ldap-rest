@@ -26,9 +26,23 @@ class OtherProvider extends DmPlugin {
   provides = [OtherService.with({ greet: name => `other ${name}` })];
 }
 
+class MultiProvider extends DmPlugin {
+  name = 'multiProvider';
+  provides = [
+    GreeterService.with({ greet: name => `hello ${name}` }),
+    OtherService.with({ greet: name => `other ${name}` }),
+  ];
+}
+
 class GreeterConsumer extends DmPlugin {
   name = 'greeterConsumer';
   lookup = (): GreeterApi | null => this.service(GreeterService);
+}
+
+class MultiConsumer extends DmPlugin {
+  name = 'multiConsumer';
+  greeter = (): GreeterApi | null => this.service(GreeterService);
+  other = (): GreeterApi | null => this.service(OtherService);
 }
 
 class RequiringConsumer extends DmPlugin {
@@ -94,6 +108,38 @@ describe('Plugin services', () => {
     ]);
   });
 
+  it('warns once per missing service, not once per lookup', async () => {
+    const dm = new DM();
+    await dm.ready;
+    const warnings = captureWarnings(dm);
+    const consumer = new MultiConsumer(dm);
+
+    expect(consumer.greeter()).to.equal(null);
+    expect(consumer.other()).to.equal(null);
+    expect(consumer.greeter()).to.equal(null);
+    expect(consumer.other()).to.equal(null);
+
+    expect(warnings).to.deep.equal([
+      "multiConsumer: service 'test-greeter' is not provided — its features will be skipped",
+      "multiConsumer: service 'test-other' is not provided — its features will be skipped",
+    ]);
+  });
+
+  it('registers every service a plugin provides', async () => {
+    const dm = new DM();
+    await dm.ready;
+    const provider = new MultiProvider(dm);
+
+    await dm.registerPlugin('test/multi', provider, 'multi');
+
+    expect(dm.services.get(GreeterService)).to.equal(
+      provider.provides[0].service
+    );
+    expect(dm.services.get(OtherService)).to.equal(
+      provider.provides[1].service
+    );
+  });
+
   it('keeps the first provider and warns when another offers the same token', async () => {
     const dm = new DM();
     await dm.ready;
@@ -107,6 +153,23 @@ describe('Plugin services', () => {
 
     const consumer = new GreeterConsumer(dm);
     expect(consumer.lookup()?.greet('world')).to.equal('hello world');
+    expect(warnings).to.deep.equal([
+      "Plugin second: service 'test-greeter' is already provided by first; this one is ignored",
+    ]);
+  });
+
+  it('still registers a second provider other services', async () => {
+    const dm = new DM();
+    await dm.ready;
+    const warnings = captureWarnings(dm);
+    const first = new GreeterProvider(dm);
+    const second = new MultiProvider(dm);
+
+    await dm.registerPlugin('test/first', first, 'first');
+    await dm.registerPlugin('test/second', second, 'second');
+
+    expect(dm.services.get(GreeterService)).to.equal(first.provides[0].service);
+    expect(dm.services.get(OtherService)).to.equal(second.provides[1].service);
     expect(warnings).to.deep.equal([
       "Plugin second: service 'test-greeter' is already provided by first; this one is ignored",
     ]);
