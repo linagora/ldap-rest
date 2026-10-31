@@ -139,6 +139,18 @@
   unknown name, where it was taken for a declared attribute and written to
   the directory
   ([#543](https://github.com/linagora/ldap-rest/issues/543)).
+- The raw LDAP API hides an attribute under every name its type answers to:
+  a credential or configured hidden attribute requested or answered as an
+  OID, an alias or with an `OID.` prefix is no longer served
+  ([details](docs/usage/plugins/ldap/raw.md#hidden-attributes)).
+- A raw LDAP search filter that tests a hidden attribute, at any depth and
+  under any of its names or a supertype the directory evaluates with it, is
+  refused with a 400 instead of being evaluated with the service account's
+  rights; so is an extensible match without an attribute, which runs over
+  every attribute. Entry reads and searches are
+  refused with a 503 when the directory schema cannot be read, rather than
+  answered with only the configured names compared
+  ([details](docs/usage/plugins/ldap/raw.md#hidden-attributes)).
 
 ## v1.2.1 (2026-10-28)
 

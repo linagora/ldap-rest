@@ -3030,7 +3030,7 @@
             }
           },
           "400": {
-            "description": "Invalid scope, invalid limit, or unparseable LDAP filter. The\nmessage names the offending filter and recalls the expected\nform, e.g. `Invalid LDAP filter \"gov\"`.\n",
+            "description": "Invalid scope, invalid limit, unparseable LDAP filter, or a\nfilter testing a hidden attribute — including an extensible\nmatch without an attribute, which runs over every attribute.\nThe message names an unparseable filter and recalls the expected\nform, e.g. `Invalid LDAP filter \"gov\"`.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -3064,6 +3064,16 @@
           },
           "500": {
             "description": "Internal server error"
+          },
+          "503": {
+            "description": "The directory schema could not be read, so a hidden attribute\ncannot be matched under its OID or aliases; the search is\nrefused rather than answered unmasked.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3200,6 +3210,16 @@
           },
           "500": {
             "description": "Internal server error"
+          },
+          "503": {
+            "description": "The directory schema could not be read, so a hidden attribute\ncannot be matched under its OID or aliases; the entry is not\nserved rather than answered unmasked.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [

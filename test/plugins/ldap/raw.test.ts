@@ -4,6 +4,7 @@ import { Client, Attribute } from 'ldapts';
 
 import LdapRaw from '../../../src/plugins/ldap/raw';
 import { DM } from '../../../src/bin';
+import { ServiceUnavailableError } from '../../../src/lib/errors';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('LDAP Raw Plugin', function () {
@@ -56,6 +57,146 @@ describe('LDAP Raw Plugin', function () {
       expect(instance.hiddenAttributes.has('telephonenumber')).to.equal(true);
       // The built-in credential list stays in place
       expect(instance.hiddenAttributes.has('userpassword')).to.equal(true);
+    });
+  });
+
+  describe('hidden attribute types', () => {
+    const hidden = new Set([
+      'userpassword',
+      '2.5.4.35',
+      'hometelephonenumber',
+      'homephone',
+      '0.9.2342.19200300.100.1.20',
+    ]);
+
+    it('hides an answered name under its OID, alias or OID prefix', () => {
+      const raw = Object.create(LdapRaw.prototype) as LdapRaw;
+      const internals = raw as unknown as {
+        hiddenAttributes: Set<string>;
+        hiddenTypeNames: Set<string>;
+      };
+      internals.hiddenAttributes = new Set([
+        'userpassword',
+        'hometelephonenumber',
+      ]);
+      internals.hiddenTypeNames = hidden;
+
+      for (const name of [
+        '2.5.4.35',
+        'OID.2.5.4.35',
+        'homePhone',
+        '0.9.2342.19200300.100.1.20',
+        'USERPASSWORD;binary',
+      ]) {
+        const entry = raw.formatEntry({
+          dn: 'uid=jdoe,dc=example,dc=com',
+          [name]: '{SSHA}c2VjcmV0',
+        });
+        expect(entry.attributes, name).to.not.have.property(name);
+      }
+      expect(
+        raw.formatEntry({
+          dn: 'uid=jdoe,dc=example,dc=com',
+          cn: 'John Doe',
+        }).attributes
+      ).to.have.property('cn');
+    });
+
+    it('refuses a filter on a supertype of a hidden type', async () => {
+      const raw = Object.create(LdapRaw.prototype) as LdapRaw;
+      const internals = raw as unknown as {
+        hiddenAttributes: Set<string>;
+        getSchemaIndex: () => Promise<unknown>;
+        hiddenNames: () => Promise<ReadonlySet<string>>;
+        hiddenFilterNames?: Set<string>;
+      };
+      internals.hiddenAttributes = new Set(['surname']);
+      internals.getSchemaIndex = async () => ({
+        getAttributeType: (name: string) => {
+          const key = name.toLowerCase();
+          if (key === 'surname' || key === 'sn' || key === '2.5.4.4')
+            return {
+              oid: '2.5.4.4',
+              names: ['sn', 'surname'],
+              sup: 'name',
+            };
+          if (key === 'name' || key === '2.5.4.41')
+            return { oid: '2.5.4.41', names: ['name'] };
+          return undefined;
+        },
+      });
+
+      await internals.hiddenNames();
+      expect(internals.hiddenFilterNames?.has('name')).to.equal(true);
+      expect(() =>
+        raw.checkFilter('(name=AliasSurname)', internals.hiddenFilterNames!)
+      ).to.throw('does not expose');
+      expect(() =>
+        raw.checkFilter('(cn=Raw Alias)', internals.hiddenFilterNames!)
+      ).to.not.throw();
+    });
+
+    it('refuses to resolve hidden types without a schema', async () => {
+      const raw = Object.create(LdapRaw.prototype) as LdapRaw;
+      const internals = raw as unknown as {
+        hiddenAttributes: Set<string>;
+        getSchemaIndex: () => Promise<unknown>;
+        hiddenNames: () => Promise<ReadonlySet<string>>;
+      };
+      internals.hiddenAttributes = new Set(['userpassword']);
+      internals.getSchemaIndex = async () => {
+        throw new Error('subschema unreadable');
+      };
+
+      let refusal: unknown;
+      try {
+        await internals.hiddenNames();
+      } catch (err) {
+        refusal = err;
+      }
+      expect(refusal).to.be.instanceOf(ServiceUnavailableError);
+    });
+
+    it('reads no schema when nothing is hidden', async () => {
+      const raw = Object.create(LdapRaw.prototype) as LdapRaw;
+      const internals = raw as unknown as {
+        hiddenAttributes: Set<string>;
+        getSchemaIndex: () => Promise<unknown>;
+        hiddenNames: () => Promise<ReadonlySet<string>>;
+      };
+      internals.hiddenAttributes = new Set();
+      internals.getSchemaIndex = async () => {
+        throw new Error('must not be called');
+      };
+
+      const names = await internals.hiddenNames();
+      expect([...names]).to.deep.equal([]);
+    });
+
+    it('resolves a configured name to its type OID and aliases', async () => {
+      const raw = Object.create(LdapRaw.prototype) as LdapRaw;
+      const internals = raw as unknown as {
+        hiddenAttributes: Set<string>;
+        getSchemaIndex: () => Promise<unknown>;
+        hiddenNames: () => Promise<ReadonlySet<string>>;
+      };
+      internals.hiddenAttributes = new Set(['hometelephonenumber']);
+      internals.getSchemaIndex = async () => ({
+        getAttributeType: (name: string) =>
+          name.toLowerCase() === 'hometelephonenumber'
+            ? {
+                oid: '0.9.2342.19200300.100.1.20',
+                names: ['homePhone', 'homeTelephoneNumber'],
+              }
+            : undefined,
+      });
+
+      const names = await internals.hiddenNames();
+      expect([...names]).to.include.members([
+        'hometelephonenumber',
+        'homephone',
+        '0.9.2342.19200300.100.1.20',
+      ]);
     });
   });
 
@@ -409,14 +550,105 @@ describe('LDAP Raw Plugin', function () {
     });
 
     it('should accept a well-formed filter', () => {
-      expect(() => plugin.checkFilter('(cn=foo)')).to.not.throw();
       expect(() =>
-        plugin.checkFilter('(|(cn=*foo*)(ou=*foo*))')
+        plugin.checkFilter('(cn=foo)', plugin.hiddenAttributes)
       ).to.not.throw();
-      expect(() => plugin.checkFilter('gov')).to.throw('Invalid LDAP filter');
-      expect(() => plugin.checkFilter('(cn=foo')).to.throw(
+      expect(() =>
+        plugin.checkFilter('(|(cn=*foo*)(ou=*foo*))', plugin.hiddenAttributes)
+      ).to.not.throw();
+      expect(() => plugin.checkFilter('gov', plugin.hiddenAttributes)).to.throw(
         'Invalid LDAP filter'
       );
+      expect(() =>
+        plugin.checkFilter('(cn=foo', plugin.hiddenAttributes)
+      ).to.throw('Invalid LDAP filter');
+    });
+
+    it('should refuse a filter on a hidden attribute under any name', () => {
+      const hidden = new Set([
+        'userpassword',
+        'sambantpassword',
+        '2.5.4.35',
+        'hometelephonenumber',
+        'homephone',
+      ]);
+      for (const filter of [
+        '(userPassword=*)',
+        '(&(uid=jdoe)(sambaNTPassword=0123456789ABCDEF))',
+        '(|(cn=x)(!(userPassword=*)))',
+        '(homePhone=*)',
+        '(HOMEphone=*)',
+        '(homePhone:caseExactMatch:=x)',
+        '(:octetStringMatch:=x)',
+        '(:dn:2.5.13.17:=x)',
+      ])
+        expect(() => plugin.checkFilter(filter, hidden), filter).to.throw(
+          /does not expose|matches on every attribute/
+        );
+      expect(() => plugin.checkFilter('(cn=foo)', hidden)).to.not.throw();
+    });
+
+    it('should refuse a search filter testing a hidden attribute', async () => {
+      let refusal: unknown;
+      try {
+        await plugin.search({
+          base: `ou=users,${base}`,
+          scope: 'sub',
+          filter: '(userPassword=*)',
+        });
+      } catch (err) {
+        refusal = err;
+      }
+      expect(String(refusal)).to.contain('does not expose');
+    });
+
+    it('should hide an alias and refuse a filter on it', async () => {
+      const dn = `uid=rawalias,ou=users,${base}`;
+      await server.ldap.add(dn, {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'rawalias',
+        cn: 'Raw Alias',
+        sn: 'AliasSurname',
+      });
+      const internals = plugin as unknown as {
+        hiddenAttributes: Set<string>;
+        hiddenTypeNames?: Set<string>;
+        hiddenFilterNames?: Set<string>;
+      };
+      try {
+        internals.hiddenAttributes.add('surname');
+        internals.hiddenTypeNames = undefined;
+        internals.hiddenFilterNames = undefined;
+
+        const entry = await plugin.getEntry(dn);
+        expect(entry.attributes).to.not.have.property('sn');
+        expect(entry.attributes).to.have.property('cn');
+
+        let refusal: unknown;
+        try {
+          await plugin.search({ base: dn, scope: 'base', filter: '(sn=*)' });
+        } catch (err) {
+          refusal = err;
+        }
+        expect(String(refusal)).to.contain('does not expose');
+
+        refusal = undefined;
+        try {
+          await plugin.search({
+            base: dn,
+            scope: 'base',
+            filter: '(name=AliasSurname)',
+          });
+        } catch (err) {
+          refusal = err;
+        }
+        expect(String(refusal)).to.contain('does not expose');
+      } finally {
+        internals.hiddenAttributes.delete('surname');
+        internals.hiddenTypeNames = undefined;
+        internals.hiddenFilterNames = undefined;
+        await server.ldap.delete(dn);
+      }
     });
 
     it('should reject an invalid scope', async () => {
