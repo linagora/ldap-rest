@@ -1,155 +1,75 @@
 # Changelog
 
-## Unreleased
+## v1.3.0 (2026-10-31)
+
+The October 2026 code-quality work and the five security findings it fixed.
+Four breaking changes; ten checks before deploying, several for a plugin
+built outside this repository,
+[upgrading](docs/usage/upgrading.md#from-121).
 
 ### Added
 
-- `GET /v1/config` answers the server's `version`, so a client can tell an
-  administrator the server is older than it supports. Only an installation
-  that moved the `package.json` outside the package leaves the field out
+- `GET /v1/config` answers the server's `version`
   ([details](docs/client-development/api/rest-api.md#get-configuration)).
-- An option or `DM_*` variable no declared option reads is named in a startup
-  warning; `--strict-options` refuses it instead
+- An undeclared option or `DM_*` variable is named at startup, and refused
+  with `--strict-options`
   ([details](docs/usage/configuration.md#general-options)).
-- The published image declares a `HEALTHCHECK` that calls `GET /healthz`
+- The image declares a `HEALTHCHECK`
   ([details](docs/usage/operations.md#health-and-readiness)).
+
+### Breaking Changes
+
+- Hooks go through `this.hookBus` and are declared in `src/hooks.ts`
+  ([details](docs/usage/upgrading.md#from-121),
+  [#415](https://github.com/linagora/ldap-rest/issues/415)).
+- `--group-allow-unexistent-members` is gone
+  ([upgrading](docs/usage/upgrading.md#the-group-member-check-option)).
+- `Config` has no index signature; declare options with `defineOptions`
+  ([upgrading](docs/usage/upgrading.md#a-config-key-a-plugin-did-not-declare)).
+- `TwakePlugin` takes the WebAdmin URL, token and concurrency
+  ([upgrading](docs/usage/upgrading.md#a-plugin-extending-twakeplugin)).
 
 ### Changed
 
-- A route whose input is malformed answers `400` with an
-  `Invalid request: <part>.<field>: <reason>` body naming every failing path
-  ([details](docs/plugin-development/routes.md#refusals)).
-- Node 22 is the oldest runtime supported and tested
-  ([upgrading](docs/usage/upgrading.md#from-121)).
-- The published image loads `core/demo/helloworld` as its second plugin and
-  starts without `DM_PLUGINS`
+- A malformed request answers `400` with every failing path
+  ([details](docs/plugin-development/routes.md#refusals)); Node 22 is the
+  oldest runtime ([upgrading](docs/usage/upgrading.md#from-121)).
+- The image loads `core/demo/helloworld` and starts without `DM_PLUGINS`
   ([details](docs/usage/operations.md#health-and-readiness)).
-- A plugin raises hooks through `this.hookBus` (`chain`, `notify`,
-  `notifyAndWait`, `notifyStrict`, `has`, `subscribers`, `settled`) instead
-  of `launchHooks` / `launchHooksChained`, every hook is declared in
-  `src/hooks.ts`, and every LDAP "done" hook gets its arguments one by one,
-  where it used to get them as a tuple — a subscriber still reading a tuple
-  receives the DN instead. A test waits on `settled()` rather than sleeping.
-  A plugin built outside this repository needs updating
-  ([details](docs/usage/upgrading.md#from-121))
-  ([#415](https://github.com/linagora/ldap-rest/issues/415)).
-- Options a plugin declares are checked when it loads: a SCIM limit outside
-  its range, or a value of the wrong JSON type in a per-instance override,
-  now stops the server instead of being replaced by the default or coerced —
-  this covers SCIM, applicative accounts and every Twake plugin, such as
-  `--scim-max-results 0`, `{"scim_max_results": "50"}`,
-  `{"max_app_accounts": "5"}` or `{"twake_drive_concurrency": "5"}`. A zero
-  or negative James, Calendar, Drive or migration proxy concurrency was
-  already refused, and now names the option. A zero
-  `--twake-group-max-page-limit`, `--twake-instance-timeout`,
-  `--cloudery-workflow-poll-interval-ms` or
-  `--cloudery-workflow-max-attempts` used to be replaced by the default and
-  is now refused. A zero rate-limit window or maximum, CrowdSec cache TTL or
-  authorization cache TTL used to be replaced by the default and is now
-  refused too; a zero TOTP step or HMAC window was accepted and broke the
-  plugin, and is now refused at startup. A zero
-  `--ldap-organization-max-subnodes`, `--ldap-raw-max-results`,
-  `--ppolicy-warn-days`, `--ppolicy-min-length` or `--bcl-retention` used to be
-  replaced by the default and is now refused ([details](docs/plugin-development/options.md)).
-- `--group-allow-unexistent-members` is gone: it was stored under a key the
-  groups plugin never read. Use `--groups-allow-unexistent-members` or
-  `DM_ALLOW_UNEXISTENT_MEMBERS`, which the plugin now reads
-  ([upgrading](docs/usage/upgrading.md#the-group-member-check-option)).
-- `Config` has no index signature any more: a plugin reading an option it did
-  not declare no longer compiles. Declare it with `defineOptions`
-  ([upgrading](docs/usage/upgrading.md#a-config-key-a-plugin-did-not-declare)).
-- `TwakePlugin` takes the WebAdmin URL, token and concurrency instead of the
-  names of the options holding them: a plugin built outside this repository
-  that extends it must update its `super()` call
-  ([upgrading](docs/usage/upgrading.md#a-plugin-extending-twakeplugin)).
+- Declared options are checked when their plugin loads
+  ([details](docs/plugin-development/options.md)).
 
 ### Fixed
 
-- A plugin that wrapped an error keeps the answer it deserved: the status and
-  the class of what was thrown are read through the `cause` chain, so a
-  refusal stays a 403 and a timeout a 504, where both surfaced as a 500
-  ([details](docs/client-development/api/rest-api.md#error-handling)).
-- A burst of requests arriving with the connection pool empty used to open
-  one connection per request and keep them all, going past
-  `--ldap-pool-size`: a connection being opened now takes its place in the
-  pool, and the requests over the size wait for a free one. The new
-  `ldap_rest_ldap_pool_opening` reports the connections being opened. A
-  connection that fails to open fails the requests waiting for it with that
-  error, and a request waiting behind a connection discarded as expired
-  takes its place, instead of both waiting for the 30 s pool timeout
-  ([details](docs/usage/operations.md#metrics),
+- A wrapped error keeps its status and class
+  ([details](docs/client-development/api/rest-api.md#error-handling)); the
+  LDAP pool waits over `--ldap-pool-size` instead of opening a connection
+  per request ([details](docs/usage/operations.md#metrics),
   [#460](https://github.com/linagora/ldap-rest/issues/460)).
-- An attribute the schema declares is checked and written whatever its case
-  or `;binary` option: a boolean sent as `PWDRESET` or `pwdReset;binary` is no
-  longer answered 400 as not a string, a `required` attribute sent as `Cn` no
-  longer counts as missing, and a `fixed` one is written once, at its default;
-  two names of one attribute in an entry or in one part of a change are
-  refused
-  ([#497](https://github.com/linagora/ldap-rest/issues/497)).
-- A creation or an `add` carrying `null` for an attribute the entity's schema
-  does not declare, or for every attribute when it has no schema, is no
-  longer answered 500: the attribute is written as if the key were left out.
-  The same applies to a `replace` of such an entry, where `null` clears the
-  attribute
-  ([#495](https://github.com/linagora/ldap-rest/issues/495)).
-- A size normalised with `byteSize` is answered 400 when it exceeds
-  2⁵³ − 1 bytes (`53687 TB`, a too large `default`), where it was stored as
-  `53687000000000000`, `1e+21` or `Infinity`
-  ([#493](https://github.com/linagora/ldap-rest/issues/493)).
-- A date checked as not already past, such as `twakeDeletionDate`, is read
-  as written: a year below 100 is no longer taken for a year of the 1900s,
-  and a leap second (`20991231235960Z`) no longer makes the date 400 as
-  invalid
-  ([details](docs/usage/plugins/ldap/enterprise-rules.md#scheduled-removal)).
-- The French labels and hints of the Twake schemas use the typographic
-  apostrophe (`’`), as the rest of the French text does
+- An attribute is checked and written whatever its case or `;binary` option,
+  two names of one are refused, and a `null` for an undeclared one is left
+  out ([#497](https://github.com/linagora/ldap-rest/issues/497),
+  [#495](https://github.com/linagora/ldap-rest/issues/495)).
+- Sizes past 2⁵³ − 1 bytes and JSON numbers that are not plain decimals are
+  refused; a date below year 100 or with a leap second is read as sent
+  ([#493](https://github.com/linagora/ldap-rest/issues/493),
+  [#496](https://github.com/linagora/ldap-rest/issues/496),
+  [details](docs/usage/plugins/ldap/enterprise-rules.md#scheduled-removal)).
+- The French labels of the Twake schemas use the typographic apostrophe
   ([#462](https://github.com/linagora/ldap-rest/issues/462)).
-- A `number` or `integer` sent as a JSON number is answered 400 by the
-  schema when the text written for it is not a plain decimal, so `1e21` and
-  `1e-7` are refused like the text `"1e+21"` already was instead of reaching
-  the directory, and so is a whole number beyond 2⁵³, whose digits the JSON
-  parser has already lost
-  ([details](docs/client-development/schemas/README.md#what-a-value-must-look-like),
-  [#496](https://github.com/linagora/ldap-rest/issues/496)).
 
 ### Security
 
-- A name sent as a DN, when creating a flat entry or a group, is no longer
-  read with a pattern that backtracks over its escapes: a DN of a few dozen
-  escapes could keep the process from answering any request until it was
-  restarted. The name written is now the value of the DN's first RDN, with
-  its escapes decoded — `uid=Smith\,John,…` names the entry `Smith,John`,
-  where it used to be `Smith\,John`. Such a name is answered 400 when the
-  DN gives none (empty, a control character, or a first RDN that is
-  multi-valued)
-  ([details](docs/usage/plugins/ldap/flat-generic.md#create-entry)).
-- A schema `test` pattern no longer reads a value longer than 4096
-  characters, unless the schema declares a `maxLength`: a longer value is
-  answered 400 with the length it may not exceed. Every attribute carrying a
-  pattern is concerned, a deployment's own included, and none of the shipped
-  schemas declares a longer one; a `maxLength` that is not a whole number of
-  characters makes the server refuse the schema at load. The address
-  patterns shipped with the schemas are rewritten so that a long value costs
-  one pass, and now refuse a trailing dot and an empty label (`a@b.c.`,
-  `a@b..c`), which they used to accept; the name patterns of the `example`
-  schemas accept the same values as before
+- A DN-named identifier no longer backtracks, and a control character in a
+  name is refused
+  ([details](docs/usage/plugins/ldap/flat-generic.md#create-entry)); a
+  schema pattern reads no value past 4096 characters, and the shipped
+  address patterns are linear
   ([details](docs/client-development/schemas/README.md#maxlength-optional)).
-- An attribute name the schema does not declare, such as `constructor`,
-  `toString` or `__proto__`, is refused by a strict schema like any other
-  unknown name, where it was taken for a declared attribute and written to
-  the directory
-  ([#543](https://github.com/linagora/ldap-rest/issues/543)).
-- The raw LDAP API hides an attribute under every name its type answers to:
-  a credential or configured hidden attribute requested or answered as an
-  OID, an alias or with an `OID.` prefix is no longer served
-  ([details](docs/usage/plugins/ldap/raw.md#hidden-attributes)).
-- A raw LDAP search filter that tests a hidden attribute, at any depth and
-  under any of its names or a supertype the directory evaluates with it, is
-  refused with a 400 instead of being evaluated with the service account's
-  rights; so is an extensible match without an attribute, which runs over
-  every attribute. Entry reads and searches are
-  refused with a 503 when the directory schema cannot be read, rather than
-  answered with only the configured names compared
+- An undeclared name such as `constructor` or `__proto__` is refused by a
+  strict schema ([#543](https://github.com/linagora/ldap-rest/issues/543)).
+- The raw API hides an attribute under its OID and aliases, refuses filters
+  on it, and answers 503 when the schema cannot be read
   ([details](docs/usage/plugins/ldap/raw.md#hidden-attributes)).
 
 ## v1.2.1 (2026-10-28)
