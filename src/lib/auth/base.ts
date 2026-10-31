@@ -276,7 +276,7 @@ export default abstract class AuthBase extends DmPlugin {
     try {
       [req, res] = await this.server.hookBus.chain('beforeAuth', [req, res]);
     } catch (err) {
-      return serverError(res, err as Error);
+      return serverError(res, err);
     }
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     this.authMethod(req, res, async (): Promise<void> => {
@@ -290,7 +290,7 @@ export default abstract class AuthBase extends DmPlugin {
         [req, res] = await this.server.hookBus.chain('afterAuth', [req, res]);
         next();
       } catch (err) {
-        serverError(res, err as Error);
+        serverError(res, err);
       }
     });
   }

@@ -233,8 +233,8 @@ export default class AuthzDynamic extends AuthBase {
       const next: TokenEntry[] = [];
       for (const entry of result.searchEntries || []) {
         const dn = typeof entry.dn === 'string' ? entry.dn : String(entry.dn);
-        const cn = asString(entry.cn as AttributeValue) || '';
-        const hash = asString(entry[this.tokenAttr] as AttributeValue) || '';
+        const cn = asString(entry.cn) || '';
+        const hash = asString(entry[this.tokenAttr]) || '';
         if (!hash) continue; // skip container OUs / entries without secret
 
         // Tenant: prefer the `tenant` field in the JSON config, fall back to
@@ -242,7 +242,7 @@ export default class AuthzDynamic extends AuthBase {
         let tenantFromJson: string | undefined;
 
         let bases: BranchAcl[] = [];
-        const cfgRaw = asString(entry[this.configAttr] as AttributeValue);
+        const cfgRaw = asString(entry[this.configAttr]);
         if (cfgRaw) {
           try {
             const parsed = JSON.parse(cfgRaw) as TokenConfig;
@@ -269,7 +269,7 @@ export default class AuthzDynamic extends AuthBase {
         const tenantFromAttr =
           this.tenantAttr === 'cn'
             ? cn
-            : asString(entry[this.tenantAttr] as AttributeValue) || cn;
+            : asString(entry[this.tenantAttr]) || cn;
         const tenant = tenantFromJson || tenantFromAttr;
 
         next.push({ dn, cn, tenant, hash, bases });

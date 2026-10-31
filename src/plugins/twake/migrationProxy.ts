@@ -133,13 +133,7 @@ export default class MigrationProxy extends TwakePlugin {
   hooks: Hooks = {
     onLdapEntryChange: (dn, before, after) => {
       if (!this.branches.some(branch => isDnInBranch(dn, branch))) return;
-      return this.inOrder(dn, () =>
-        this.follow(
-          dn,
-          before as AttributesList | null,
-          after as AttributesList | null
-        )
-      );
+      return this.inOrder(dn, () => this.follow(dn, before, after));
     },
   };
 

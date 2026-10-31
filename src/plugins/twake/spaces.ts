@@ -412,22 +412,15 @@ export default class TwakeSpaces extends DmPlugin {
           this.domains.delete(unescapeDnValue(changed.org).toLowerCase());
         });
       if (this.follows)
-        this.queue(dn, () =>
-          this.follow(
-            dn,
-            before as AttributesList | null,
-            after as AttributesList | null,
-            context
-          )
-        );
+        this.queue(dn, () => this.follow(dn, before, after, context));
       const org = organizationIn(this.userPattern, dn);
       if (
         org !== undefined &&
         this.lifecycle.deleted &&
         before &&
         after &&
-        !isTombstone(before as AttributesList, this.lifecycle) &&
-        isTombstone(after as AttributesList, this.lifecycle)
+        !isTombstone(before, this.lifecycle) &&
+        isTombstone(after, this.lifecycle)
       )
         this.queue(dn, async () =>
           this.handOver(org, dn, await this.administered(org, dn), context)

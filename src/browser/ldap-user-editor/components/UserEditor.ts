@@ -571,10 +571,7 @@ export class UserEditor {
     if (submitBtn) submitBtn.disabled = true;
 
     try {
-      const replace = changedAttributes(
-        this.user as unknown as Record<string, unknown>,
-        this.formData
-      );
+      const replace = changedAttributes(this.user, this.formData);
       if (Object.keys(replace).length)
         await this.api.updateUser(this.userDn, replace);
 

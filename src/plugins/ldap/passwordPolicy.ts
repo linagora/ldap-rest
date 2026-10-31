@@ -1059,7 +1059,7 @@ export default class PasswordPolicy extends DmPlugin {
       if (!result.searchEntries || result.searchEntries.length === 0) {
         throw new NotFoundError(`User not found: ${userId}`);
       }
-      return userEntry(result.searchEntries[0] as RawEntry);
+      return userEntry(result.searchEntries[0]);
     } catch (error) {
       // Handle LDAP NoSuchObjectError (0x20)
       if (
@@ -1182,7 +1182,7 @@ export default class PasswordPolicy extends DmPlugin {
       throw new NotFoundError(`User not found: ${userId}`);
     }
 
-    const entry = userEntry(result.searchEntries[0] as RawEntry);
+    const entry = userEntry(result.searchEntries[0]);
 
     // Build delete changes for existing attributes only
     const deleteAttrs: Record<string, string[]> = {};
@@ -1241,7 +1241,7 @@ export default class PasswordPolicy extends DmPlugin {
     const expiringUsers: ExpiringUser[] = [];
 
     for (const entry of result.searchEntries) {
-      const e = userEntry(entry as RawEntry);
+      const e = userEntry(entry);
       const changed = this.parseGeneralizedTime(e.pwdChangedTime);
       if (!changed) continue;
       const policy = await this.policyFor(e);
@@ -1294,7 +1294,7 @@ export default class PasswordPolicy extends DmPlugin {
     )) as SearchResult;
 
     return result.searchEntries.map(entry => {
-      const e = userEntry(entry as RawEntry);
+      const e = userEntry(entry);
       return {
         dn: e.dn,
         uid: e.uid,
@@ -1398,7 +1398,7 @@ export default class PasswordPolicy extends DmPlugin {
         dn
       )) as SearchResult;
       if (result.searchEntries.length > 0) {
-        policy = policyConfig(result.searchEntries[0] as RawEntry, dn);
+        policy = policyConfig(result.searchEntries[0], dn);
       }
     } catch (error) {
       failure = String(error);
@@ -1449,7 +1449,7 @@ export default class PasswordPolicy extends DmPlugin {
         this.policyBase(),
         req
       )) as SearchResult;
-      return result.searchEntries as RawEntry[];
+      return result.searchEntries;
     } catch (error) {
       if (extractLdapCode(error) !== 32) throw error;
       if (!this.warnedMissingBase) {

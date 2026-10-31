@@ -344,12 +344,7 @@ export default class TwakeLifecycleEvents extends DmPlugin {
 
   hooks: Hooks = {
     onLdapEntryChange: (dn, before, after, context) =>
-      this.onEntryChange(
-        dn,
-        before as AttributesList | null,
-        after as AttributesList | null,
-        context
-      ),
+      this.onEntryChange(dn, before, after, context),
     // core/twake/tombstone, on a second delete of a tombstone: nothing is
     // written, so this is the one way the deletion is announced again.
     twakedeletionreplay: (

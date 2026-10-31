@@ -249,7 +249,7 @@ export abstract class TwakePlugin extends DmPlugin {
     )) as SearchResult;
     for (const entry of found.searchEntries ?? [])
       if (await this.server.ldap.readableBy(String(entry.dn), req))
-        return entry as AttributesList;
+        return entry;
     return null;
   }
 
@@ -299,6 +299,9 @@ export abstract class TwakePlugin extends DmPlugin {
     if (Array.isArray(value)) {
       return value.length > 0 ? String(value[0]) : null;
     }
+    // An attribute value is a string or a Buffer; without the cast, String()
+    // would be seen as stringifying an arbitrary object.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     return String(value as string | Buffer);
   }
 
@@ -324,7 +327,7 @@ export abstract class TwakePlugin extends DmPlugin {
       )) as SearchResult;
 
       if (result.searchEntries && result.searchEntries.length > 0) {
-        return result.searchEntries[0] as AttributesList;
+        return result.searchEntries[0];
       }
       return null;
     } catch (err) {

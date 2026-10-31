@@ -164,7 +164,7 @@ export default class OpenIDConnect extends AuthBase {
       afterCallback: async (req, _res, session) => ({
         ...session,
         [SESSION_ID]: await this.sessionId(
-          req as unknown as DmRequest,
+          req,
           subjectOf((session as { id_token?: unknown }).id_token)
         ),
       }),
@@ -341,7 +341,7 @@ export default class OpenIDConnect extends AuthBase {
         // The provider's session survives and will log the caller back in:
         // that is the provider's limit, and a 500 would not lift it.
         return res.redirect(this.options(openidconnectOptions).base_url);
-      if (err) return serverError(res, err as Error);
+      if (err) return serverError(res, err);
       if (
         (req.method === 'GET' || req.method === 'HEAD') &&
         LOGOUT.test(req.path)

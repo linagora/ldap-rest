@@ -501,10 +501,7 @@ export class GroupPropertyEditor {
         edited[key] = value;
       }
     });
-    const updates = changedAttributes(
-      this.group as unknown as Record<string, unknown>,
-      edited
-    );
+    const updates = changedAttributes(this.group, edited);
     // Members have their own routes, which check them; a modify refuses them
     const membersChanged = 'member' in updates;
     const members = listChanges(this.group?.member, updates.member);

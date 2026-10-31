@@ -185,7 +185,7 @@ export function processFormData(
 
     if (attribute.type === 'array' && typeof data[fieldName] === 'string') {
       // Split by newlines and filter empty lines
-      data[fieldName] = (data[fieldName] as string)
+      data[fieldName] = data[fieldName]
         .split('\n')
         .map(line => line.trim())
         .filter(line => line.length > 0);
@@ -196,8 +196,8 @@ export function processFormData(
       // Convert to number
       data[fieldName] =
         attribute.type === 'integer'
-          ? parseInt(data[fieldName] as string, 10)
-          : parseFloat(data[fieldName] as string);
+          ? parseInt(data[fieldName], 10)
+          : parseFloat(data[fieldName]);
     }
   }
 
