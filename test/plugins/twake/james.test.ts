@@ -798,9 +798,7 @@ describe('James Plugin', () => {
     it('should remove delegation when twakeDelegatedUsers is removed', async () => {
       let removeApiCalled = false;
 
-      const addScope = nock(
-        process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
-      )
+      nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
         .put('/users/delegate@test.org/authorizedUsers/assistant@test.org')
         .reply(200);
 
@@ -809,8 +807,6 @@ describe('James Plugin', () => {
       )
         .delete('/users/delegate@test.org/authorizedUsers/assistant@test.org')
         .reply(200);
-
-      addScope.on('request', () => {});
 
       removeScope.on('request', () => {
         removeApiCalled = true;
@@ -910,13 +906,9 @@ describe('James Plugin', () => {
     });
     const testMail1 = `${testUser1}@test.org`;
     const testMail2 = `${testUser2}@test.org`;
-    let _identityScope: nock.Scope;
-
     before(function () {
       // Mock JMAP identity endpoints
-      _identityScope = nock(
-        process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
-      )
+      nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
         .persist()
         .get(`/users/${testMail1}/identities`)
         .reply(200, [
@@ -1036,7 +1028,6 @@ describe('James Plugin', () => {
 
   describe('Signature template', () => {
     let testDN4: string;
-    let _signatureScope: nock.Scope;
     let savedTemplate: string | undefined;
 
     before(function () {
@@ -1047,9 +1038,7 @@ describe('James Plugin', () => {
         '--<br/>{givenName} {sn}<br/>{title}<br/>{departmentNumber}';
 
       // Mock JMAP identity endpoints for signature test
-      _signatureScope = nock(
-        process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
-      )
+      nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
         .persist()
         .get('/users/signature@test.org/identities')
         .query({ default: 'true' })
