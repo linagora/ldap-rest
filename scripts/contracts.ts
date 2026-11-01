@@ -317,6 +317,20 @@ function allowsNull(shape: Shape): boolean {
   );
 }
 
+/** The schema `outer` restricted by one `allOf` member */
+function intersect(outer: Shape, member: Shape): Shape {
+  const merged: Shape = { ...outer, ...member, allOf: undefined };
+  // Merged, not substituted: a member that only adds a property keeps the
+  // ones the schema already declared.
+  if (outer.properties || member.properties)
+    merged.properties = { ...outer.properties, ...member.properties };
+  if (outer.required || member.required)
+    merged.required = [
+      ...new Set([...(outer.required ?? []), ...(member.required ?? [])]),
+    ];
+  return merged;
+}
+
 /**
  * What a change does to a schema. A request field a client sends cannot go
  * away or become required without breaking it; a response field it reads
@@ -329,13 +343,37 @@ export function shapeChanges(
   direction: 'request' | 'response'
 ): ContractDifference[] {
   const differences: ContractDifference[] = [];
+  // An `allOf` the base did not have intersects the schema with its members,
+  // which is what the schema accepts: a member that only adds a property
+  // keeps the ones the schema already declares.
+  if (!base.allOf && current.allOf?.length)
+    current = current.allOf.reduce(intersect, {
+      ...current,
+      allOf: undefined,
+    });
   const currentVariants = [...(current.oneOf ?? []), ...(current.anyOf ?? [])];
-  // The alternatives that carry the base type, when the current schema
-  // replaced it with a union. Comparison continues against each of them.
+  // The alternatives that answer for the base type, when the current schema
+  // is a union of them. A union replacing the type keeps it in its
+  // alternatives; one written next to the type applies that type to each
+  // alternative, so what the outer schema says is carried into them too.
+  const outer: Shape = {
+    ...current,
+    oneOf: undefined,
+    anyOf: undefined,
+    allOf: undefined,
+  };
   const variantsKeepingType =
-    base.type === undefined || current.type !== undefined
+    base.type === undefined
       ? []
-      : currentVariants.filter(variant => variant.type === base.type);
+      : current.type === undefined
+        ? currentVariants.filter(variant => variant.type === base.type)
+        : current.type === base.type
+          ? currentVariants.map(variant => ({
+              ...outer,
+              ...variant,
+              type: variant.type ?? base.type,
+            }))
+          : [];
   // A union that keeps the base type as one of its alternatives is the same
   // contract for that alternative; one that replaces it is a narrowing.
   if (
@@ -379,13 +417,17 @@ export function shapeChanges(
       ...(variant.enum ?? []),
       ...(variant.const !== undefined ? [variant.const] : []),
     ]);
-    for (const variant of variantsKeepingType) {
+    const reported = variantsKeepingType.map(variant => {
       const widened =
         base.enum !== undefined && accepted.length > 0
           ? { ...variant, const: undefined, enum: accepted }
           : variant;
-      differences.push(...shapeChanges(where, base, widened, direction));
-    }
+      return shapeChanges(where, base, widened, direction);
+    });
+    // An alternative that accepts everything the base did keeps the union
+    // additive, whatever the others add to it.
+    if (!reported.some(changes => changes.length === 0))
+      for (const changes of reported) differences.push(...changes);
   } else {
     if (base.format !== current.format && base.format !== undefined)
       differences.push({
@@ -408,6 +450,23 @@ export function shapeChanges(
         kind: 'changed',
         what: where,
         detail: `type: none → ${current.type}`,
+      });
+    // A schema that accepted any value now accepts one of a few: the union
+    // closes it as surely as an enum does.
+    else if (
+      direction === 'request' &&
+      base.type === undefined &&
+      base.const === undefined &&
+      base.enum === undefined &&
+      !base.oneOf &&
+      !base.anyOf &&
+      !base.allOf &&
+      (current.oneOf?.length || current.anyOf?.length)
+    )
+      differences.push({
+        kind: 'changed',
+        what: where,
+        detail: 'type: none → union',
       });
     else if (
       direction === 'request' &&
@@ -435,6 +494,17 @@ export function shapeChanges(
       'const',
       'default',
     ] as const) {
+      // A `const` one alternative of a union carries is not gone from the
+      // contract: `const a` → `anyOf[const a, const b]` accepts `a` still.
+      const keptByVariant =
+        name === 'const' &&
+        current.const === undefined &&
+        currentVariants.some(
+          variant =>
+            variant.const !== undefined &&
+            JSON.stringify(variant.const) === JSON.stringify(base.const)
+        );
+      if (keptByVariant) continue;
       const changed =
         base[name] !== undefined &&
         JSON.stringify(base[name]) !== JSON.stringify(current[name]);
@@ -489,7 +559,16 @@ export function shapeChanges(
       });
 
     const allowed = new Set(
-      (current.enum ?? []).map(value => JSON.stringify(value))
+      [
+        ...(current.enum ?? []),
+        // A value the union accepts through an alternative is not removed
+        ...(current.enum === undefined
+          ? currentVariants.flatMap(variant => [
+              ...(variant.enum ?? []),
+              ...(variant.const !== undefined ? [variant.const] : []),
+            ])
+          : []),
+      ].map(value => JSON.stringify(value))
     );
     for (const value of base.enum ?? [])
       if (!allowed.has(JSON.stringify(value)))
@@ -537,20 +616,6 @@ export function shapeChanges(
             detail: 'required: true → false',
           });
     }
-
-    // An allOf the base did not have intersects the schema with further
-    // constraints, which narrows what a request may send. Comparing the base
-    // with the intersection reports it, and the bound is read as added.
-    if (!base.allOf && current.allOf?.length)
-      for (const member of current.allOf)
-        differences.push(
-          ...shapeChanges(
-            where,
-            base,
-            { ...current, allOf: undefined, ...member },
-            direction
-          )
-        );
 
     for (const combinator of ['oneOf', 'anyOf', 'allOf'] as const) {
       const was = base[combinator];

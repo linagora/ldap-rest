@@ -932,6 +932,98 @@ describe('OpenAPI contracts', () => {
     ).to.deep.equal([]);
   });
 
+  it('reports an untyped request value that becomes a union', () => {
+    const base = document();
+    base.paths['/api/v1/things'].post.requestBody.content[
+      'application/json'
+    ].schema.properties.name = {};
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        anyOf: [{ const: 'a' }, { const: 'b' }],
+      };
+    });
+
+    expect(
+      diffOpenApi(base as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'type: none → union',
+    });
+  });
+
+  it('reports an enum added next to the type through oneOf', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        type: 'string',
+        oneOf: [{ enum: ['x'] }],
+      };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'enum added',
+    });
+  });
+
+  it('leaves a union additive when an alternative keeps the base', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        anyOf: [{ type: 'string' }, { type: 'string', const: 'a' }],
+      };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.equal([]);
+  });
+
+  it('keeps a const an alternative of the union carries', () => {
+    const base = document();
+    base.paths['/api/v1/things'].post.requestBody.content[
+      'application/json'
+    ].schema.properties.name = { const: 'a' };
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        anyOf: [{ const: 'a' }, { const: 'b' }],
+      };
+    });
+
+    expect(
+      diffOpenApi(base as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.equal([]);
+  });
+
+  it('keeps the properties an allOf member does not touch', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema = {
+        type: 'object',
+        required: ['name'],
+        properties: {
+          name: { type: 'string' },
+        },
+        allOf: [{ properties: { age: { type: 'number' } } }],
+      };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.equal([]);
+  });
+
   it('reports a nullable response field that was not nullable', () => {
     const spec = changed(document => {
       document.paths['/api/v1/things'].get.responses['200'].content[

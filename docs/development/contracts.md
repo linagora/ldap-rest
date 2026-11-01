@@ -58,12 +58,14 @@ method, parameter, response status, response header or field, a request field
 that becomes required, a response that may now be null, changed security
 requirements, a removed union variant, a value an alternative of the type
 closes with an enum or a `const` where the type used to accept any, an
-`allOf` that adds a constraint, or — once the plugin snapshot exists — a
-removed export or a narrowed signature. Renaming an option is a deprecation,
-not a removal, as long as the old CLI name and environment variable stay in
-its `aliases` and `envAliases`. Adding a union variant, a field or an optional
-parameter is additive. Documentation-only edits, such as a summary or
-description, are ignored.
+untyped request value that becomes a union, an `allOf` that adds a
+constraint, or — once the plugin snapshot exists — a removed export or a
+narrowed signature. Renaming an option is a deprecation, not a removal, as
+long as the old CLI name and environment variable stay in its `aliases` and
+`envAliases`. Adding a union variant, a field or an optional parameter is
+additive, and so is a union with an alternative that still accepts everything
+the base did. Documentation-only edits, such as a summary or description, are
+ignored.
 
 The job runs the scripts from the pull request, so a change to them is
 reviewed like any other code, as `.github/CODEOWNERS` requires.
