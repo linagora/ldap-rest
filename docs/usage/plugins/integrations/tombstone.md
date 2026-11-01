@@ -10,10 +10,11 @@ is old enough, or right away when forced.
 
 ## Behaviour
 
-- A delete of an entry whose DN matches `--twake-tombstone-dn` writes, in one
-  modify: the deleted attribute, the deletion date (now), the reason, the
-  lock, and removes `--twake-tombstone-clear-attributes`. Other entries are
-  deleted as usual.
+- A delete of an entry whose DN matches `--twake-tombstone-dn` — under any
+  spelling the directory folds, so spaces, case and escapes do not matter —
+  writes, in one modify: the deleted attribute, the deletion date (now), the
+  reason, the lock, and removes `--twake-tombstone-clear-attributes`. Other
+  entries are deleted as usual.
 - A delete of an existing tombstone writes nothing and answers as a delete.
   It fires the `twakedeletionreplay` hook with the tombstone, so
   [lifecycle events](lifecycle-events.md) publishes the deletion again, with

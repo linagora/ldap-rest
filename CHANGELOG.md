@@ -95,6 +95,11 @@
   spelled with other spacing or escapes, or whose RDN holds an escaped comma:
   such a creation no longer keeps an address or a mark the caller supplied
   ([#601](https://github.com/linagora/ldap-rest/issues/601)).
+- A delete under another spelling of a tombstone's DN — spaces, case or
+  escapes — no longer removes the entry for good: the expressions are
+  compared as the directory compares DNs, so the delete writes a tombstone,
+  and a delete of an existing tombstone writes nothing
+  ([#615](https://github.com/linagora/ldap-rest/issues/615)).
 - A tombstone's deletion date is read only when it is written as a
   GeneralizedTime with its zone or as an ISO 8601 date: a malformed value
   another writer left (`1`, `Jan 1`) and the extra forms the default

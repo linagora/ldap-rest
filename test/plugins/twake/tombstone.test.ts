@@ -217,6 +217,45 @@ describe('Twake tombstone plugin', function () {
       });
     }
 
+    it('writes a tombstone whatever spelling of the DN the delete gives', async () => {
+      const stored = flat('ts-alice');
+      // The directory names one entry; the expression was written for one
+      // spelling of it
+      const spellings = [
+        stored,
+        stored.toUpperCase(),
+        stored.replace(/,/g, ', '),
+        stored.replace(/,/g, ' , '),
+        stored.replace('ts-alice', 't\\73-alice'),
+        stored.replace('uid=', 'uid = '),
+      ];
+      try {
+        for (const dn of spellings) {
+          await add(stored);
+          await dm.ldap.delete(dn);
+          expect(await read(stored), dn).to.include({
+            employeeType: 'deleted',
+          });
+          await cleanup(stored);
+        }
+      } finally {
+        await cleanup(stored);
+      }
+    });
+
+    it('keeps a tombstone when deleted under another spelling', async () => {
+      const dn = flat('ts-alice');
+      await add(dn);
+      await dm.ldap.delete(dn);
+      const tombstone = await read(dn);
+      expect(tombstone).to.include({ employeeType: 'deleted' });
+      await dm.ldap.delete(dn.replace(/,/g, ' , '));
+      expect(await read(dn)).to.include({
+        employeeType: 'deleted',
+        roomNumber: tombstone?.roomNumber,
+      });
+    });
+
     it('deletes an entry no pattern matches', async () => {
       await add(flat('plain-bob'));
       await dm.ldap.delete(flat('plain-bob'));
