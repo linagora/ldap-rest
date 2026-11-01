@@ -2,8 +2,6 @@
  * LDAP low-level library
  * @author Xavier Guimard <xguimard@linagora.com>
  */
-import { createHash } from 'node:crypto';
-
 import type { Request } from 'express';
 import { Attribute, Change, Control } from 'ldapts';
 import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
@@ -36,6 +34,7 @@ import {
   timedLdap,
 } from './metrics';
 import LdapPool, { type PooledConnection } from './ldap/pool';
+import SearchCache, { digestKey, membersNamed } from './ldap/searchCache';
 import {
   BadRequestError,
   ConflictError,
@@ -213,114 +212,12 @@ function withCode<T extends Error>(err: T, code: number): T {
   return err;
 }
 
-/**
- * Field separator of a search-cache key.
- *
- * NUL cannot appear unescaped in a DN (RFC 4514 writes it `\00`) nor in an
- * LDAP filter (RFC 4515 writes it `\00` too), so `invalidateCache` can split
- * the base DN back out of a key instead of guessing where it ends. A `:` —
- * what this used to join on — is a legal DN character.
- */
-const CACHE_KEY_SEPARATOR = '\u0000';
-
 /** The request hooks an operation is judged in, see `ldapActions.authorize` */
 type AuthorizedHook =
   | 'ldapaddrequest'
   | 'ldapmodifyrequest'
   | 'ldapdeleterequest'
   | 'ldaprenamerequest';
-
-/**
- * Short, stable stand-in for a cache key in a log line.
- *
- * The key is built from the search base, which comes from configuration and
- * therefore ultimately from the environment — logging it verbatim is what
- * CodeQL flags as clear-text logging of environment-derived data. A digest
- * carries none of the key's content, but the same key always digests to the
- * same token, so a "cache hit" line can still be matched back to the
- * "cached" line that filled the entry it hit.
- */
-const digestKey = (key: string): string =>
-  createHash('sha256').update(key).digest('hex').slice(0, 12);
-
-/**
- * Fold a DN to the form cache keys are matched on.
- *
- * The directory compares DNs case-insensitively, and callers build them from
- * everywhere: a URL path, a configuration value, an attribute read back from
- * the server. `uid=Foo,dc=x` and `uid=foo,dc=x` name one entry, so a write
- * spelling it one way has to drop what a read spelling it the other stored.
- * Spacing around the separators is folded for the same reason.
- *
- * Folding serves matching only, never key building: a DN that two callers
- * spell differently costs two cache entries, and one write drops both. The
- * reverse — folding into the key itself — would merge two entries whose RDN
- * values differ only in case, which a case-exact naming attribute makes two
- * different entries.
- *
- * Written as a split/trim/join rather than a `\s*,\s*` regex: that shape is
- * polynomial-backtracking on a long run of spaces containing no comma, and
- * `dn` comes from caller-controlled input (a URL path segment, among
- * others), so the cost was quadratic in an attacker-chosen length. Splitting
- * on the literal comma and trimming each part does the same folding in
- * linear time.
- */
-const foldDn = (dn: string): string =>
-  dn
-    .trim()
-    .toLowerCase()
-    .split(',')
-    .map(part => part.trim())
-    .join(',');
-
-/**
- * Group attributes the `memberof` overlay mirrors onto the entries they name,
- * as their `memberOf`. Lowercase, as attribute names compare.
- */
-const MEMBERSHIP_ATTRIBUTES = new Set(['member', 'uniquemember']);
-
-const isMembershipAttribute = (name: string): boolean =>
-  MEMBERSHIP_ATTRIBUTES.has(name.toLowerCase());
-
-/** The DNs that attributes of an entry or a change name as members. */
-const membersNamed = (attributes: object | undefined): string[] =>
-  Object.entries(attributes ?? {}).flatMap(([name, value]) =>
-    isMembershipAttribute(name)
-      ? ([value] as unknown[])
-          .flat()
-          .map(v => (Buffer.isBuffer(v) ? v.toString() : v))
-          .filter((v): v is string => typeof v === 'string')
-      : []
-  );
-
-/**
- * Copy a search result at the cache boundary.
- *
- * Without this the cache hands the very same object to every caller, and a
- * caller that edits the entry it was given edits what the next one reads.
- *
- * The entry is copied, and so is every value that is a list: an attribute
- * comes back as an array whenever it holds — or may hold — several values,
- * and `entry.member.push(…)` or `entry.objectClass.sort()` on a returned
- * entry would otherwise be a write into the cache, serving the result to
- * every later reader until the TTL ran out. No caller does that today; the
- * copy is what keeps that from being a rule nobody wrote down.
- *
- * What stays shared is the bytes of a `Buffer` value, which only a caller
- * writing into a binary attribute in place could reach, and which copying on
- * every hit would pay for on every deployment that never does.
- */
-const cloneSearchResult = (result: SearchResult): SearchResult => ({
-  searchEntries: result.searchEntries.map(entry =>
-    Object.fromEntries(
-      Object.entries(entry).map(([name, value]) => [
-        name,
-        Array.isArray(value) ? [...value] : value,
-      ])
-    )
-  ) as SearchResult['searchEntries'],
-  searchReferences: [...result.searchReferences],
-});
 
 /**
  * ldapts gives every requested attribute the entry lacks an empty list, so
@@ -471,27 +368,9 @@ class ldapActions {
   base: string;
   parent: DM;
   logger: winston.Logger;
-  private searchCache: LRUCache<string, SearchResult>;
-  private cacheEnabled: boolean;
-  /**
-   * How many writes this instance has made since it was built.
-   *
-   * A read can be overtaken by a write: the write lands and `invalidateCache`
-   * finds nothing to drop, because the read has not stored its answer yet —
-   * and the read then stores what it read *before* the write, an entry
-   * nothing will drop until its TTL runs out. `search()` remembers the count
-   * it started at and stores only if no write happened in between, so a read
-   * a write overtook costs a cache entry, never a stale answer.
-   *
-   * The count is per instance and per write, not per DN: a write to another
-   * branch keeps a concurrent read out of the cache too. That is hit rate
-   * given up, not freshness.
-   */
-  private cacheGeneration = 0;
+  private cache: SearchCache;
   public queryLimit: ReturnType<typeof pLimit>;
   private pool: LdapPool;
-  // LRU cache for attribute signatures to prevent unbounded memory growth
-  private attrSignatureCache: LRUCache<string, string>;
   /** See {@link declareObjectClasses}. */
   private declaredClasses = new Map<
     string,
@@ -529,45 +408,26 @@ class ldapActions {
       `Global LDAP query concurrency limit set to ${concurrency}`
     );
 
-    // Initialize LRU cache for search results
+    // Initialize the search cache
     const cacheMax: number =
       typeof this.config.ldap_cache_max === 'string'
         ? parseInt(this.config.ldap_cache_max, 10) || 1000
         : (this.config.ldap_cache_max ?? 1000);
-    // `--ldap-cache-ttl` defaults to 0, and 0 means "do not cache".
-    //
-    // The branch that stored a result was unreachable until #166, so no
-    // deployment has ever run with this cache actually caching. Switching it
-    // on for everyone in the release that repairs it is how staleness nobody
-    // can reproduce gets shipped: anything writing the directory without
-    // going through this process — LSC, ldapmodify, a second replica of this
-    // server — leaves this one answering the entry it read before, for the
-    // whole TTL, and no write path here can know. A deployment that wants
-    // the cache turns it on deliberately.
+    // `--ldap-cache-ttl` defaults to 0, and 0 means "do not cache": anything
+    // writing the directory without going through this process — LSC,
+    // ldapmodify, a second replica — leaves this one answering the entry it
+    // read before for the whole TTL, and no write path here can know. A
+    // deployment that wants the cache turns it on deliberately.
     const ttlSetting = this.config.ldap_cache_ttl;
     const cacheTtlSeconds =
       typeof ttlSetting === 'string'
         ? parseInt(ttlSetting, 10) || 0
         : (ttlSetting ?? 0);
     const cacheTtl = Math.max(cacheTtlSeconds, 0) * 1000; // seconds to ms
-    this.cacheEnabled = cacheTtl > 0;
-    this.searchCache = new LRUCache<string, SearchResult>({
+    this.cache = new SearchCache({
       max: cacheMax,
-      // An LRU built with `ttl: 0` expires nothing ever, which is the
-      // opposite of what 0 asks for: the cache is switched off through
-      // `cacheEnabled`, and then nothing is ever stored in it.
-      ttl: this.cacheEnabled ? cacheTtl : undefined,
-      updateAgeOnGet: false,
-      updateAgeOnHas: false,
-    });
-    this.logger.info(
-      this.cacheEnabled
-        ? `LDAP search cache initialized: max=${cacheMax}, ttl=${cacheTtl / 1000}s`
-        : 'LDAP search cache disabled (--ldap-cache-ttl=0)'
-    );
-    // Initialize bounded LRU cache for attribute signatures
-    this.attrSignatureCache = new LRUCache<string, string>({
-      max: 1000, // Reasonable limit for attribute signature combinations
+      ttl: cacheTtl,
+      logger: this.logger,
     });
     if (!server.config.ldap_url || server.config.ldap_url.length === 0) {
       throw new Error('LDAP URL is not defined');
@@ -639,123 +499,13 @@ class ldapActions {
   }
 
   /**
-   * Get a sorted signature for attribute list, using cache for performance
-   */
-  private getAttributeSignature(attributes: string[] | undefined): string {
-    if (!attributes || attributes.length === 0) return '*';
-    // Use array as-is for cache key (common patterns repeat)
-    const key = attributes.join('|');
-    let sig = this.attrSignatureCache.get(key);
-    if (!sig) {
-      sig = [...attributes].sort().join(',');
-      this.attrSignatureCache.set(key, sig);
-    }
-    return sig;
-  }
-
-  /**
-   * Generate cache key for LDAP search
-   *
-   * Every option that changes the answer belongs in here, or a search that
-   * asked for more is served what a search that asked for less got: the
-   * requested attributes above all, but also the ones that change the shape
-   * of what comes back. `timeLimit` is deliberately absent — it bounds how
-   * long the server may spend, not what it returns.
-   */
-  private getCacheKey(base: string, opts: SearchOptions): string {
-    // Create a deterministic cache key from base DN and search options
-    const sortedAttrs = this.getAttributeSignature(opts.attributes);
-    const bufferAttrs = opts.explicitBufferAttributes?.length
-      ? [...opts.explicitBufferAttributes].sort().join(',')
-      : '-';
-    const filterStr =
-      typeof opts.filter === 'string'
-        ? opts.filter
-        : opts.filter
-          ? opts.filter.toString()
-          : '(objectClass=*)';
-    return [
-      base,
-      opts.scope || 'sub',
-      filterStr,
-      sortedAttrs,
-      bufferAttrs,
-      opts.returnAttributeValues === false ? 'novalues' : 'values',
-      opts.derefAliases ?? '-',
-      String(opts.sizeLimit ?? '-'),
-    ].join(CACHE_KEY_SEPARATOR);
-  }
-
-  /**
    * Drop every cached read of `dn`, and of everything below it.
    *
    * Called after each write, so the next read of what just changed goes to
-   * the directory. Two things this does that a `key.startsWith(dn)` test did
-   * not: it compares DNs the way the directory does (see {@link foldDn}), so
-   * a write spelling a DN differently from the read that cached it still
-   * drops it; and it drops the subtree, because `rename()` and `move()`
-   * re-parent a whole branch in one operation — renaming an organization
-   * changes the DN of every entry under it — leaving the cached reads of
-   * those children filed under DNs that no longer exist. A leaf has nothing
-   * below it and the extra test costs nothing.
+   * the directory. See {@link SearchCache.invalidate}.
    */
   invalidateCache(dn: string): void {
-    if (!this.cacheEnabled) return;
-    // Every write ends the epoch any read in flight started in, whether or
-    // not this call finds an entry to drop: the read it overtook may not
-    // have stored its own yet. See `cacheGeneration`.
-    this.cacheGeneration++;
-    const target = foldDn(dn);
-    const descendantSuffix = `,${target}`;
-    // Collect before deleting: dropping entries from the LRU while walking
-    // its own key iterator is not something lru-cache promises to survive.
-    const doomed: string[] = [];
-    for (const key of this.searchCache.keys()) {
-      const keyBase = foldDn(key.split(CACHE_KEY_SEPARATOR)[0]);
-      if (keyBase === target || keyBase.endsWith(descendantSuffix))
-        doomed.push(key);
-    }
-    for (const key of doomed) this.searchCache.delete(key);
-  }
-
-  /**
-   * Drop every cached read holding a value that names `dn`, or an entry
-   * below it.
-   *
-   * The directory mirrors some writes onto other entries than the one
-   * written: the `memberof` overlay keeps each member's `memberOf` in step
-   * with the group's `member` / `uniqueMember`, and `refint` rewrites or
-   * removes the references to an entry renamed or deleted. Those entries'
-   * cached reads are what {@link invalidateCache} cannot find, and they name
-   * the entry written: the members of a group name it in their `memberOf`.
-   * A member a write adds names it only once the write has landed; the
-   * caller drops those by their own DN.
-   *
-   * Every attribute is looked at, not `memberOf` alone: which attributes an
-   * overlay maintains is the deployment's configuration. A read naming `dn`
-   * for another reason is dropped too, which costs a miss.
-   */
-  private invalidateReferences(dn: string): void {
-    if (!this.cacheEnabled) return;
-    this.cacheGeneration++;
-    const target = foldDn(dn);
-    const descendantSuffix = `,${target}`;
-    const names = (value: unknown): boolean => {
-      if (typeof value !== 'string') return false;
-      const folded = foldDn(value);
-      return folded === target || folded.endsWith(descendantSuffix);
-    };
-    const doomed: string[] = [];
-    for (const [key, result] of this.searchCache.entries())
-      if (
-        result.searchEntries.some(entry =>
-          Object.values(entry).some(value =>
-            Array.isArray(value) ? value.some(names) : names(value)
-          )
-        )
-      )
-        doomed.push(key);
-    for (const key of doomed) this.searchCache.delete(key);
+    this.cache.invalidate(dn);
   }
 
   /*
@@ -1439,19 +1189,20 @@ class ldapActions {
     // authorization plugins refuse by throwing from them, so a cache hit is
     // only ever reached by a request already allowed to read `base`, and the
     // key is built from the base and options those hooks settled on.
-    const cacheable = this.cacheEnabled && !opts.paged && opts.scope === 'base';
-    const cacheKey = cacheable ? this.getCacheKey(base, opts) : '';
+    const cacheable =
+      this.cache.enabled && !opts.paged && opts.scope === 'base';
+    const cacheKey = cacheable ? this.cache.key(base, opts) : '';
     // The write count this read starts at: a write landing between here and
     // the store below would leave what comes back describing a state that no
-    // longer holds, and `invalidateCache` would find nothing to drop. See
-    // `cacheGeneration`.
-    const generation = this.cacheGeneration;
+    // longer holds, and `invalidate` would find nothing to drop. See
+    // `SearchCache.generation`.
+    const generation = this.cache.generation;
     if (cacheable) {
-      const cached = this.searchCache.get(cacheKey);
+      const cached = this.cache.get(cacheKey);
       ldapSearchCache.inc({ result: cached ? 'hit' : 'miss' });
       if (cached) {
         this.logger.debug(`LDAP search cache hit: ${digestKey(cacheKey)}`);
-        return this.filterForCaller(cloneSearchResult(cached), req, opts);
+        return this.filterForCaller(cached, req, opts);
       }
     }
 
@@ -1486,11 +1237,11 @@ class ldapActions {
         const result = res as unknown as SearchResult;
         // A write that landed while this read was in flight makes what came
         // back describe the directory as it was before that write, and there
-        // is nothing left to drop it: the write's `invalidateCache` ran when
+        // is nothing left to drop it: the write's `invalidate` ran when
         // this entry did not exist yet. Storing it now would serve the state
         // it replaced for a whole TTL, so it is answered, not kept.
-        if (generation === this.cacheGeneration) {
-          this.searchCache.set(cacheKey, cloneSearchResult(result));
+        if (generation === this.cache.generation) {
+          this.cache.set(cacheKey, result);
           this.logger.debug(`LDAP search cached: ${digestKey(cacheKey)}`);
         } else {
           this.logger.debug(
@@ -1619,11 +1370,11 @@ class ldapActions {
       // below runs only once the answer has come back: a read landing in that
       // round trip would find the entry still cached and answer what it held
       // before the write. Dropping it early costs a miss if the write then
-      // fails, which is harmless, and `cacheGeneration` keeps a read the write
+      // fails, which is harmless, and the cache's generation keeps a read the
       // overtook from putting it back.
-      this.invalidateCache(dn);
+      this.cache.invalidate(dn);
       // A group created with members changes their `memberOf`
-      for (const member of members) this.invalidateCache(member);
+      for (const member of members) this.cache.invalidate(member);
       await timedLdap('add', () => pooled.client.add(dn, attributes));
       // Drop any cached read of this DN.
       //
@@ -1633,8 +1384,8 @@ class ldapActions {
       // cached here, then deleted by something else — another replica, LSC,
       // ldapmodify — and re-created through this call, where the cache would
       // otherwise keep answering the entry that used to carry this DN.
-      this.invalidateCache(dn);
-      for (const member of members) this.invalidateCache(member);
+      this.cache.invalidate(dn);
+      for (const member of members) this.cache.invalidate(member);
       this.parent.hookBus.notify('ldapadddone', dn, entry, changeContext(req));
     } catch (error) {
       throw ldapAddError(dn, error);
@@ -1747,18 +1498,9 @@ class ldapActions {
     // A change of a group's members changes their `memberOf`: those it names,
     // and those a replace or a delete of every value removes, which only
     // their cached reads still tie to the group.
-    const membershipChanged = [changes.add, changes.replace, changes.delete]
-      .flatMap(part =>
-        Array.isArray(part) ? part : Object.keys((part as object) ?? {})
-      )
-      .some(isMembershipAttribute);
     const invalidate = (): void => {
-      this.invalidateCache(dn);
-      if (!membershipChanged) return;
-      this.invalidateReferences(dn);
-      for (const part of [changes.add, changes.replace, changes.delete])
-        for (const member of membersNamed(Array.isArray(part) ? {} : part))
-          this.invalidateCache(member);
+      this.cache.invalidate(dn);
+      this.cache.invalidateMembership(dn, changes);
     };
     if (ldapChanges.length !== 0) {
       const controls = options.permissive
@@ -1774,7 +1516,7 @@ class ldapActions {
         // below runs only once the answer has come back: a read landing in that
         // round trip would find the entry still cached and answer what it held
         // before the write. Dropping it early costs a miss if the write then
-        // fails, which is harmless, and `cacheGeneration` keeps a read the write
+        // fails, which is harmless, and the cache's generation keeps a read the
         // overtook from putting it back.
         invalidate();
         try {
@@ -1804,7 +1546,7 @@ class ldapActions {
                 });
           if (repairChange) ldapChanges.push(repairChange);
           // The repair's read may have cached the entry again
-          this.invalidateCache(dn);
+          this.cache.invalidate(dn);
           try {
             await send();
           } catch (retry) {
@@ -1914,22 +1656,22 @@ class ldapActions {
       // below runs only once the answer has come back: a read landing in that
       // round trip would find the entry still cached and answer what it held
       // before the write. Dropping it early costs a miss if the write then
-      // fails, which is harmless, and `cacheGeneration` keeps a read the write
+      // fails, which is harmless, and the cache's generation keeps a read the
       // overtook from putting it back.
-      this.invalidateCache(dn);
-      this.invalidateCache(newRdn);
-      this.invalidateReferences(dn);
+      this.cache.invalidate(dn);
+      this.cache.invalidate(newRdn);
+      this.cache.invalidateReferences(dn);
       await timedLdap('rename', () => pooled.client.modifyDN(dn, newRdn));
       // Invalidate both ends. A base-scope read of the old DN would
       // otherwise keep answering the entry that is no longer there, and a
       // read cached under the new DN — of whatever used to carry it — would
-      // hide the entry that just took its place. `invalidateCache` drops the
+      // hide the entry that just took its place. `invalidate` drops the
       // subtree too: renaming a container moves every DN under it. And the
       // directory rewrites what named the old DN — the members' `memberOf`
       // of a renamed group, the references `refint` follows.
-      this.invalidateCache(dn);
-      this.invalidateCache(newRdn);
-      this.invalidateReferences(dn);
+      this.cache.invalidate(dn);
+      this.cache.invalidate(newRdn);
+      this.cache.invalidateReferences(dn);
       done.push(
         this.parent.hookBus.notifyAndWait(
           'ldaprenamedone',
@@ -1975,16 +1717,16 @@ class ldapActions {
       // below runs only once the answer has come back: a read landing in that
       // round trip would find the entry still cached and answer what it held
       // before the write. Dropping it early costs a miss if the write then
-      // fails, which is harmless, and `cacheGeneration` keeps a read the write
+      // fails, which is harmless, and the cache's generation keeps a read the
       // overtook from putting it back.
-      this.invalidateCache(dn);
-      this.invalidateCache(newDn);
-      this.invalidateReferences(dn);
+      this.cache.invalidate(dn);
+      this.cache.invalidate(newDn);
+      this.cache.invalidateReferences(dn);
       await timedLdap('rename', () => pooled.client.modifyDN(dn, newDn));
       // Invalidate both ends — see rename() above for why both matter.
-      this.invalidateCache(dn);
-      this.invalidateCache(newDn);
-      this.invalidateReferences(dn);
+      this.cache.invalidate(dn);
+      this.cache.invalidate(newDn);
+      this.cache.invalidateReferences(dn);
       // A move is a modifyDN, so it is a rename: the plugins that watch a
       // rename watch a move, and the two caches that outlive the search cache
       // (the authz group cache, the identity → DN resolution cache) are
@@ -2048,15 +1790,15 @@ class ldapActions {
           // below runs only once the answer has come back: a read landing in that
           // round trip would find the entry still cached and answer what it held
           // before the write. Dropping it early costs a miss if the write then
-          // fails, which is harmless, and `cacheGeneration` keeps a read the write
+          // fails, which is harmless, and the cache's generation keeps a read the
           // overtook from putting it back.
-          this.invalidateCache(entry);
-          this.invalidateReferences(entry);
+          this.cache.invalidate(entry);
+          this.cache.invalidateReferences(entry);
           await timedLdap('delete', () => client.del(entry));
           // Invalidate cache for this DN, and for what named it: a deleted
           // group leaves its members' `memberOf`
-          this.invalidateCache(entry);
-          this.invalidateReferences(entry);
+          this.cache.invalidate(entry);
+          this.cache.invalidateReferences(entry);
         } catch (error) {
           const code = extractLdapCode(error);
           throw code === 32
