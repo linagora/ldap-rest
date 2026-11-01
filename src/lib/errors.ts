@@ -157,16 +157,23 @@ export const isAuthzRefusal = (err: unknown): boolean =>
  *
  * The first error from the outside that names one decides: a wrapper names
  * none, so the error it wraps is read; a layer that translates an inner error
- * keeps its own status.
+ * keeps its own status. `statusCode` is the convention of this module, while
+ * Express's router sets `status` alone on the errors it throws.
  *
  * @param err what was thrown
  * @returns its status code, 500 when it names none
  */
 export const statusCodeOf = (err: unknown): number => {
-  const named = errorChain(err).find(
-    e => typeof (e as { statusCode?: unknown }).statusCode === 'number'
-  ) as { statusCode?: number } | undefined;
-  return named?.statusCode ?? 500;
+  for (const error of errorChain(err)) {
+    const { statusCode, status } = error as {
+      statusCode?: unknown;
+      status?: unknown;
+    };
+    if (typeof statusCode === 'number') return statusCode;
+    if (typeof status === 'number' && status >= 400 && status < 600)
+      return status;
+  }
+  return 500;
 };
 
 /**

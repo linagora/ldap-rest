@@ -13,6 +13,7 @@ import {
   NotFoundError,
 } from '../../src/lib/errors';
 import {
+  errorResponse,
   getLogger,
   jsonBody,
   serverError,
@@ -222,6 +223,30 @@ describe('serverError', () => {
  * Callers return as soon as `jsonBody` gives `false` or nothing, taking it as
  * "already answered": a body it hands back undefined leaves the request open.
  */
+describe('errorResponse', () => {
+  it('answers the status an Express error carries in `status`', async () => {
+    const app = express();
+    app.get('/things/:id', (_req, res) => {
+      res.json({});
+    });
+    app.use(
+      (
+        err: unknown,
+        _req: express.Request,
+        res: express.Response,
+        _next: express.NextFunction
+      ) => {
+        const { status, body } = errorResponse(err, false);
+        res.status(status).json(body);
+      }
+    );
+
+    const res = await supertest(app).get('/things/%FF');
+
+    expect(res.status).to.equal(400);
+  });
+});
+
 describe('jsonBody', () => {
   const app = express();
   app.use(bodyParser.json());

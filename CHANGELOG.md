@@ -8,6 +8,9 @@
   date range is reported as never expiring instead of answering `500` on
   `GET /v1/users/:id/password-status`
   ([#553](https://github.com/linagora/ldap-rest/issues/553)).
+- An error carrying `status` instead of `statusCode`, such as a malformed
+  percent-encoded path parameter, is answered with that status instead of
+  `500` ([#555](https://github.com/linagora/ldap-rest/issues/555)).
 
 ## v1.3.0 (2026-10-31)
 
