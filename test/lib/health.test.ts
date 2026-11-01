@@ -233,17 +233,22 @@ describe('Health routes', function () {
     }
   });
 
+  const poolUrls = (urls?: string[]): string[] => {
+    const pool = server.ldap['pool'] as unknown as { urls: string[] };
+    if (urls) pool.urls = urls;
+    return pool.urls;
+  };
+
   it('pings the directory on a connection of its own, and fails on a closed port', async () => {
     await server.ldap.ping(2000);
-    const urls = server.ldap['ldapUrls'];
-    server.ldap['ldapUrls'] = ['ldap://127.0.0.1:1'];
+    const urls = poolUrls(['ldap://127.0.0.1:1']);
     try {
       await server.ldap.ping(2000).then(
         () => expect.fail('answered on a closed port'),
         (err: Error) => expect(err.message).to.match(/No directory answered/)
       );
     } finally {
-      server.ldap['ldapUrls'] = urls;
+      poolUrls(urls);
     }
   });
 
@@ -251,8 +256,7 @@ describe('Health routes', function () {
     const mute = createServer(() => undefined);
     await new Promise<void>(resolve => mute.listen(0, '127.0.0.1', resolve));
     const { port } = mute.address() as AddressInfo;
-    const urls = server.ldap['ldapUrls'];
-    server.ldap['ldapUrls'] = [`ldap://127.0.0.1:${port}`];
+    const urls = poolUrls([`ldap://127.0.0.1:${port}`]);
     const started = Date.now();
     try {
       await server.ldap.ping(300).then(
@@ -261,7 +265,7 @@ describe('Health routes', function () {
       );
       expect(Date.now() - started, 'within the budget').to.be.below(2000);
     } finally {
-      server.ldap['ldapUrls'] = urls;
+      poolUrls(urls);
       mute.close();
     }
   });

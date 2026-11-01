@@ -468,9 +468,6 @@ function ldapRenameError(
 
 class ldapActions {
   config: Config;
-  options: ClientOptions;
-  dn: string;
-  pwd: string;
   base: string;
   parent: DM;
   logger: winston.Logger;
@@ -493,7 +490,6 @@ class ldapActions {
   private cacheGeneration = 0;
   public queryLimit: ReturnType<typeof pLimit>;
   private pool: LdapPool;
-  private ldapUrls: string[];
   // LRU cache for attribute signatures to prevent unbounded memory growth
   private attrSignatureCache: LRUCache<string, string>;
   /** See {@link declareObjectClasses}. */
@@ -598,51 +594,35 @@ class ldapActions {
       );
     }
     this.base = server.config.ldap_base;
-    this.ldapUrls = server.config.ldap_url;
-    this.options = {
-      url: this.ldapUrls[0],
+    const ldapUrls = server.config.ldap_url;
+    const options: ClientOptions = {
+      url: ldapUrls[0],
       timeout: 0,
       connectTimeout: 0,
       strictDN: false,
     };
-    if (this.ldapUrls[0].startsWith('ldaps://')) {
-      this.options.tlsOptions = {
+    if (ldapUrls[0].startsWith('ldaps://')) {
+      options.tlsOptions = {
         minVersion: 'TLSv1.2',
       };
     }
-    this.dn = server.config.ldap_dn;
-    this.pwd = server.config.ldap_pwd;
     this.pool = new LdapPool({
-      urls: () => this.ldapUrls,
-      dn: this.dn,
-      pwd: this.pwd,
-      options: this.options,
+      urls: ldapUrls,
+      dn: server.config.ldap_dn,
+      pwd: server.config.ldap_pwd,
+      options,
       poolSize: server.config.ldap_pool_size || 5,
       connectionTtl: (server.config.ldap_connection_ttl || 60) * 1000,
       logger: this.logger,
     });
   }
 
-  /**
-   * Ask the directory for its root DSE on a connection of its own, bound
-   * as the server and closed after: the readiness probe. Neither the pool
-   * nor the search cache nor the hooks answer for a directory that does
-   * not, and a directory that stops answering holds nothing of the pool.
-   * The URLs are tried as the pool's connection opens them.
-   *
-   * @param timeoutMs how long the connection, the bind and the search may
-   *   each take; the client closes the socket when it passes
-   * @throws when no URL answers in time
-   */
+  /** See {@link LdapPool.ping}. */
   async ping(timeoutMs: number): Promise<void> {
     await this.pool.ping(timeoutMs);
   }
 
-  /**
-   * Close every pooled connection, the ones in use included: an operation
-   * still running on one is rejected by the client, and a waiter is refused
-   * rather than kept.
-   */
+  /** See {@link LdapPool.close}. */
   async close(): Promise<void> {
     await this.pool.close();
   }

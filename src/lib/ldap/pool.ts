@@ -38,8 +38,8 @@ export type ClientFactory = (
 ) => Client | Promise<Client>;
 
 export interface LdapPoolOptions {
-  /** The URLs to try, read when a connection is opened or probed. */
-  urls: () => string[];
+  /** The URLs to try. */
+  urls: string[];
   dn: string;
   pwd: string;
   /** Options shared by every URL; the pool sets `url` and `tlsOptions`. */
@@ -51,7 +51,7 @@ export interface LdapPoolOptions {
 }
 
 export default class LdapPool {
-  private readonly urls: () => string[];
+  private readonly urls: string[];
   private readonly dn: string;
   private readonly pwd: string;
   private readonly options: ClientOptions;
@@ -84,7 +84,7 @@ export default class LdapPool {
       `LDAP connection pool initialized: size=${this.poolSize}, ttl=${this.connectionTtl / 1000}s`
     );
     this.logger.info(
-      `LDAP failover configured with ${this.urls().length} URL(s): ${this.urls().join(', ')}`
+      `LDAP failover configured with ${this.urls.length} URL(s): ${this.urls.join(', ')}`
     );
   }
 
@@ -93,7 +93,7 @@ export default class LdapPool {
    */
   private async createConnection(): Promise<Client> {
     const errors: Error[] = [];
-    const urls = this.urls();
+    const urls = this.urls;
 
     for (let i = 0; i < urls.length; i++) {
       const urlIndex = (this.currentUrlIndex + i) % urls.length;
@@ -190,7 +190,7 @@ export default class LdapPool {
   async ping(timeoutMs: number): Promise<void> {
     if (this.closed) throw new Error('LDAP connections closed');
     const errors: string[] = [];
-    const urls = this.urls();
+    const urls = this.urls;
     for (let i = 0; i < urls.length; i++) {
       const url = urls[(this.currentUrlIndex + i) % urls.length];
       const options: ClientOptions = {

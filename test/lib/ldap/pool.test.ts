@@ -52,7 +52,7 @@ const poolFor = (
 ): { pool: LdapPool; clients: FakeClient[] } => {
   const clients: FakeClient[] = [];
   const pool = new LdapPool({
-    urls: () => urls,
+    urls,
     dn: 'cn=admin,dc=example,dc=com',
     pwd: 'secret',
     options: { url: urls[0], timeout: 0, connectTimeout: 0, strictDN: false },
