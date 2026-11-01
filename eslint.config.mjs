@@ -3,7 +3,7 @@ import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
 import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
-import importPlugin from 'eslint-plugin-import';
+import importX from 'eslint-plugin-import-x';
 import globals from 'globals';
 
 import noConfigCast from './eslint-rules/no-config-cast.mjs';
@@ -32,7 +32,7 @@ export default [
     plugins: {
       '@typescript-eslint': tseslint,
       prettier: prettier,
-      import: importPlugin,
+      'import-x': importX,
     },
     rules: {
       // TS rules
@@ -53,7 +53,7 @@ export default [
       '@typescript-eslint/no-var-requires': 'error',
 
       // Import rules
-      'import/order': [
+      'import-x/order': [
         'error',
         {
           groups: [
@@ -152,7 +152,7 @@ export default [
     plugins: {
       '@typescript-eslint': tseslint,
       prettier: prettier,
-      import: importPlugin,
+      'import-x': importX,
     },
     rules: {
       ...tseslint.configs.recommended.rules,
@@ -170,7 +170,7 @@ export default [
       '@typescript-eslint/no-var-requires': 'error',
       // Chai's assertions are expressions whose value is unused
       '@typescript-eslint/no-unused-expressions': 'off',
-      'import/order': [
+      'import-x/order': [
         'error',
         {
           groups: [
