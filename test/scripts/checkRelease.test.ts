@@ -5,6 +5,7 @@ import {
   isMajorRelease,
   listsBreakingChange,
   previousRelease,
+  unreleasedSection,
 } from '../../scripts/check-release';
 
 const changelog = `# Changelog
@@ -122,5 +123,21 @@ describe('Release gate', () => {
     expect(
       listsBreakingChange('- the answer no longer says breaking changes')
     ).to.equal(false);
+  });
+
+  it('reads Unreleased when the tag has no section of its own', () => {
+    expect(unreleasedSection(changelog)).to.contain('Something.');
+    expect(unreleasedSection(changelog)).not.to.contain('A feature.');
+    expect(
+      unreleasedSection('# Changelog\n\n## v1.0.0\n\n### Fixes\n')
+    ).to.equal(null);
+    const unreleased = unreleasedSection(`## Unreleased
+
+### Breaking Changes
+
+- An option went away.
+`);
+    expect(unreleased).not.to.equal(null);
+    expect(listsBreakingChange(unreleased ?? '')).to.equal(true);
   });
 });

@@ -129,7 +129,8 @@ moved. A migrated plugin no longer reads them: it uses `options()`.
 
 Plugins outside the repository cannot add to `args.ts` yet, but they can
 declare options the same way and name them in `optionDefinitions`: the startup
-report subtracts those keys, and `options()` reads a declared `env` variable
-when the parser did not carry the key. An option without a declaration still
-reaches `this.config` from an unknown `--key value` pair, and the startup
-report names it.
+report subtracts those keys and their aliases, and `options()` reads a declared
+`env` variable or a deprecated CLI alias the parser did not carry, warning at
+startup for the alias as it does for a core option. An option without a
+declaration still reaches `this.config` from an unknown `--key value` pair, and
+the startup report names it.

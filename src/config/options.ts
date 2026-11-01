@@ -129,6 +129,11 @@ function cliName(key: string): string {
   return `--${key.replace(/_/g, '-')}`;
 }
 
+/** The `Config` key an unknown `--name` reaches the parser's result under */
+function cliKey(name: string): string {
+  return name.replace(/^--?/, '').replace(/-/g, '_');
+}
+
 function emptyValue(type: OptionType): unknown {
   switch (type) {
     case 'boolean':
@@ -313,27 +318,67 @@ function environmentIsSet(
   return true;
 }
 
+/** Deprecation messages already logged, so a plugin reading twice warns once */
+const reportedWarnings = new Set<string>();
+
+function reportWarning(
+  warn: ((message: string) => void) | undefined,
+  message: string
+): void {
+  if (!warn || reportedWarnings.has(message)) return;
+  reportedWarnings.add(message);
+  warn(message);
+}
+
 /**
  * Read a plugin's options from a parsed configuration, applying the declared
  * defaults and checking the values. Called once per instance by
  * `DmPlugin.options()`.
+ *
+ * `parsedKeys` names the options the parser knew. An option declared outside
+ * `src/config/args.ts` reaches the parser as an unknown `--name value` pair,
+ * so its aliases are read here, under the key the unknown name produces.
  */
 export function readOptions<T extends OptionSet>(
   options: T,
   config: Config | Record<string, unknown>,
-  parsedKeys: ReadonlySet<string> = new Set()
+  parsedKeys: ReadonlySet<string> = new Set(),
+  warn?: (message: string) => void
 ): OptionsOf<T> {
   const source = config as Record<string, unknown>;
   const result: Record<string, unknown> = {};
   for (const [key, spec] of Object.entries(options)) {
-    const envName = [spec.env, ...(spec.envAliases ?? [])].find(
-      name => name !== undefined && environmentIsSet(spec, process.env[name])
+    const envNames = [spec.env, ...(spec.envAliases ?? [])].filter(
+      (name): name is string =>
+        name !== undefined && environmentIsSet(spec, process.env[name])
     );
-    const configured =
-      source[key] ??
-      (!parsedKeys.has(key) && !(key in source) && envName
+    const envName = envNames[0];
+    const envAlias = envName !== undefined && envName !== spec.env;
+    const cliAlias =
+      !parsedKeys.has(key) && !(key in source)
+        ? (spec.aliases ?? []).find(alias => cliKey(alias) in source)
+        : undefined;
+    const fromSource = key in source || cliAlias !== undefined;
+    const configured = fromSource
+      ? (source[key] ??
+        (cliAlias === undefined ? undefined : source[cliKey(cliAlias)]))
+      : !parsedKeys.has(key) && envName
         ? valueFromEnvironment(key, spec, process.env[envName] as string)
-        : undefined);
+        : undefined;
+    if (cliAlias !== undefined)
+      reportWarning(
+        warn,
+        `Configuration: ${
+          cliAlias.startsWith('--') ? cliAlias : `--${cliAlias}`
+        } is deprecated, use ${cliName(key)}`
+      );
+    if (envAlias && envName !== undefined && !fromSource)
+      reportWarning(
+        warn,
+        `Configuration: ${envName} is deprecated, use ${
+          spec.env ?? cliName(key)
+        }`
+      );
     const emptyString =
       spec.type === 'string' &&
       !spec.emptyIsValue &&

@@ -9,6 +9,10 @@ on:
     branches:
       - master
   pull_request:
+    # The contracts job reads the `breaking` label. Listening to label events
+    # makes a label added after the first run visible; the other jobs skip them
+    # rather than repeat the suite. See docs/development/contracts.md.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -36,6 +40,10 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # A label event only exists to re-evaluate the contracts gate
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action != 'labeled' && github.event.action != 'unlabeled')
 
     strategy:
       # Each version answers for itself: one of them stumbling should report
@@ -229,6 +237,9 @@ jobs:
     runs-on: ubuntu-latest
     name: Helm chart and Docker image
     timeout-minutes: 20
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action != 'labeled' && github.event.action != 'unlabeled')
 
     steps:
       - name: Checkout code

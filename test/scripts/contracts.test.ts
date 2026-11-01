@@ -675,6 +675,210 @@ describe('OpenAPI contracts', () => {
     ).to.deep.equal([]);
   });
 
+  it('reports a type replaced by a union that drops it', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        oneOf: [{ type: 'number' }, { type: 'boolean' }],
+      };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'type: string → none',
+    });
+  });
+
+  it('reports a null alternative added to a response', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].get.responses['200'].content[
+        'application/json'
+      ].schema.items.properties.name = {
+        anyOf: [{ type: 'string' }, { type: 'null' }],
+      };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'GET /api/v1/things 200 response application/json[].name',
+      detail: 'null added to the answer',
+    });
+  });
+
+  it('reports a free request value that becomes an enum', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = { type: 'string', enum: ['x'] };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'enum added',
+    });
+  });
+
+  it('reports a request that stops accepting additional properties', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.additionalProperties = false;
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json',
+      detail: 'additional properties no longer accepted',
+    });
+  });
+
+  it('reports a changed const value', () => {
+    const base = document();
+    base.paths['/api/v1/things'].post.requestBody.content[
+      'application/json'
+    ].schema.properties.name.const = 'a';
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name.const = 'b';
+    });
+
+    expect(
+      diffOpenApi(base as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'const: "a" → "b"',
+    });
+  });
+
+  it('reports a replaced const union variant', () => {
+    const base = document();
+    base.paths['/api/v1/things'].post.requestBody.content[
+      'application/json'
+    ].schema = {
+      anyOf: [{ const: 'a' }, { const: 'b' }],
+    };
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema = {
+        anyOf: [{ const: 'a' }, { const: 'c' }],
+      };
+    });
+
+    expect(
+      diffOpenApi(base as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json anyOf[0]',
+      detail: 'const: "b" → "c"',
+    });
+  });
+
+  it('reports a nullable response field that was not nullable', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].get.responses['200'].content[
+        'application/json'
+      ].schema.items.properties.name.nullable = true;
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'GET /api/v1/things 200 response application/json[].name',
+      detail: 'null added to the answer',
+    });
+  });
+
+  it('reports security requirements added to an operation', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].get.security = [{ bearer: [] }];
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'security GET /api/v1/things',
+      detail: 'security requirements changed',
+    });
+  });
+
+  it('reports array and multiple-of bounds added to a request', () => {
+    const base = document();
+    const schema =
+      base.paths['/api/v1/things'].post.requestBody.content['application/json']
+        .schema;
+    schema.properties.tags = { type: 'array', items: { type: 'string' } };
+    const spec = changed(document => {
+      const schema =
+        document.paths['/api/v1/things'].post.requestBody.content[
+          'application/json'
+        ].schema;
+      schema.properties.tags = {
+        type: 'array',
+        items: { type: 'string' },
+        minItems: 1,
+        maxItems: 3,
+      };
+      schema.properties.age = { type: 'number', multipleOf: 5 };
+    });
+    const differences = diffOpenApi(
+      base as OpenApiDocument,
+      spec as OpenApiDocument
+    );
+
+    for (const detail of [
+      'minItems: undefined → 1',
+      'maxItems: undefined → 3',
+      'multipleOf: undefined → 5',
+    ])
+      expect(differences).to.deep.include({
+        kind: 'changed',
+        what:
+          detail === 'multipleOf: undefined → 5'
+            ? 'POST /api/v1/things request application/json.age'
+            : 'POST /api/v1/things request application/json.tags',
+        detail,
+      });
+  });
+
+  it('reports a response reached through a component reference', () => {
+    const base = document();
+    base.paths['/api/v1/things'].get.responses['200'] = {
+      $ref: '#/components/responses/Thing',
+    };
+    base.components.responses = {
+      Thing: {
+        description: 'Things',
+        content: {
+          'application/json': { schema: { type: 'string' } },
+        },
+      },
+    };
+
+    expect(
+      diffOpenApi(base as OpenApiDocument, document() as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'GET /api/v1/things 200 response application/json',
+      detail: 'type: string → array',
+    });
+  });
+
   it('stops on a cycle between component schemas', () => {
     const spec = document();
     spec.components.schemas.A = {

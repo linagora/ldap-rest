@@ -481,7 +481,14 @@ export class DM {
       plugin => (plugin.constructor as typeof DmPlugin).optionDefinitions ?? {}
     );
     const declared = new Set(
-      definitions.flatMap(optionSet => Object.keys(optionSet))
+      definitions.flatMap(optionSet =>
+        Object.entries(optionSet).flatMap(([key, spec]) => [
+          key,
+          ...(spec.aliases ?? []).map(name =>
+            name.replace(/^--?/, '').replace(/-/g, '_')
+          ),
+        ])
+      )
     );
     const unknownCli = this.unknownCliOptions.filter(
       name => !declared.has(name.replace(/^--?/, '').replace(/-/g, '_'))

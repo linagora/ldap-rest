@@ -8,8 +8,8 @@ request says so before it merges.
   [Configuration](../usage/configuration.md) and of each plugin's page.
 - **REST API**: the routes, request bodies and answers of the
   [REST API](../client-development/api/rest-api.md), their parameters,
-  statuses and response headers. The error `code` values are reviewed by
-  hand: the document types them as strings.
+  responses (references resolved), statuses and response headers. The error
+  `code` values are reviewed by hand: the document types them as strings.
 - **Plugin API**: what the npm sub-path exports declare — `ldap-rest`,
   `./hooks`, `./plugin`, `./ldapactions`, `./expressformatedresponses`, the
   `./plugin-*`, `./abstract-*` and `./browser-*` entries — and the JSON
@@ -51,22 +51,25 @@ ones. It reports:
   `breaking` label.
 
 A change is non-additive when it removes or narrows what was published:
-a removed option or environment variable, a changed type, default, bound or
-required flag, a removed route, method, parameter, response status, response
-header or field, a request field that becomes required, a removed union
-variant, or — once the plugin snapshot exists — a removed export or a narrowed
-signature. Renaming an option is a deprecation, not a removal, as long as the
-old CLI name and environment variable stay in its `aliases` and `envAliases`.
-Adding a union variant, a field or an optional parameter is additive.
-Documentation-only edits, such as a summary or description, are ignored.
+a removed option or environment variable, a changed type, default, bound,
+`const`, enum or required flag, a request value that becomes an enum, a
+request object that stops accepting additional properties, a removed route,
+method, parameter, response status, response header or field, a request field
+that becomes required, a response that may now be null, changed security
+requirements, a removed union variant, or — once the plugin snapshot exists —
+a removed export or a narrowed signature. Renaming an option is a deprecation,
+not a removal, as long as the old CLI name and environment variable stay in
+its `aliases` and `envAliases`. Adding a union variant, a field or an optional
+parameter is additive. Documentation-only edits, such as a summary or
+description, are ignored.
 
 The job runs the scripts from the pull request, so a change to them is
 reviewed like any other code, as `.github/CODEOWNERS` requires.
 
 The `breaking` label records that the maintainers accepted the break, and the
 `CHANGELOG.md` section must say so: the release gate below reads the section,
-not the label, and refuses to ship the break as a minor or patch release.
-Adding the label does not re-run the job: run it again from the pull request.
+not the label, and refuses to ship the break as a minor or patch release. The
+workflow listens to label events, so adding the label runs the job again.
 
 To try the comparison locally against your base branch:
 
@@ -79,10 +82,11 @@ npx tsx scripts/contracts.ts --base origin/master
 `.github/workflows/release.yml` runs `scripts/check-release.ts` on the tag. A
 non-major tag whose `CHANGELOG.md` section lists `### Breaking Changes` is
 refused. For a 0.x version, a minor release counts as major, as semantic
-versioning lets it break. When the CHANGELOG lists no earlier release, only a
-first `X.0.0` counts as major, so a trimmed file cannot open the gate. A tag
-with no CHANGELOG section only warns, since the release notes already fall
-back to a link.
+versioning lets it break. When the tag has no section of its own, the gate
+reads `## Unreleased`, so a tag cut before the section was renamed is still
+checked; with neither section it fails. When the CHANGELOG lists no earlier
+release, only a first `X.0.0` counts as major, so a trimmed file cannot open
+the gate.
 
 ## Deprecating instead of breaking
 

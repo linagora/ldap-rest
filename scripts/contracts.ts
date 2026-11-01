@@ -37,10 +37,12 @@ interface Operation {
 
 export interface OpenApiDocument {
   paths?: Record<string, Record<string, unknown>>;
+  security?: Schema[];
   components?: {
     schemas?: Record<string, Schema>;
     parameters?: Record<string, Schema>;
     requestBodies?: Record<string, Schema>;
+    responses?: Record<string, Schema>;
   };
 }
 
@@ -72,6 +74,12 @@ interface Shape {
   minLength?: number;
   maxLength?: number;
   pattern?: string;
+  minItems?: number;
+  maxItems?: number;
+  minProperties?: number;
+  maxProperties?: number;
+  multipleOf?: number;
+  const?: unknown;
   default?: unknown;
   enum?: unknown[];
   items?: Shape;
@@ -104,6 +112,7 @@ export function shapeOf(
   if (typeof schema.type === 'string') shape.type = schema.type;
   if (typeof schema.format === 'string') shape.format = schema.format;
   if (typeof schema.nullable === 'boolean') shape.nullable = schema.nullable;
+  if (schema.const !== undefined) shape.const = schema.const;
   for (const name of [
     'minimum',
     'maximum',
@@ -112,6 +121,11 @@ export function shapeOf(
     'minLength',
     'maxLength',
     'pattern',
+    'minItems',
+    'maxItems',
+    'minProperties',
+    'maxProperties',
+    'multipleOf',
     'default',
   ] as const)
     if (schema[name] !== undefined) shape[name] = schema[name];
@@ -250,12 +264,15 @@ function responseChanges(
   currentDocument: OpenApiDocument
 ): ContractDifference[] {
   const differences: ContractDifference[] = [];
-  for (const [status, response] of Object.entries(base.responses ?? {})) {
-    const now = current.responses?.[status];
-    if (!now) {
+  for (const [status, baseResponse] of Object.entries(base.responses ?? {})) {
+    const currentResponse = current.responses?.[status];
+    if (!currentResponse) {
       differences.push({ kind: 'removed', what: `response ${key} ${status}` });
       continue;
     }
+    const response = dereference(baseResponse, baseDocument) ?? baseResponse;
+    const now =
+      dereference(currentResponse, currentDocument) ?? currentResponse;
     differences.push(
       ...responseHeaderChanges(
         `${key} ${status}`,
@@ -289,6 +306,17 @@ function responseChanges(
   return differences;
 }
 
+/** Whether a schema, or one of its alternatives, lets a null through */
+function allowsNull(shape: Shape): boolean {
+  return (
+    shape.nullable === true ||
+    shape.type === 'null' ||
+    [...(shape.oneOf ?? []), ...(shape.anyOf ?? [])].some(
+      variant => variant.nullable === true || variant.type === 'null'
+    )
+  );
+}
+
 /**
  * What a change does to a schema. A request field a client sends cannot go
  * away or become required without breaking it; a response field it reads
@@ -301,12 +329,14 @@ export function shapeChanges(
   direction: 'request' | 'response'
 ): ContractDifference[] {
   const differences: ContractDifference[] = [];
-  if (
+  // A union that keeps the base type as one of its alternatives is the same
+  // contract for that alternative; one that replaces it is a narrowing.
+  const currentVariants = [...(current.oneOf ?? []), ...(current.anyOf ?? [])];
+  const keepsBaseType =
     base.type !== undefined &&
-    base.type !== current.type &&
-    !current.oneOf &&
-    !current.anyOf
-  )
+    current.type === undefined &&
+    currentVariants.some(variant => variant.type === base.type);
+  if (base.type !== undefined && base.type !== current.type && !keepsBaseType)
     differences.push({
       kind: 'changed',
       what: where,
@@ -340,11 +370,21 @@ export function shapeChanges(
       what: where,
       detail: 'items added',
     });
-  if (base.nullable !== current.nullable && base.nullable !== undefined)
+  const nullableChanged =
+    base.nullable !== current.nullable && base.nullable !== undefined;
+  const nullAdded =
+    direction === 'response' && allowsNull(current) && !allowsNull(base);
+  const nullRemoved =
+    direction === 'request' && allowsNull(base) && !allowsNull(current);
+  if (nullableChanged || nullAdded || nullRemoved)
     differences.push({
       kind: 'changed',
       what: where,
-      detail: `nullable: ${String(base.nullable)} → ${String(current.nullable)}`,
+      detail: nullableChanged
+        ? `nullable: ${String(base.nullable)} → ${String(current.nullable)}`
+        : nullAdded
+          ? 'null added to the answer'
+          : 'null removed from the request',
     });
   for (const name of [
     'minimum',
@@ -354,6 +394,12 @@ export function shapeChanges(
     'minLength',
     'maxLength',
     'pattern',
+    'minItems',
+    'maxItems',
+    'minProperties',
+    'maxProperties',
+    'multipleOf',
+    'const',
     'default',
   ] as const) {
     const changed =
@@ -371,10 +417,13 @@ export function shapeChanges(
         detail: `${name}: ${JSON.stringify(base[name])} → ${JSON.stringify(current[name])}`,
       });
   }
-  if (
-    base.additionalProperties === true &&
-    current.additionalProperties !== true
-  )
+  const noLongerAcceptsExtra =
+    (base.additionalProperties === true &&
+      current.additionalProperties !== true) ||
+    (direction === 'request' &&
+      base.additionalProperties !== false &&
+      current.additionalProperties === false);
+  if (noLongerAcceptsExtra)
     differences.push({
       kind: 'changed',
       what: where,
@@ -412,6 +461,13 @@ export function shapeChanges(
         what: where,
         detail: `enum value ${JSON.stringify(value)} removed`,
       });
+  // A free string that becomes a closed set refuses values clients send today
+  if (direction === 'request' && base.enum === undefined && current.enum)
+    differences.push({
+      kind: 'changed',
+      what: where,
+      detail: 'enum added',
+    });
 
   const before = base.properties ?? {};
   const after = current.properties ?? {};
@@ -491,6 +547,27 @@ export function shapeChanges(
   return differences;
 }
 
+/** Security requirements, in a form that ignores declaration order */
+function securitySignature(security: Schema[] | undefined): string {
+  if (!security || security.length === 0) return '';
+  return JSON.stringify(
+    security
+      .map(requirement =>
+        Object.fromEntries(
+          Object.entries(requirement as Record<string, unknown>)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([name, scopes]) => [
+              name,
+              Array.isArray(scopes) ? [...scopes].sort() : scopes,
+            ])
+        )
+      )
+      .sort((left, right) =>
+        JSON.stringify(left).localeCompare(JSON.stringify(right))
+      )
+  );
+}
+
 /** What a change does to the REST API contract, operation by operation */
 export function diffOpenApi(
   base: OpenApiDocument,
@@ -500,12 +577,28 @@ export function diffOpenApi(
   const before = operations(base);
   const after = operations(current);
 
+  if (securitySignature(base.security) !== securitySignature(current.security))
+    differences.push({
+      kind: 'changed',
+      what: 'security requirements',
+      detail: 'global security requirements changed',
+    });
+
   for (const [key, baseOperation] of before) {
     const now = after.get(key);
     if (!now) {
       differences.push({ kind: 'removed', what: key });
       continue;
     }
+    if (
+      securitySignature(baseOperation.security as Schema[] | undefined) !==
+      securitySignature(now.security as Schema[] | undefined)
+    )
+      differences.push({
+        kind: 'changed',
+        what: `security ${key}`,
+        detail: 'security requirements changed',
+      });
 
     const params = new Map(
       (baseOperation.parameters ?? []).map(parameter => {

@@ -121,6 +121,101 @@ describe('unknown options', () => {
     }
   });
 
+  it('reads a declared CLI alias the parser did not carry and warns', () => {
+    const definitions = defineOptions({
+      ext_url: opt.string({
+        env: 'DM_EXT_URL',
+        aliases: ['ext-uri'],
+        default: '',
+      }),
+    });
+    const warnings: string[] = [];
+    const options = readOptions(
+      definitions,
+      { ext_uri: 'https://example.com' },
+      new Set(),
+      message => warnings.push(message)
+    );
+
+    expect(options.ext_url).to.equal('https://example.com');
+    expect(warnings).to.deep.equal([
+      'Configuration: --ext-uri is deprecated, use --ext-url',
+    ]);
+  });
+
+  it('warns when a declared environment alias is read', () => {
+    const saved = process.env.DM_EXT_LEGACY_URL;
+    process.env.DM_EXT_LEGACY_URL = 'https://example.com';
+    try {
+      const definitions = defineOptions({
+        ext_url: opt.string({
+          env: 'DM_EXT_URL',
+          envAliases: ['DM_EXT_LEGACY_URL'],
+          default: '',
+        }),
+      });
+      const warnings: string[] = [];
+      const options = readOptions(definitions, {}, new Set(), message =>
+        warnings.push(message)
+      );
+
+      expect(options.ext_url).to.equal('https://example.com');
+      expect(warnings).to.deep.equal([
+        'Configuration: DM_EXT_LEGACY_URL is deprecated, use DM_EXT_URL',
+      ]);
+    } finally {
+      if (saved === undefined) delete process.env.DM_EXT_LEGACY_URL;
+      else process.env.DM_EXT_LEGACY_URL = saved;
+    }
+  });
+
+  it('does not warn for the canonical name', () => {
+    const definitions = defineOptions({
+      ext_url: opt.string({
+        env: 'DM_EXT_URL',
+        aliases: ['ext-uri'],
+        default: '',
+      }),
+    });
+    const warnings: string[] = [];
+    const options = readOptions(
+      definitions,
+      { ext_url: 'https://example.com' },
+      new Set(),
+      message => warnings.push(message)
+    );
+
+    expect(options.ext_url).to.equal('https://example.com');
+    expect(warnings).to.deep.equal([]);
+  });
+
+  it('does not warn for an environment alias the CLI overrides', () => {
+    const saved = process.env.DM_EXT_SUPERSEDED_URL;
+    process.env.DM_EXT_SUPERSEDED_URL = 'https://alias.example.com';
+    try {
+      const definitions = defineOptions({
+        ext_url: opt.string({
+          env: 'DM_EXT_URL',
+          envAliases: ['DM_EXT_SUPERSEDED_URL'],
+          default: '',
+        }),
+      });
+      const warnings: string[] = [];
+      const options = readOptions(
+        definitions,
+        { ext_url: 'https://cli.example.com' },
+        new Set(),
+        message => warnings.push(message)
+      );
+
+      expect(options.ext_url).to.equal('https://cli.example.com');
+      expect(warnings).to.deep.equal([]);
+    } finally {
+      if (saved === undefined) delete process.env.DM_EXT_SUPERSEDED_URL;
+      else process.env.DM_EXT_SUPERSEDED_URL = saved;
+    }
+  });
+
   it('refuses an unknown variable with --strict-options', async () => {
     const saved = {
       DM_STRICT_OPTIONS: process.env.DM_STRICT_OPTIONS,

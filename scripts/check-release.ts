@@ -63,6 +63,17 @@ export function changelogSection(
   return lines.slice(start, end === -1 ? lines.length : end).join('\n');
 }
 
+/** The body of the `## Unreleased` section, without its heading */
+export function unreleasedSection(markdown: string): string | null {
+  const lines = markdown.split('\n');
+  const start = lines.findIndex(line => /^##\s+Unreleased\b/i.test(line));
+  if (start === -1) return null;
+  const end = lines.findIndex(
+    (line, index) => index > start && /^##\s/.test(line)
+  );
+  return lines.slice(start + 1, end === -1 ? lines.length : end).join('\n');
+}
+
 /**
  * The highest release the CHANGELOG lists below this one. Read by version
  * rather than by line order, so a section appended at the end still counts.
@@ -121,16 +132,24 @@ export function listsBreakingChange(section: string): boolean {
 function main(): void {
   const version = process.argv[2] ?? process.env.GITHUB_REF_NAME ?? '';
   const changelog = readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
-  const section = changelogSection(changelog, version);
+  const ownSection = changelogSection(changelog, version);
+  const section = ownSection ?? unreleasedSection(changelog);
   const previous = previousRelease(changelog, version);
 
   if (section === null) {
-    console.warn(
-      `CHANGELOG.md has no section for v${version.replace(/^v/, '')}: ` +
-        'nothing to check. Add one so the release gate can read it.'
+    console.error(
+      `CHANGELOG.md has no section for v${version.replace(/^v/, '')} and no ` +
+        'Unreleased section: nothing proves the release carries no breaking ' +
+        'change. Add a section.'
     );
+    process.exitCode = 1;
     return;
   }
+  if (ownSection === null)
+    console.warn(
+      `CHANGELOG.md has no section for v${version.replace(/^v/, '')}: ` +
+        'reading Unreleased instead.'
+    );
   if (isMajorRelease(previous, version)) {
     console.log(`v${version.replace(/^v/, '')} is a major release.`);
     return;
