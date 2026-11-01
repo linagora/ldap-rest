@@ -61,7 +61,7 @@ The deletion date is read only in those two shapes now, where the default
 and a rule whose payload holds only `$changed.<date>` publishes nothing. Write
 an ISO 8601 date, such as with `date -u '+%Y-%m-%dT%H:%M:%SZ'`, or a
 GeneralizedTime with its zone, and see
-[lifecycle events](../plugins/integrations/lifecycle-events.md#configuration).
+[lifecycle events](plugins/integrations/lifecycle-events.md#configuration).
 
 ## From 1.2.1
 

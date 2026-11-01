@@ -97,8 +97,8 @@
   ([#601](https://github.com/linagora/ldap-rest/issues/601)).
 - A tombstone's deletion date is read only when it is written as a
   GeneralizedTime with its zone or as an ISO 8601 date: a malformed value
-  another writer left (`1`, `Jan 1`, `1712011200`) and the extra forms the
-  default `iso8601` mode took from `new Date()` — `2025-01-01 12:00:00`,
+  another writer left (`1`, `Jan 1`) and the extra forms the default
+  `iso8601` mode took from `new Date()` — `2025-01-01 12:00:00`,
   `Wed, 01 Jan 2025 12:00:00 GMT`, `01/02/2025` — are no longer read, so
   `erase` refuses such a tombstone until forced instead of deleting it for
   good
