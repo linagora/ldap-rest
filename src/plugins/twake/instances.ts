@@ -26,9 +26,12 @@ import {
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
 import {
+  canonicalDn,
   escapeLdapFilter,
+  isChildOf,
   isDirectChildOf,
   normalizeDn,
+  rdnTypes,
   rdnValue,
 } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
@@ -192,7 +195,7 @@ export default class TwakeInstances extends DmPlugin {
     ldapaddafter: async (dn, entry) => {
       const account = this.account(dn, entry);
       if (!account) return;
-      await this.serialized(dn, async () => {
+      await this.serialized(this.key(dn), async () => {
         try {
           await this.provide(dn, entry, account);
         } catch (err) {
@@ -211,10 +214,10 @@ export default class TwakeInstances extends DmPlugin {
       if (!(provider instanceof CozyStackProvider)) return;
       for (const dn of Array.isArray(dns) ? dns : [dns]) {
         const match = this.match(dn);
-        const uid = /^uid=/i.test(dn) ? rdnValue(dn) : '';
+        const uid = this.uid(dn);
         if (!match || !uid) continue;
         // Queued before a re-create of the same DN, whose add comes after
-        await this.serialized(dn, async () => {
+        await this.serialized(this.key(dn), async () => {
           try {
             await provider.destroy(this.id(uid, match.exec), uid);
           } catch (err) {
@@ -329,7 +332,7 @@ export default class TwakeInstances extends DmPlugin {
     req?: Request
   ): Promise<'ready' | 'pending'> {
     let orgId: string | undefined;
-    const state = await this.serialized(dn, async () => {
+    const state = await this.serialized(this.key(dn), async () => {
       const entry = await this.read(dn, req);
       if (!entry) throw new NotFoundError(`No entry at ${dn}`);
       const account = this.account(dn, entry);
@@ -513,7 +516,7 @@ export default class TwakeInstances extends DmPlugin {
   }
 
   private async settle(dn: string, fqdn: string): Promise<void> {
-    await this.serialized(dn, async () => {
+    await this.serialized(this.key(dn), async () => {
       const entry = await this.read(dn);
       const account = entry && this.account(dn, entry);
       if (!entry || !account) return;
@@ -564,7 +567,7 @@ export default class TwakeInstances extends DmPlugin {
       account.orgId &&
       (await this.findOrganization(account.orgId));
     if (org && !first(this.value(org, this.sentAttribute))) {
-      if (dn.toLowerCase().endsWith(`,${(org.dn as string).toLowerCase()}`)) {
+      if (isChildOf(dn, org.dn as string)) {
         this.logger.info(
           `${this.name}: ${dn} waits for organization ${account.orgId}`
         );
@@ -836,8 +839,8 @@ export default class TwakeInstances extends DmPlugin {
    *
    * A client may spell the branch differently from the configured expression:
    * the directory stores the entry at its canonical DN, so the expressions
-   * are tried against that too. Captured values come lowercased from there,
-   * which the ids and slugs derived from them already fold.
+   * are tried against that too. Its captured values keep the caller's case,
+   * which an organization id is sent as.
    */
   private match(dn: string): PatternMatch | undefined {
     for (const [index, pattern] of this.patterns.entries()) {
@@ -846,7 +849,7 @@ export default class TwakeInstances extends DmPlugin {
     }
     let canonical: string;
     try {
-      canonical = normalizeDn(dn);
+      canonical = canonicalDn(dn);
     } catch {
       return undefined;
     }
@@ -855,6 +858,24 @@ export default class TwakeInstances extends DmPlugin {
       if (exec) return { exec, index };
     }
     return undefined;
+  }
+
+  /** The uid of an account's DN, under any name or alias of the type. */
+  private uid(dn: string): string {
+    try {
+      return rdnTypes(dn).includes('uid') ? rdnValue(dn) : '';
+    } catch {
+      return '';
+    }
+  }
+
+  /** One queue per entry, whatever spelling its DN came in. */
+  private key(dn: string): string {
+    try {
+      return normalizeDn(dn);
+    } catch {
+      return dn.toLowerCase();
+    }
   }
 
   private id(uid: string, match: RegExpExecArray): string {

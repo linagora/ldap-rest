@@ -758,7 +758,7 @@ const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
  *
  * @param raw the value as written, after its `=`
  */
-function canonicalValue(raw: string): string {
+function canonicalValue(raw: string, foldCase = true): string {
   const trimmed = trimUnescaped(raw);
   if (/^#(?:[0-9a-fA-F]{2})+$/.test(trimmed)) return trimmed;
   raw = unquotedValue(trimmed);
@@ -792,14 +792,16 @@ function canonicalValue(raw: string): string {
   // `fi`, a no-break space or an ideographic one is a space. Lower-casing
   // after NFKC would leave `T\u0308` as `t\u0308`, which NFKC composes
   const kept = (char: string): boolean => char.length === 3 && char[0] === '\\';
+  const fold = (text: string): string =>
+    (foldCase ? text.toLowerCase() : text).normalize('NFKC');
   const tokens: string[] = [];
   let run = '';
   for (const char of chars)
     if (kept(char)) {
-      tokens.push(...run.toLowerCase().normalize('NFKC'), char);
+      tokens.push(...fold(run), char);
       run = '';
     } else run += char;
-  tokens.push(...run.toLowerCase().normalize('NFKC'));
+  tokens.push(...fold(run));
 
   const folded = dropSpaces(tokens);
   let out = '';
@@ -992,10 +994,22 @@ export function normalizeDn(dn: string): string {
 }
 
 /**
+ * A DN's structure normalized as {@link normalizeDn} does, with the case of
+ * its values kept.
+ *
+ * A configured expression compiled to ignore case reads a DN through this
+ * form: its values are folded as the directory folds them, but a value it
+ * captures keeps the spelling the caller wrote.
+ */
+export function canonicalDn(dn: string): string {
+  return normalizedRdns(dn, false).join(',');
+}
+
+/**
  * The RDNs of {@link normalizeDn}, kept apart: joined, an escaped separator
  * the directory spelled `\2C` would read as one that was not escaped.
  */
-function normalizedRdns(dn: string): string[] {
+function normalizedRdns(dn: string, foldCase = true): string[] {
   return parseDn(dn)
     .map(rdn =>
       splitRdn(rdn)
@@ -1006,7 +1020,8 @@ function normalizedRdns(dn: string): string[] {
           // polynomial scan a regex incurs on untrusted DN strings (ReDoS).
           const eq = atav.indexOf('=');
           if (eq === -1) return atav.trim().toLowerCase();
-          return `${canonicalType(atav.slice(0, eq).trim())}=${canonicalValue(atav.slice(eq + 1)).toLowerCase()}`;
+          const value = canonicalValue(atav.slice(eq + 1), foldCase);
+          return `${canonicalType(atav.slice(0, eq).trim())}=${foldCase ? value.toLowerCase() : value}`;
         })
         .sort()
         .join('+')
