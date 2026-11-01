@@ -57,6 +57,50 @@ describe('SearchCache', () => {
       ).to.not.equal(key);
     });
 
+    it('does not merge an attribute name holding a separator with two names', () => {
+      const cache = cacheFor();
+      const key = (attributes: string[]): string =>
+        cache.key('uid=jdoe,dc=example,dc=com', {
+          scope: 'base',
+          attributes,
+        });
+
+      expect(key(['cn|mail'])).to.not.equal(key(['cn', 'mail']));
+    });
+
+    it('does not merge an attribute name holding a comma with two names', () => {
+      const cache = cacheFor();
+      const key = (attributes: string[]): string =>
+        cache.key('uid=jdoe,dc=example,dc=com', {
+          scope: 'base',
+          attributes,
+        });
+
+      expect(key(['a,b'])).to.not.equal(key(['a', 'b']));
+    });
+
+    it('does not merge a name that looks like a JSON list with one element', () => {
+      const cache = cacheFor();
+      const key = (attributes: string[]): string =>
+        cache.key('uid=jdoe,dc=example,dc=com', {
+          scope: 'base',
+          attributes,
+        });
+
+      expect(key(['["cn"]'])).to.not.equal(key(['cn']));
+    });
+
+    it('does not merge buffer attribute names holding a comma', () => {
+      const cache = cacheFor();
+      const key = (explicitBufferAttributes: string[]): string =>
+        cache.key('uid=jdoe,dc=example,dc=com', {
+          scope: 'base',
+          explicitBufferAttributes,
+        });
+
+      expect(key(['a,b'])).to.not.equal(key(['a', 'b']));
+    });
+
     it('digests a key without carrying its content', () => {
       expect(digestKey('uid=alice,dc=example,dc=com')).to.have.length(12);
       expect(digestKey('uid=alice,dc=example,dc=com')).to.equal(

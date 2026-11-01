@@ -57,6 +57,10 @@
   used to reach
   ([#552](https://github.com/linagora/ldap-rest/issues/552),
   [upgrading](docs/usage/upgrading.md#a-path-parameter-is-percent-decoded-once)).
+- The LDAP search cache no longer merges searches whose attribute names hold
+  a separator: `['cn|mail']` and `['cn', 'mail']` — like `['a,b']` and
+  `['a', 'b']` — are now different cache keys
+  ([#562](https://github.com/linagora/ldap-rest/issues/562)).
 
 ## v1.3.0 (2026-10-31)
 

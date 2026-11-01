@@ -132,7 +132,6 @@ export default class SearchCache {
   readonly enabled: boolean;
   private readonly logger: CacheLogger;
   private readonly searchCache: LRUCache<string, SearchResult>;
-  private readonly attrSignatureCache: LRUCache<string, string>;
   /**
    * How many writes this cache has seen.
    *
@@ -166,8 +165,6 @@ export default class SearchCache {
         ? `LDAP search cache initialized: max=${options.max}, ttl=${options.ttl / 1000}s`
         : 'LDAP search cache disabled (--ldap-cache-ttl=0)'
     );
-    // Bounded so a caller's attribute lists cannot grow it without end
-    this.attrSignatureCache = new LRUCache<string, string>({ max: 1000 });
   }
 
   get generation(): number {
@@ -186,7 +183,7 @@ export default class SearchCache {
   key(base: string, opts: SearchOptions): string {
     const sortedAttrs = this.getAttributeSignature(opts.attributes);
     const bufferAttrs = opts.explicitBufferAttributes?.length
-      ? [...opts.explicitBufferAttributes].sort().join(',')
+      ? JSON.stringify([...opts.explicitBufferAttributes].sort())
       : '-';
     const filterStr =
       typeof opts.filter === 'string'
@@ -305,14 +302,15 @@ export default class SearchCache {
         this.invalidate(member);
   }
 
+  /**
+   * Get a sorted signature for an attribute list.
+   *
+   * The signature is JSON, not a separator-joined string: an attribute
+   * description may contain any character that could stand for a separator,
+   * so joining would let `['cn|mail']` and `['cn', 'mail']` share one.
+   */
   private getAttributeSignature(attributes: string[] | undefined): string {
     if (!attributes || attributes.length === 0) return '*';
-    const key = attributes.join('|');
-    let sig = this.attrSignatureCache.get(key);
-    if (!sig) {
-      sig = [...attributes].sort().join(',');
-      this.attrSignatureCache.set(key, sig);
-    }
-    return sig;
+    return JSON.stringify([...attributes].sort());
   }
 }
