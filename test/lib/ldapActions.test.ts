@@ -947,9 +947,11 @@ describe('ldapActions', function () {
     const watchOpening = (
       target: LdapActions
     ): { opened: () => number; most: () => number; stop: () => void } => {
-      const inner = target as unknown as {
-        createConnection: () => Promise<Client>;
-      };
+      const inner = (
+        target as unknown as {
+          pool: { createConnection: () => Promise<Client> };
+        }
+      ).pool;
       const create = inner.createConnection;
       let opened = 0;
       let open = 0;
@@ -959,7 +961,7 @@ describe('ldapActions', function () {
         open++;
         most = Math.max(most, open);
         try {
-          return await create.call(target);
+          return await create.call(inner);
         } finally {
           open--;
         }
@@ -979,9 +981,9 @@ describe('ldapActions', function () {
       const opening = watchOpening(pool);
       let seenOpening = 0;
       let queued = 0;
-      const inner = pool as unknown as {
-        waitingResolvers: unknown[];
-      };
+      const inner = (
+        pool as unknown as { pool: { waitingResolvers: unknown[] } }
+      ).pool;
       const push = inner.waitingResolvers.push.bind(inner.waitingResolvers);
       inner.waitingResolvers.push = (...waiters: unknown[]): number => {
         queued = Math.max(queued, inner.waitingResolvers.length + 1);
@@ -1033,9 +1035,11 @@ describe('ldapActions', function () {
       // comes and fails on the 30 s pool timeout
       this.timeout(2000);
       pool = build(1);
-      const inner = pool as unknown as {
-        createConnection: () => Promise<Client>;
-      };
+      const inner = (
+        pool as unknown as {
+          pool: { createConnection: () => Promise<Client> };
+        }
+      ).pool;
       const create = inner.createConnection;
       inner.createConnection = async (): Promise<Client> => {
         throw new Error('no directory answered');
@@ -1070,33 +1074,41 @@ describe('ldapActions', function () {
 
     it('lets a waiter take the place of an expired connection', async () => {
       pool = build(1);
-      const inner = pool as unknown as {
-        takeConnection: () => Promise<{ createdAt: number }>;
-        releaseConnection: (conn: { createdAt: number }) => void;
-        connectionTtl: number;
-      };
+      const inner = (
+        pool as unknown as {
+          pool: {
+            takeConnection: () => Promise<{ createdAt: number }>;
+            release: (conn: { createdAt: number }) => void;
+            connectionTtl: number;
+          };
+        }
+      ).pool;
       const first = await inner.takeConnection();
       const waiting = inner.takeConnection();
       expect(pool.poolStats().waiting, 'queued behind the connection').to.equal(
         1
       );
       first.createdAt = Date.now() - inner.connectionTtl - 1;
-      inner.releaseConnection(first);
+      inner.release(first);
       const woken = await waiting;
       expect(woken, 'a connection of its own').to.not.equal(first);
       expect(pool.poolStats()).to.deep.include({ busy: 1, waiting: 0 });
-      inner.releaseConnection(woken);
+      inner.release(woken);
     });
 
     it('unbinds the connection it opened while close ran', async () => {
       pool = build(1);
       // The pool is drained by close() before the connection it is opening
       // is there: the pool holds no reference to it, only this call does
-      const inner = pool as unknown as {
-        createConnection: () => Promise<Client>;
-        connectionPool: unknown[];
-        opening: number;
-      };
+      const inner = (
+        pool as unknown as {
+          pool: {
+            createConnection: () => Promise<Client>;
+            connectionPool: unknown[];
+            opening: number;
+          };
+        }
+      ).pool;
       let closeFirst!: () => void;
       const closed = new Promise<void>(resolve => {
         closeFirst = resolve;
@@ -1104,7 +1116,7 @@ describe('ldapActions', function () {
       const bound: Array<Promise<void>> = [];
       const create = inner.createConnection;
       inner.createConnection = async (): Promise<Client> => {
-        const client = await create.call(pool);
+        const client = await create.call(inner);
         await closed;
         const unbind = client.unbind.bind(client);
         client.unbind = (): Promise<void> => {
