@@ -323,7 +323,7 @@ multi-valued complex attribute such as `emails` takes a list of objects whose
 refused with `400 invalidValue` when its value holds an escape RFC 4514 does
 not define, as the flat routes hold a client-written DN. The directory
 refuses such a value itself on an attribute of DN syntax; this names the
-escape in the SCIM answer and applies wherever the mapping writes a DN.
+escape in the SCIM answer and applies wherever the mapping declares one.
 
 A PATCH `add`, or a `remove` naming values, changes only the values it names:
 values the caller's read did not show, such as group members an
