@@ -60,6 +60,44 @@ describe('SCIM PATCH applicator', () => {
     expect(req.replace).to.deep.equal({ sn: 'Smith' });
   });
 
+  it('refuses a reference DN with an escape RFC 4514 does not define', async () => {
+    const mapping = {
+      ...DEFAULT_USER_MAPPING,
+      entries: [
+        ...DEFAULT_USER_MAPPING.entries,
+        { scim: 'manager', sub: { value: 'manager' }, subDn: ['value'] },
+      ],
+    };
+    await patchToModifyRequest(
+      {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          {
+            op: 'replace',
+            path: 'manager.value',
+            value: 'uid=bob,ou=users,dc=example,dc=com',
+          },
+        ],
+      },
+      { ...ctx, mapping }
+    );
+    for (const value of [
+      'uid=\\q\\x,ou=users,dc=example,dc=com',
+      'uid=bob\\',
+    ]) {
+      let error: unknown;
+      await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'manager.value', value }],
+        },
+        { ...ctx, mapping }
+      ).catch(e => (error = e));
+      expect(error).to.be.instanceOf(ScimError);
+      expect((error as ScimError).scimType).to.equal('invalidValue');
+    }
+  });
+
   it('remove deletes an attribute the entry holds', async () => {
     const req = await patchToModifyRequest(
       {

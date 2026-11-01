@@ -41,7 +41,9 @@ import {
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
+  assertReferenceDn,
   holdsValue,
+  isDnSubAttribute,
   readActive,
   scimPathToLdapAttribute,
 } from './mapping';
@@ -470,6 +472,8 @@ async function applyOperation(
     throw scimInvalidValue(`PATCH ${op.op} ${op.path} missing value`);
   }
   const values = Array.isArray(value) ? value : [value];
+  if (sub && isDnSubAttribute(ctx.mapping, top, sub))
+    for (const v of values) assertReferenceDn(v, `${top}.${sub}`);
   if (operation === 'add') entry.append(ldapAttr, values);
   else entry.set(ldapAttr, values);
 }
