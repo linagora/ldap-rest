@@ -174,6 +174,53 @@ describe('SearchCache', () => {
       expect(cache.get(cache.key(bob, baseSearch()))).to.not.equal(undefined);
     });
 
+    for (const write of [
+      'uid=jdo\\65,ou=users,dc=example,dc=com',
+      '0.9.2342.19200300.100.1.1=jdoe,ou=users,dc=example,dc=com',
+      'uid=jdoe;ou=users;dc=example;dc=com',
+      'uid="jdoe",ou=users,dc=example,dc=com',
+    ])
+      it(`drops the cached reads of a write spelled ${write}`, () => {
+        const cache = cacheFor();
+        const read = 'uid=jdoe,ou=users,dc=example,dc=com';
+        cache.set(cache.key(read, baseSearch()), answer({}));
+
+        cache.invalidate(write);
+
+        expect(cache.get(cache.key(read, baseSearch()))).to.equal(undefined);
+      });
+
+    it('drops a cached read when the write names the RDN type by its OID', () => {
+      const cache = cacheFor();
+      const cached = 'cn=jdoe,ou=users,dc=example,dc=com';
+      cache.set(cache.key(cached, baseSearch()), answer({}));
+
+      cache.invalidate('2.5.4.3=jdoe,ou=users,dc=example,dc=com');
+
+      expect(cache.get(cache.key(cached, baseSearch()))).to.equal(undefined);
+    });
+
+    it('drops a cached read when the write reorders a multi-valued RDN', () => {
+      const cache = cacheFor();
+      const cached = 'cn=jdoe+uid=1000,ou=users,dc=example,dc=com';
+      cache.set(cache.key(cached, baseSearch()), answer({}));
+
+      cache.invalidate('uid=1000+cn=jdoe,ou=users,dc=example,dc=com');
+
+      expect(cache.get(cache.key(cached, baseSearch()))).to.equal(undefined);
+    });
+
+    it('drops a cached read naming the entry under another spelling', () => {
+      const cache = cacheFor();
+      const group = 'cn=group,dc=example,dc=com';
+      const member = 'uid=jdoe,ou=users,dc=example,dc=com';
+      cache.set(cache.key(group, baseSearch()), answer({ member }));
+
+      cache.invalidateReferences('uid=jdo\\65,ou=users,dc=example,dc=com');
+
+      expect(cache.get(cache.key(group, baseSearch()))).to.equal(undefined);
+    });
+
     it('drops reads that name a written DN, or an entry below it', () => {
       const cache = cacheFor();
       const group = 'cn=Sales,ou=Groups,dc=Example,dc=Com';

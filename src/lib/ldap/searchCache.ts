@@ -7,6 +7,8 @@ import { createHash } from 'node:crypto';
 import type { SearchOptions, SearchResult } from 'ldapts';
 import { LRUCache } from 'lru-cache';
 
+import { normalizeDn } from '../utils';
+
 export interface CacheLogger {
   info(message: string): void;
 }
@@ -43,11 +45,12 @@ export const digestKey = (key: string): string =>
 /**
  * Fold a DN to the form cache keys are matched on.
  *
- * The directory compares DNs case-insensitively, and callers build them from
- * everywhere: a URL path, a configuration value, an attribute read back from
- * the server. `uid=Foo,dc=x` and `uid=foo,dc=x` name one entry, so a write
- * spelling it one way has to drop what a read spelling it the other stored.
- * Spacing around the separators is folded for the same reason.
+ * The directory reads DNs through their parsed form, and callers build them
+ * from everywhere: a URL path, a configuration value, an attribute read back
+ * from the server. Case, spacing, hex escapes, LDAPv2 quotes and semicolons,
+ * attribute aliases and OIDs, and the order of a multi-valued RDN all name
+ * one entry, so a write spelling it one way has to drop what a read spelling
+ * it another stored. {@link normalizeDn} folds every one of them.
  *
  * Folding serves matching only, never key building: a DN that two callers
  * spell differently costs two cache entries, and one write drops both. The
@@ -55,20 +58,21 @@ export const digestKey = (key: string): string =>
  * values differ only in case, which a case-exact naming attribute makes two
  * different entries.
  *
- * Written as a split/trim/join rather than a `\s*,\s*` regex: that shape is
- * polynomial-backtracking on a long run of spaces containing no comma, and
- * `dn` comes from caller-controlled input (a URL path segment, among
- * others), so the cost was quadratic in an attacker-chosen length. Splitting
- * on the literal comma and trimming each part does the same folding in
- * linear time.
+ * A DN {@link normalizeDn} cannot parse falls back to folding case and
+ * spacing alone, so a malformed spelling never makes invalidation throw.
  */
-const foldDn = (dn: string): string =>
-  dn
-    .trim()
-    .toLowerCase()
-    .split(',')
-    .map(part => part.trim())
-    .join(',');
+const foldDn = (dn: string): string => {
+  try {
+    return normalizeDn(dn);
+  } catch {
+    return dn
+      .trim()
+      .toLowerCase()
+      .split(',')
+      .map(part => part.trim())
+      .join(',');
+  }
+};
 
 /**
  * Group attributes the `memberof` overlay mirrors onto the entries they name,

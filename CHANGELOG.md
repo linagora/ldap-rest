@@ -61,6 +61,10 @@
   a separator: `['cn|mail']` and `['cn', 'mail']` — like `['a,b']` and
   `['a', 'b']` — are now different cache keys
   ([#562](https://github.com/linagora/ldap-rest/issues/562)).
+- The LDAP search cache now drops a cached read however the write spells the
+  DN: hex escapes, attribute aliases and OIDs, `;`, quotes and multi-valued
+  RDN order all name the same entry
+  ([#563](https://github.com/linagora/ldap-rest/issues/563)).
 
 ## v1.3.0 (2026-10-31)
 
