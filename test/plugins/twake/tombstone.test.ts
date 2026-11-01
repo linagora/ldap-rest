@@ -280,6 +280,12 @@ describe('Twake tombstone plugin', function () {
       }
     });
 
+    it('answers 400 for a DN the directory cannot parse', async () => {
+      let error: unknown;
+      await dm.ldap.delete(`uid=pl\\qain,${USERS}`).catch(e => (error = e));
+      expect(error).to.have.property('statusCode', 400);
+    });
+
     it('deletes an entry no pattern matches', async () => {
       await add(flat('plain-bob'));
       await dm.ldap.delete(flat('plain-bob'));

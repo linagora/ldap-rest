@@ -421,7 +421,9 @@ export default class TwakeTombstone extends DmPlugin {
       )) as SearchResult;
       return res.searchEntries[0];
     } catch (err) {
-      if (extractLdapCode(err) === 32) return undefined;
+      const code = extractLdapCode(err);
+      if (code === 32) return undefined;
+      if (code === 34) throw new BadRequestError(`Invalid DN: ${dn}`);
       throw err;
     }
   }
