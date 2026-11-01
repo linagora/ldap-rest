@@ -42,9 +42,9 @@ not by the snapshot, and is reviewed by hand, as is a custom error `code`.
 
 ## The pull request gate
 
-The `contracts` job of `.github/workflows/test.yml` generates the snapshots
-from the pull request and compares them with the base branch's committed
-ones. It reports:
+The `contracts` job of `.github/workflows/contracts.yml` generates the
+snapshots from the pull request and compares them with the base branch's
+committed ones. It reports:
 
 - additive changes — a new option, route or field — and lets them through;
 - non-additive changes, and fails unless the pull request carries the
@@ -56,8 +56,10 @@ a removed option or environment variable, a changed type, default, bound,
 request object that stops accepting additional properties, a removed route,
 method, parameter, response status, response header or field, a request field
 that becomes required, a response that may now be null, changed security
-requirements, a removed union variant, or — once the plugin snapshot exists —
-a removed export or a narrowed signature. Renaming an option is a deprecation,
+requirements, a removed union variant, a value an alternative of the type
+closes with an enum or a `const` where the type used to accept any, an
+`allOf` that adds a constraint, or — once the plugin snapshot exists — a
+removed export or a narrowed signature. Renaming an option is a deprecation,
 not a removal, as long as the old CLI name and environment variable stay in
 its `aliases` and `envAliases`. Adding a union variant, a field or an optional
 parameter is additive. Documentation-only edits, such as a summary or
@@ -69,7 +71,8 @@ reviewed like any other code, as `.github/CODEOWNERS` requires.
 The `breaking` label records that the maintainers accepted the break, and the
 `CHANGELOG.md` section must say so: the release gate below reads the section,
 not the label, and refuses to ship the break as a minor or patch release. The
-workflow listens to label events, so adding the label runs the job again.
+workflow listens to label events, so adding the label runs the job again; it
+has its own concurrency group, so that event does not cancel the test matrix.
 
 To try the comparison locally against your base branch:
 

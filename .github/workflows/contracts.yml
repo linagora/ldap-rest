@@ -1,0 +1,49 @@
+name: Published contracts
+
+# A pull request shows what it does to the options and the REST API that were
+# published. Kept out of test.yml: the `breaking` label changes the verdict, so
+# a label event has to run this job again, and its own concurrency group keeps
+# that event from cancelling the test matrix. See docs/development/contracts.md.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    name: Published contracts
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compare the published contracts
+        run: |
+          git fetch origin "$BASE_REF"
+          base=$(git merge-base HEAD "origin/$BASE_REF")
+          if [ "$BREAKING" = 'true' ]; then
+            npx tsx scripts/contracts.ts --base "$base" --breaking
+          else
+            npx tsx scripts/contracts.ts --base "$base"
+          fi
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BREAKING: ${{ contains(github.event.pull_request.labels.*.name, 'breaking') }}

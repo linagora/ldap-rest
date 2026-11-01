@@ -9,10 +9,7 @@ on:
     branches:
       - master
   pull_request:
-    # The contracts job reads the `breaking` label. Listening to label events
-    # makes a label added after the first run visible; the other jobs skip them
-    # rather than repeat the suite. See docs/development/contracts.md.
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -40,10 +37,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    # A label event only exists to re-evaluate the contracts gate
-    if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.action != 'unlabeled')
 
     strategy:
       # Each version answers for itself: one of them stumbling should report
@@ -141,42 +134,6 @@ jobs:
           DM_TEST_VALKEY_URL: redis://localhost:6379
           DM_TEST_LDAP_IMAGE: mirror.gcr.io/osixia/openldap:1.5.0
 
-  # A pull request shows what it does to the published contracts: the
-  # snapshots committed on the base branch are compared with what the pull
-  # request generates. See docs/development/contracts.md.
-  contracts:
-    runs-on: ubuntu-latest
-    name: Published contracts
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.x
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Compare the published contracts
-        run: |
-          git fetch origin "$BASE_REF"
-          base=$(git merge-base HEAD "origin/$BASE_REF")
-          if [ "$BREAKING" = 'true' ]; then
-            npx tsx scripts/contracts.ts --base "$base" --breaking
-          else
-            npx tsx scripts/contracts.ts --base "$base"
-          fi
-        env:
-          BASE_REF: ${{ github.base_ref }}
-          BREAKING: ${{ contains(github.event.pull_request.labels.*.name, 'breaking') }}
-
   lsc-plugin-test:
     runs-on: ubuntu-latest
     name: LSC ldap-rest plugin (Java)
@@ -237,9 +194,6 @@ jobs:
     runs-on: ubuntu-latest
     name: Helm chart and Docker image
     timeout-minutes: 20
-    if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.action != 'unlabeled')
 
     steps:
       - name: Checkout code

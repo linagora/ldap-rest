@@ -329,46 +329,24 @@ export function shapeChanges(
   direction: 'request' | 'response'
 ): ContractDifference[] {
   const differences: ContractDifference[] = [];
+  const currentVariants = [...(current.oneOf ?? []), ...(current.anyOf ?? [])];
+  // The alternatives that carry the base type, when the current schema
+  // replaced it with a union. Comparison continues against each of them.
+  const variantsKeepingType =
+    base.type === undefined || current.type !== undefined
+      ? []
+      : currentVariants.filter(variant => variant.type === base.type);
   // A union that keeps the base type as one of its alternatives is the same
   // contract for that alternative; one that replaces it is a narrowing.
-  const currentVariants = [...(current.oneOf ?? []), ...(current.anyOf ?? [])];
-  const keepsBaseType =
+  if (
     base.type !== undefined &&
-    current.type === undefined &&
-    currentVariants.some(variant => variant.type === base.type);
-  if (base.type !== undefined && base.type !== current.type && !keepsBaseType)
-    differences.push({
-      kind: 'changed',
-      what: where,
-      detail: `type: ${base.type} → ${current.type ?? 'none'}`,
-    });
-  if (base.format !== current.format && base.format !== undefined)
-    differences.push({
-      kind: 'changed',
-      what: where,
-      detail: `format: ${base.format} → ${current.format ?? 'none'}`,
-    });
-  else if (
-    direction === 'request' &&
-    base.format === undefined &&
-    current.format
+    base.type !== current.type &&
+    variantsKeepingType.length === 0
   )
     differences.push({
       kind: 'changed',
       what: where,
-      detail: `format: none → ${current.format}`,
-    });
-  else if (direction === 'request' && base.type === undefined && current.type)
-    differences.push({
-      kind: 'changed',
-      what: where,
-      detail: `type: none → ${current.type}`,
-    });
-  else if (direction === 'request' && base.items === undefined && current.items)
-    differences.push({
-      kind: 'changed',
-      what: where,
-      detail: 'items added',
+      detail: `type: ${base.type} → ${current.type ?? 'none'}`,
     });
   const nullableChanged =
     base.nullable !== current.nullable && base.nullable !== undefined;
@@ -386,162 +364,236 @@ export function shapeChanges(
           ? 'null added to the answer'
           : 'null removed from the request',
     });
-  for (const name of [
-    'minimum',
-    'maximum',
-    'exclusiveMinimum',
-    'exclusiveMaximum',
-    'minLength',
-    'maxLength',
-    'pattern',
-    'minItems',
-    'maxItems',
-    'minProperties',
-    'maxProperties',
-    'multipleOf',
-    'const',
-    'default',
-  ] as const) {
-    const changed =
-      base[name] !== undefined &&
-      JSON.stringify(base[name]) !== JSON.stringify(current[name]);
-    // A bound added to a request schema narrows what a client may send
-    const added =
-      direction === 'request' &&
-      base[name] === undefined &&
-      current[name] !== undefined;
-    if (changed || added)
-      differences.push({
-        kind: 'changed',
-        what: where,
-        detail: `${name}: ${JSON.stringify(base[name])} → ${JSON.stringify(current[name])}`,
-      });
-  }
-  const noLongerAcceptsExtra =
-    (base.additionalProperties === true &&
-      current.additionalProperties !== true) ||
-    (direction === 'request' &&
-      base.additionalProperties !== false &&
-      current.additionalProperties === false);
-  if (noLongerAcceptsExtra)
-    differences.push({
-      kind: 'changed',
-      what: where,
-      detail: 'additional properties no longer accepted',
-    });
-  else if (
-    base.additionalProperties &&
-    typeof base.additionalProperties === 'object' &&
-    current.additionalProperties &&
-    typeof current.additionalProperties === 'object'
-  )
-    differences.push(
-      ...shapeChanges(
-        `${where}{}`,
-        base.additionalProperties,
-        current.additionalProperties,
-        direction
-      )
-    );
-
-  if (base.items && current.items)
-    differences.push(
-      ...shapeChanges(`${where}[]`, base.items, current.items, direction)
-    );
-  else if (base.items && !current.items)
-    differences.push({ kind: 'changed', what: where, detail: 'items removed' });
-
-  const allowed = new Set(
-    (current.enum ?? []).map(value => JSON.stringify(value))
-  );
-  for (const value of base.enum ?? [])
-    if (!allowed.has(JSON.stringify(value)))
-      differences.push({
-        kind: 'changed',
-        what: where,
-        detail: `enum value ${JSON.stringify(value)} removed`,
-      });
-  // A free string that becomes a closed set refuses values clients send today
-  if (direction === 'request' && base.enum === undefined && current.enum)
-    differences.push({
-      kind: 'changed',
-      what: where,
-      detail: 'enum added',
-    });
-
-  const before = base.properties ?? {};
-  const after = current.properties ?? {};
-  for (const [name, property] of Object.entries(before)) {
-    const now = after[name];
-    if (!now) {
-      differences.push({ kind: 'removed', what: `${where}.${name}` });
-      continue;
+  if (variantsKeepingType.length > 0) {
+    // Keeping the type says what the value is, not what it may be: an
+    // alternative can still add a bound, an enum or a closed object, which
+    // the base alone would have been compared for. Each alternative carrying
+    // the type is compared with the base, and the alternatives that do not
+    // narrow it are additive.
+    //
+    // A value the union accepts through another alternative is not gone: an
+    // `enum` split across alternatives still accepts every value, so each
+    // alternative is widened to the values they all accept before the
+    // comparison.
+    const accepted = variantsKeepingType.flatMap(variant => [
+      ...(variant.enum ?? []),
+      ...(variant.const !== undefined ? [variant.const] : []),
+    ]);
+    for (const variant of variantsKeepingType) {
+      const widened =
+        base.enum !== undefined && accepted.length > 0
+          ? { ...variant, const: undefined, enum: accepted }
+          : variant;
+      differences.push(...shapeChanges(where, base, widened, direction));
     }
-    differences.push(
-      ...shapeChanges(`${where}.${name}`, property, now, direction)
-    );
-  }
-  if (direction === 'request') {
-    const was = base.required ?? [];
-    for (const name of current.required ?? [])
-      if (!was.includes(name))
-        differences.push({
-          kind: 'changed',
-          what: `${where}.${name}`,
-          detail: 'required: false → true',
-        });
   } else {
-    const now = current.required ?? [];
-    for (const name of base.required ?? [])
-      if (!now.includes(name))
-        differences.push({
-          kind: 'changed',
-          what: `${where}.${name}`,
-          detail: 'required: true → false',
-        });
-  }
-
-  for (const combinator of ['oneOf', 'anyOf', 'allOf'] as const) {
-    const was = base[combinator];
-    const now = current[combinator];
-    if (!was) continue;
-    if (!now) {
+    if (base.format !== current.format && base.format !== undefined)
       differences.push({
         kind: 'changed',
         what: where,
-        detail: `${combinator} removed`,
+        detail: `format: ${base.format} → ${current.format ?? 'none'}`,
       });
-      continue;
-    }
-    // An added variant widens what is accepted or answered; a removed one
-    // takes away something a client relied on. Variants are matched by shape
-    // first so that an additive edit inside one is compared field by field.
-    const unmatchedCurrent = [...now];
-    const unmatchedBase: Shape[] = [];
-    for (const variant of was) {
-      const index = unmatchedCurrent.findIndex(
-        candidate => JSON.stringify(candidate) === JSON.stringify(variant)
-      );
-      if (index === -1) unmatchedBase.push(variant);
-      else unmatchedCurrent.splice(index, 1);
-    }
-    if (unmatchedBase.length === unmatchedCurrent.length)
-      for (let index = 0; index < unmatchedBase.length; index++)
-        differences.push(
-          ...shapeChanges(
-            `${where} ${combinator}[${index}]`,
-            unmatchedBase[index],
-            unmatchedCurrent[index],
-            direction
-          )
-        );
-    else {
-      for (const _variant of unmatchedBase)
+    else if (
+      direction === 'request' &&
+      base.format === undefined &&
+      current.format
+    )
+      differences.push({
+        kind: 'changed',
+        what: where,
+        detail: `format: none → ${current.format}`,
+      });
+    else if (direction === 'request' && base.type === undefined && current.type)
+      differences.push({
+        kind: 'changed',
+        what: where,
+        detail: `type: none → ${current.type}`,
+      });
+    else if (
+      direction === 'request' &&
+      base.items === undefined &&
+      current.items
+    )
+      differences.push({
+        kind: 'changed',
+        what: where,
+        detail: 'items added',
+      });
+    for (const name of [
+      'minimum',
+      'maximum',
+      'exclusiveMinimum',
+      'exclusiveMaximum',
+      'minLength',
+      'maxLength',
+      'pattern',
+      'minItems',
+      'maxItems',
+      'minProperties',
+      'maxProperties',
+      'multipleOf',
+      'const',
+      'default',
+    ] as const) {
+      const changed =
+        base[name] !== undefined &&
+        JSON.stringify(base[name]) !== JSON.stringify(current[name]);
+      // A bound added to a request schema narrows what a client may send
+      const added =
+        direction === 'request' &&
+        base[name] === undefined &&
+        current[name] !== undefined;
+      if (changed || added)
         differences.push({
           kind: 'changed',
           what: where,
-          detail: `${combinator} variant removed`,
+          detail: `${name}: ${JSON.stringify(base[name])} → ${JSON.stringify(current[name])}`,
         });
+    }
+    const noLongerAcceptsExtra =
+      (base.additionalProperties === true &&
+        current.additionalProperties !== true) ||
+      (direction === 'request' &&
+        base.additionalProperties !== false &&
+        current.additionalProperties === false);
+    if (noLongerAcceptsExtra)
+      differences.push({
+        kind: 'changed',
+        what: where,
+        detail: 'additional properties no longer accepted',
+      });
+    else if (
+      base.additionalProperties &&
+      typeof base.additionalProperties === 'object' &&
+      current.additionalProperties &&
+      typeof current.additionalProperties === 'object'
+    )
+      differences.push(
+        ...shapeChanges(
+          `${where}{}`,
+          base.additionalProperties,
+          current.additionalProperties,
+          direction
+        )
+      );
+
+    if (base.items && current.items)
+      differences.push(
+        ...shapeChanges(`${where}[]`, base.items, current.items, direction)
+      );
+    else if (base.items && !current.items)
+      differences.push({
+        kind: 'changed',
+        what: where,
+        detail: 'items removed',
+      });
+
+    const allowed = new Set(
+      (current.enum ?? []).map(value => JSON.stringify(value))
+    );
+    for (const value of base.enum ?? [])
+      if (!allowed.has(JSON.stringify(value)))
+        differences.push({
+          kind: 'changed',
+          what: where,
+          detail: `enum value ${JSON.stringify(value)} removed`,
+        });
+    // A free string that becomes a closed set refuses values clients send today
+    if (direction === 'request' && base.enum === undefined && current.enum)
+      differences.push({
+        kind: 'changed',
+        what: where,
+        detail: 'enum added',
+      });
+
+    const before = base.properties ?? {};
+    const after = current.properties ?? {};
+    for (const [name, property] of Object.entries(before)) {
+      const now = after[name];
+      if (!now) {
+        differences.push({ kind: 'removed', what: `${where}.${name}` });
+        continue;
+      }
+      differences.push(
+        ...shapeChanges(`${where}.${name}`, property, now, direction)
+      );
+    }
+    if (direction === 'request') {
+      const was = base.required ?? [];
+      for (const name of current.required ?? [])
+        if (!was.includes(name))
+          differences.push({
+            kind: 'changed',
+            what: `${where}.${name}`,
+            detail: 'required: false → true',
+          });
+    } else {
+      const now = current.required ?? [];
+      for (const name of base.required ?? [])
+        if (!now.includes(name))
+          differences.push({
+            kind: 'changed',
+            what: `${where}.${name}`,
+            detail: 'required: true → false',
+          });
+    }
+
+    // An allOf the base did not have intersects the schema with further
+    // constraints, which narrows what a request may send. Comparing the base
+    // with the intersection reports it, and the bound is read as added.
+    if (!base.allOf && current.allOf?.length)
+      for (const member of current.allOf)
+        differences.push(
+          ...shapeChanges(
+            where,
+            base,
+            { ...current, allOf: undefined, ...member },
+            direction
+          )
+        );
+
+    for (const combinator of ['oneOf', 'anyOf', 'allOf'] as const) {
+      const was = base[combinator];
+      const now = current[combinator];
+      if (!was) continue;
+      if (!now) {
+        differences.push({
+          kind: 'changed',
+          what: where,
+          detail: `${combinator} removed`,
+        });
+        continue;
+      }
+      // An added variant widens what is accepted or answered; a removed one
+      // takes away something a client relied on. Variants are matched by shape
+      // first so that an additive edit inside one is compared field by field.
+      const unmatchedCurrent = [...now];
+      const unmatchedBase: Shape[] = [];
+      for (const variant of was) {
+        const index = unmatchedCurrent.findIndex(
+          candidate => JSON.stringify(candidate) === JSON.stringify(variant)
+        );
+        if (index === -1) unmatchedBase.push(variant);
+        else unmatchedCurrent.splice(index, 1);
+      }
+      if (unmatchedBase.length === unmatchedCurrent.length)
+        for (let index = 0; index < unmatchedBase.length; index++)
+          differences.push(
+            ...shapeChanges(
+              `${where} ${combinator}[${index}]`,
+              unmatchedBase[index],
+              unmatchedCurrent[index],
+              direction
+            )
+          );
+      else {
+        for (const _variant of unmatchedBase)
+          differences.push({
+            kind: 'changed',
+            what: where,
+            detail: `${combinator} variant removed`,
+          });
+      }
     }
   }
   return differences;

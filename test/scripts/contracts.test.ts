@@ -787,6 +787,151 @@ describe('OpenAPI contracts', () => {
     });
   });
 
+  it('reports a const alternative that closes a request value', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        anyOf: [
+          { type: 'string', const: 'a' },
+          { type: 'string', const: 'b' },
+        ],
+      };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'const: undefined → "a"',
+    });
+  });
+
+  it('reports an enum alternative that closes a request value', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        anyOf: [{ type: 'string', enum: ['x'] }, { type: 'number' }],
+      };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'enum added',
+    });
+  });
+
+  it('reports a bound added inside a union alternative', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        anyOf: [{ type: 'string', maxLength: 3 }, { type: 'null' }],
+      };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'maxLength: undefined → 3',
+    });
+  });
+
+  it('reports a closed object alternative', () => {
+    const base = document();
+    base.paths['/api/v1/things'].post.requestBody.content[
+      'application/json'
+    ].schema.properties.name = { type: 'object' };
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        anyOf: [
+          { type: 'object', additionalProperties: false },
+          { type: 'null' },
+        ],
+      };
+    });
+
+    expect(
+      diffOpenApi(base as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'additional properties no longer accepted',
+    });
+  });
+
+  it('reports an item alternative that closes the values', () => {
+    const base = document();
+    base.paths['/api/v1/things'].post.requestBody.content[
+      'application/json'
+    ].schema.properties.name = { type: 'array', items: { type: 'string' } };
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        type: 'array',
+        items: { anyOf: [{ type: 'string', const: 'a' }] },
+      };
+    });
+
+    expect(
+      diffOpenApi(base as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name[]',
+      detail: 'const: undefined → "a"',
+    });
+  });
+
+  it('reports an enum added through allOf', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        type: 'string',
+        allOf: [{ enum: ['x'] }],
+      };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'enum added',
+    });
+  });
+
+  it('leaves an enum split across union alternatives additive', () => {
+    const base = document();
+    base.paths['/api/v1/things'].post.requestBody.content[
+      'application/json'
+    ].schema.properties.name = { type: 'string', enum: ['a', 'b'] };
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        anyOf: [
+          { type: 'string', enum: ['a'] },
+          { type: 'string', enum: ['b'] },
+        ],
+      };
+    });
+
+    expect(
+      diffOpenApi(base as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.equal([]);
+  });
+
   it('reports a nullable response field that was not nullable', () => {
     const spec = changed(document => {
       document.paths['/api/v1/things'].get.responses['200'].content[
