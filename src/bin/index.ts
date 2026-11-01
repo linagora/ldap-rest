@@ -59,16 +59,23 @@ import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
 
+/** Whether the request announces a body, as body-parser's own `hasBody` does */
+const hasBody = (req: Request): boolean =>
+  req.headers['transfer-encoding'] !== undefined ||
+  !Number.isNaN(Number(req.headers['content-length']));
+
 /**
  * Refuse a `Content-Type` that names no media type, such as
- * `;application/json`.
+ * `;application/json`, when a parser would read the body.
  *
  * `type-is` throws a `TypeError` on it where `body-parser` expects the type
- * simply not to match, and the request would be answered `500`.
+ * simply not to match, and the request would be answered `500`. A request
+ * without a body reaches no parser, so its header is left alone.
  */
 const rejectEmptyMediaType: RequestHandler = (req, _res, next) => {
   const contentType = req.headers['content-type'];
   if (
+    hasBody(req) &&
     typeof contentType === 'string' &&
     contentType.split(';', 1)[0].trim() === ''
   ) {
@@ -282,9 +289,9 @@ export class DM {
       res.setHeader('X-Request-Id', id);
       runWithLogContext({ requestId: id }, next);
     });
+    this.app.use(rejectEmptyMediaType);
     // Each parser keeps the bytes it read: core/auth/hmac hashes those, as
     // the client signed them, not the body re-serialized.
-    this.app.use(rejectEmptyMediaType);
     this.app.use(this.bodyParsers);
     this.app.use(bodyParser.json({ verify: keepRawBody }));
     this.app.use(
