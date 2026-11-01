@@ -1535,12 +1535,23 @@ describe('Twake instances plugin', function () {
           .reply(200, {})
           .persist();
         clouderyOrg('acme1-instance');
-        search('acme1.example.org').reply((_uri, _body, answer) => {
-          rabbit.handler!(orgWorkplace).then(
-            () => answer(null, [200, { items: [PLATFORM_ORG_INSTANCE] }]),
-            (err: Error) => answer(err, [500, {}])
-          );
-        });
+        // nock 15 no longer types the reply callback: its parameters are
+        // named here rather than read from the overload nock 14 carried
+        search('acme1.example.org').reply(
+          (
+            _uri: string,
+            _body: string | Record<string, unknown>,
+            answer: (
+              err: NodeJS.ErrnoException | null,
+              result: [number, string | Record<string, unknown>]
+            ) => void
+          ) => {
+            rabbit.handler!(orgWorkplace).then(
+              () => answer(null, [200, { items: [PLATFORM_ORG_INSTANCE] }]),
+              (err: Error) => answer(err, [500, {}])
+            );
+          }
+        );
         try {
           expect(await plugin(dm).ensureInstance(erin, rest())).to.equal(
             'pending'
