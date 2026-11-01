@@ -6,6 +6,7 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { SearchResult } from 'ldapts';
 
 import { DM } from '../../../src/bin';
 import LdapGroups from '../../../src/plugins/ldap/groups';
@@ -69,5 +70,21 @@ describe('The name of a group', function () {
     const res = await request.post(route).send({ cn: dn, member: [] });
     expect(res.status, JSON.stringify(res.body)).to.equal(200);
     await server.ldap.delete(dn).catch(() => undefined);
+  });
+
+  it('writes the name the directory folds the RDN to', async () => {
+    // `cn=\ zoë` is the name `zoë` for the directory: the group is written
+    // under the folded one, with that value, not under one it folds away
+    const folded = `cn=zoë,ou=lists,ou=groups,${base}`;
+    const res = await request
+      .post(route)
+      .send({ cn: `cn=${B} zoë,ou=lists,ou=groups,${base}`, member: [] });
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    const stored = (await server.ldap.search(
+      { paged: false, scope: 'base', attributes: ['cn'] },
+      folded
+    )) as SearchResult;
+    expect(stored.searchEntries[0]?.cn).to.equal('zoë');
+    await server.ldap.delete(folded).catch(() => undefined);
   });
 });

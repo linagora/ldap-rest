@@ -157,7 +157,9 @@ POST /api/v1/ldap/groups
 
 **Notes:**
 
-- `cn` is required
+- `cn` is required; it may be the group's DN, whose first RDN gives the
+  name, folded as the directory folds it
+  ([details](flat-generic.md#create-entry))
 - `member` can be a string (single member) or array (multiple members)
 - If no members provided, a dummy member is automatically added, and it is
   left out of `member` when the group is read back, on both the list and the

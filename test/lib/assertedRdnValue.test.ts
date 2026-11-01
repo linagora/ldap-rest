@@ -24,13 +24,10 @@ describe('assertedRdnValue', () => {
     );
   });
 
-  it('reads a quoted value holding a + as one assertion', () => {
-    // LDAPv2 quotes a whole value: `splitRdn` and `normalizeDn` see one
-    // assertion here, and so does this reader, which keeps the quotes as
-    // `rdnValue` does
-    expect(assertedRdnValue(`uid="a+b",${base}`, 'uid', base)).to.equal(
-      '"a+b"'
-    );
+  it('reads a quoted value as the value it holds', () => {
+    // LDAPv2 quotes a whole value: `parseDn` and `normalizeDn` see one
+    // assertion holding `a+b`, and so does this reader
+    expect(assertedRdnValue(`uid="a+b",${base}`, 'uid', base)).to.equal('a+b');
   });
 
   it('decodes the escapes of the value, as the entry is named', () => {
@@ -39,6 +36,29 @@ describe('assertedRdnValue', () => {
     expect(
       assertedRdnValue(`uid=Smith${B},John,${base}`, 'uid', base)
     ).to.equal('Smith,John');
+  });
+
+  it('names the value with the fold the directory applies', () => {
+    // NFKC, which the directory's matching rules apply: a decomposed accent
+    // is the composed character it indexes the name under
+    expect(assertedRdnValue(`uid=cafe\u0301,${base}`, 'uid', base)).to.equal(
+      'café'
+    );
+    // A space an escape leads with is insignificant (RFC 4518 §2.6.1): the
+    // DN names "bob", and the entry is written with that name
+    expect(assertedRdnValue(`uid=${B} bob,${base}`, 'uid', base)).to.equal(
+      'bob'
+    );
+    // One space for a run, none at either end
+    expect(assertedRdnValue(`uid=a  b ${B} ,${base}`, 'uid', base)).to.equal(
+      'a b'
+    );
+  });
+
+  it('keeps the case the caller spelled', () => {
+    // Folded for a comparison, not written folded: the name is the one the
+    // entry carries
+    expect(assertedRdnValue(`uid=Bob,${base}`, 'uid', base)).to.equal('Bob');
   });
 
   it('reads a bare RDN without a branch', () => {

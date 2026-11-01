@@ -1211,10 +1211,12 @@ export default abstract class LdapFlat extends DmPlugin {
     await this.addEntry(id, additional, req);
     // As the server: the identifier the caller just wrote is answered back
     // to them, whether or not they may read the branch it went to — that
-    // only. By its DN: the name may be another entry's elsewhere.
+    // only. By its DN: the name may be another entry's elsewhere, and read
+    // from `creationOf` as the write read it, so a spelling the directory
+    // folds differently is not answered from another DN.
     const written = (await this.ldap.system.search(
       { paged: false, scope: 'base', attributes: [this.mainAttribute] },
-      this.resolveDn(id)
+      this.creationOf(id).dn
     )) as SearchResult;
     return created(res, this.project(written.searchEntries[0]));
   }
@@ -1425,6 +1427,32 @@ export default abstract class LdapFlat extends DmPlugin {
     return `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
   }
 
+  /**
+   * The name and the DN a creation of `id` gives: `id` is the naming value,
+   * or a DN whose first RDN names the entry, folded as the directory folds
+   * it and written back in this branch.
+   *
+   * Both the write and the answer it gets after it read the DN here, so a
+   * spelling the directory folds differently cannot leave the entry created
+   * under one DN and read back at another.
+   */
+  protected creationOf(id: string): { name: string; dn: string } {
+    if (!namesByDn(id, this.mainAttribute))
+      return { name: id, dn: this.resolveDn(id) };
+    // `resolveDn` refuses a DN under another branch with the message that
+    // names it; the RDN is then rebuilt here, in this branch
+    this.resolveDn(id);
+    const name = assertedRdnValue(id, this.mainAttribute, this.base);
+    if (name === null)
+      throw new BadRequestError(
+        `${this.mainAttribute} must be a value, or a "${this.mainAttribute}=…,${this.base}" DN`
+      );
+    return {
+      name,
+      dn: `${this.mainAttribute}=${escapeDnValue(name)},${this.base}`,
+    };
+  }
+
   async addEntry(
     id: string,
     additional: AttributesList = {},
@@ -1434,21 +1462,9 @@ export default abstract class LdapFlat extends DmPlugin {
       throw new BadRequestError(`${this.mainAttribute} must be a string`);
     // Checked below under the names the write will give them
     await this.ldap.canonicalAttributes(additional);
-    let dn: string;
-    if (namesByDn(id, this.mainAttribute)) {
-      // A DN naming the entry: its first RDN gives the name. A DN that cannot
-      // name it — another branch, a multi-valued RDN — is refused, since read
-      // as a bare name it would be written whole in the naming attribute
-      dn = this.resolveDn(id);
-      const name = assertedRdnValue(id, this.mainAttribute, this.base);
-      if (name === null)
-        throw new BadRequestError(
-          `${this.mainAttribute} must be a value, or a "${this.mainAttribute}=…,${this.base}" DN`
-        );
-      id = name;
-    } else {
-      dn = this.resolveDn(id);
-    }
+    const creation = this.creationOf(id);
+    id = creation.name;
+    let dn = creation.dn;
     try {
       validateDnValue(id, this.mainAttribute);
     } catch (err) {
