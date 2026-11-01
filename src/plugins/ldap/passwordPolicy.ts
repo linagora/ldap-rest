@@ -72,6 +72,14 @@ const POLICY_ATTRIBUTE_TYPES: Record<string, 'integer' | 'boolean' | 'text'> = {
 // a shared object slapd loads, so writing it would run code in slapd
 const READ_ONLY_POLICY_ATTRS = ['pwdAttribute', 'pwdCheckModule'];
 
+/**
+ * The largest value an integer policy attribute takes: beyond it a JSON
+ * number is no longer an exact integer, and `String()` writes it as an
+ * exponent (`1e+21`), which the directory refuses and `parseInt()` reads
+ * back as 1.
+ */
+const MAX_POLICY_INTEGER = Number.MAX_SAFE_INTEGER;
+
 // Carried by the pwdPolicyChecker class, not by pwdPolicy
 const CHECKER_ATTRS = ['pwdCheckModuleArg', 'pwdUseCheckModule'];
 
@@ -1534,14 +1542,14 @@ export default class PasswordPolicy extends DmPlugin {
       case 'integer':
         if (
           typeof value !== 'number' ||
-          !Number.isInteger(value) ||
+          !Number.isSafeInteger(value) ||
           value < 0 ||
           (name === 'pwdCheckQuality' && value > 2)
         ) {
           throw new BadRequestError(
             name === 'pwdCheckQuality'
               ? 'pwdCheckQuality must be 0, 1 or 2'
-              : `${name} must be a non-negative integer`
+              : `${name} must be an integer between 0 and ${MAX_POLICY_INTEGER}`
           );
         }
         return String(value);

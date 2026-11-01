@@ -397,7 +397,7 @@ describe('PasswordPolicy Plugin: policy management', () => {
   after(async () => {
     if (!dm) return;
     await dm.ldap.delete(userDn).catch(() => undefined);
-    for (const cn of ['default', 'aged', 'software', 'checked'])
+    for (const cn of ['default', 'aged', 'software', 'checked', 'huge'])
       await dm.ldap.delete(`cn=${cn},${policyBase}`).catch(() => undefined);
     await dm.ldap.delete(policyBase).catch(() => undefined);
     await dm.stop();
@@ -707,6 +707,41 @@ describe('PasswordPolicy Plugin: policy management', () => {
     } finally {
       dm.config.ppolicy_default_dn = `cn=default,${policyBase}`;
       dm.config.ppolicy_base = policyBase;
+    }
+  });
+
+  it('refuses an integer that cannot be written as a decimal', async () => {
+    // `1e21` goes out as `1e+21`, which the directory refuses; 2⁵³ is the
+    // first integer a JSON number no longer holds exactly
+    for (const pwdMaxAge of [
+      1e21,
+      9007199254740992,
+      2 ** 60,
+      Number.MAX_VALUE,
+    ]) {
+      const res = await request.post(api).send({ cn: 'huge', pwdMaxAge });
+      expect(res.status, String(pwdMaxAge)).to.equal(400);
+      expect(res.body.error).to.match(/between 0 and 9007199254740991/);
+    }
+    expect((await request.get(`${api}/huge`)).status).to.equal(404);
+  });
+
+  it('refuses such an integer on a change too', async () => {
+    const res = await request.patch(`${api}/aged`).send({ pwdMaxAge: 1e21 });
+    expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(res.body.error).to.match(/between 0 and 9007199254740991/);
+    // The policy keeps the value it had
+    expect((await request.get(`${api}/aged`)).body.pwdMaxAge).to.equal(864000);
+  });
+
+  it('accepts every integer the directory stores', async () => {
+    // 3000000000 is past 2³¹: a bound the directory does not have would
+    // refuse it, while its INTEGER syntax takes it
+    for (const pwdMaxAge of [3000000000, Number.MAX_SAFE_INTEGER]) {
+      const res = await request.post(api).send({ cn: 'huge', pwdMaxAge });
+      expect(res.status, JSON.stringify(res.body)).to.equal(201);
+      expect(res.body.pwdMaxAge).to.equal(pwdMaxAge);
+      await dm.ldap.delete(`cn=huge,${policyBase}`).catch(() => undefined);
     }
   });
 });

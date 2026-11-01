@@ -341,6 +341,9 @@ curl -X PATCH "http://localhost:8081/api/v1/password-policies/default" \
 
 - `pwdAttribute` and `pwdCheckModule` are read-only. Before OpenLDAP 2.6,
   `pwdCheckModule` is the path of a library slapd loads; set it in slapd.
+- Durations and counts are integers from 0 to 9007199254740991 (2⁵³ − 1),
+  the largest a JSON number holds exactly: a larger value, or one sent as an
+  exponent such as `1e21`, is refused with a `400`.
 - `pwdCheckModuleArg`, the configuration of the quality-check module (ppm,
   for instance), is a string, usually of several lines. Writing it, or
   `pwdUseCheckModule`, gives the entry the `pwdPolicyChecker` class. Both
