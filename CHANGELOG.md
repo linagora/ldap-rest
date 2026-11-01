@@ -92,9 +92,8 @@
   does not define
   ([#592](https://github.com/linagora/ldap-rest/issues/592)).
 - The Twake instances plugin recognises an organization whose branch is
-  spelled under another case, spacing or escape, or whose RDN holds an
-  escaped comma: such a creation no longer keeps an address or a mark the
-  caller supplied
+  spelled with other spacing or escapes, or whose RDN holds an escaped comma:
+  such a creation no longer keeps an address or a mark the caller supplied
   ([#601](https://github.com/linagora/ldap-rest/issues/601)).
 
 ## v1.3.0 (2026-10-31)
