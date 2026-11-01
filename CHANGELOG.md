@@ -100,6 +100,11 @@
   canonical DN: the address and mark a caller supplied are removed and its
   instance is provisioned
   ([#610](https://github.com/linagora/ldap-rest/issues/610)).
+- A delete under another spelling of a tombstone's DN — spaces, case or
+  escapes — no longer removes the entry for good: the expressions are
+  compared as the directory compares DNs, so the delete writes a tombstone,
+  and a delete of an existing tombstone writes nothing
+  ([#615](https://github.com/linagora/ldap-rest/issues/615)).
 - SCIM answers `400 invalidValue` for a reference the mapping declares a DN
   (`subDn`) when its value holds an escape RFC 4514 does not define, before
   the write: the directory refuses such a value on an attribute of DN syntax,

@@ -26,7 +26,7 @@ import {
 import { changeContext } from '../../lib/changeContext';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import { escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+import { escapeLdapFilter, isDnInBranch, normalizeDn } from '../../lib/utils';
 import { scimOptionsOf } from '../scim/scim.options';
 
 import {
@@ -118,9 +118,15 @@ export default class TwakeTombstone extends DmPlugin {
     ldapdeleterequest: async ([dn, req]) => {
       const kept: string[] = [];
       for (const one of Array.isArray(dn) ? dn : [dn]) {
-        if (this.keeps(one)) {
+        if (!this.erasing.has(one)) {
           const entry = await this.read(one);
-          if (entry) {
+          // An expression written with an escape or a doubled space may match
+          // only the stored spelling: the directory answers the DN with the
+          // client's spacing folded away, even when it accepted that spacing.
+          if (
+            entry &&
+            (this.matches(one) || this.matches(entry.dn as string))
+          ) {
             await this.writeTombstone(one, entry, this.reasonOf(one, req), req);
             continue;
           }
@@ -364,8 +370,22 @@ export default class TwakeTombstone extends DmPlugin {
     this.logger.warn({ plugin: this.name, event: 'restore', dn });
   }
 
+  /**
+   * Whether this DN names an entry the expressions keep. A client may spell
+   * the DN differently from the expression; the directory stores the entry
+   * at its canonical DN, so the expressions read that too. The DN as sent is
+   * still tried: an expression written with the directory's own spelling
+   * (`\2C`, a doubled space) matches only that form.
+   */
   private matches(dn: string): boolean {
-    return this.patterns.some(p => p.test(dn));
+    if (this.patterns.some(p => p.test(dn))) return true;
+    let canonical: string;
+    try {
+      canonical = normalizeDn(dn);
+    } catch {
+      return false;
+    }
+    return this.patterns.some(p => p.test(canonical));
   }
 
   private isScim(req?: Request): boolean {

@@ -121,7 +121,11 @@ describe('Twake tombstone plugin', function () {
           events: { created: 'created', deleted: 'deleted' },
         },
       ]),
-      twake_tombstone_dn: [`^uid=ts-[^,]+,${USERS}$`, `^uid=[^,]+,${ORG}$`],
+      twake_tombstone_dn: [
+        `^uid=ts-[^,]+,${USERS}$`,
+        `^uid=[^,]+,${ORG}$`,
+        `^uid=ts-[^,]+,ou=A\\\\2CB,${LDAP_BASE}$`,
+      ],
       twake_tombstone_reasons: ['deleted', 'user_request', 'violation'],
       twake_tombstone_clear_attributes: ['mobile', 'telephoneNumber'],
       twake_tombstone_erase_min_age: 3600,
@@ -216,6 +220,65 @@ describe('Twake tombstone plugin', function () {
         expect(Date.now() - at).to.be.below(60000);
       });
     }
+
+    it('writes a tombstone whatever spelling of the DN the delete gives', async () => {
+      const stored = flat('ts-alice');
+      // The directory names one entry; the expression was written for one
+      // spelling of it
+      const spellings = [
+        stored,
+        stored.toUpperCase(),
+        stored.replace(/,/g, ', '),
+        stored.replace(/,/g, ' , '),
+        stored.replace('ts-alice', 't\\73-alice'),
+        stored.replace('uid=', 'uid = '),
+      ];
+      try {
+        for (const dn of spellings) {
+          await add(stored);
+          await dm.ldap.delete(dn);
+          expect(await read(stored), dn).to.include({
+            employeeType: 'deleted',
+          });
+          await cleanup(stored);
+        }
+      } finally {
+        await cleanup(stored);
+      }
+    });
+
+    it('keeps a tombstone when deleted under another spelling', async () => {
+      const dn = flat('ts-alice');
+      await add(dn);
+      await dm.ldap.delete(dn);
+      const tombstone = await read(dn);
+      expect(tombstone).to.include({ employeeType: 'deleted' });
+      await dm.ldap.delete(dn.replace(/,/g, ' , '));
+      expect(await read(dn)).to.include({
+        employeeType: 'deleted',
+        roomNumber: tombstone?.roomNumber,
+      });
+    });
+
+    it('writes a tombstone for an expression written with \\2C under spaced RDNs', async () => {
+      // The expression matches the stored spelling only; the client writes
+      // spaces around the commas, which normalizeDn folds but turns \2C into \,
+      const branch = `ou=A\\2CB,${LDAP_BASE}`;
+      const dn = `uid=ts-carol,${branch}`;
+      try {
+        await dm.ldap.add(branch, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'A,B',
+        });
+        await add(dn);
+        await dm.ldap.delete(
+          `uid=ts-carol , ou=A\\2CB , ${LDAP_BASE.replace(/,/g, ' , ')}`
+        );
+        expect(await read(dn)).to.include({ employeeType: 'deleted' });
+      } finally {
+        await cleanup(dn, branch);
+      }
+    });
 
     it('deletes an entry no pattern matches', async () => {
       await add(flat('plain-bob'));
