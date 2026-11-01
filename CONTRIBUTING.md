@@ -80,7 +80,7 @@ that keeps it there, and the path that pulls the package in:
 | Override                         | Advisory                                                                                                            | Resolved through                                         |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | `diff >=8.0.3`                   | `GHSA-73rr-hh4g-fpgx` (low), denial of service in `parsePatch` and `applyPatch`                                     | `mocha`, test only                                       |
-| `glob >=11.0.4`                  | `GHSA-5j98-mcp5-4vw2` (high), command injection through the CLI                                                     | build and test tools                                     |
+| `glob >=11.1.0`                  | `GHSA-5j98-mcp5-4vw2` (high), command injection through the CLI                                                     | build and test tools                                     |
 | `minimatch ^10.2.3`              | `GHSA-3ppc-4f35-3m26`, `GHSA-7r86-cg39-jmmj` and `GHSA-23c5-xmqv-rm74` (high), regular-expression denial of service | build and test tools                                     |
 | `postcss-selector-parser ^7.1.6` | `GHSA-rj75-hqrm-r3gf` (medium), quadratic selector parsing                                                          | `rollup-plugin-postcss`, build only                      |
 | `serialize-javascript >=7.0.3`   | `GHSA-5c6j-r48x-rmvq` (high), remote code execution through `RegExp.flags`                                          | `@rollup/plugin-terser` and `mocha`, build and test only |
