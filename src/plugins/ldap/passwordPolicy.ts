@@ -164,6 +164,9 @@ const policyConfig = (raw: RawEntry, dn: string): PpolicyConfig => {
 // Special characters for password complexity validation
 const SPECIAL_CHARS_REGEX = /[!@#$%^&*()_+\-=[\]{}|;:'",.<>?/]/;
 
+/** The ppolicy marker for a lock that lasts until an administrator lifts it */
+const PERMANENT_LOCK = '000001010000Z';
+
 interface PpolicyConfig {
   dn?: string;
   pwdMaxAge?: number;
@@ -497,6 +500,7 @@ export const ValidatePasswordBody = Type.Object({
   password: Type.String({ minLength: 1 }),
 });
 
+import { parseDirectoryDate } from './enterpriseRules';
 import {
   passwordPolicyOptions,
   type PasswordPolicyOptions,
@@ -1093,7 +1097,7 @@ export default class PasswordPolicy extends DmPlugin {
     const now = Date.now();
 
     // Parse pwdChangedTime
-    const lastChanged = this.parseGeneralizedTime(entry.pwdChangedTime);
+    const lastChanged = this.parsePolicyTime(entry.pwdChangedTime);
 
     // Calculate expiration
     let expiresAt: Date | null = null;
@@ -1121,11 +1125,11 @@ export default class PasswordPolicy extends DmPlugin {
     // Check lockout
     const lockedTime = entry.pwdAccountLockedTime;
     let isLocked = !!lockedTime;
-    const isPermanentLock = lockedTime === '000001010000Z';
+    const isPermanentLock = lockedTime === PERMANENT_LOCK;
 
     // Calculate lockout end (auto-unlock if duration passed)
     if (isLocked && !isPermanentLock && policy.pwdLockoutDuration) {
-      const lockedAt = this.parseGeneralizedTime(lockedTime);
+      const lockedAt = this.parsePolicyTime(lockedTime);
       if (lockedAt) {
         const lockoutEndsAt = new Date(
           lockedAt.getTime() + policy.pwdLockoutDuration * 1000
@@ -1157,9 +1161,11 @@ export default class PasswordPolicy extends DmPlugin {
       isExpiringSoon,
       mustChange,
       isLocked,
-      lockedAt: lockedTime
-        ? this.parseGeneralizedTime(lockedTime)?.toISOString() || null
-        : null,
+      // The permanent marker is not an instant: there is no lock date to show
+      lockedAt:
+        lockedTime && !isPermanentLock
+          ? this.parsePolicyTime(lockedTime)?.toISOString() || null
+          : null,
       failureCount,
       graceLoginsUsed,
       policy: policy.dn ?? null,
@@ -1255,7 +1261,7 @@ export default class PasswordPolicy extends DmPlugin {
 
     for (const entry of result.searchEntries) {
       const e = userEntry(entry);
-      const changed = this.parseGeneralizedTime(e.pwdChangedTime);
+      const changed = this.parsePolicyTime(e.pwdChangedTime);
       if (!changed) continue;
       const policy = await this.policyFor(e);
       // Without pwdMaxAge, the password does not expire
@@ -1313,9 +1319,10 @@ export default class PasswordPolicy extends DmPlugin {
         uid: e.uid,
         displayName: e.displayName || e.cn,
         mail: e.mail,
-        lockedAt: this.parseGeneralizedTime(
-          e.pwdAccountLockedTime
-        )?.toISOString(),
+        lockedAt:
+          e.pwdAccountLockedTime === PERMANENT_LOCK
+            ? undefined
+            : this.parsePolicyTime(e.pwdAccountLockedTime)?.toISOString(),
         failureCount: Array.isArray(e.pwdFailureTime)
           ? e.pwdFailureTime.length
           : 0,
@@ -1724,15 +1731,11 @@ export default class PasswordPolicy extends DmPlugin {
   }
 
   /**
-   * Parse GeneralizedTime (YYYYMMDDHHmmssZ) to Date
+   * A time the directory wrote, or null when the entry holds none, read as
+   * the rest of LDAP-Rest reads one: see {@link parseDirectoryDate}.
    */
-  private parseGeneralizedTime(value: string | undefined): Date | null {
-    if (!value) return null;
-    // Format: YYYYMMDDHHmmss[.fraction]Z
-    const match = value.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
-    if (!match) return null;
-    const [, y, m, d, h, min, s] = match;
-    return new Date(Date.UTC(+y, +m - 1, +d, +h, +min, +s));
+  private parsePolicyTime(value: string | undefined): Date | null {
+    return value === undefined ? null : parseDirectoryDate(value);
   }
 
   /**

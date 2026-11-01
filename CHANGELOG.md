@@ -29,6 +29,16 @@
   and the naming attribute spell one value
   ([#501](https://github.com/linagora/ldap-rest/issues/501),
   [details](docs/usage/plugins/ldap/flat-generic.md#create-entry)).
+- A time the password policy plugin reads from an entry — `pwdChangedTime`,
+  `pwdAccountLockedTime` — is read as the rest of the server reads a
+  directory time: the zone offset and the fraction are honoured, a year below
+  100 is read as written, and the optional minutes and seconds are accepted.
+  A time written with an offset no longer shifts `lastChanged`, `lockedAt` or
+  `expiresAt` by hours, a lock with a duration ends when it should, and a
+  date the format refuses — a month 13 — leaves the password with no expiry
+  rather than one read from a rolled-over date
+  ([#557](https://github.com/linagora/ldap-rest/issues/557),
+  [details](docs/usage/plugins/ldap/password-policy.md#get-user-password-status)).
 
 ## v1.3.0 (2026-10-31)
 
