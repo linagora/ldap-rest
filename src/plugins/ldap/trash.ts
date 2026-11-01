@@ -17,6 +17,7 @@ import type { Request } from 'express';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { Hooks } from '../../hooks';
 import type { SearchResult } from '../../lib/ldapActions';
+import { BadRequestError } from '../../lib/errors';
 import { isDnInBranch, normalizeDn, parseDn } from '../../lib/utils';
 
 import { trashOptions } from './ldap.options';
@@ -270,6 +271,10 @@ class TrashPlugin extends DmPlugin {
           this.logger.error(
             `Trash plugin: Failed to move ${currentDn} to trash: ${String(error)}`
           );
+
+          // A DN the client wrote wrongly keeps its 400: wrapping it here
+          // would make the answer a 5xx
+          if (error instanceof BadRequestError) throw error;
 
           // Check if it's a permission error
           if (

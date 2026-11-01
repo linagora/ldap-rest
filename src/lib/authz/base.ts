@@ -247,6 +247,10 @@ export default abstract class AuthzBase extends DmPlugin {
       const found = res.searchEntries?.[0]?.dn;
       if (found) return String(found);
     } catch (err) {
+      // A DN the client wrote wrongly is a 400, and keeps the write from
+      // going on to a spelling the rules do not know
+      if ((err as { code?: unknown })?.code === 34)
+        throw new BadRequestError(`Invalid DN: ${dn}`);
       // Any other failure might not stop the write that follows, judged
       // then on a spelling the rules may not know: refused, as the outage
       // it is rather than a denial. Recognized by its code alone, not by a

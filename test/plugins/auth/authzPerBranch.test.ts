@@ -591,6 +591,17 @@ describe('AuthzPerBranch', function () {
   });
 
   describe('Hook integration', () => {
+    it('answers 400 for a DN the directory cannot parse', async () => {
+      const storedDn = (
+        plugin as unknown as { storedDn(dn: string): Promise<string> }
+      ).storedDn.bind(plugin);
+      let error: unknown;
+      await storedDn(`uid=pl\\qain,ou=users,${process.env.DM_LDAP_BASE}`).catch(
+        e => (error = e)
+      );
+      expect(error).to.have.property('statusCode', 400);
+    });
+
     it('should register ldapsearchrequest hook', () => {
       expect(plugin.hooks).to.not.be.undefined;
       expect(plugin.hooks).to.have.property('ldapsearchrequest');
