@@ -25,7 +25,15 @@ import {
 } from '../../lib/instanceProviders';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import { escapeLdapFilter, isDirectChildOf, rdnValue } from '../../lib/utils';
+import {
+  canonicalDn,
+  escapeLdapFilter,
+  isChildOf,
+  isDirectChildOf,
+  normalizeDn,
+  rdnTypes,
+  rdnValue,
+} from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
 import {
@@ -47,6 +55,12 @@ export interface WorkplaceCreated {
 /** An account's instance request, and the id `user.created` names it by. */
 interface Account extends InstanceRequest {
   twakeId: string;
+}
+
+/** A `--twake-instance-dn` expression that read a DN, and where it sits. */
+interface PatternMatch {
+  exec: RegExpExecArray;
+  index: number;
 }
 
 const first = (value: unknown): string | undefined => {
@@ -167,7 +181,7 @@ export default class TwakeInstances extends DmPlugin {
     // The address and the mark are this plugin's to write: one supplied by
     // the caller would skip the provider, or the event
     ldapaddrequest: ([dn, entry, req]) => {
-      if (this.patterns.some(p => p.test(dn)) || this.isOrganization(dn)) {
+      if (this.match(dn) || this.isOrganization(dn)) {
         const owned = [
           this.fqdnAttribute,
           this.sentAttribute,
@@ -181,7 +195,7 @@ export default class TwakeInstances extends DmPlugin {
     ldapaddafter: async (dn, entry) => {
       const account = this.account(dn, entry);
       if (!account) return;
-      await this.serialized(dn, async () => {
+      await this.serialized(this.key(dn), async () => {
         try {
           await this.provide(dn, entry, account);
         } catch (err) {
@@ -200,12 +214,12 @@ export default class TwakeInstances extends DmPlugin {
       if (!(provider instanceof CozyStackProvider)) return;
       for (const dn of Array.isArray(dns) ? dns : [dns]) {
         const match = this.match(dn);
-        const uid = /^uid=/i.test(dn) ? rdnValue(dn) : '';
+        const uid = this.uid(dn);
         if (!match || !uid) continue;
         // Queued before a re-create of the same DN, whose add comes after
-        await this.serialized(dn, async () => {
+        await this.serialized(this.key(dn), async () => {
           try {
-            await provider.destroy(this.id(uid, match), uid);
+            await provider.destroy(this.id(uid, match.exec), uid);
           } catch (err) {
             this.logger.error({
               plugin: this.name,
@@ -318,7 +332,7 @@ export default class TwakeInstances extends DmPlugin {
     req?: Request
   ): Promise<'ready' | 'pending'> {
     let orgId: string | undefined;
-    const state = await this.serialized(dn, async () => {
+    const state = await this.serialized(this.key(dn), async () => {
       const entry = await this.read(dn, req);
       if (!entry) throw new NotFoundError(`No entry at ${dn}`);
       const account = this.account(dn, entry);
@@ -502,7 +516,7 @@ export default class TwakeInstances extends DmPlugin {
   }
 
   private async settle(dn: string, fqdn: string): Promise<void> {
-    await this.serialized(dn, async () => {
+    await this.serialized(this.key(dn), async () => {
       const entry = await this.read(dn);
       const account = entry && this.account(dn, entry);
       if (!entry || !account) return;
@@ -553,7 +567,7 @@ export default class TwakeInstances extends DmPlugin {
       account.orgId &&
       (await this.findOrganization(account.orgId));
     if (org && !first(this.value(org, this.sentAttribute))) {
-      if (dn.toLowerCase().endsWith(`,${(org.dn as string).toLowerCase()}`)) {
+      if (isChildOf(dn, org.dn as string)) {
         this.logger.info(
           `${this.name}: ${dn} waits for organization ${account.orgId}`
         );
@@ -768,8 +782,9 @@ export default class TwakeInstances extends DmPlugin {
 
   /** What to ask for this account, when it gets an instance at all. */
   protected account(dn: string, entry: AttributesList): Account | undefined {
-    const match = this.match(dn);
-    if (!match) return undefined;
+    const matched = this.match(dn);
+    if (!matched) return undefined;
+    const match = matched.exec;
     // A tombstone put back (a refused SCIM create restores it) is no account
     if (isTombstone(entry, this.lifecycle)) return undefined;
     const skip = this.settings.twake_instance_skip_attribute;
@@ -793,7 +808,7 @@ export default class TwakeInstances extends DmPlugin {
     const orgDomain = match.groups?.org
       ? email.split('@')[1]
       : (cozy && this.settings.twake_instance_cozy_org_domain) || undefined;
-    const offer = this.offers[this.patterns.findIndex(p => p.test(dn))];
+    const offer = this.offers[matched.index];
     const id = this.id(uid, match);
     if (!id) {
       this.logger.warn(
@@ -819,10 +834,48 @@ export default class TwakeInstances extends DmPlugin {
     };
   }
 
-  private match(dn: string): RegExpExecArray | undefined {
-    return this.patterns
-      .map(p => p.exec(dn))
-      .find((m): m is RegExpExecArray => m !== null);
+  /**
+   * The expression that takes this DN for an account's, and where it sits.
+   *
+   * Each expression reads the canonical DN first: a client may spell the
+   * branch differently, and a space or an escape inside a captured value
+   * would otherwise be captured as written. The canonical form keeps the
+   * caller's case, which an organization id is sent as. An expression written
+   * with the directory's own spelling — `\2C`, a doubled space — does not
+   * match that form, so the DN as sent is tried next.
+   */
+  private match(dn: string): PatternMatch | undefined {
+    let canonical: string | undefined;
+    try {
+      canonical = canonicalDn(dn);
+    } catch {
+      canonical = undefined;
+    }
+    for (const [index, pattern] of this.patterns.entries()) {
+      const exec =
+        (canonical !== undefined ? pattern.exec(canonical) : null) ??
+        pattern.exec(dn);
+      if (exec) return { exec, index };
+    }
+    return undefined;
+  }
+
+  /** The uid of an account's DN, under any name or alias of the type. */
+  private uid(dn: string): string {
+    try {
+      return rdnTypes(dn).includes('uid') ? rdnValue(dn) : '';
+    } catch {
+      return '';
+    }
+  }
+
+  /** One queue per entry, whatever spelling its DN came in. */
+  private key(dn: string): string {
+    try {
+      return normalizeDn(dn);
+    } catch {
+      return dn.toLowerCase();
+    }
   }
 
   private id(uid: string, match: RegExpExecArray): string {
@@ -854,6 +907,6 @@ export default class TwakeInstances extends DmPlugin {
       this.config.ldap_base,
       req
     )) as SearchResult;
-    return res.searchEntries.find(e => this.patterns.some(p => p.test(e.dn)));
+    return res.searchEntries.find(e => this.match(e.dn as string));
   }
 }

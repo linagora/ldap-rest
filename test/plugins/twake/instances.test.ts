@@ -323,6 +323,32 @@ describe('Twake instances plugin', function () {
       expect(entry).not.to.have.property('businessCategory');
     });
 
+    it('takes an account under a respelled branch for one', async () => {
+      // The directory stores this entry at its canonical DN, which the
+      // expressions match; the DN as sent does not
+      const respelled = `uid=in-q2 , OU=USERS , ${process.env.DM_LDAP_BASE}`;
+      const scope = search('in-q2.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances')
+        .reply(202, {});
+      try {
+        await dm.ldap.add(
+          respelled,
+          person('in-q2', {
+            description: 'evil.example.net',
+            businessCategory: '2026-01-01T00:00:00Z',
+          }),
+          rest()
+        );
+        expect(scope.isDone()).to.equal(true);
+        const entry = await read(dm, dnOf('in-q2'));
+        expect(entry).not.to.have.property('description');
+        expect(entry).not.to.have.property('businessCategory');
+      } finally {
+        await dm.ldap.delete(dnOf('in-q2')).catch(() => undefined);
+      }
+    });
+
     it('asks nothing for a tombstone put back', async () => {
       await dm.ldap.add(
         dnOf('in-alice'),
@@ -528,6 +554,42 @@ describe('Twake instances plugin', function () {
       ]);
     });
 
+    it('keeps the case of an organization captured from a respelled branch', async () => {
+      const org = `ou=InAcme,${ORGS}`;
+      await dm.ldap.add(org, {
+        objectClass: ['top', 'organizationalUnit'],
+        ou: 'InAcme',
+        l: 'acme.example',
+      });
+      await dm.ldap.add(`ou=users,${org}`, {
+        objectClass: ['top', 'organizationalUnit'],
+        ou: 'users',
+      });
+      let asked: Record<string, unknown> = {};
+      search('inyinacme.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', body => {
+          asked = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(202, {});
+      try {
+        await dm.ldap.add(
+          `uid=in.y , ou=users , ou=InAcme,${ORGS}`,
+          { ...person('in.y'), mail: 'in.y@acme.example' },
+          rest()
+        );
+        expect(asked).to.include({ slug: 'inyinacme', org_id: 'InAcme' });
+      } finally {
+        for (const dn of [
+          `uid=in.y,ou=users,ou=InAcme,${ORGS}`,
+          `ou=users,${org}`,
+          org,
+        ])
+          await dm.ldap.delete(dn).catch(() => undefined);
+      }
+    });
+
     describe('making sure an account has its instance', () => {
       beforeEach(async () => {
         search('in-alice.example.org').reply(200, { items: [] });
@@ -562,6 +624,38 @@ describe('Twake instances plugin', function () {
         expect(states).to.deep.equal(['pending', 'pending']);
         expect(create.isDone()).to.equal(true);
         expect(nock.pendingMocks()).to.deep.equal([]);
+      });
+
+      it('asks once when two spellings of one DN make sure at the same time', async () => {
+        // The second spelling may only read once the first creation has
+        // landed: a queue per spelling lets it read before
+        let created = false;
+        let readsAfterCreate = 0;
+        search('in-alice.example.org')
+          .twice()
+          .reply(200, () => {
+            if (created) readsAfterCreate++;
+            return {
+              items: created
+                ? [{ fqdn: 'in-alice.example.org', instantiated_at: null }]
+                : [],
+            };
+          });
+        nock(CLOUDERY)
+          .post('/api/v1/instances')
+          .twice()
+          .delay(100)
+          .reply(202, () => {
+            created = true;
+            return {};
+          });
+        const respelled = `uid=in-alice , ${USERS.toUpperCase().replace(/,/g, ' , ')}`;
+        const states = await Promise.all([
+          plugin(dm).ensureInstance(dnOf('in-alice')),
+          plugin(dm).ensureInstance(respelled),
+        ]);
+        expect(states).to.deep.equal(['pending', 'pending']);
+        expect(readsAfterCreate).to.equal(1);
       });
 
       it('asks no organization about an instance at another address than the account’s', async () => {
@@ -1214,6 +1308,17 @@ describe('Twake instances plugin', function () {
         expect(rabbit.published).to.have.length(2);
       });
 
+      it('holds a respelled member’s user.created too', async () => {
+        await addErin();
+        await rabbit.handler!(erinWorkplace);
+        expect(rabbit.published).to.deep.equal([]);
+        const respelled = erin.replace(/,/g, ' , ');
+        expect(await plugin(dm).ensureInstance(respelled, rest())).to.equal(
+          'ready'
+        );
+        expect(rabbit.published).to.deep.equal([]);
+      });
+
       it('sends each event once, the organization’s first, when both instances arrive together', async () => {
         await addErin();
         link('acme1', 'acme1.example.org');
@@ -1706,6 +1811,83 @@ describe('Twake instances plugin', function () {
     });
   });
 
+  describe('with expressions written for one spelling', () => {
+    let dm: DM;
+    let rabbit: StubRabbitMq;
+
+    const BASE = process.env.DM_LDAP_BASE as string;
+    // One expression spells the branch with one space where the directory
+    // stores two; the other uses the directory's own two
+    const myOrg = `ou=My  Org,${BASE}`;
+    const hisOrg = `ou=His  Org,${BASE}`;
+    const his = `uid=in-his,${hisOrg}`;
+    const my = `uid=in-my,${myOrg}`;
+
+    before(async () => {
+      ({ dm, rabbit } = await server({
+        twake_instance_provider: 'cloudery',
+        twake_instance_cloudery_url: CLOUDERY,
+        twake_instance_cloudery_token: 'tok',
+        twake_instance_cloudery_domain: 'example.org',
+        twake_instance_cloudery_offer: 'standard',
+        twake_instance_dn: [
+          `^uid=in-[^,]+,ou=My Org,${BASE}$`,
+          `^uid=in-[^,]+,ou=His  Org,${BASE}$`,
+        ],
+        twake_instance_fqdn_attribute: 'description',
+        twake_instance_sent_attribute: 'businessCategory',
+        twake_lifecycle_deleted_attribute: 'carLicense',
+      }));
+      for (const [dn, ou] of [
+        [myOrg, 'My  Org'],
+        [hisOrg, 'His  Org'],
+      ])
+        await dm.ldap
+          .add(dn, { objectClass: ['top', 'organizationalUnit'], ou })
+          .catch(() => undefined);
+    });
+
+    after(async () => {
+      for (const dn of [myOrg, hisOrg])
+        await dm.ldap.delete(dn).catch(() => undefined);
+    });
+
+    beforeEach(() => (rabbit.published = []));
+
+    afterEach(async () => {
+      for (const dn of [his, my])
+        await dm.ldap.delete(dn).catch(() => undefined);
+    });
+
+    it('matches an expression written as the directory spells it', async () => {
+      const scope = search('in-his.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances')
+        .reply(202, {});
+      await dm.ldap.add(his, person('in-his'), rest());
+      expect(scope.isDone()).to.equal(true);
+      expect(await read(dm, his)).not.to.have.property('description');
+    });
+
+    it('finds the account by mail when the directory answers another spelling', async () => {
+      search('in-my.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances')
+        .reply(202, {});
+      await dm.ldap.add(my, person('in-my'), rest());
+      await rabbit.handler!({
+        twakeId: 'in-my',
+        internalEmail: 'in-my@example.org',
+        workplaceFqdn: 'in-my.example.org',
+      });
+      expect(await read(dm, my)).to.have.property(
+        'description',
+        'in-my.example.org'
+      );
+      expect(rabbit.published.map(p => p.key)).to.deep.equal(['user.created']);
+    });
+  });
+
   describe('with cozy-stack', () => {
     let dm: DM;
     let rabbit: StubRabbitMq;
@@ -1880,6 +2062,24 @@ describe('Twake instances plugin', function () {
       for (let i = 0; i < 50 && !other.isDone(); i++)
         await new Promise(r => setTimeout(r, 10));
       expect(kept.isDone()).to.equal(false);
+    });
+
+    it('destroys the instance of an account deleted under another spelling', async () => {
+      nock(COZY)
+        .get('/instances/in-alice.example.org')
+        .reply(200, instance('in-alice@example.org', 'in-alice'));
+      await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
+      const destroyed = nock(COZY)
+        .get('/instances/in-alice.example.org')
+        .reply(200, instance('in-alice@example.org', 'in-alice'))
+        .delete('/instances/in-alice.example.org')
+        .reply(204);
+      await dm.ldap.delete(
+        `userid=in-alice , ${USERS.toUpperCase().replace(/,/g, ' , ')}`
+      );
+      for (let i = 0; i < 50 && !destroyed.isDone(); i++)
+        await new Promise(r => setTimeout(r, 10));
+      expect(destroyed.isDone()).to.equal(true);
     });
 
     it('refuses to start without a broker', async () => {

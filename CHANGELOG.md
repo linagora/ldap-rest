@@ -95,6 +95,11 @@
   spelled with other spacing or escapes, or whose RDN holds an escaped comma:
   such a creation no longer keeps an address or a mark the caller supplied
   ([#601](https://github.com/linagora/ldap-rest/issues/601)).
+- The Twake instances plugin takes an account created under a branch spelled
+  with other spacing or case for one, as the directory stores it at its
+  canonical DN: the address and mark a caller supplied are removed and its
+  instance is provisioned
+  ([#610](https://github.com/linagora/ldap-rest/issues/610)).
 - A delete under another spelling of a tombstone's DN — spaces, case or
   escapes — no longer removes the entry for good: the expressions are
   compared as the directory compares DNs, so the delete writes a tombstone,
