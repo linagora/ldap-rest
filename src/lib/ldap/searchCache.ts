@@ -23,8 +23,7 @@ export interface SearchCacheOptions {
  *
  * NUL cannot appear unescaped in a DN (RFC 4514 writes it `\00`) nor in an
  * LDAP filter (RFC 4515 writes it `\00` too), so `invalidate` can split
- * the base DN back out of a key instead of guessing where it ends. A `:` —
- * what this used to join on — is a legal DN character.
+ * the base DN back out of a key instead of guessing where it ends.
  */
 const CACHE_KEY_SEPARATOR = '\u0000';
 
@@ -222,14 +221,13 @@ export default class SearchCache {
    * Drop every cached read of `dn`, and of everything below it.
    *
    * Called after each write, so the next read of what just changed goes to
-   * the directory. Two things this does that a `key.startsWith(dn)` test did
-   * not: it compares DNs the way the directory does (see {@link foldDn}), so
-   * a write spelling a DN differently from the read that cached it still
-   * drops it; and it drops the subtree, because a rename or a move
-   * re-parents a whole branch in one operation — renaming an organization
-   * changes the DN of every entry under it — leaving the cached reads of
-   * those children filed under DNs that no longer exist. A leaf has nothing
-   * below it and the extra test costs nothing.
+   * the directory. It compares DNs the way the directory does (see
+   * {@link foldDn}), so a write spelling a DN differently from the read that
+   * cached it still drops it; and it drops the subtree, because a rename or
+   * a move re-parents a whole branch in one operation — renaming an
+   * organization changes the DN of every entry under it — leaving the cached
+   * reads of those children filed under DNs that no longer exist. A leaf has
+   * nothing below it and the extra test costs nothing.
    */
   invalidate(dn: string): void {
     if (!this.enabled) return;

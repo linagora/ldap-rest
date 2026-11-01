@@ -72,13 +72,6 @@ type WaiterOutcome =
   | { retry: true }
   | { error: Error };
 
-/** The request hooks an operation is judged in, see `ldapActions.authorize` */
-type AuthorizedHook =
-  | 'ldapaddrequest'
-  | 'ldapmodifyrequest'
-  | 'ldapdeleterequest'
-  | 'ldaprenamerequest';
-
 // search
 const defaultSearchOptions: SearchOptions = {
   scope: 'sub',
@@ -239,6 +232,13 @@ function withCode<T extends Error>(err: T, code: number): T {
   (err as { code?: number }).code = code;
   return err;
 }
+
+/** The request hooks an operation is judged in, see `ldapActions.authorize` */
+type AuthorizedHook =
+  | 'ldapaddrequest'
+  | 'ldapmodifyrequest'
+  | 'ldapdeleterequest'
+  | 'ldaprenamerequest';
 
 /**
  * ldapts gives every requested attribute the entry lacks an empty list, so

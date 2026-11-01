@@ -20,7 +20,7 @@ const answer = (...entries: Array<Record<string, unknown>>): SearchResult => ({
   searchReferences: [],
 });
 
-const baseSearch = (base: string): SearchOptions => ({
+const baseSearch = (): SearchOptions => ({
   scope: 'base',
   filter: '(objectClass=*)',
   attributes: ['*'],
@@ -31,27 +31,27 @@ describe('SearchCache', () => {
     it('keys a search by the base and by what changes its answer', () => {
       const cache = cacheFor();
       const key = cache.key('uid=alice,dc=example,dc=com', {
-        ...baseSearch('uid=alice,dc=example,dc=com'),
+        ...baseSearch(),
         attributes: ['cn', 'mail'],
       });
       expect(
         cache.key('uid=alice,dc=example,dc=com', {
-          ...baseSearch('uid=alice,dc=example,dc=com'),
+          ...baseSearch(),
           attributes: ['mail', 'cn'],
         })
       ).to.equal(key);
-      expect(
-        cache.key('uid=bob,dc=example,dc=com', baseSearch('uid=bob'))
-      ).to.not.equal(key);
+      expect(cache.key('uid=bob,dc=example,dc=com', baseSearch())).to.not.equal(
+        key
+      );
       expect(
         cache.key('uid=alice,dc=example,dc=com', {
-          ...baseSearch('uid=alice'),
+          ...baseSearch(),
           scope: 'sub',
         })
       ).to.not.equal(key);
       expect(
         cache.key('uid=alice,dc=example,dc=com', {
-          ...baseSearch('uid=alice'),
+          ...baseSearch(),
           filter: '(uid=alice)',
         })
       ).to.not.equal(key);
@@ -119,21 +119,15 @@ describe('SearchCache', () => {
       const alice = 'uid=Alice,ou=People,dc=Example,dc=Com';
       const child = 'cn=Child,uid=Alice,ou=People,dc=Example,dc=Com';
       const bob = 'uid=Bob,ou=People,dc=Example,dc=Com';
-      cache.set(cache.key(alice, baseSearch(alice)), answer({}));
-      cache.set(cache.key(child, baseSearch(child)), answer({}));
-      cache.set(cache.key(bob, baseSearch(bob)), answer({}));
+      cache.set(cache.key(alice, baseSearch()), answer({}));
+      cache.set(cache.key(child, baseSearch()), answer({}));
+      cache.set(cache.key(bob, baseSearch()), answer({}));
 
       cache.invalidate('uid=alice, ou=people, dc=example, dc=com');
 
-      expect(cache.get(cache.key(alice, baseSearch(alice)))).to.equal(
-        undefined
-      );
-      expect(cache.get(cache.key(child, baseSearch(child)))).to.equal(
-        undefined
-      );
-      expect(cache.get(cache.key(bob, baseSearch(bob)))).to.not.equal(
-        undefined
-      );
+      expect(cache.get(cache.key(alice, baseSearch()))).to.equal(undefined);
+      expect(cache.get(cache.key(child, baseSearch()))).to.equal(undefined);
+      expect(cache.get(cache.key(bob, baseSearch()))).to.not.equal(undefined);
     });
 
     it('drops reads that name a written DN, or an entry below it', () => {
@@ -142,18 +136,13 @@ describe('SearchCache', () => {
       const child = 'cn=EMEA,cn=Sales,ou=Groups,dc=Example,dc=Com';
       const alice = 'uid=Alice,ou=People,dc=Example,dc=Com';
       const bob = 'uid=Bob,ou=People,dc=Example,dc=Com';
-      cache.set(
-        cache.key(alice, baseSearch(alice)),
-        answer({ memberOf: [group] })
-      );
-      cache.set(cache.key(bob, baseSearch(bob)), answer({ memberOf: [child] }));
+      cache.set(cache.key(alice, baseSearch()), answer({ memberOf: [group] }));
+      cache.set(cache.key(bob, baseSearch()), answer({ memberOf: [child] }));
 
       cache.invalidateReferences(group);
 
-      expect(cache.get(cache.key(alice, baseSearch(alice)))).to.equal(
-        undefined
-      );
-      expect(cache.get(cache.key(bob, baseSearch(bob)))).to.equal(undefined);
+      expect(cache.get(cache.key(alice, baseSearch()))).to.equal(undefined);
+      expect(cache.get(cache.key(bob, baseSearch()))).to.equal(undefined);
     });
   });
 
@@ -163,41 +152,29 @@ describe('SearchCache', () => {
 
     it('drops the read of a member a change adds', () => {
       const cache = cacheFor();
-      cache.set(cache.key(alice, baseSearch(alice)), answer({ memberOf: [] }));
+      cache.set(cache.key(alice, baseSearch()), answer({ memberOf: [] }));
 
       cache.invalidateMembership(group, { add: { member: [alice] } });
 
-      expect(cache.get(cache.key(alice, baseSearch(alice)))).to.equal(
-        undefined
-      );
+      expect(cache.get(cache.key(alice, baseSearch()))).to.equal(undefined);
     });
 
     it('drops the reads of members a replace no longer names', () => {
       const cache = cacheFor();
-      cache.set(
-        cache.key(alice, baseSearch(alice)),
-        answer({ memberOf: [group] })
-      );
+      cache.set(cache.key(alice, baseSearch()), answer({ memberOf: [group] }));
 
       cache.invalidateMembership(group, { replace: { member: [] } });
 
-      expect(cache.get(cache.key(alice, baseSearch(alice)))).to.equal(
-        undefined
-      );
+      expect(cache.get(cache.key(alice, baseSearch()))).to.equal(undefined);
     });
 
     it('leaves reads alone when the change touches no membership', () => {
       const cache = cacheFor();
-      cache.set(
-        cache.key(alice, baseSearch(alice)),
-        answer({ memberOf: [group] })
-      );
+      cache.set(cache.key(alice, baseSearch()), answer({ memberOf: [group] }));
 
       cache.invalidateMembership(group, { replace: { description: 'x' } });
 
-      expect(cache.get(cache.key(alice, baseSearch(alice)))).to.not.equal(
-        undefined
-      );
+      expect(cache.get(cache.key(alice, baseSearch()))).to.not.equal(undefined);
     });
   });
 
