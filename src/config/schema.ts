@@ -4,7 +4,11 @@ import type {
   ModifyRequest,
 } from '../lib/ldapActions';
 import { BadRequestError } from '../lib/errors';
-import { getCompiledRegex, isDnInBranch } from '../lib/utils';
+import {
+  assertRfc4514Escapes,
+  getCompiledRegex,
+  isDnInBranch,
+} from '../lib/utils';
 
 /**
  * Scalar and container types an entity schema may declare.
@@ -619,6 +623,7 @@ export async function checkDnValues(
   if (dns.includes(''))
     throw new BadRequestError(`Attribute "${field}" must point to a DN`);
   for (const dn of dns) {
+    assertRfc4514Escapes(dn, `Attribute "${field}"`);
     if (branches?.length && !branches.some(branch => isDnInBranch(dn, branch)))
       throw new BadRequestError(
         `Attribute "${field}" must point to a DN within allowed branches: ${branches.join(', ')}`

@@ -86,6 +86,11 @@
   an escape the directory folds — is addressed by every flat route, not only
   created by one: the parent is compared as a DN, as the creation path
   already did ([#587](https://github.com/linagora/ldap-rest/issues/587)).
+- A DN a client writes is held to RFC 4514 on every route that writes one:
+  a pointer or branch attribute of a create or modify, and the destination of
+  a move, are refused with `400` naming the escape when it holds one RFC 4514
+  does not define
+  ([#592](https://github.com/linagora/ldap-rest/issues/592)).
 
 ## v1.3.0 (2026-10-31)
 

@@ -38,7 +38,7 @@ import {
   escapeDnValue,
   escapeLdapFilter,
   getRdn,
-  hasOnlyRfc4514Escapes,
+  assertRfc4514Escapes,
   isDnInBranch,
   isDnSyntax,
   isDummyMemberDn,
@@ -846,10 +846,7 @@ export default class LdapGroups extends DmPlugin {
       // As on a flat entry, the caller's DN is held to the escapes RFC 4514
       // defines before anything is decoded; checking `cn` before `,base`
       // keeps a trailing backslash from escaping the separator
-      if (!hasOnlyRfc4514Escapes(cn))
-        throw new BadRequestError(
-          `${this.cn} DN uses an escape RFC 4514 does not define`
-        );
+      assertRfc4514Escapes(cn, `${this.cn} DN`);
       // A bare RDN lies in the groups branch, as a name does; an escaped
       // comma is one RDN, so `parseDn` splits on the separators it sees
       const [, ...parent] = parseDn(cn);

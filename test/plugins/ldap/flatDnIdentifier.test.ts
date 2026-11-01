@@ -90,6 +90,17 @@ describe('A flat entry created under a DN', function () {
     ).to.deep.equal([]);
   });
 
+  it('answers 400 for a pointer attribute holding an escape RFC 4514 does not define', async () => {
+    // The guard used to stop at the entry's own DN: a DN-valued attribute was
+    // written as sent, so an escape the directory does not define reached it
+    const manager = `uid=${B}q${B}x,ou=users,${base}`;
+    const created = await request
+      .post(route)
+      .send({ uid: 'pointerholder', cn: 'P', sn: 'P', manager });
+    expect(created.status, JSON.stringify(created.body)).to.equal(400);
+    expect(created.body.error).to.match(/escape RFC 4514/);
+  });
+
   it('writes the name the DN gives, escapes decoded', async () => {
     const dn = `uid=Smith${B},John,ou=users,${base}`;
     const res = await request
