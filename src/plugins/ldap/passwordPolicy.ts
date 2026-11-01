@@ -164,6 +164,9 @@ const policyConfig = (raw: RawEntry, dn: string): PpolicyConfig => {
 // Special characters for password complexity validation
 const SPECIAL_CHARS_REGEX = /[!@#$%^&*()_+\-=[\]{}|;:'",.<>?/]/;
 
+/** The ppolicy marker for a lock that lasts until an administrator lifts it */
+const PERMANENT_LOCK = '000001010000Z';
+
 interface PpolicyConfig {
   dn?: string;
   pwdMaxAge?: number;
@@ -1122,7 +1125,7 @@ export default class PasswordPolicy extends DmPlugin {
     // Check lockout
     const lockedTime = entry.pwdAccountLockedTime;
     let isLocked = !!lockedTime;
-    const isPermanentLock = lockedTime === '000001010000Z';
+    const isPermanentLock = lockedTime === PERMANENT_LOCK;
 
     // Calculate lockout end (auto-unlock if duration passed)
     if (isLocked && !isPermanentLock && policy.pwdLockoutDuration) {
@@ -1158,9 +1161,11 @@ export default class PasswordPolicy extends DmPlugin {
       isExpiringSoon,
       mustChange,
       isLocked,
-      lockedAt: lockedTime
-        ? this.parsePolicyTime(lockedTime)?.toISOString() || null
-        : null,
+      // The permanent marker is not an instant: there is no lock date to show
+      lockedAt:
+        lockedTime && !isPermanentLock
+          ? this.parsePolicyTime(lockedTime)?.toISOString() || null
+          : null,
       failureCount,
       graceLoginsUsed,
       policy: policy.dn ?? null,
@@ -1314,7 +1319,10 @@ export default class PasswordPolicy extends DmPlugin {
         uid: e.uid,
         displayName: e.displayName || e.cn,
         mail: e.mail,
-        lockedAt: this.parsePolicyTime(e.pwdAccountLockedTime)?.toISOString(),
+        lockedAt:
+          e.pwdAccountLockedTime === PERMANENT_LOCK
+            ? undefined
+            : this.parsePolicyTime(e.pwdAccountLockedTime)?.toISOString(),
         failureCount: Array.isArray(e.pwdFailureTime)
           ? e.pwdFailureTime.length
           : 0,

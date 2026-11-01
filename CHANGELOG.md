@@ -32,9 +32,6 @@
   rather than one read from a rolled-over date
   ([#557](https://github.com/linagora/ldap-rest/issues/557),
   [details](docs/usage/plugins/ldap/password-policy.md#get-user-password-status)).
-- A permanently locked account reports `lockedAt` as
-  `0000-01-01T00:00:00.000Z`, the instant the marker `000001010000Z` names,
-  where it reported none ([#557](https://github.com/linagora/ldap-rest/issues/557)).
 
 ## v1.3.0 (2026-10-31)
 

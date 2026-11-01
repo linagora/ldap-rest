@@ -862,4 +862,45 @@ describe('PasswordPolicy: the status it computes', () => {
     );
     expect(status.lockedAt).to.equal('2019-12-31T22:00:00.000Z');
   });
+
+  it('reports no lock date for the permanent marker', () => {
+    const status = plugin.calculateStatus(
+      'uid=x,dc=x',
+      { pwdAccountLockedTime: '000001010000Z' },
+      {}
+    );
+    expect(status.isLocked).to.equal(true);
+    expect(status.lockedAt).to.equal(null);
+  });
+});
+
+describe('PasswordPolicy: the locked accounts it lists', () => {
+  const plugin = Object.create(PasswordPolicy.prototype) as unknown as {
+    settings: Record<string, unknown>;
+    config: { ldap_base: string };
+    server: { ldap: { search: () => Promise<unknown> } };
+    findLockedAccounts(): Promise<Array<Record<string, unknown>>>;
+  };
+  Object.defineProperty(plugin, 'settings', { value: {} });
+  Object.defineProperty(plugin, 'config', { value: { ldap_base: 'dc=x' } });
+  Object.defineProperty(plugin, 'server', {
+    value: {
+      ldap: {
+        search: async (): Promise<unknown> => ({
+          searchEntries: [
+            {
+              dn: 'uid=x,dc=x',
+              uid: 'x',
+              pwdAccountLockedTime: '000001010000Z',
+            },
+          ],
+        }),
+      },
+    },
+  });
+
+  it('reports no lock date for the permanent marker', async () => {
+    const [account] = await plugin.findLockedAccounts();
+    expect(account.lockedAt).to.equal(undefined);
+  });
 });
