@@ -146,6 +146,26 @@ describe('SearchCache', () => {
         expect(cache.get(cache.key(read, baseSearch()))).to.equal(undefined);
       });
 
+    it('drops a cached read when the write names the RDN type by its OID', () => {
+      const cache = cacheFor();
+      const cached = 'cn=jdoe,ou=users,dc=example,dc=com';
+      cache.set(cache.key(cached, baseSearch()), answer({}));
+
+      cache.invalidate('2.5.4.3=jdoe,ou=users,dc=example,dc=com');
+
+      expect(cache.get(cache.key(cached, baseSearch()))).to.equal(undefined);
+    });
+
+    it('drops a cached read when the write reorders a multi-valued RDN', () => {
+      const cache = cacheFor();
+      const cached = 'cn=jdoe+uid=1000,ou=users,dc=example,dc=com';
+      cache.set(cache.key(cached, baseSearch()), answer({}));
+
+      cache.invalidate('uid=1000+cn=jdoe,ou=users,dc=example,dc=com');
+
+      expect(cache.get(cache.key(cached, baseSearch()))).to.equal(undefined);
+    });
+
     it('drops a cached read naming the entry under another spelling', () => {
       const cache = cacheFor();
       const group = 'cn=group,dc=example,dc=com';
