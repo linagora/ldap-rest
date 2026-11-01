@@ -48,6 +48,21 @@ failure, the 30 s wait for a pooled connection and an `ldapsearchresult` hook
 that refuses are answered on the first page, not by the call; a read that
 must fail when it is made uses `paged: false`.
 
+### A deletion date written in another shape
+
+**Who is affected:** a deployment whose writer writes the lifecycle deletion
+date as something other than an ISO 8601 date or a GeneralizedTime with its
+zone — for example `date '+%F %T'` (`2025-01-01 12:00:00`), an RFC 2822 date,
+or a US-style `01/02/2025`.
+
+The deletion date is read only in those two shapes now, where the default
+`iso8601` mode handed anything else to `new Date()`. An unreadable date makes
+`erase` answer `409` without `force`, leaves `deletedAt` out of the events,
+and a rule whose payload holds only `$changed.<date>` publishes nothing. Write
+an ISO 8601 date, such as with `date -u '+%Y-%m-%dT%H:%M:%SZ'`, or a
+GeneralizedTime with its zone, and see
+[lifecycle events](../plugins/integrations/lifecycle-events.md#configuration).
+
 ## From 1.2.1
 
 ### A plugin written against the old hooks API

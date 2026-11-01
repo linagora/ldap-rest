@@ -927,10 +927,6 @@ describe('Twake lifecycle events plugin', function () {
     expect(parseDeletedAt('20260102030405Z')?.toISOString()).to.equal(
       '2026-01-02T03:04:05.000Z'
     );
-    // No zone: the shared reader takes the value as UTC
-    expect(parseDeletedAt('20250101123045')?.toISOString()).to.equal(
-      '2025-01-01T12:30:45.000Z'
-    );
     expect(parseDeletedAt('yesterday')).to.equal(undefined);
   });
 
@@ -951,6 +947,10 @@ describe('Twake lifecycle events plugin', function () {
       '2025-02-31',
       '2025-02-31T12:00:00Z',
     ])
+      expect(parseDeletedAt(value), value).to.equal(undefined);
+    // RFC 4517 requires a zone; without one, a 10-digit Unix timestamp
+    // would read as a year
+    for (const value of ['20250101123045', '1712011200'])
       expect(parseDeletedAt(value), value).to.equal(undefined);
   });
 

@@ -108,12 +108,12 @@ export function formatDeletedAt(date: Date, format: DeletedAtFormat): string {
 }
 
 /**
- * The shapes a deletion date is written in: an LDAP GeneralizedTime, which
- * the shared reader also takes with its zone, minutes and seconds left out,
- * or an ISO 8601 date, alone or with a time.
+ * The shapes a deletion date is written in: an LDAP GeneralizedTime, whose
+ * zone RFC 4517 requires — without one, a 10-digit Unix timestamp reads as a
+ * year — or an ISO 8601 date, alone or with a time.
  */
 const GENERALIZED_TIME =
-  /^\d{10}(?:\d{2}(?:\d{2})?)?(?:[.,]\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/;
+  /^\d{10}(?:\d{2}(?:\d{2})?)?(?:[.,]\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)$/;
 const ISO_8601 =
   /^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 
@@ -144,8 +144,6 @@ export function parseDeletedAt(value: string): Date | undefined {
   if (iso) {
     if (!isCalendarDay(Number(iso[1]), Number(iso[2]), Number(iso[3])))
       return undefined;
-    return parseDirectoryDate(text) ?? undefined;
-  }
-  if (!GENERALIZED_TIME.test(text)) return undefined;
+  } else if (!GENERALIZED_TIME.test(text)) return undefined;
   return parseDirectoryDate(text) ?? undefined;
 }
