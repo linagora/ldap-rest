@@ -223,16 +223,17 @@ and `--scim-group-mapping`.
 
 Each element of `entries` is a `MappingEntry` with the following optional fields:
 
-| Field           | Purpose                                                                                                              |
-| --------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `scim`          | **Required.** Top-level SCIM attribute name (`userName`, `displayName`, `emails`, …).                                |
-| `ldap`          | Simple 1:1 mapping to an LDAP attribute.                                                                             |
-| `ldapPrimary`   | For multi-valued SCIM attributes (`emails`, `phoneNumbers`, …), the LDAP attribute that stores the _primary_ value.  |
-| `ldapSecondary` | LDAP attribute that stores the _non-primary_ values of the same SCIM attribute (array).                              |
-| `sub`           | Object that maps SCIM sub-attributes to LDAP attributes. Used for complex SCIM values like `name.familyName` → `sn`. |
-| `multi`         | `"array"` or `"single"` (default) — hints array serialization for `ldap`.                                            |
-| `readOnly`      | `true` to skip this attribute on write (create/update ignore it).                                                    |
-| `operational`   | `true` for LDAP operational attributes (e.g. `entryUUID`) — loaded on read only.                                     |
+| Field           | Purpose                                                                                                                       |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `scim`          | **Required.** Top-level SCIM attribute name (`userName`, `displayName`, `emails`, …).                                         |
+| `ldap`          | Simple 1:1 mapping to an LDAP attribute.                                                                                      |
+| `ldapPrimary`   | For multi-valued SCIM attributes (`emails`, `phoneNumbers`, …), the LDAP attribute that stores the _primary_ value.           |
+| `ldapSecondary` | LDAP attribute that stores the _non-primary_ values of the same SCIM attribute (array).                                       |
+| `sub`           | Object that maps SCIM sub-attributes to LDAP attributes. Used for complex SCIM values like `name.familyName` → `sn`.          |
+| `subDn`         | Sub-attribute names in `sub` whose value is a DN (for example `["value"]` for `manager`); they are held to RFC 4514 on write. |
+| `multi`         | `"array"` or `"single"` (default) — hints array serialization for `ldap`.                                                     |
+| `readOnly`      | `true` to skip this attribute on write (create/update ignore it).                                                             |
+| `operational`   | `true` for LDAP operational attributes (e.g. `entryUUID`) — loaded on read only.                                              |
 
 ### Merging
 
@@ -269,7 +270,8 @@ override only what's different and inherit the rest.
     },
     {
       "scim": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager",
-      "sub": { "value": "manager" }
+      "sub": { "value": "manager" },
+      "subDn": ["value"]
     }
   ]
 }
@@ -317,7 +319,9 @@ of them; a complex attribute takes an object whose sub-attributes are scalars
 multi-valued complex attribute such as `emails` takes a list of objects whose
 `value` is a scalar. Anything else is answered
 `400 invalidValue`, as is a PATCH operation that is not an object or whose
-`op` is not a string.
+`op` is not a string. A reference the mapping declares a DN (`subDn`) is
+refused with `400 invalidValue` when its value holds an escape RFC 4514 does
+not define, as the flat routes hold a client-written DN.
 
 A PATCH `add`, or a `remove` naming values, changes only the values it names:
 values the caller's read did not show, such as group members an
