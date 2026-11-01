@@ -7,6 +7,7 @@ This guide will help you create powerful, production-ready plugins for LDAP-Rest
 - [Why Create a Plugin](#why-create-a-plugin)
 - [Plugin Structure](#plugin-structure)
 - [Creating Your Plugin](#creating-your-plugin)
+- [Plugin services](./services.md)
 - [Custom Configuration Options](#custom-configuration-options)
   - [Plugin options](./options.md)
 - [Loading Your Plugin](#loading-your-plugin)
@@ -54,6 +55,8 @@ export default class MyPlugin extends DmPlugin {
 - **roles** (optional): Array categorizing plugin purpose
 - **dependencies** (optional): Required plugins that must load first
 - **hooks** (optional): Callbacks for LDAP operations
+- **provides** (optional): Typed services this plugin offers, see
+  [plugin services](services.md)
 - **api()** (optional): Method to register REST endpoints
 
 ### Available from Base Class
@@ -65,6 +68,8 @@ export default class MyPlugin extends DmPlugin {
 - **this.logger**: Winston logger instance
 - **this.hookBus**: The server's hooks: chain, notify and wait on them, see
   [hooks](hooks.md#the-bus)
+- **this.service(token)**: The instance another plugin provides under a
+  service token, or `null`, see [plugin services](services.md)
 - **this.fetch**: `fetch` timed into the
   [outbound metrics](../usage/operations.md#metrics) under the plugin's
   name; the lint refuses a bare `fetch` or `node-fetch` under `src`, and a
@@ -1320,6 +1325,7 @@ See [Tests and checks](../../CONTRIBUTING.md#tests-and-checks).
 
 - [Contributing Guide](../../CONTRIBUTING.md) - Git workflow and PR guidelines
 - [Hooks Reference](./hooks.md) - Complete list of available hooks
+- [Plugin services](./services.md) - Typed interfaces between plugins
 - [Core Plugin Examples](../../src/plugins/) - Browse existing plugins
 - [Test Examples](../../test/plugins/) - See how core plugins are tested
 

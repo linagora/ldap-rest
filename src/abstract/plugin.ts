@@ -9,6 +9,11 @@ import type { Config, DM } from '../bin';
 import type { Hooks, MaybePromise } from '../hooks';
 import type HookBus from '../lib/hookBus';
 import type { HealthStatus } from '../lib/health';
+import {
+  providedService,
+  type ServiceProvider,
+  type ServiceToken,
+} from '../lib/services';
 import { timedOutbound } from '../lib/metrics';
 import {
   neverReturnAttributes,
@@ -30,6 +35,8 @@ export {
   validateDnValue,
 } from '../lib/utils';
 export { defineRoute, registeredRoutes } from '../lib/route';
+export { serviceToken } from '../lib/services';
+export type { ServiceProvider, ServiceToken } from '../lib/services';
 export {
   HttpError,
   BadRequestError,
@@ -85,6 +92,13 @@ export default abstract class DmPlugin {
 
   /* Needed plugins */
   dependencies?: Record<string, string>;
+
+  /**
+   * Services this plugin provides, each bound to its token. A consumer
+   * reaches them with `service(token)`, see
+   * `docs/plugin-development/services.md`.
+   */
+  provides?: ServiceProvider<unknown>[];
 
   /* Plugin roles for categorization */
   roles?: Role[] | undefined;
@@ -237,6 +251,32 @@ export default abstract class DmPlugin {
 
   /** Names already warned about by requirePlugin, so each warns at most once. */
   private missingPluginsWarned?: Set<string>;
+
+  /** Services already warned about by service(), so each warns at most once. */
+  private missingServicesWarned?: Set<ServiceToken<unknown>>;
+
+  /**
+   * Reach a service another plugin provides. Declare the providing plugin in
+   * `dependencies` so it registers first. Returns null and logs a single
+   * warning when nothing provides it, so the consumer skips its feature
+   * rather than throwing.
+   *
+   * @param token the service wanted
+   * @returns the provided instance, or null
+   */
+  protected service<T>(token: ServiceToken<T>): T | null {
+    const provided = providedService(this.server.services, token);
+    if (provided !== undefined) return provided;
+    if (!this.missingServicesWarned)
+      this.missingServicesWarned = new Set<ServiceToken<unknown>>();
+    if (!this.missingServicesWarned.has(token)) {
+      this.missingServicesWarned.add(token);
+      this.logger.warn(
+        `${this.name}: service '${token.name}' is not provided — its features will be skipped`
+      );
+    }
+    return null;
+  }
 
   /**
    * Resolve a sibling plugin by its registry name (the value of its `name`

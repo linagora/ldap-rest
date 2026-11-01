@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Plugins can provide a typed service under a token and reach another plugin's
+  service with `this.service(token)`, which returns the provided instance or
+  `null` ([details](docs/plugin-development/services.md)); a plugin that
+  already declares its own `service` or `provides` member must rename it
+  ([service](docs/usage/upgrading.md#a-plugin-with-its-own-service-member),
+  [provides](docs/usage/upgrading.md#a-plugin-with-its-own-provides-member)).
+
 ### Fixed
 
 - A password policy whose `pwdMaxAge` sets an expiry beyond the representable
@@ -42,6 +51,23 @@
 - A DN-named identifier using an escape RFC 4514 does not define is refused
   with `400` on creation instead of being written as the bare character
   ([#500](https://github.com/linagora/ldap-rest/issues/500)).
+- A request whose `Content-Type` names no media type (`;application/json`) and
+  that carries a body is refused with `400` instead of letting the body
+  parser answer `500`
+  ([#554](https://github.com/linagora/ldap-rest/issues/554)).
+- A path parameter naming an entry is percent-decoded once; a client that
+  encoded one twice now names the escaped value instead of the entry it
+  used to reach
+  ([#552](https://github.com/linagora/ldap-rest/issues/552),
+  [upgrading](docs/usage/upgrading.md#a-path-parameter-is-percent-decoded-once)).
+- The LDAP search cache no longer merges searches whose attribute names hold
+  a separator: `['cn|mail']` and `['cn', 'mail']` — like `['a,b']` and
+  `['a', 'b']` — are now different cache keys
+  ([#562](https://github.com/linagora/ldap-rest/issues/562)).
+- The LDAP search cache now drops a cached read however the write spells the
+  DN: hex escapes, attribute aliases and OIDs, `;`, quotes and multi-valued
+  RDN order all name the same entry
+  ([#563](https://github.com/linagora/ldap-rest/issues/563)).
 
 ## v1.3.0 (2026-10-31)
 

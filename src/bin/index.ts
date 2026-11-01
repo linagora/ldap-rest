@@ -20,7 +20,7 @@ import { dirname, join } from 'path';
 import express from 'express';
 import bodyParser from 'body-parser';
 import type winston from 'winston';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import { ConfigParser } from '../lib/parseConfig';
 import { unknownEnvironmentOptions } from '../config/options';
@@ -43,7 +43,8 @@ import {
   LDAP_JUDGING_HOOKS,
 } from '../lib/authz/composition';
 import { registerAttributeTypes } from '../lib/utils';
-import { errorChain } from '../lib/errors';
+import { BadRequestError, errorChain } from '../lib/errors';
+import { type ServiceMap, type ServiceToken } from '../lib/services';
 import HookBus, { recordHookOwner, type HookFn } from '../lib/hookBus';
 import { runForRequest, runWithLogContext } from '../lib/requestContext';
 import { requestId } from '../lib/changeContext';
@@ -58,6 +59,32 @@ import { registerProcessShutdown, shutdownTimeout } from '../lib/shutdown';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
+
+/** Whether the request announces a body, as body-parser's own `hasBody` does */
+const hasBody = (req: Request): boolean =>
+  req.headers['transfer-encoding'] !== undefined ||
+  !Number.isNaN(Number(req.headers['content-length']));
+
+/**
+ * Refuse a `Content-Type` that names no media type, such as
+ * `;application/json`, when a parser would read the body.
+ *
+ * `type-is` throws a `TypeError` on it where `body-parser` expects the type
+ * simply not to match, and the request would be answered `500`. A request
+ * without a body reaches no parser, so its header is left alone.
+ */
+const rejectEmptyMediaType: RequestHandler = (req, _res, next) => {
+  const contentType = req.headers['content-type'];
+  if (
+    hasBody(req) &&
+    typeof contentType === 'string' &&
+    contentType.split(';', 1)[0].trim() === ''
+  ) {
+    next(new BadRequestError('Content-Type names no media type'));
+    return;
+  }
+  next();
+};
 
 /**
  * Every stack of a chain of `cause`s, the wrapper's first: the outer stack
@@ -149,6 +176,13 @@ export class DM {
   hooks: Hooks = {};
   readonly hookBus: HookBus = new HookBus(this.hooks);
   loadedPlugins: { [key: string]: DmPlugin } = {};
+  /**
+   * The services plugins provide, keyed by their token. Shared by `withConfig`
+   * views as the plugin registry is; `registerPlugin` fills it.
+   */
+  readonly services: ServiceMap = new Map();
+  /** The plugin that provided each service, for the duplicate warning. */
+  private readonly serviceOwners = new Map<ServiceToken<unknown>, string>();
   ldap: ldapActions;
   operationSequence: number;
   logger: winston.Logger;
@@ -263,6 +297,7 @@ export class DM {
       res.setHeader('X-Request-Id', id);
       runWithLogContext({ requestId: id }, next);
     });
+    this.app.use(rejectEmptyMediaType);
     // Each parser keeps the bytes it read: core/auth/hmac hashes those, as
     // the client signed them, not the body re-serialized.
     this.app.use(this.bodyParsers);
@@ -1088,6 +1123,29 @@ export class DM {
       }
     }
     this.loadedPlugins[obj.name] = obj;
+    this.registerServices(obj);
     return true;
+  }
+
+  /**
+   * Record the services a plugin provides. The first provider of a token
+   * wins: a second one would answer for the same interface and leave the
+   * choice to the load order, so it is ignored and named in a warning.
+   *
+   * @param obj the plugin just registered
+   */
+  private registerServices(obj: DmPlugin): void {
+    for (const provided of obj.provides ?? []) {
+      const owner = this.serviceOwners.get(provided.token);
+      if (owner !== undefined) {
+        this.logger.warn(
+          `Plugin ${obj.name}: service '${provided.token.name}' is already ` +
+            `provided by ${owner}; this one is ignored`
+        );
+        continue;
+      }
+      this.services.set(provided.token, provided.service);
+      this.serviceOwners.set(provided.token, obj.name);
+    }
   }
 }

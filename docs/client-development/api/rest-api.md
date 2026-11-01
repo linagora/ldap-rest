@@ -1365,6 +1365,10 @@ const encoded = encodeURIComponent(dn);
 // Result: uid%3Djohn.doe%2Cou%3Dusers%2Cdc%3Dexample%2Cdc%3Dcom
 ```
 
+A path parameter is percent-decoded once, as RFC 3986 spells it: an
+identifier holding `%` is sent as `%25`, so `100%` is addressed as
+`/api/v1/ldap/users/100%25`.
+
 ### LDAP Attributes are Arrays
 
 LDAP attributes are always returned as arrays, even for single-valued attributes:
