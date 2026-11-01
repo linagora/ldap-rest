@@ -38,8 +38,14 @@ describe('SCIM mapped reference DNs', function () {
       JSON.stringify({
         resourceType: 'User',
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        // An attribute without DN syntax: the directory would store the
+        // value as sent, so the mapping's own check is what refuses it
         entries: [
-          { scim: 'manager', sub: { value: 'manager' }, subDn: ['value'] },
+          {
+            scim: 'manager',
+            sub: { value: 'description' },
+            subDn: ['value'],
+          },
         ],
       })
     );
