@@ -1087,21 +1087,6 @@ export function movedToTrash(
 }
 
 /**
- * Wrapper for async Express route handlers to catch errors and pass them to error middleware
- * This ensures that errors in async routes are properly handled and don't crash the server
- *
- * @param fn - The async route handler function
- * @returns A wrapped handler that catches errors
- *
- * @example
- * ```typescript
- * app.get('/api/data', asyncHandler(async (req, res) => {
- *   const data = await fetchData();
- *   res.json(data);
- * }));
- * ```
- */
-/**
  * Parse a directory date: an LDAP generalized time or anything `Date`
  * understands.
  *
@@ -1160,6 +1145,21 @@ export function parseDirectoryDate(raw: AttributeValue): Date | null {
   return new Date(time);
 }
 
+/**
+ * Wrapper for async Express route handlers to catch errors and pass them to error middleware
+ * This ensures that errors in async routes are properly handled and don't crash the server
+ *
+ * @param fn - The async route handler function
+ * @returns A wrapped handler that catches errors
+ *
+ * @example
+ * ```typescript
+ * app.get('/api/data', asyncHandler(async (req, res) => {
+ *   const data = await fetchData();
+ *   res.json(data);
+ * }));
+ * ```
+ */
 export const asyncHandler = (
   fn: (req: Request, res: Response, next: NextFunction) => Promise<void>
 ): RequestHandler => {

@@ -81,8 +81,8 @@
 
 - A directory time is read by one reader everywhere: a deletion date no
   longer reads a year below 100 as 19xx nor refuses an offset or a fraction,
-  and the SCIM timestamps are written in UTC, at the instant the directory
-  stored ([#586](https://github.com/linagora/ldap-rest/issues/586)).
+  and a GeneralizedTime read by SCIM is written in UTC, at the instant the
+  directory stored ([#586](https://github.com/linagora/ldap-rest/issues/586)).
 
 ## v1.3.0 (2026-10-31)
 

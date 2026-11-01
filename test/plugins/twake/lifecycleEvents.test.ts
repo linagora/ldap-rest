@@ -916,6 +916,14 @@ describe('Twake lifecycle events plugin', function () {
   });
 
   it('reads a GeneralizedTime deletion date', () => {
+    // The shared reader keeps a year below 100 and honours an offset, where
+    // the body this replaced read 1950 and refused both
+    expect(parseDeletedAt('00500101000000Z')?.toISOString()).to.equal(
+      '0050-01-01T00:00:00.000Z'
+    );
+    expect(parseDeletedAt('20260102030405+0200')?.toISOString()).to.equal(
+      '2026-01-02T01:04:05.000Z'
+    );
     expect(parseDeletedAt('20260102030405Z')?.toISOString()).to.equal(
       '2026-01-02T03:04:05.000Z'
     );
