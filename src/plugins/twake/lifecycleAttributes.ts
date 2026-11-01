@@ -7,6 +7,7 @@
  */
 import type { Config } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
+import { parseDirectoryDate } from '../../lib/utils';
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   holdsValue,
@@ -106,28 +107,12 @@ export function formatDeletedAt(date: Date, format: DeletedAtFormat): string {
     : iso.replace(/[-:T]/g, '').replace(/\.\d+Z$/, 'Z');
 }
 
-/** A deletion date as the directory holds it, or undefined if unreadable. */
-export function parseDeletedAt(
-  value: string,
-  format: DeletedAtFormat
-): Date | undefined {
-  if (format === 'iso8601') {
-    const date = new Date(value);
-    return isNaN(date.getTime()) ? undefined : date;
-  }
-  const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?(?:[.,](\d+))?Z$/.exec(
-    value
-  );
-  if (!m) return undefined;
-  return new Date(
-    Date.UTC(
-      +m[1],
-      +m[2] - 1,
-      +m[3],
-      +m[4],
-      +m[5],
-      +(m[6] || 0),
-      Math.round(+`0.${m[7] || 0}` * 1000)
-    )
-  );
+/**
+ * A deletion date as the directory holds it, or undefined if unreadable.
+ *
+ * Read by the same reader as every other directory time: the format only says
+ * how this deployment writes the date, not how it is read.
+ */
+export function parseDeletedAt(value: string): Date | undefined {
+  return parseDirectoryDate(value) ?? undefined;
 }

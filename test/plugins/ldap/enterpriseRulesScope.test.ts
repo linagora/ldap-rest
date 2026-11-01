@@ -15,8 +15,8 @@ import supertest from 'supertest';
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
+import { parseDirectoryDate } from '../../../src/lib/utils';
 import LdapEnterpriseRules, {
-  parseDirectoryDate,
   startOfUtcDay,
 } from '../../../src/plugins/ldap/enterpriseRules';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';

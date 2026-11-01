@@ -916,10 +916,10 @@ describe('Twake lifecycle events plugin', function () {
   });
 
   it('reads a GeneralizedTime deletion date', () => {
-    expect(
-      parseDeletedAt('20260102030405Z', 'generalizedTime')?.toISOString()
-    ).to.equal('2026-01-02T03:04:05.000Z');
-    expect(parseDeletedAt('yesterday', 'generalizedTime')).to.equal(undefined);
+    expect(parseDeletedAt('20260102030405Z')?.toISOString()).to.equal(
+      '2026-01-02T03:04:05.000Z'
+    );
+    expect(parseDeletedAt('yesterday')).to.equal(undefined);
   });
 
   describe('lock', () => {

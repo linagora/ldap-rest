@@ -27,6 +27,7 @@ import {
   escapeDnValue,
   escapeLdapFilter,
   normalizeDn,
+  parseDirectoryDate,
   validateDnValue,
 } from '../../lib/utils';
 import { jsonBody } from '../../lib/expressFormatedResponses';
@@ -500,7 +501,6 @@ export const ValidatePasswordBody = Type.Object({
   password: Type.String({ minLength: 1 }),
 });
 
-import { parseDirectoryDate } from './enterpriseRules';
 import {
   passwordPolicyOptions,
   type PasswordPolicyOptions,

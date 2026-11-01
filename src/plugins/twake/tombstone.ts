@@ -230,7 +230,7 @@ export default class TwakeTombstone extends DmPlugin {
       throw new NotFoundError(`No tombstone at ${dn}`);
     if (!force) {
       const raw = first(valueOf(entry, this.attrs.deletedAt));
-      const at = raw && parseDeletedAt(raw, this.attrs.deletedAtFormat);
+      const at = raw && parseDeletedAt(raw);
       if (!at)
         throw new ConflictError(
           `${dn} holds no readable deletion date (--twake-lifecycle-deleted-at-attribute); force it to erase now`
