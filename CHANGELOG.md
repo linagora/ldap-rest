@@ -103,6 +103,9 @@
 - A delete of a DN the directory cannot parse answers `400` naming the DN,
   where it answered `500` and hid the directory's `invalidDNSyntax`
   ([#619](https://github.com/linagora/ldap-rest/issues/619)).
+- A read or a move of a DN the directory cannot parse answers `400` naming
+  the DN, where it answered `500` and hid the directory's `invalidDNSyntax`
+  ([#621](https://github.com/linagora/ldap-rest/issues/621)).
 - A delete under another spelling of a tombstone's DN — spaces, case or
   escapes — no longer removes the entry for good: the expressions are
   compared as the directory compares DNs, so the delete writes a tombstone,

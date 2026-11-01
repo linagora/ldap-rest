@@ -269,6 +269,23 @@ function ldapWriteError(context: string, dn: string, error: unknown): Error {
 }
 
 /**
+ * Wrap a read failure, turning a refusal of the request's content (see
+ * `isSchemaRefusal`) into a 400: the mistake is the client's, and a 500
+ * would hide it in logs it cannot read. Any other failure leaves as it was
+ * thrown. The base names the subtree read, which a configuration may set.
+ */
+function ldapSearchError(base: string, error: unknown): Error {
+  const code = extractLdapCode(error);
+  if (isSchemaRefusal(code))
+    return ldapRefusal(
+      `The directory refused this read of ${base}`,
+      code!,
+      error
+    );
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+/**
  * Wrap an add failure, turning entryAlreadyExists (68) into a 409.
  *
  * Every creation route ends here, so this is the one place that knows a
@@ -719,7 +736,11 @@ class ldapActions {
     try {
       const searched = timedLdap('search', () =>
         pooled.client.search(base, opts)
-      ).then(dropSelectors);
+      )
+        .then(dropSelectors)
+        .catch(error => {
+          throw ldapSearchError(base, error);
+        });
       // The hooks are handed the driver's value unawaited, and the chain
       // resolves it: the result is never a Promise after this.
       const res = await this.parent.hookBus.chain(
