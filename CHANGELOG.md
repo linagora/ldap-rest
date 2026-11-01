@@ -95,6 +95,11 @@
   spelled with other spacing or escapes, or whose RDN holds an escaped comma:
   such a creation no longer keeps an address or a mark the caller supplied
   ([#601](https://github.com/linagora/ldap-rest/issues/601)).
+- The Twake instances plugin takes an account created under a branch spelled
+  with other spacing or case for one, as the directory stores it at its
+  canonical DN: the address and mark a caller supplied are removed and its
+  instance is provisioned
+  ([#610](https://github.com/linagora/ldap-rest/issues/610)).
 - SCIM answers `400 invalidValue` for a reference the mapping declares a DN
   (`subDn`) when its value holds an escape RFC 4514 does not define, before
   the write: the directory refuses such a value on an attribute of DN syntax,
