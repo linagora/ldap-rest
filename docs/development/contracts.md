@@ -65,8 +65,11 @@ long as the old CLI name and environment variable stay in its `aliases` and
 `envAliases`. Adding a union variant, a field or an optional parameter is
 additive, and so is a request union with an alternative that still accepts
 everything the base did — in a response the client reads every alternative,
-so a field the others drop is still a removal. Documentation-only edits, such
-as a summary or description, are ignored.
+so a field the others drop is still a removal. A `oneOf` is the exception:
+it refuses a value two alternatives match, so an alternative as wide as the
+base narrows the others away, and the alternatives are not told apart from
+one another — a disjoint `oneOf` therefore asks for the label too.
+Documentation-only edits, such as a summary or description, are ignored.
 
 The job runs the scripts from the pull request, so a change to them is
 reviewed like any other code, as `.github/CODEOWNERS` requires.
