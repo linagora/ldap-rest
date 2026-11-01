@@ -71,6 +71,25 @@ it applies, and `reason`. An advisory named by its GHSA covers the packages
 that pull the vulnerable one in as well. Fix the advisory; allow it only
 where it cannot apply here, and remove the entry once it is fixed.
 
+### Package overrides
+
+`package.json` overrides raise the floor of a transitive dependency that no
+released parent resolves to a patched version. Each one names the advisory
+that keeps it there, and the path that pulls the package in:
+
+| Override                         | Advisory                                                                                                            | Resolved through                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `diff >=8.0.3`                   | `GHSA-73rr-hh4g-fpgx` (low), denial of service in `parsePatch` and `applyPatch`                                     | `mocha`, test only                                       |
+| `glob >=11.0.4`                  | `GHSA-5j98-mcp5-4vw2` (high), command injection through the CLI                                                     | build and test tools                                     |
+| `minimatch ^10.2.3`              | `GHSA-3ppc-4f35-3m26`, `GHSA-7r86-cg39-jmmj` and `GHSA-23c5-xmqv-rm74` (high), regular-expression denial of service | build and test tools                                     |
+| `postcss-selector-parser ^7.1.6` | `GHSA-rj75-hqrm-r3gf` (medium), quadratic selector parsing                                                          | `rollup-plugin-postcss`, build only                      |
+| `serialize-javascript >=7.0.3`   | `GHSA-5c6j-r48x-rmvq` (high), remote code execution through `RegExp.flags`                                          | `@rollup/plugin-terser` and `mocha`, build and test only |
+
+To check one: remove it, run `npm install`, then `npm ls <package>` and
+`npm audit`. Keep it out when every resolved version is outside the
+advisory's vulnerable range; otherwise put back the lowest floor that stays
+patched. An override no dependency resolves any more is stale: remove it.
+
 ## Submitting changes
 
 1. Branch from `master`: `feat/<topic>` or `fix/<topic>`.
