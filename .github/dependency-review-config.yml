@@ -1,0 +1,7 @@
+# Read by actions/dependency-review-action on every pull request. The gate
+# matches npm run audit:prod: high and critical advisories.
+fail-on-severity: high
+
+# An advisory that cannot apply here goes in this list as its GHSA id, with a
+# comment saying why and when the entry can go. None is allowlisted today.
+allow-ghsas: []
