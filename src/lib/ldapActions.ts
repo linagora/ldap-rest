@@ -271,14 +271,18 @@ function ldapWriteError(context: string, dn: string, error: unknown): Error {
 /**
  * Wrap a read failure, turning a refusal of the request's content (see
  * `isSchemaRefusal`) into a 400: the mistake is the client's, and a 500
- * would hide it in logs it cannot read. The base is the DN the client asked
- * to read.
+ * would hide it in logs it cannot read. Any other failure leaves as it was
+ * thrown. The base names the subtree read, which a configuration may set.
  */
 function ldapSearchError(base: string, error: unknown): Error {
   const code = extractLdapCode(error);
-  return isSchemaRefusal(code)
-    ? ldapRefusal(`The directory refused this read of ${base}`, code!, error)
-    : ldapError('LDAP search error', error);
+  if (isSchemaRefusal(code))
+    return ldapRefusal(
+      `The directory refused this read of ${base}`,
+      code!,
+      error
+    );
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 /**
@@ -812,7 +816,7 @@ class ldapActions {
           page = await generator.next();
         } catch (err) {
           result = ldapResult(err);
-          throw ldapSearchError(base, err);
+          throw err;
         } finally {
           spent += secondsSince(started);
         }
