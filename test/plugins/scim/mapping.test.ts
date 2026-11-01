@@ -361,6 +361,39 @@ describe('SCIM mapping', () => {
       expect(scimPathToLdapAttribute(1 as never, mapping)).to.equal(undefined);
     });
 
+    it('refuses a reference DN with an escape RFC 4514 does not define', () => {
+      const mapping = {
+        ...DEFAULT_USER_MAPPING,
+        entries: [
+          ...DEFAULT_USER_MAPPING.entries,
+          {
+            scim: 'manager',
+            sub: { value: 'manager' },
+            subDn: ['value'],
+          },
+        ],
+      };
+      const body = (manager: string) => ({
+        userName: 'alice',
+        manager: { value: manager },
+      });
+      const { attributes } = scimUserToLdap(
+        body('uid=bob,ou=users,dc=example,dc=com') as never,
+        mapping,
+        userCtx,
+        ['inetOrgPerson']
+      );
+      expect(attributes.manager).to.equal('uid=bob,ou=users,dc=example,dc=com');
+      refused(() =>
+        scimUserToLdap(
+          body('uid=\\q\\x,ou=users,dc=example,dc=com') as never,
+          mapping,
+          userCtx,
+          ['inetOrgPerson']
+        )
+      );
+    });
+
     it('reads a scalar element value as a PATCH does, and skips a null one', () => {
       const { attributes } = scimUserToLdap(
         {

@@ -95,6 +95,12 @@
   spelled with other spacing or escapes, or whose RDN holds an escaped comma:
   such a creation no longer keeps an address or a mark the caller supplied
   ([#601](https://github.com/linagora/ldap-rest/issues/601)).
+- SCIM answers `400 invalidValue` for a reference the mapping declares a DN
+  (`subDn`) when its value holds an escape RFC 4514 does not define, before
+  the write: the directory refuses such a value on an attribute of DN syntax,
+  but another syntax would store it as sent
+  ([#602](https://github.com/linagora/ldap-rest/issues/602),
+  [details](docs/usage/plugins/integrations/scim.md#writing-a-custom-mapping-schema)).
 - A tombstone's deletion date is read only when it is written as a
   GeneralizedTime with its zone or as an ISO 8601 date: a malformed value
   another writer left (`1`, `Jan 1`) and the extra forms the default

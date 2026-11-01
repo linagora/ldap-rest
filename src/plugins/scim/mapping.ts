@@ -12,7 +12,7 @@
 import fs from 'fs';
 
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
-import { parseDirectoryDate } from '../../lib/utils';
+import { hasOnlyRfc4514Escapes, parseDirectoryDate } from '../../lib/utils';
 
 import { kindOf, scimInvalidValue } from './errors';
 import {
@@ -475,7 +475,11 @@ export function scimUserToLdap(
           (value as Record<string, unknown>)[scimKey],
           `${m.scim}.${scimKey}`
         );
-        if (sv !== undefined && sv !== '') attributes[ldapKey] = sv;
+        if (sv !== undefined && sv !== '') {
+          if (m.subDn?.includes(scimKey))
+            assertReferenceDn(sv, `${m.scim}.${scimKey}`);
+          attributes[ldapKey] = sv;
+        }
       }
       continue;
     }
@@ -666,6 +670,31 @@ export function requiredLdapAttributes(
     if (m.sub) for (const v of Object.values(m.sub)) attrs.add(v);
   }
   return Array.from(attrs);
+}
+
+/**
+ * Refuse a DN a client wrote in a mapped reference when it holds an escape
+ * RFC 4514 does not define.
+ *
+ * The mapping says which sub-attributes carry a DN (`subDn`): a reference
+ * such as `manager.value` is written to the directory as sent, where the
+ * entity validator that holds the flat routes to RFC 4514 never sees it.
+ */
+export function assertReferenceDn(value: string, what: string): void {
+  if (!hasOnlyRfc4514Escapes(value))
+    throw scimInvalidValue(`${what} uses an escape RFC 4514 does not define`);
+}
+
+/** Whether the mapping declares this sub-attribute a DN (`subDn`). */
+export function isDnSubAttribute(
+  mapping: ResourceMapping,
+  top: string,
+  sub: string
+): boolean {
+  return (
+    mapping.entries.find(entry => entry.scim === top)?.subDn?.includes(sub) ===
+    true
+  );
 }
 
 /**
