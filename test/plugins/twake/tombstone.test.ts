@@ -568,11 +568,11 @@ describe('Twake tombstone plugin', function () {
         account: (dn: string, entry: AttributesList) => unknown;
       };
       expect(restored?.entry).to.include({ employeeType: 'deleted' });
-      expect(
-        await instances.account(flat('ts-alice'), restored!.entry)
-      ).to.equal(undefined);
+      expect(instances.account(flat('ts-alice'), restored!.entry)).to.equal(
+        undefined
+      );
       const { employeeType: _, ...alive } = restored!.entry;
-      expect(await instances.account(flat('ts-alice'), alive)).not.to.equal(
+      expect(instances.account(flat('ts-alice'), alive)).not.to.equal(
         undefined
       );
     });

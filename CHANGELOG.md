@@ -106,8 +106,8 @@
   and a delete of an existing tombstone writes nothing
   ([#615](https://github.com/linagora/ldap-rest/issues/615)).
 - An escaped comma in a DN value no longer names the branch after it: the
-  instance expressions read every value comma as `\2C`, so an entry beside the
-  branch is not taken for an account
+  instance expressions never read a comma inside a value as an RDN separator,
+  so an entry beside the branch is not taken for an account
   ([#617](https://github.com/linagora/ldap-rest/issues/617)).
 - An organization id captured from a `--twake-instance-dn` group is read from
   the organization entry, so the case a caller spells the branch in no longer

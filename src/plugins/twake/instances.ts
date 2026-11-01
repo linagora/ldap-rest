@@ -33,6 +33,7 @@ import {
   normalizeDn,
   rdnTypes,
   rdnValue,
+  unescapeDnValue,
 } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
@@ -55,6 +56,8 @@ export interface WorkplaceCreated {
 /** An account's instance request, and the id `user.created` names it by. */
 interface Account extends InstanceRequest {
   twakeId: string;
+  /** The organization id came from the DN, not from the provider settings */
+  fromDn?: boolean;
 }
 
 /** A `--twake-instance-dn` expression that read a DN, and where it sits. */
@@ -193,7 +196,7 @@ export default class TwakeInstances extends DmPlugin {
       return [dn, entry, req];
     },
     ldapaddafter: async (dn, entry) => {
-      const account = await this.account(dn, entry);
+      const account = await this.storedAccount(dn, entry);
       if (!account) return;
       await this.serialized(this.key(dn), async () => {
         try {
@@ -335,7 +338,7 @@ export default class TwakeInstances extends DmPlugin {
     const state = await this.serialized(this.key(dn), async () => {
       const entry = await this.read(dn, req);
       if (!entry) throw new NotFoundError(`No entry at ${dn}`);
-      const account = await this.account(dn, entry);
+      const account = await this.storedAccount(dn, entry);
       if (!account) throw new BadRequestError(`${dn} gets no instance`);
       orgId = account.orgId;
       if (first(this.value(entry, this.sentAttribute))) return 'ready';
@@ -518,7 +521,7 @@ export default class TwakeInstances extends DmPlugin {
   private async settle(dn: string, fqdn: string): Promise<void> {
     await this.serialized(this.key(dn), async () => {
       const entry = await this.read(dn);
-      const account = entry && (await this.account(dn, entry));
+      const account = entry && this.account(dn, entry);
       if (!entry || !account) return;
       if (first(this.value(entry, this.sentAttribute))) return;
       await this.ready(dn, entry, account, fqdn);
@@ -677,7 +680,7 @@ export default class TwakeInstances extends DmPlugin {
   /** Announce a held member, with the address rule ensureInstance applies */
   private async release(member: AttributesList): Promise<void> {
     const dn = member.dn as string;
-    const account = await this.account(dn, member);
+    const account = this.account(dn, member);
     const known = first(this.value(member, this.fqdnAttribute));
     if (!account || !known) return;
     const confirmed =
@@ -738,8 +741,20 @@ export default class TwakeInstances extends DmPlugin {
    * stands when there is no entry or no organization base.
    */
   private async storedOrganizationId(id: string): Promise<string> {
-    const entry = await this.findOrganization(id).catch(() => undefined);
-    return (entry && first(this.value(entry, this.organizationId))) || id;
+    const value = unescapeDnValue(id);
+    const entry = await this.findOrganization(value).catch(() => undefined);
+    return entry ? rdnValue(entry.dn as string) : value;
+  }
+
+  /** `account()`, with a captured organization id read from its entry. */
+  private async storedAccount(
+    dn: string,
+    entry: AttributesList
+  ): Promise<Account | undefined> {
+    const account = this.account(dn, entry);
+    if (!account?.fromDn || !account.orgId) return account;
+    const orgId = await this.storedOrganizationId(account.orgId);
+    return orgId === account.orgId ? account : { ...account, orgId };
   }
 
   private async findOrganization(
@@ -792,10 +807,7 @@ export default class TwakeInstances extends DmPlugin {
   }
 
   /** What to ask for this account, when it gets an instance at all. */
-  protected async account(
-    dn: string,
-    entry: AttributesList
-  ): Promise<Account | undefined> {
+  protected account(dn: string, entry: AttributesList): Account | undefined {
     const matched = this.match(dn);
     if (!matched) return undefined;
     const match = matched.exec;
@@ -815,10 +827,9 @@ export default class TwakeInstances extends DmPlugin {
       return undefined;
     }
     const cozy = this.provider instanceof CozyStackProvider;
+    const captured = match.groups?.org;
     const orgId =
-      (match.groups?.org
-        ? await this.storedOrganizationId(match.groups.org)
-        : undefined) ||
+      captured ||
       (cozy ? this.settings.twake_instance_cozy_org_id : '') ||
       undefined;
     const orgDomain = match.groups?.org
@@ -844,6 +855,7 @@ export default class TwakeInstances extends DmPlugin {
         uid,
       locale: first(this.value(entry, 'preferredLanguage')) || this.locale,
       phone: first(this.value(entry, 'mobile')),
+      ...(captured ? { fromDn: true } : {}),
       ...(orgId ? { orgId } : {}),
       ...(orgDomain ? { orgDomain } : {}),
       ...(offer ? { offer } : {}),
@@ -863,7 +875,7 @@ export default class TwakeInstances extends DmPlugin {
   private match(dn: string): PatternMatch | undefined {
     let canonical: string | undefined;
     try {
-      canonical = this.separators(canonicalDn(dn));
+      canonical = canonicalDn(dn);
     } catch {
       canonical = undefined;
     }

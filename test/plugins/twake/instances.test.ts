@@ -590,6 +590,38 @@ describe('Twake instances plugin', function () {
       }
     });
 
+    it('reads an organization id whose branch holds a comma', async () => {
+      const org = `ou=Foo\\2C Bar,${ORGS}`;
+      await dm.ldap.add(org, {
+        objectClass: ['top', 'organizationalUnit'],
+        ou: 'Foo, Bar',
+        l: 'acme.example',
+      });
+      await dm.ldap.add(`ou=users,${org}`, {
+        objectClass: ['top', 'organizationalUnit'],
+        ou: 'users',
+      });
+      let asked: Record<string, unknown> = {};
+      search('inzfoo2cbar.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', body => {
+          asked = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(202, {});
+      try {
+        await dm.ldap.add(
+          `uid=in.z,ou=users,ou=FOO\\2C BAR,${ORGS}`,
+          { ...person('in.z'), mail: 'in.z@acme.example' },
+          rest()
+        );
+        expect(asked).to.include({ org_id: 'Foo, Bar' });
+      } finally {
+        for (const dn of [`uid=in.z,ou=users,${org}`, `ou=users,${org}`, org])
+          await dm.ldap.delete(dn).catch(() => undefined);
+      }
+    });
+
     describe('making sure an account has its instance', () => {
       beforeEach(async () => {
         search('in-alice.example.org').reply(200, { items: [] });
@@ -2170,21 +2202,14 @@ describe('Twake instances plugin', function () {
             twake_instance_cloudery_offer: offer,
           })
         )() as unknown as {
-          account: (
-            dn: string,
-            entry: AttributesList
-          ) => Promise<{ offer?: string } | undefined>;
+          account: (dn: string, entry: AttributesList) => { offer?: string };
         };
-        return Promise.all(
-          ['a', 'b', 'c'].map(
-            async ou =>
-              (
-                await instances.account(`uid=x,ou=${ou}`, {
-                  uid: 'x',
-                  mail: 'x@example.org',
-                })
-              )?.offer
-          )
+        return ['a', 'b', 'c'].map(
+          ou =>
+            instances.account(`uid=x,ou=${ou}`, {
+              uid: 'x',
+              mail: 'x@example.org',
+            }).offer
         );
       };
       expect(await offersOf(' personal ;; business ;')).to.deep.equal([

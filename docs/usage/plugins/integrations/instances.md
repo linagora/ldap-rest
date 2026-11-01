@@ -24,8 +24,8 @@ gets no instance.
   account created under a branch written with other spacing or case is still
   one, and an expression written with the directory's own spelling (`\2C`, a
   doubled space) still matches. An expression naming a value that holds a
-  comma writes it `\2C`: the matched form writes every comma inside a value
-  that way, so `[^,]` cannot read one as an RDN separator.
+  comma writes it `\2C` or `\,`: a value comma never stands in for an RDN
+  separator in the form matched.
 - The address (`--twake-instance-fqdn-attribute`) and the mark
   (`--twake-instance-sent-attribute`) are this plugin's to write: an add that
   carries them has them removed, and an address written by a modify is taken
