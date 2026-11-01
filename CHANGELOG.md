@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- An error carrying `status` instead of `statusCode`, such as a malformed
+  percent-encoded path parameter, is answered with that status instead of
+  `500` ([#555](https://github.com/linagora/ldap-rest/issues/555)).
+
 ## v1.3.0 (2026-10-31)
 
 The October 2026 code-quality work and the five security findings it fixed.

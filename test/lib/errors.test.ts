@@ -22,6 +22,19 @@ describe('error chain', () => {
     expect(statusCodeOf(wrapping(translated))).to.equal(403);
   });
 
+  it('reads a `status` when no error names a `statusCode`', () => {
+    // Express's router sets `status` alone on a malformed path parameter
+    const err = Object.assign(new URIError("Failed to decode param '%FF'"), {
+      status: 400,
+    });
+    expect(statusCodeOf(wrapping(err))).to.equal(400);
+  });
+
+  it('ignores a `status` outside the HTTP error range', () => {
+    const err = Object.assign(new Error('odd'), { status: 200 });
+    expect(statusCodeOf(err)).to.equal(500);
+  });
+
   it('reads a refusal through a wrapper and a renamed subclass', () => {
     class Renamed extends AuthzRefusedError {
       constructor() {
