@@ -168,7 +168,6 @@ describe('LdapFlat base-scope guard', function () {
     });
 
     it('accepts a parent that differs only in case and spacing', async () => {
-      const uid = 'SpacedCase';
       await instance.addEntry(uid);
       const spelled = `cn=${uid},  OU=TwakeTitle ,ou=Nomenclature,${BASE}`;
       const res = await request.get(`/api/v1/ldap/titles/${enc(spelled)}`);
