@@ -39,6 +39,9 @@
   rather than one read from a rolled-over date
   ([#557](https://github.com/linagora/ldap-rest/issues/557),
   [details](docs/usage/plugins/ldap/password-policy.md#get-user-password-status)).
+- A DN-named identifier using an escape RFC 4514 does not define is refused
+  with `400` on creation instead of being written as the bare character
+  ([#500](https://github.com/linagora/ldap-rest/issues/500)).
 
 ## v1.3.0 (2026-10-31)
 

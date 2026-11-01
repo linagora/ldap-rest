@@ -10,6 +10,7 @@ import type { SearchResult } from 'ldapts';
 
 import { DM } from '../../../src/bin';
 import LdapGroups from '../../../src/plugins/ldap/groups';
+import { BadRequestError } from '../../../src/lib/errors';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 const B = String.fromCharCode(92);
@@ -17,6 +18,7 @@ const B = String.fromCharCode(92);
 describe('The name of a group', function () {
   let server: DM;
   let request: ReturnType<typeof supertest>;
+  let groups: LdapGroups;
   let base: string;
   const route = '/api/v1/ldap/groups';
 
@@ -31,7 +33,8 @@ describe('The name of a group', function () {
     server = new DM();
     await server.ready;
     server.config.ldap_group_base = `ou=lists,ou=groups,${base}`;
-    await server.registerPlugin('core/ldap/groups', new LdapGroups(server));
+    groups = new LdapGroups(server);
+    await server.registerPlugin('core/ldap/groups', groups);
     server.setupErrorMiddleware();
     request = supertest(server.app);
   });
@@ -62,6 +65,36 @@ describe('The name of a group', function () {
     const res = await request.post(route).send({ cn: dn, member: [] });
     expect(res.status, JSON.stringify(res.body)).to.equal(400);
     expect(res.body.error).to.match(/must be a value, or a/);
+  });
+
+  it('answers 400 for a DN value with an escape RFC 4514 does not define', async () => {
+    // The DN keeps the escape while the name is decoded: the directory
+    // would refuse it, or store a group its own spelling does not name
+    const dn = `cn=${B}q,ou=lists,ou=groups,${base}`;
+    const res = await request.post(route).send({ cn: dn, member: [] });
+    expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(res.body.error).to.match(/escape RFC 4514/);
+  });
+
+  it('answers 400 for an escape RFC 4514 does not define in the branch', async () => {
+    // `normalizeDn` folds `\p` away, so the branch check alone accepts it
+    const dn = `cn=x,ou=lists,ou=grou${B}ps,${base}`;
+    const res = await request.post(route).send({ cn: dn, member: [] });
+    expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(res.body.error).to.match(/escape RFC 4514/);
+  });
+
+  it('refuses a bare RDN ending in a backslash before the branch is appended', async () => {
+    // Appending `,base` would turn the backslash into an escaped comma,
+    // moving the group one branch up
+    let error: unknown;
+    try {
+      await groups.addGroup(`cn=foo${B}`, []);
+    } catch (err) {
+      error = err;
+    }
+    expect(error).to.be.instanceOf(BadRequestError);
+    expect((error as Error).message).to.match(/escape RFC 4514/);
   });
 
   it('creates a group named by a DN whose value carries an escaped comma', async () => {

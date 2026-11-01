@@ -7,6 +7,7 @@ import {
   parseDn,
   getParentDn,
   getRdn,
+  hasOnlyRfc4514Escapes,
   isChildOf,
   rdnValue,
   normalizeDn,
@@ -257,6 +258,46 @@ describe('LDAP Utils', () => {
       expect(() =>
         validateDnValue('bad\x00value', 'organizationalUnit')
       ).to.throw('organizationalUnit contains invalid control characters');
+    });
+  });
+
+  describe('hasOnlyRfc4514Escapes', () => {
+    it('accepts the escapes RFC 4514 defines', () => {
+      for (const value of [
+        'a\\,b',
+        'a\\+b',
+        'a\\"b',
+        'a\\<b',
+        'a\\>b',
+        'a\\;b',
+        'a\\\\b',
+        'a\\#b',
+        'a\\=b',
+        'a\\ b',
+        '\\20a',
+        'caf\\C3\\A9',
+        '\\5c',
+      ])
+        expect(
+          hasOnlyRfc4514Escapes(`uid=${value},dc=example,dc=com`),
+          value
+        ).to.equal(true);
+    });
+
+    it('refuses an escape RFC 4514 does not define', () => {
+      for (const value of ['a\\qb', 'a\\zb', 'a\\a'])
+        expect(
+          hasOnlyRfc4514Escapes(`uid=${value},dc=example,dc=com`),
+          value
+        ).to.equal(false);
+      // A backslash at the end of the DN escapes nothing
+      expect(hasOnlyRfc4514Escapes('uid=a\\')).to.equal(false);
+    });
+
+    it('accepts a DN without escapes', () => {
+      expect(
+        hasOnlyRfc4514Escapes('uid=bob,ou=users,dc=example,dc=com')
+      ).to.equal(true);
     });
   });
 

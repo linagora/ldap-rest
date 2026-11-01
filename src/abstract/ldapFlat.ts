@@ -34,6 +34,7 @@ import {
   escapeRegex,
   getCompiledRegex,
   getParentDn,
+  hasOnlyRfc4514Escapes,
   isDummyMemberDn,
   normalizeDn,
   assertedRdnValue,
@@ -1439,6 +1440,13 @@ export default abstract class LdapFlat extends DmPlugin {
   protected creationOf(id: string): { name: string; dn: string } {
     if (!namesByDn(id, this.mainAttribute))
       return { name: id, dn: this.resolveDn(id) };
+    // The caller's DN is held to the grammar before anything is decoded:
+    // the RDN is rebuilt from the folded name, and an escape RFC 4514 does
+    // not define would name another value than the one written
+    if (!hasOnlyRfc4514Escapes(id))
+      throw new BadRequestError(
+        `${this.mainAttribute} DN uses an escape RFC 4514 does not define`
+      );
     // `resolveDn` refuses a DN under another branch with the message that
     // names it; the RDN is then rebuilt here, in this branch
     this.resolveDn(id);
