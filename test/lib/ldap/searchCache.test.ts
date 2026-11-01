@@ -130,6 +130,33 @@ describe('SearchCache', () => {
       expect(cache.get(cache.key(bob, baseSearch()))).to.not.equal(undefined);
     });
 
+    for (const write of [
+      'uid=jdo\\65,ou=users,dc=example,dc=com',
+      '0.9.2342.19200300.100.1.1=jdoe,ou=users,dc=example,dc=com',
+      'uid=jdoe;ou=users;dc=example;dc=com',
+      'uid="jdoe",ou=users,dc=example,dc=com',
+    ])
+      it(`drops the cached reads of a write spelled ${write}`, () => {
+        const cache = cacheFor();
+        const read = 'uid=jdoe,ou=users,dc=example,dc=com';
+        cache.set(cache.key(read, baseSearch()), answer({}));
+
+        cache.invalidate(write);
+
+        expect(cache.get(cache.key(read, baseSearch()))).to.equal(undefined);
+      });
+
+    it('drops a cached read naming the entry under another spelling', () => {
+      const cache = cacheFor();
+      const group = 'cn=group,dc=example,dc=com';
+      const member = 'uid=jdoe,ou=users,dc=example,dc=com';
+      cache.set(cache.key(group, baseSearch()), answer({ member }));
+
+      cache.invalidateReferences('uid=jdo\\65,ou=users,dc=example,dc=com');
+
+      expect(cache.get(cache.key(group, baseSearch()))).to.equal(undefined);
+    });
+
     it('drops reads that name a written DN, or an entry below it', () => {
       const cache = cacheFor();
       const group = 'cn=Sales,ou=Groups,dc=Example,dc=Com';

@@ -39,6 +39,10 @@
   rather than one read from a rolled-over date
   ([#557](https://github.com/linagora/ldap-rest/issues/557),
   [details](docs/usage/plugins/ldap/password-policy.md#get-user-password-status)).
+- The LDAP search cache now drops a cached read however the write spells the
+  DN: hex escapes, attribute aliases and OIDs, `;`, quotes and multi-valued
+  RDN order all name the same entry
+  ([#563](https://github.com/linagora/ldap-rest/issues/563)).
 
 ## v1.3.0 (2026-10-31)
 
