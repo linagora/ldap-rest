@@ -115,6 +115,11 @@ jobs:
   lsc-plugin-test:
     runs-on: ubuntu-latest
     name: LSC ldap-rest plugin (Java)
+    env:
+      LSC_CORE_TAG: v2.2
+      # Bump when the tag moves without changing its name, or delete the
+      # cache in the Actions page, to rebuild lsc-core from the new commit.
+      LSC_CORE_CACHE_REVISION: '1'
 
     steps:
       - name: Checkout code
@@ -127,11 +132,21 @@ jobs:
           java-version: '17'
           cache: maven
 
-      # lsc-core is not on Maven Central — build it from the v2.2 tag and
-      # install it into the local Maven repo.
-      - name: Build and install LSC core (v2.2)
+      # lsc-core is not on Maven Central: build it once per tag and keep the
+      # artifacts Maven installs under org/lsc. The local repository is
+      # restored only on an exact key, so bumping the revision rebuilds it
+      # rather than reusing the previous build.
+      - name: Cache LSC core (${{ env.LSC_CORE_TAG }})
+        id: lsc-core
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository/org/lsc
+          key: lsc-core-${{ env.LSC_CORE_TAG }}-${{ env.LSC_CORE_CACHE_REVISION }}
+
+      - name: Build and install LSC core (${{ env.LSC_CORE_TAG }})
+        if: steps.lsc-core.outputs.cache-hit != 'true'
         run: |
-          git clone --depth 1 --branch v2.2 https://github.com/lsc-project/lsc.git /tmp/lsc
+          git clone --depth 1 --branch "$LSC_CORE_TAG" https://github.com/lsc-project/lsc.git /tmp/lsc
           cd /tmp/lsc
           mvn -B -DskipTests install
 
