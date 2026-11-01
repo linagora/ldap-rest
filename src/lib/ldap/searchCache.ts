@@ -186,7 +186,7 @@ export default class SearchCache {
   key(base: string, opts: SearchOptions): string {
     const sortedAttrs = this.getAttributeSignature(opts.attributes);
     const bufferAttrs = opts.explicitBufferAttributes?.length
-      ? [...opts.explicitBufferAttributes].sort().join(',')
+      ? JSON.stringify([...opts.explicitBufferAttributes].sort())
       : '-';
     const filterStr =
       typeof opts.filter === 'string'
@@ -305,12 +305,21 @@ export default class SearchCache {
         this.invalidate(member);
   }
 
+  /**
+   * Get a sorted signature for attribute list, using cache for performance
+   *
+   * Both the memo key and the signature are JSON, not a separator-joined
+   * string: an attribute description may contain any character that could
+   * stand for a separator, so joining would let `['cn|mail']` and
+   * `['cn', 'mail']` share one signature.
+   */
   private getAttributeSignature(attributes: string[] | undefined): string {
     if (!attributes || attributes.length === 0) return '*';
-    const key = attributes.join('|');
+    // Use array as-is for cache key (common patterns repeat)
+    const key = JSON.stringify(attributes);
     let sig = this.attrSignatureCache.get(key);
     if (!sig) {
-      sig = [...attributes].sort().join(',');
+      sig = JSON.stringify([...attributes].sort());
       this.attrSignatureCache.set(key, sig);
     }
     return sig;
