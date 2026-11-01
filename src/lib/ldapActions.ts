@@ -24,7 +24,7 @@ import {
   secondsSince,
   timedLdap,
 } from './metrics';
-import LdapPool, { type PooledConnection } from './ldap/pool';
+import LdapPool from './ldap/pool';
 import SearchCache, { digestKey, membersNamed } from './ldap/searchCache';
 import DirectorySchema from './ldap/schema';
 import CallerView from './ldap/callerView';
@@ -701,20 +701,31 @@ class ldapActions {
       }
     }
 
+    // A paged search is a generator: the connection is taken on its first
+    // page, so a walk the caller never starts holds none. The hooks above
+    // have already run, so a refusal is still answered by `search()`.
+    // A closed pool still refuses a paged search at once, as an unpaged one.
+    if (opts.paged) {
+      this.pool.assertOpen();
+      return this.filterForCaller(
+        this.pagedSearch(base, opts),
+        req,
+        opts
+      ) as AsyncGenerator<SearchResult>;
+    }
+
     // Acquire connection from pool
     const pooled = await this.pool.acquire();
     try {
-      const searched = opts.paged
-        ? dropSelectorsPaged(pooled.client.searchPaginated(base, opts))
-        : timedLdap('search', () => pooled.client.search(base, opts)).then(
-            dropSelectors
-          );
+      const searched = timedLdap('search', () =>
+        pooled.client.search(base, opts)
+      ).then(dropSelectors);
       // The hooks are handed the driver's value unawaited, and the chain
-      // resolves it: a non-paginated result is never a Promise after this.
-      const res = (await this.parent.hookBus.chain(
+      // resolves it: the result is never a Promise after this.
+      const res = await this.parent.hookBus.chain(
         'ldapsearchresult',
         searched as unknown as SearchResult
-      )) as unknown as typeof searched;
+      );
 
       // Cache non-paginated, base-scope search results.
       //
@@ -729,7 +740,7 @@ class ldapActions {
       // out of the chain above and never reaches this line, so a missing
       // entry is never cached as missing.
       if (cacheable) {
-        const result = res as unknown as SearchResult;
+        const result = res;
         // A write that landed while this read was in flight makes what came
         // back describe the directory as it was before that write, and there
         // is nothing left to drop it: the write's `invalidate` ran when
@@ -743,44 +754,44 @@ class ldapActions {
             `LDAP search not cached, a write overtook it: ${digestKey(cacheKey)}`
           );
         }
-        return this.filterForCaller(result, req, opts);
       }
 
-      // For paginated searches, return a wrapped generator that releases connection when done
-      if (opts.paged) {
-        return this.filterForCaller(
-          this.wrapPaginatedSearch(res as AsyncGenerator<SearchResult>, pooled),
-          req,
-          opts
-        ) as AsyncGenerator<SearchResult>;
-      }
-
-      return this.filterForCaller(res as unknown as SearchResult, req, opts);
+      return this.filterForCaller(res, req, opts);
     } finally {
-      // For non-paginated searches, release connection immediately
-      if (!opts.paged) {
-        this.pool.release(pooled);
-      }
+      this.pool.release(pooled);
     }
   }
 
   /**
-   * Wrap paginated search to ensure connection is released when done
+   * A paged search, opened on its first page: a generator that is never
+   * started holds no connection. The pool is taken here, in the generator
+   * body, not by `search()`.
    */
-  private async *wrapPaginatedSearch(
-    generator: AsyncGenerator<SearchResult>,
-    pooled: PooledConnection
+  private async *pagedSearch(
+    base: string,
+    opts: SearchOptions
   ): AsyncGenerator<SearchResult> {
-    // Timed page by page: between two pages the generator waits on the
-    // caller, whose work is not the directory's. A walk the caller leaves
-    // early is a walk the directory answered.
+    const pooled = await this.pool.acquire();
+    let generator: AsyncGenerator<SearchResult> | undefined;
+    let ran = false;
     let spent = 0;
     let result = 'ok';
     try {
+      const searched = dropSelectorsPaged(
+        pooled.client.searchPaginated(base, opts)
+      );
+      generator = (await this.parent.hookBus.chain(
+        'ldapsearchresult',
+        searched as unknown as SearchResult
+      )) as unknown as AsyncGenerator<SearchResult>;
+      // Timed page by page: between two pages the generator waits on the
+      // caller, whose work is not the directory's. A walk the caller leaves
+      // early is a walk the directory answered.
       for (;;) {
         const started = process.hrtime.bigint();
         let page: IteratorResult<SearchResult>;
         try {
+          ran = true;
           page = await generator.next();
         } catch (err) {
           result = ldapResult(err);
@@ -793,11 +804,12 @@ class ldapActions {
       }
     } finally {
       try {
-        await generator.return(undefined);
+        await generator?.return(undefined);
       } catch {
         // A hook may hand back something that is no generator
       } finally {
-        ldapOperationDuration.observe({ operation: 'search', result }, spent);
+        if (ran)
+          ldapOperationDuration.observe({ operation: 'search', result }, spent);
         this.pool.release(pooled);
       }
     }

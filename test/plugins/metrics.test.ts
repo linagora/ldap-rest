@@ -232,7 +232,9 @@ describe('metrics', function () {
       await walk.next();
       held.push(walk);
     }
-    const waiting = dm.ldap.search(page);
+    const waiting = (await dm.ldap.search(page)) as AsyncGenerator<unknown>;
+    // A paged walk takes its connection on the first page
+    const waitingPage = waiting.next();
     await new Promise(resolve => setImmediate(resolve));
     const full = await scrape();
     const pool = (text: string, name: string, labels = ''): number =>
@@ -242,11 +244,9 @@ describe('metrics', function () {
     expect(pool(full, 'waiting')).to.equal(1);
     expect(pool(full, 'max')).to.equal(max);
     for (const walk of held) await walk.return(undefined);
-    // A walk never started holds its connection: the generator's own
-    // release runs only once it ran
-    const served = (await waiting) as AsyncGenerator<unknown>;
-    await served.next();
-    await served.return(undefined);
+    const served = await waitingPage;
+    expect(served.done).to.equal(false);
+    await waiting.return(undefined);
     const after = await scrape();
     expect(pool(after, 'waiting')).to.equal(0);
     expect(pool(after, 'connections', 'state="busy"')).to.equal(0);
