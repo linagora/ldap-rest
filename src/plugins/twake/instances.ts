@@ -33,6 +33,7 @@ import {
   normalizeDn,
   rdnTypes,
   rdnValue,
+  unescapeDnValue,
 } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
@@ -55,6 +56,8 @@ export interface WorkplaceCreated {
 /** An account's instance request, and the id `user.created` names it by. */
 interface Account extends InstanceRequest {
   twakeId: string;
+  /** The organization id came from the DN, not from the provider settings */
+  fromDn?: boolean;
 }
 
 /** A `--twake-instance-dn` expression that read a DN, and where it sits. */
@@ -193,7 +196,7 @@ export default class TwakeInstances extends DmPlugin {
       return [dn, entry, req];
     },
     ldapaddafter: async (dn, entry) => {
-      const account = this.account(dn, entry);
+      const account = await this.storedAccount(dn, entry);
       if (!account) return;
       await this.serialized(this.key(dn), async () => {
         try {
@@ -335,7 +338,7 @@ export default class TwakeInstances extends DmPlugin {
     const state = await this.serialized(this.key(dn), async () => {
       const entry = await this.read(dn, req);
       if (!entry) throw new NotFoundError(`No entry at ${dn}`);
-      const account = this.account(dn, entry);
+      const account = await this.storedAccount(dn, entry);
       if (!account) throw new BadRequestError(`${dn} gets no instance`);
       orgId = account.orgId;
       if (first(this.value(entry, this.sentAttribute))) return 'ready';
@@ -731,6 +734,28 @@ export default class TwakeInstances extends DmPlugin {
     return base ? isDirectChildOf(dn, base) : false;
   }
 
+  /**
+   * The id the organization's own entry spells, for an id captured from a
+   * client's DN: the caller may write the branch in another case, and the
+   * Cloudery branch and the slug should not follow it. The captured value
+   * stands when there is no entry or no organization base.
+   */
+  private async storedOrganizationId(id: string): Promise<string> {
+    const entry = await this.findOrganization(id).catch(() => undefined);
+    return entry ? rdnValue(entry.dn as string) : id;
+  }
+
+  /** `account()`, with a captured organization id read from its entry. */
+  private async storedAccount(
+    dn: string,
+    entry: AttributesList
+  ): Promise<Account | undefined> {
+    const account = this.account(dn, entry);
+    if (!account?.fromDn || !account.orgId) return account;
+    const orgId = await this.storedOrganizationId(account.orgId);
+    return orgId === account.orgId ? account : { ...account, orgId };
+  }
+
   private async findOrganization(
     id: string
   ): Promise<AttributesList | undefined> {
@@ -801,8 +826,9 @@ export default class TwakeInstances extends DmPlugin {
       return undefined;
     }
     const cozy = this.provider instanceof CozyStackProvider;
+    const captured = match.groups?.org && unescapeDnValue(match.groups.org);
     const orgId =
-      match.groups?.org ||
+      captured ||
       (cozy ? this.settings.twake_instance_cozy_org_id : '') ||
       undefined;
     const orgDomain = match.groups?.org
@@ -828,6 +854,7 @@ export default class TwakeInstances extends DmPlugin {
         uid,
       locale: first(this.value(entry, 'preferredLanguage')) || this.locale,
       phone: first(this.value(entry, 'mobile')),
+      ...(captured ? { fromDn: true } : {}),
       ...(orgId ? { orgId } : {}),
       ...(orgDomain ? { orgDomain } : {}),
       ...(offer ? { offer } : {}),
@@ -851,13 +878,42 @@ export default class TwakeInstances extends DmPlugin {
     } catch {
       canonical = undefined;
     }
+    const sent = this.separators(dn);
     for (const [index, pattern] of this.patterns.entries()) {
       const exec =
         (canonical !== undefined ? pattern.exec(canonical) : null) ??
-        pattern.exec(dn);
+        pattern.exec(sent);
       if (exec) return { exec, index };
     }
     return undefined;
+  }
+
+  /**
+   * The DN with a comma inside a value written `\2C`, as the directory writes
+   * it: an expression's `[^,]` cannot then read that comma as an RDN
+   * separator and name the branch of an entry beside it.
+   */
+  private separators(dn: string): string {
+    let out = '';
+    for (let i = 0; i < dn.length; i++) {
+      if (dn[i] !== '\\' || i + 1 === dn.length) {
+        out += dn[i];
+        continue;
+      }
+      const next = dn[i + 1];
+      const hex = dn.slice(i + 1, i + 3);
+      if (next === ',') {
+        out += '\\2C';
+        i++;
+      } else if (/^[0-9a-f]{2}$/i.test(hex) && parseInt(hex, 16) === 0x2c) {
+        out += '\\2C';
+        i += 2;
+      } else {
+        out += dn.slice(i, i + 2);
+        i++;
+      }
+    }
+    return out;
   }
 
   /** The uid of an account's DN, under any name or alias of the type. */
