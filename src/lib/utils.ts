@@ -623,9 +623,9 @@ export function assertedRdnValue(
   attribute: string,
   base?: string
 ): string | null {
-  // Splits once, on the first unescaped comma, and decodes one short RDN: a
-  // cost linear in the input, where a pattern of `\\.` against `[^,]` would
-  // try every way of splitting a run of escapes before failing
+  // Linear in the input, where a pattern of `\\.` against `[^,]` would try
+  // every way of splitting a run of escapes before failing: the RDN is read
+  // once, and the parent only when a base is given
   const [rdn] = parseDn(dn);
   const eq = rdn ? rdn.indexOf('=') : -1;
   if (eq <= 0) return null;
