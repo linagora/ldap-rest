@@ -19,9 +19,11 @@ gets no instance.
   An entry holding `--twake-instance-skip-value` in
   `--twake-instance-skip-attribute`, a technical account for instance, gets
   none, and neither does a tombstone
-  (`--twake-lifecycle-deleted-attribute`) put back in place. The expressions
-  are also tried against the DN as the directory spells it, so an account
-  created under a branch written with other spacing or case is still one.
+  (`--twake-lifecycle-deleted-attribute`) put back in place. Each expression
+  is tried against the canonical DN first, then against the DN as sent: an
+  account created under a branch written with other spacing or case is still
+  one, and an expression written with the directory's own spelling (`\2C`, a
+  doubled space) still matches.
 - The address (`--twake-instance-fqdn-attribute`) and the mark
   (`--twake-instance-sent-attribute`) are this plugin's to write: an add that
   carries them has them removed, and an address written by a modify is taken

@@ -1811,6 +1811,83 @@ describe('Twake instances plugin', function () {
     });
   });
 
+  describe('with expressions written for one spelling', () => {
+    let dm: DM;
+    let rabbit: StubRabbitMq;
+
+    const BASE = process.env.DM_LDAP_BASE as string;
+    // One expression spells the branch with one space where the directory
+    // stores two; the other uses the directory's own two
+    const myOrg = `ou=My  Org,${BASE}`;
+    const hisOrg = `ou=His  Org,${BASE}`;
+    const his = `uid=in-his,${hisOrg}`;
+    const my = `uid=in-my,${myOrg}`;
+
+    before(async () => {
+      ({ dm, rabbit } = await server({
+        twake_instance_provider: 'cloudery',
+        twake_instance_cloudery_url: CLOUDERY,
+        twake_instance_cloudery_token: 'tok',
+        twake_instance_cloudery_domain: 'example.org',
+        twake_instance_cloudery_offer: 'standard',
+        twake_instance_dn: [
+          `^uid=in-[^,]+,ou=My Org,${BASE}$`,
+          `^uid=in-[^,]+,ou=His  Org,${BASE}$`,
+        ],
+        twake_instance_fqdn_attribute: 'description',
+        twake_instance_sent_attribute: 'businessCategory',
+        twake_lifecycle_deleted_attribute: 'carLicense',
+      }));
+      for (const [dn, ou] of [
+        [myOrg, 'My  Org'],
+        [hisOrg, 'His  Org'],
+      ])
+        await dm.ldap
+          .add(dn, { objectClass: ['top', 'organizationalUnit'], ou })
+          .catch(() => undefined);
+    });
+
+    after(async () => {
+      for (const dn of [myOrg, hisOrg])
+        await dm.ldap.delete(dn).catch(() => undefined);
+    });
+
+    beforeEach(() => (rabbit.published = []));
+
+    afterEach(async () => {
+      for (const dn of [his, my])
+        await dm.ldap.delete(dn).catch(() => undefined);
+    });
+
+    it('matches an expression written as the directory spells it', async () => {
+      const scope = search('in-his.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances')
+        .reply(202, {});
+      await dm.ldap.add(his, person('in-his'), rest());
+      expect(scope.isDone()).to.equal(true);
+      expect(await read(dm, his)).not.to.have.property('description');
+    });
+
+    it('finds the account by mail when the directory answers another spelling', async () => {
+      search('in-my.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances')
+        .reply(202, {});
+      await dm.ldap.add(my, person('in-my'), rest());
+      await rabbit.handler!({
+        twakeId: 'in-my',
+        internalEmail: 'in-my@example.org',
+        workplaceFqdn: 'in-my.example.org',
+      });
+      expect(await read(dm, my)).to.have.property(
+        'description',
+        'in-my.example.org'
+      );
+      expect(rabbit.published.map(p => p.key)).to.deep.equal(['user.created']);
+    });
+  });
+
   describe('with cozy-stack', () => {
     let dm: DM;
     let rabbit: StubRabbitMq;

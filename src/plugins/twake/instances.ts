@@ -837,21 +837,24 @@ export default class TwakeInstances extends DmPlugin {
   /**
    * The expression that takes this DN for an account's, and where it sits.
    *
-   * The expressions read the canonical DN: a client may spell the branch
-   * differently from the configured expression, and a space or an escape
-   * inside a captured value would otherwise be captured as written. The
-   * canonical form keeps the caller's case, which an organization id is sent
-   * as.
+   * Each expression reads the canonical DN first: a client may spell the
+   * branch differently, and a space or an escape inside a captured value
+   * would otherwise be captured as written. The canonical form keeps the
+   * caller's case, which an organization id is sent as. An expression written
+   * with the directory's own spelling — `\2C`, a doubled space — does not
+   * match that form, so the DN as sent is tried next.
    */
   private match(dn: string): PatternMatch | undefined {
-    let canonical: string;
+    let canonical: string | undefined;
     try {
       canonical = canonicalDn(dn);
     } catch {
-      return undefined;
+      canonical = undefined;
     }
     for (const [index, pattern] of this.patterns.entries()) {
-      const exec = pattern.exec(canonical);
+      const exec =
+        (canonical !== undefined ? pattern.exec(canonical) : null) ??
+        pattern.exec(dn);
       if (exec) return { exec, index };
     }
     return undefined;
@@ -904,6 +907,6 @@ export default class TwakeInstances extends DmPlugin {
       this.config.ldap_base,
       req
     )) as SearchResult;
-    return res.searchEntries.find(e => this.patterns.some(p => p.test(e.dn)));
+    return res.searchEntries.find(e => this.match(e.dn as string));
   }
 }
