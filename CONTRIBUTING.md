@@ -79,6 +79,11 @@ it applies, and `reason`. An advisory named by its GHSA covers the packages
 that pull the vulnerable one in as well. Fix the advisory; allow it only
 where it cannot apply here, and remove the entry once it is fixed.
 
+A pull request gets the same gate from GitHub's dependency review, configured
+in `.github/dependency-review-config.yml`. Its `allow-ghsas` list is the
+equivalent of `.github/audit-allowlist.json`: add a GHSA only with a comment
+saying why it cannot apply, and remove it once the dependency is patched.
+
 ### Package overrides
 
 `package.json` overrides raise the floor of a transitive dependency that no
