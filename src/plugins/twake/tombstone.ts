@@ -118,9 +118,15 @@ export default class TwakeTombstone extends DmPlugin {
     ldapdeleterequest: async ([dn, req]) => {
       const kept: string[] = [];
       for (const one of Array.isArray(dn) ? dn : [dn]) {
-        if (this.keeps(one)) {
+        if (!this.erasing.has(one)) {
           const entry = await this.read(one);
-          if (entry) {
+          // An expression written with an escape or a doubled space may match
+          // only the stored spelling: the directory answers the DN with the
+          // client's spacing folded away, even when it accepted that spacing.
+          if (
+            entry &&
+            (this.matches(one) || this.matches(entry.dn as string))
+          ) {
             await this.writeTombstone(one, entry, this.reasonOf(one, req), req);
             continue;
           }

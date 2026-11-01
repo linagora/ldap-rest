@@ -121,7 +121,11 @@ describe('Twake tombstone plugin', function () {
           events: { created: 'created', deleted: 'deleted' },
         },
       ]),
-      twake_tombstone_dn: [`^uid=ts-[^,]+,${USERS}$`, `^uid=[^,]+,${ORG}$`],
+      twake_tombstone_dn: [
+        `^uid=ts-[^,]+,${USERS}$`,
+        `^uid=[^,]+,${ORG}$`,
+        `^uid=ts-[^,]+,ou=A\\\\2CB,${LDAP_BASE}$`,
+      ],
       twake_tombstone_reasons: ['deleted', 'user_request', 'violation'],
       twake_tombstone_clear_attributes: ['mobile', 'telephoneNumber'],
       twake_tombstone_erase_min_age: 3600,
@@ -254,6 +258,26 @@ describe('Twake tombstone plugin', function () {
         employeeType: 'deleted',
         roomNumber: tombstone?.roomNumber,
       });
+    });
+
+    it('writes a tombstone for an expression written with \\2C under spaced RDNs', async () => {
+      // The expression matches the stored spelling only; the client writes
+      // spaces around the commas, which normalizeDn folds but turns \2C into \,
+      const branch = `ou=A\\2CB,${LDAP_BASE}`;
+      const dn = `uid=ts-carol,${branch}`;
+      try {
+        await dm.ldap.add(branch, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'A,B',
+        });
+        await add(dn);
+        await dm.ldap.delete(
+          `uid=ts-carol , ou=A\\2CB , ${LDAP_BASE.replace(/,/g, ' , ')}`
+        );
+        expect(await read(dn)).to.include({ employeeType: 'deleted' });
+      } finally {
+        await cleanup(dn, branch);
+      }
     });
 
     it('deletes an entry no pattern matches', async () => {
