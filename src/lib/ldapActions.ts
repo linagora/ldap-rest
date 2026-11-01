@@ -1205,15 +1205,6 @@ class ldapActions {
     this.schema.declareObjectClasses(base, classes, includeBase);
   }
 
-  /** See {@link DirectorySchema.classRepair}. */
-  private async classRepair(
-    dn: string,
-    changes: ModifyRequest,
-    extra: string[] = []
-  ): Promise<string[] | 'allowed'> {
-    return this.schema.classRepair(dn, changes, extra);
-  }
-
   /** See {@link DirectorySchema.subschemaDn}. */
   async subschemaDn(): Promise<string> {
     return this.schema.subschemaDn();
@@ -1650,7 +1641,7 @@ class ldapActions {
           // write it takes costs no read. The connection is given back before
           // the repair reads: holding it meanwhile could exhaust the pool.
           if (extractLdapCode(error) !== 65) throw error;
-          const repair = await this.classRepair(
+          const repair = await this.schema.classRepair(
             dn,
             changes,
             options.declaredClasses

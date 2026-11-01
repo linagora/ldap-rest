@@ -226,7 +226,7 @@ describe('Object class repair on modify', function () {
 
   it('should not fail when a writer gave the entry the class in the meantime', async () => {
     const dm = bare();
-    (dm.ldap as any).classRepair = async (): Promise<string[]> => {
+    (dm.ldap as any).schema.classRepair = async (): Promise<string[]> => {
       // That writer lands between the repair's read and its write.
       await server.ldap.modify(accountDn, {
         add: { objectClass: 'twakeWhitePages' },
@@ -242,10 +242,9 @@ describe('Object class repair on modify', function () {
   it('should write when a writer gave the entry the class after the refusal', async () => {
     const dm = bare();
     dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
-    const repair = (dm.ldap as any).classRepair.bind(dm.ldap);
-    (dm.ldap as any).classRepair = async (
-      ...args: unknown[]
-    ): Promise<unknown> => {
+    const schema = (dm.ldap as any).schema;
+    const repair = schema.classRepair.bind(schema);
+    schema.classRepair = async (...args: unknown[]): Promise<unknown> => {
       // That writer lands between the refusal and the repair's read.
       await server.ldap.modify(accountDn, {
         add: { objectClass: 'twakeWhitePages' },
