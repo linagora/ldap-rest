@@ -796,3 +796,70 @@ describe('PasswordPolicy.calculateStatus', () => {
     expect(Number.isSafeInteger(status.daysUntilExpiration)).to.equal(true);
   });
 });
+
+describe('PasswordPolicy: the times it reads', () => {
+  // As the plugin reads one, without a server: the time itself is all this
+  // does
+  const plugin = Object.create(PasswordPolicy.prototype) as unknown as {
+    parsePolicyTime: (value: string | undefined) => Date | null;
+  };
+
+  for (const [text, expected] of [
+    // An offset and a fraction, which the plugin used to drop
+    ['20261031120000.5+0200', '2026-10-31T10:00:00.500Z'],
+    ['20261031120000.5', '2026-10-31T12:00:00.500Z'],
+    // A year it used to read as 1950
+    ['00500101000000Z', '0050-01-01T00:00:00.000Z'],
+    // Minutes and seconds, which the syntax makes optional
+    ['2026103112', '2026-10-31T12:00:00.000Z'],
+    ['202610311200Z', '2026-10-31T12:00:00.000Z'],
+  ]) {
+    it(`reads ${text} as ${expected}`, () => {
+      expect(plugin.parsePolicyTime(text)?.toISOString()).to.equal(expected);
+    });
+  }
+
+  it('reads no time from a date the directory does not hold', () => {
+    // It used to roll the 61st day over into April
+    expect(plugin.parsePolicyTime('00520261031120Z')).to.equal(null);
+    expect(plugin.parsePolicyTime('20261301000000Z')).to.equal(null);
+    expect(plugin.parsePolicyTime(undefined)).to.equal(null);
+  });
+});
+
+describe('PasswordPolicy: the status it computes', () => {
+  // The status of an entry the directory hands over, without a server: the
+  // times it is built from are all this reads
+  const plugin = Object.create(PasswordPolicy.prototype) as unknown as {
+    settings: { ppolicy_warn_days: number };
+    calculateStatus(
+      dn: string,
+      entry: Record<string, unknown>,
+      policy: Record<string, unknown>
+    ): Record<string, unknown>;
+  };
+  Object.defineProperty(plugin, 'settings', {
+    value: { ppolicy_warn_days: 7 },
+  });
+
+  it('expires a password from the instant its time names', () => {
+    // 12:00:00.5 at +0200 is 10:00:00.5 UTC; `pwdMaxAge` counts from there
+    const status = plugin.calculateStatus(
+      'uid=x,dc=x',
+      { userPassword: 'x', pwdChangedTime: '20261031120000.5+0200' },
+      { pwdMaxAge: 864000 }
+    );
+    expect(status.lastChanged).to.equal('2026-10-31T10:00:00.500Z');
+    expect(status.expiresAt).to.equal('2026-11-10T10:00:00.500Z');
+  });
+
+  it('reports a lock at the instant its time names', () => {
+    // Midnight at +0200 is ten in the evening the day before, in UTC
+    const status = plugin.calculateStatus(
+      'uid=x,dc=x',
+      { pwdAccountLockedTime: '20200101000000+0200' },
+      { pwdLockoutDuration: 3600 }
+    );
+    expect(status.lockedAt).to.equal('2019-12-31T22:00:00.000Z');
+  });
+});
