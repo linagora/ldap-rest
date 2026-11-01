@@ -4,6 +4,18 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## From 1.3.0
+
+### A path parameter is percent-decoded once
+
+**Who is affected:** a client that encoded a path parameter twice to reach an
+identifier holding `%`, sending `/users/100%2525` for the entry `100%`.
+
+The parameter is decoded once now, as RFC 3986 spells it: an identifier
+holding `%` goes out as `100%25`. A parameter still encoded twice names the
+escaped text, so `/users/100%2525` addresses the entry `100%25`
+([details](../client-development/api/rest-api.md#url-encoding)).
+
 ## From 1.2.1
 
 ### A plugin written against the old hooks API

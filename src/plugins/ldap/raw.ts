@@ -907,7 +907,7 @@ export default class LdapRaw extends DmPlugin {
       params: RawDnParams,
       query: RawChildrenQuery,
       handler: async ({ req, params, query, res }) => {
-        const dn = decodeURIComponent(params.dn);
+        const dn = params.dn;
         const withChildren =
           query.children !== undefined && query.children !== 'false';
         await tryMethodData(
@@ -957,7 +957,7 @@ export default class LdapRaw extends DmPlugin {
       path: `${prefix}/entry/:dn`,
       params: RawDnParams,
       handler: async ({ req, params, res }) => {
-        const dn = decodeURIComponent(params.dn);
+        const dn = params.dn;
         await tryMethodData(res, this.getEntry.bind(this), dn, req);
       },
     });

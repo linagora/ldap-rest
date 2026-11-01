@@ -1154,7 +1154,7 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async apiGet(req: Request, res: Response): Promise<void> {
-    const id = decodeURIComponent(req.params.id as string);
+    const id = req.params.id as string;
     try {
       const dn = this.resolveDn(id);
       const result = (await this.ldap.search(
@@ -1222,7 +1222,7 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
-    const id = decodeURIComponent(req.params.id as string);
+    const id = req.params.id as string;
     await tryMethod(res, this.deleteEntry.bind(this), id, req);
   }
 
@@ -1231,13 +1231,13 @@ export default abstract class LdapFlat extends DmPlugin {
     if (!body) return;
     assertModifyRequest(body);
     this.rejectForbiddenInput(modifiedAttributeNames(body));
-    const id = decodeURIComponent(req.params.id as string);
+    const id = req.params.id as string;
     await tryMethod(res, this.modifyEntry.bind(this), id, body, req);
   }
 
   async apiMove(req: Request, res: Response): Promise<void> {
     const body = req.body as { targetOrgDn: string };
-    const id = decodeURIComponent(req.params.id as string);
+    const id = req.params.id as string;
     const { targetOrgDn } = body;
 
     const result = await this.moveEntry(id, targetOrgDn, req);
@@ -1289,7 +1289,7 @@ export default abstract class LdapFlat extends DmPlugin {
     // The schema's own rule, the one a creation applies
     await this.validator().validateValue(this.mainAttribute, newId);
 
-    const id = decodeURIComponent(req.params.id as string);
+    const id = req.params.id as string;
     const dn = this.resolveDn(id);
     const newDn = this.resolveDn(newId);
 

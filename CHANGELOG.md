@@ -39,6 +39,13 @@
   rather than one read from a rolled-over date
   ([#557](https://github.com/linagora/ldap-rest/issues/557),
   [details](docs/usage/plugins/ldap/password-policy.md#get-user-password-status)).
+- A path parameter naming an entry is percent-decoded once: an identifier
+  holding `%`, such as `uid=100%`, is addressed as `100%25` and answered
+  instead of 500, and `a%2541` names `a%41` rather than `aA` — on the flat,
+  group, organization, raw and account lifecycle routes. A client that
+  encoded the parameter twice now names the escaped value
+  ([#552](https://github.com/linagora/ldap-rest/issues/552),
+  [details](docs/client-development/api/rest-api.md#url-encoding)).
 
 ## v1.3.0 (2026-10-31)
 
