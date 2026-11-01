@@ -33,7 +33,7 @@ describe('Schema markers over the API', () => {
         ou: 'MarkersOrg',
         twakeDepartmentPath: 'MarkersOrg',
       });
-    } catch (_e) {
+    } catch {
       // already there
     }
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));

@@ -19,7 +19,7 @@ describe('Fixed attributes validation', function () {
   afterEach(async () => {
     try {
       await plugin.deleteEntry('testfixed').catch(() => {});
-    } catch (_e) {
+    } catch {
       // Ignore cleanup errors
     }
   });

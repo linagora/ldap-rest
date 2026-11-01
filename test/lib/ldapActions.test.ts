@@ -188,7 +188,7 @@ describe('ldapActions', function () {
         // Clean up: delete the test entry if it exists
         try {
           await ldapActions.delete(testDN);
-        } catch (_err) {
+        } catch {
           // Ignore errors if the entry does not exist
         }
       });
@@ -309,12 +309,12 @@ describe('ldapActions', function () {
         // Clean up: delete the test entry if it exists
         try {
           await ldapActions.delete(testDN);
-        } catch (_err) {
+        } catch {
           // Ignore errors if the entry does not exist
         }
         try {
           await ldapActions.delete(newDN);
-        } catch (_err) {
+        } catch {
           // Ignore errors if the entry does not exist
         }
       });
@@ -468,7 +468,7 @@ describe('ldapActions', function () {
         for (const dn of [testDN, newDN]) {
           try {
             await ldapActions.delete(dn);
-          } catch (_err) {
+          } catch {
             // Ignore errors if the entry does not exist
           }
         }

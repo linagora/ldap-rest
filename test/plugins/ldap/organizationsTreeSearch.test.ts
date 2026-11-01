@@ -107,7 +107,7 @@ describe('Organization subtree search', function () {
     for (const [dn, entry] of entries) {
       try {
         await server.ldap.delete(dn);
-      } catch (_e) {
+      } catch {
         // ignore
       }
       await server.ldap.add(dn, entry);
@@ -119,7 +119,7 @@ describe('Organization subtree search', function () {
     for (const dn of [grandChildDn, childDn]) {
       try {
         await server.ldap.delete(dn);
-      } catch (_e) {
+      } catch {
         // ignore
       }
     }
@@ -250,7 +250,7 @@ describe('Organization subtree search', function () {
     let failed = false;
     try {
       await plugin.searchOrganisationTree(top, 'o');
-    } catch (_e) {
+    } catch {
       failed = true;
     }
     expect(failed).to.equal(true);

@@ -54,7 +54,7 @@ describe('LdapGroups Plugin', function () {
     try {
       await plugin.ldap.delete(user1);
       await plugin.ldap.delete(user2);
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });
@@ -62,7 +62,7 @@ describe('LdapGroups Plugin', function () {
   afterEach(async () => {
     try {
       await plugin.deleteGroup('testgroup');
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });
@@ -157,7 +157,7 @@ describe('LdapGroups Plugin', function () {
     this.afterEach(async () => {
       try {
         await plugin.deleteGroup('testgroupbis');
-      } catch (_e) {
+      } catch {
         // ignore
       }
     });
@@ -570,17 +570,17 @@ describe('LdapGroups Plugin', function () {
     afterEach(async () => {
       try {
         await plugin.ldap.delete(groupDn);
-      } catch (_e) {
+      } catch {
         // ignore
       }
       try {
         await plugin.ldap.delete(org1Dn);
-      } catch (_e) {
+      } catch {
         // ignore
       }
       try {
         await plugin.ldap.delete(org2Dn);
-      } catch (_e) {
+      } catch {
         // ignore
       }
     });

@@ -145,12 +145,12 @@ describe('Authorization for Group Move', function () {
   after(async () => {
     try {
       await server.ldap.delete(getOrg1Dn());
-    } catch (_e) {
+    } catch {
       // ignore
     }
     try {
       await server.ldap.delete(getOrg2Dn());
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });
@@ -169,7 +169,7 @@ describe('Authorization for Group Move', function () {
   afterEach(async () => {
     try {
       await server.ldap.delete(getGroupDn());
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });

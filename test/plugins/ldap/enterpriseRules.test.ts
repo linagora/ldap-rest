@@ -187,7 +187,7 @@ describe('Enterprise rules', () => {
       ] as [string, Record<string, unknown>][]) {
         try {
           await server.ldap.add(dn, attrs as never);
-        } catch (_e) {
+        } catch {
           // already there
         }
       }
@@ -225,7 +225,7 @@ describe('Enterprise rules', () => {
         try {
           await server.ldap.add(dn, attrs as never);
           createdFixtures.push(dn);
-        } catch (_e) {
+        } catch {
           // already there, and not ours to remove
         }
       }

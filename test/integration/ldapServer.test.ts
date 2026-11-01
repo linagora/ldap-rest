@@ -80,7 +80,7 @@ userPassword: password123
       await server.search('(uid=test-dynamic)', ['cn']);
       // If we want to clean up, we'd need to add a delete method
       // For now, the global teardown handles cleanup
-    } catch (_err) {
+    } catch {
       // Ignore
     }
   });

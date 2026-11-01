@@ -39,12 +39,12 @@ describe('LDAP Organizations Plugin', function () {
     // Clean up test organizations
     try {
       await plugin.server.ldap.delete(testOrgDn);
-    } catch (_e) {
+    } catch {
       // ignore
     }
     try {
       await plugin.server.ldap.delete(testSubOrgDn);
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });
@@ -497,22 +497,22 @@ describe('LDAP Organizations Plugin', function () {
       const newChildDn = `ou=child,${targetOrgDn}`;
       try {
         await plugin.server.ldap.delete(newChildDn);
-      } catch (_e) {
+      } catch {
         // ignore
       }
       try {
         await plugin.server.ldap.delete(childOrgDn);
-      } catch (_e) {
+      } catch {
         // ignore
       }
       try {
         await plugin.server.ldap.delete(parentOrgDn);
-      } catch (_e) {
+      } catch {
         // ignore
       }
       try {
         await plugin.server.ldap.delete(targetOrgDn);
-      } catch (_e) {
+      } catch {
         // ignore
       }
     });
@@ -874,22 +874,22 @@ describe('LDAP Organizations Plugin', function () {
         const newChildDn = `ou=child,${targetOrgDn}`;
         try {
           await plugin.server.ldap.delete(newChildDn);
-        } catch (_e) {
+        } catch {
           // ignore
         }
         try {
           await plugin.server.ldap.delete(childOrgDn);
-        } catch (_e) {
+        } catch {
           // ignore
         }
         try {
           await plugin.server.ldap.delete(parentOrgDn);
-        } catch (_e) {
+        } catch {
           // ignore
         }
         try {
           await plugin.server.ldap.delete(targetOrgDn);
-        } catch (_e) {
+        } catch {
           // ignore
         }
       });

@@ -255,22 +255,22 @@ describe('James Plugin', () => {
     // Clean up: delete the test entries if they exist
     try {
       await dm.ldap.delete(testDN);
-    } catch (_err) {
+    } catch {
       // Ignore errors if the entry does not exist
     }
     try {
       await dm.ldap.delete(testDNQuota);
-    } catch (_err) {
+    } catch {
       // Ignore errors if the entry does not exist
     }
     try {
       await dm.ldap.delete(testDNAliases);
-    } catch (_err) {
+    } catch {
       // Ignore errors if the entry does not exist
     }
     try {
       await dm.ldap.delete(testDNForwards);
-    } catch (_err) {
+    } catch {
       // Ignore errors if the entry does not exist
     }
   });
@@ -507,7 +507,7 @@ describe('James Plugin', () => {
         // Cleanup
         try {
           await dm.ldap.delete(testDNNoAlias);
-        } catch (_err) {
+        } catch {
           // Ignore
         }
         renameScope.persist(false);
@@ -577,7 +577,7 @@ describe('James Plugin', () => {
         // Cleanup
         try {
           await dm.ldap.delete(testDNNoAlias);
-        } catch (_err) {
+        } catch {
           // Ignore
         }
         renameScope.persist(false);
@@ -736,7 +736,7 @@ describe('James Plugin', () => {
           uid: 'assistant',
           mail: 'assistant@test.org',
         });
-      } catch (_err) {
+      } catch {
         // Ignore if already exists
       }
     });
@@ -744,22 +744,22 @@ describe('James Plugin', () => {
     afterEach(async () => {
       try {
         await dm.ldap.delete(userDN);
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await dm.ldap.delete(assistantDN);
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await dm.ldap.delete(assistant1DN);
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await dm.ldap.delete(assistant2DN);
-      } catch (_err) {
+      } catch {
         // Ignore
       }
     });
@@ -936,12 +936,12 @@ describe('James Plugin', () => {
       // Clean up: delete the test entries if they exist
       try {
         await dm.ldap.delete(testDN2);
-      } catch (_err) {
+      } catch {
         // Ignore errors if the entry does not exist
       }
       try {
         await dm.ldap.delete(testDN3);
-      } catch (_err) {
+      } catch {
         // Ignore errors if the entry does not exist
       }
     });
@@ -1065,7 +1065,7 @@ describe('James Plugin', () => {
     afterEach(async () => {
       try {
         await dm.ldap.delete(testDN4);
-      } catch (_err) {
+      } catch {
         // Ignore errors if the entry does not exist
       }
     });

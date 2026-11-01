@@ -132,7 +132,7 @@ describe('Authorization for Organization Move', function () {
         }
         // Then delete the parent
         await server.ldap.delete(dn);
-      } catch (_e) {
+      } catch {
         // ignore if doesn't exist
       }
     };
@@ -156,12 +156,12 @@ describe('Authorization for Organization Move', function () {
   after(async () => {
     try {
       await server.ldap.delete(getParentOrg1Dn());
-    } catch (_e) {
+    } catch {
       // ignore
     }
     try {
       await server.ldap.delete(getParentOrg2Dn());
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });
@@ -179,13 +179,13 @@ describe('Authorization for Organization Move', function () {
     try {
       // Try both possible locations
       await server.ldap.delete(getChildOrgDn());
-    } catch (_e) {
+    } catch {
       // ignore
     }
     try {
       const movedChildDn = `ou=child,${getParentOrg2Dn()}`;
       await server.ldap.delete(movedChildDn);
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });

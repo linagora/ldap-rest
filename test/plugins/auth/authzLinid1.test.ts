@@ -68,12 +68,12 @@ describe('AuthzLinid1 Plugin', () => {
     // Clean up test entries
     try {
       await dm.ldap.delete(getTestOrgDn());
-    } catch (_err) {
+    } catch {
       // Ignore if doesn't exist
     }
     try {
       await dm.ldap.delete(getTestUserDn());
-    } catch (_err) {
+    } catch {
       // Ignore if doesn't exist
     }
   });
@@ -323,17 +323,17 @@ describe('AuthzLinid1 Plugin', () => {
       // Clean up test users in users branch
       try {
         await dm.ldap.delete(getTestUserInOrgDn());
-      } catch (_err) {
+      } catch {
         // Ignore if doesn't exist
       }
       try {
         await dm.ldap.delete(getTestUser2InOrgDn());
-      } catch (_err) {
+      } catch {
         // Ignore if doesn't exist
       }
       try {
         await dm.ldap.delete(getTestOrg2Dn());
-      } catch (_err) {
+      } catch {
         // Ignore if doesn't exist
       }
     });
@@ -537,17 +537,17 @@ describe('AuthzLinid1 Plugin', () => {
       // Clean up test entries
       try {
         await dm.ldap.delete(getTestSubOrg1Dn());
-      } catch (_err) {
+      } catch {
         // Ignore if doesn't exist
       }
       try {
         await dm.ldap.delete(getTestSubOrg2Dn());
-      } catch (_err) {
+      } catch {
         // Ignore if doesn't exist
       }
       try {
         await dm.ldap.delete(getTestOrg2Dn());
-      } catch (_err) {
+      } catch {
         // Ignore if doesn't exist
       }
       delete process.env.DM_AUTH_TOKENS;
@@ -818,7 +818,7 @@ describe('AuthzLinid1 Plugin', () => {
       afterEach(async () => {
         try {
           await dm.ldap.delete(getTestUser1Dn());
-        } catch (_err) {
+        } catch {
           // Ignore if doesn't exist
         }
       });
@@ -1055,12 +1055,12 @@ describe('AuthzLinid1 Plugin', () => {
       afterEach(async () => {
         try {
           await dm.ldap.delete(getTestUser1Dn());
-        } catch (_err) {
+        } catch {
           // Ignore if doesn't exist
         }
         try {
           await dm.ldap.delete(getTestUser2Dn());
-        } catch (_err) {
+        } catch {
           // Ignore if doesn't exist
         }
       });

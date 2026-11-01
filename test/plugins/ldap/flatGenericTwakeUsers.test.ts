@@ -59,7 +59,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         ou: 'Test',
         twakeDepartmentPath: 'Test / SubTest',
       });
-    } catch (_e) {
+    } catch {
       // already there
     }
   });
@@ -67,7 +67,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
   after(async () => {
     try {
       await server.ldap.delete(testDeptDn);
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });
@@ -75,7 +75,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
   afterEach(async () => {
     try {
       await plugin.deleteUser('testuser');
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });
@@ -186,7 +186,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
     this.afterEach(async () => {
       try {
         await plugin.deleteUser('testuserbis');
-      } catch (_e) {
+      } catch {
         // ignore
       }
     });
@@ -332,7 +332,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           ou: 'TestOrg',
           twakeDepartmentPath: 'Test / Org',
         });
-      } catch (_err) {
+      } catch {
         // Ignore if already exists
       }
 
@@ -342,7 +342,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'Test / Org2',
         });
-      } catch (_err) {
+      } catch {
         // Ignore if already exists
       }
     });
@@ -351,12 +351,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       // Clean up test organizations
       try {
         await server.ldap.delete(testOrgDn);
-      } catch (_err) {
+      } catch {
         // Ignore if doesn't exist
       }
       try {
         await server.ldap.delete(testOrg2Dn);
-      } catch (_err) {
+      } catch {
         // Ignore if doesn't exist
       }
     });
@@ -530,7 +530,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           ou: 'TestOrg',
           twakeDepartmentPath: 'Test / Org',
         });
-      } catch (_err) {
+      } catch {
         // Ignore if already exists
       }
 
@@ -540,7 +540,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'Test / Org2',
         });
-      } catch (_err) {
+      } catch {
         // Ignore if already exists
       }
     });
@@ -549,12 +549,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       // Clean up test organizations
       try {
         await server.ldap.delete(testOrgDn);
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await server.ldap.delete(testOrg2Dn);
-      } catch (_err) {
+      } catch {
         // Ignore
       }
     });

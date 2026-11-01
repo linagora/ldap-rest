@@ -88,7 +88,7 @@ describe('LdapFlatGeneric plugin', function () {
     afterEach(async () => {
       try {
         await plugin.instances[0].deleteEntry('TestTitle');
-      } catch (_e) {
+      } catch {
         // Ignore
       }
     });

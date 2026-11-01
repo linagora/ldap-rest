@@ -115,12 +115,12 @@ describe('LDAP Bulk Import Plugin', function () {
     // Clean up test organizations
     try {
       await server.ldap.delete(getTestOrg1Dn());
-    } catch (_e) {
+    } catch {
       // ignore
     }
     try {
       await server.ldap.delete(getTestOrg2Dn());
-    } catch (_e) {
+    } catch {
       // ignore
     }
 
@@ -140,7 +140,7 @@ describe('LDAP Bulk Import Plugin', function () {
     for (const uid of testUsers) {
       try {
         await server.ldap.delete(`uid=${uid},${process.env.DM_LDAP_BASE}`);
-      } catch (_e) {
+      } catch {
         // ignore
       }
     }
@@ -232,7 +232,7 @@ describe('LDAP Bulk Import Plugin', function () {
           `uid=bulkuser1,${process.env.DM_LDAP_BASE}`
         );
         expect.fail('User should not exist in dry run mode');
-      } catch (_error) {
+      } catch {
         // Expected - user should not exist
       }
     });

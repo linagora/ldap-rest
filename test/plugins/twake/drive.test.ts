@@ -66,12 +66,12 @@ describe('Drive Plugin', () => {
     // Clean up: delete the test entries if they exist
     try {
       await dm.ldap.delete(testDN);
-    } catch (_err) {
+    } catch {
       // Ignore errors if the entry does not exist
     }
     try {
       await dm.ldap.delete(testDNDisplayName);
-    } catch (_err) {
+    } catch {
       // Ignore errors if the entry does not exist
     }
   });

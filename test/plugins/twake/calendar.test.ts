@@ -46,7 +46,7 @@ describe('Twake Calendar Plugin', function () {
         objectClass: ['organizationalUnit', 'top'],
         ou: 'resources',
       });
-    } catch (_err) {
+    } catch {
       // Ignore if already exists
     }
 
@@ -63,7 +63,7 @@ describe('Twake Calendar Plugin', function () {
     // Clean up test data
     try {
       await dm.ldap.delete(testResourceDN);
-    } catch (_err) {
+    } catch {
       // Ignore errors if the entry does not exist
     }
   });
@@ -456,7 +456,7 @@ describe('Twake Calendar Plugin', function () {
           sn: 'TELLIER',
           mail: 'caluser@test.org',
         });
-      } catch (_err) {
+      } catch {
         // Ignore if already exists
       }
       // Creating the entry fires onLdapChange with the mail attribute present,
@@ -467,7 +467,7 @@ describe('Twake Calendar Plugin', function () {
     afterEach(async () => {
       try {
         await dm.ldap.delete(userDN);
-      } catch (_err) {
+      } catch {
         // Ignore if it does not exist
       }
       nock.cleanAll();

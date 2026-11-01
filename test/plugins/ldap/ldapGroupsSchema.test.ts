@@ -52,7 +52,7 @@ describe('LdapGroups validation', function () {
     try {
       await plugin.ldap.delete(user1);
       await plugin.ldap.delete(user2);
-    } catch (_e) {
+    } catch {
       // ignore
     }
     if (previousGroupSchema === undefined) delete process.env.DM_GROUP_SCHEMA;

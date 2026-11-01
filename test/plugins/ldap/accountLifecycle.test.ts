@@ -49,7 +49,7 @@ describe('Account lifecycle', () => {
           ou: 'LifecycleOrg',
           twakeDepartmentPath: 'LifecycleOrg',
         });
-      } catch (_e) {
+      } catch {
         // already there
       }
       await server.registerPlugin(

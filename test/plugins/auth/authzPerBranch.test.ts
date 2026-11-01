@@ -277,17 +277,17 @@ describe('AuthzPerBranch', function () {
       this.timeout(5000);
       try {
         await server.ldap.delete(getGroupDn());
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await server.ldap.delete(getGroupMemberDn());
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await server.ldap.delete(getNonMemberDn());
-      } catch (_err) {
+      } catch {
         // Ignore
       }
     });
@@ -382,7 +382,7 @@ describe('AuthzPerBranch', function () {
       for (const dn of [groupA(), groupB(), userDn(), homonymDn()]) {
         try {
           await server.ldap.delete(dn);
-        } catch (_err) {
+        } catch {
           // Ignore
         }
       }
@@ -559,7 +559,7 @@ describe('AuthzPerBranch', function () {
     afterEach(async () => {
       try {
         await server.ldap.delete(target());
-      } catch (_err) {
+      } catch {
         // Ignore
       }
     });
@@ -753,32 +753,32 @@ describe('AuthzPerBranch', function () {
       // Clean up test entries
       try {
         await apiServer.ldap.delete(getTestUser1Dn());
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await apiServer.ldap.delete(getTestUser2Dn());
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await apiServer.ldap.delete(getTestSubOrg1Dn());
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await apiServer.ldap.delete(getTestSubOrg2Dn());
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await apiServer.ldap.delete(getTestOrgDn());
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await apiServer.ldap.delete(getTestOrg2Dn());
-      } catch (_err) {
+      } catch {
         // Ignore
       }
     });

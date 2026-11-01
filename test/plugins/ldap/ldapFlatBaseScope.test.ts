@@ -156,7 +156,7 @@ describe('LdapFlat base-scope guard', function () {
     afterEach(async () => {
       try {
         await instance.deleteEntry(uid);
-      } catch (_e) {
+      } catch {
         // ignore
       }
     });

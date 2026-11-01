@@ -70,7 +70,7 @@ describe('LDAP Department Sync Plugin', function () {
     for (const dn of cleanupEntries) {
       try {
         await server.ldap.delete(dn);
-      } catch (_e) {
+      } catch {
         // ignore
       }
     }

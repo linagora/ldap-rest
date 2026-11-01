@@ -34,12 +34,12 @@ describe('Trash Plugin - Integration Tests', function () {
     // Clean up: try to delete test entries from both locations
     try {
       await server.ldap.delete(userDn);
-    } catch (_e) {
+    } catch {
       // ignore
     }
     try {
       await server.ldap.delete(trashDn);
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });
@@ -98,12 +98,12 @@ describe('Trash Plugin - Integration Tests', function () {
         // Cleanup
         try {
           await server.ldap.delete(trashDn1);
-        } catch (_e) {
+        } catch {
           // ignore
         }
         try {
           await server.ldap.delete(trashDn2);
-        } catch (_e) {
+        } catch {
           // ignore
         }
       }
@@ -162,7 +162,7 @@ describe('Trash Plugin - Integration Tests', function () {
         // Cleanup
         try {
           await server2.ldap.delete(trashDn2);
-        } catch (_e) {
+        } catch {
           // ignore
         }
         // Restore original setting
@@ -210,7 +210,7 @@ describe('Trash Plugin - Integration Tests', function () {
         try {
           await server3.ldap.search({ paged: false }, userDn3);
           expect.fail('User should be permanently deleted');
-        } catch (_error) {
+        } catch {
           // Expected: user not found
         }
 
@@ -223,7 +223,7 @@ describe('Trash Plugin - Integration Tests', function () {
           );
           // @ts-expect-error: the search result is typed as a full entry
           expect(trashResult.searchEntries).to.have.lengthOf(0);
-        } catch (_error) {
+        } catch {
           // Expected: not in trash
         }
       } finally {

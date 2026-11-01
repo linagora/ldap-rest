@@ -48,7 +48,7 @@ describe('App Accounts Consistency Plugin', function () {
         objectClass: ['organizationalUnit', 'top'],
         ou: 'users',
       });
-    } catch (_err) {
+    } catch {
       // Ignore if already exists
     }
 
@@ -62,7 +62,7 @@ describe('App Accounts Consistency Plugin', function () {
         objectClass: ['organizationalUnit', 'top'],
         ou: ouValue,
       });
-    } catch (_err) {
+    } catch {
       // Ignore if already exists
     }
 
@@ -114,7 +114,7 @@ describe('App Accounts Consistency Plugin', function () {
     for (const dn of testDNs) {
       try {
         await dm.ldap.delete(dn);
-      } catch (_err) {
+      } catch {
         // Ignore if doesn't exist
       }
     }
@@ -658,7 +658,7 @@ describe('App Accounts Consistency Plugin', function () {
           if ((checkResult as any).searchEntries?.length > 0) {
             principalCreated = true;
           }
-        } catch (_err) {
+        } catch {
           // Not found yet, continue waiting
         }
       }
@@ -707,7 +707,7 @@ describe('App Accounts Consistency Plugin', function () {
           if ((checkResult as any).searchEntries?.length > 0) {
             principalRenamed = true;
           }
-        } catch (_err) {
+        } catch {
           // Not renamed yet, continue waiting
         }
       }
@@ -744,17 +744,17 @@ describe('App Accounts Consistency Plugin', function () {
       // Cleanup - ignore errors if already deleted
       try {
         await dm.ldap.delete(newPrincipalDN);
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await dm.ldap.delete(appAccount1DN);
-      } catch (_err) {
+      } catch {
         // Ignore
       }
       try {
         await dm.ldap.delete(appAccount2DN);
-      } catch (_err) {
+      } catch {
         // Ignore
       }
     });
@@ -871,7 +871,7 @@ describe('App Accounts Consistency Plugin', function () {
         for (const dn of [appDn, userDn]) {
           try {
             await dm2.ldap.delete(dn);
-          } catch (_err) {
+          } catch {
             // Ignore
           }
         }

@@ -30,12 +30,12 @@ describe('External users in groups', function () {
   afterEach(async () => {
     try {
       await plugin.deleteGroup('testgroup');
-    } catch (_e) {
+    } catch {
       // ignore
     }
     try {
       await plugin.ldap.delete(user1);
-    } catch (_e) {
+    } catch {
       // ignore
     }
   });
@@ -108,12 +108,12 @@ describe('External users in groups', function () {
     afterEach(async () => {
       try {
         await plugin.deleteGroup('testgroup2');
-      } catch (_e) {
+      } catch {
         // ignore
       }
       try {
         await plugin.ldap.delete(managedUser);
-      } catch (_e) {
+      } catch {
         // ignore
       }
     });
