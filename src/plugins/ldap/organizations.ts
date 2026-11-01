@@ -19,6 +19,7 @@ import {
   WriteResponse,
 } from '../../lib/expressFormatedResponses';
 import {
+  assertRfc4514Escapes,
   escapeDnValue,
   escapeLdapFilter,
   getParentDn,
@@ -1402,6 +1403,10 @@ export default class LdapOrganizations extends DmPlugin {
     targetOrgDn: string,
     req?: Request
   ): Promise<{ newDn: string }> {
+    // The destination is a DN the client wrote: it is written as sent into
+    // the new DN, so it is held to the grammar the flat creation paths hold
+    // theirs to before anything is built from it
+    assertRfc4514Escapes(targetOrgDn, 'targetOrgDn');
     // Extract the RDN (relative DN) from the source DN
     // e.g., "ou=IT,ou=Departments,dc=example,dc=com" -> "ou=IT"
     const rdn = getRdn(dn);

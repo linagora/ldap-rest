@@ -604,6 +604,19 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       );
     });
 
+    it('should answer 400 for a targetOrgDn with an escape RFC 4514 does not define', async () => {
+      const backslash = String.fromCharCode(92);
+      const res = await request
+        .post('/api/v1/ldap/users/testuser/move')
+        .type('json')
+        .send({
+          targetOrgDn: `ou=e${backslash}q,${process.env.DM_LDAP_BASE}`,
+        });
+
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      expect(res.body.error).to.match(/escape RFC 4514/);
+    });
+
     it('should return 400 when targetOrgDn is missing', async () => {
       const res = await request
         .post('/api/v1/ldap/users/testuser/move')

@@ -29,12 +29,12 @@ import {
   WriteResponse,
 } from '../lib/expressFormatedResponses';
 import {
+  assertRfc4514Escapes,
   escapeDnValue,
   escapeLdapFilter,
   escapeRegex,
   getCompiledRegex,
   getParentDn,
-  hasOnlyRfc4514Escapes,
   isDirectChildOf,
   isDummyMemberDn,
   normalizeDn,
@@ -1444,10 +1444,7 @@ export default abstract class LdapFlat extends DmPlugin {
     // The caller's DN is held to the grammar before anything is decoded:
     // the RDN is rebuilt from the folded name, and an escape RFC 4514 does
     // not define would name another value than the one written
-    if (!hasOnlyRfc4514Escapes(id))
-      throw new BadRequestError(
-        `${this.mainAttribute} DN uses an escape RFC 4514 does not define`
-      );
+    assertRfc4514Escapes(id, `${this.mainAttribute} DN`);
     // `resolveDn` refuses a DN under another branch with the message that
     // names it; the RDN is then rebuilt here, in this branch
     this.resolveDn(id);
@@ -1646,6 +1643,7 @@ export default abstract class LdapFlat extends DmPlugin {
     targetOrgDn: string,
     req?: Request
   ): Promise<{ departmentPath: string; departmentLink: string }> {
+    assertRfc4514Escapes(targetOrgDn, 'targetOrgDn');
     const dn = this.resolveDn(id);
 
     // Get link and path attribute names from config

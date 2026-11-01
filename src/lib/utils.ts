@@ -480,6 +480,25 @@ export function hasOnlyRfc4514Escapes(dn: string): boolean {
 }
 
 /**
+ * Refuse a DN a client wrote when it holds an escape RFC 4514 does not
+ * define.
+ *
+ * The readers here are permissive on purpose, because they also read what a
+ * directory answers. A DN a caller sends is held to the grammar instead, so
+ * the server only ever writes a spelling the directory would produce itself.
+ *
+ * @param dn - The DN the client wrote
+ * @param what - What to name in the refusal
+ * @throws BadRequestError when an escape is not one RFC 4514 defines
+ */
+export function assertRfc4514Escapes(dn: string, what: string): void {
+  if (!hasOnlyRfc4514Escapes(dn))
+    throw new BadRequestError(
+      `${what} uses an escape RFC 4514 does not define`
+    );
+}
+
+/**
  * Extract the parent DN from a DN
  * Removes the first RDN component to get the parent branch
  *

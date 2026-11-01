@@ -542,6 +542,17 @@ describe('LDAP Organizations Plugin', function () {
       }
     });
 
+    it('should reject a target DN with an escape RFC 4514 does not define', async () => {
+      const backslash = String.fromCharCode(92);
+      const target = `ou=x${backslash}q,${DM_LDAP_TOP_ORGANIZATION}`;
+      try {
+        await plugin.moveOrganization(childOrgDn, target);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as Error).message).to.match(/escape RFC 4514/);
+      }
+    });
+
     it('should reject move to non-existent target', async () => {
       const invalidTarget = `ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`;
 
