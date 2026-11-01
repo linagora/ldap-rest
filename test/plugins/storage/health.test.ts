@@ -3,10 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { expect } from 'chai';
-
-import { DM } from '../../../src/bin';
 import type winston from 'winston';
 
+import { DM } from '../../../src/bin';
 import Storage from '../../../src/plugins/storage';
 import FileStore from '../../../src/plugins/storage/file';
 import PostgresStore from '../../../src/plugins/storage/postgres';

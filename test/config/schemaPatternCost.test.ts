@@ -4,9 +4,10 @@
  * these tests pin that no pattern is asked to, and that the patterns shipped
  * read a long value in one pass.
  */
-import { expect } from 'chai';
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
+
+import { expect } from 'chai';
 
 import type { Schema } from '../../src/config/schema';
 import {

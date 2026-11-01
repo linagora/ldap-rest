@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 
 import { ScimError } from '../../../src/plugins/scim/errors';
-
 import {
   DEFAULT_USER_MAPPING,
   DEFAULT_GROUP_MAPPING,

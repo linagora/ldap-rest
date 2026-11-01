@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+
 import { DM } from '../../../src/bin';
 import TrashPlugin from '../../../src/plugins/ldap/trash';
 
@@ -33,12 +34,12 @@ describe('Trash Plugin - Integration Tests', function () {
     // Clean up: try to delete test entries from both locations
     try {
       await server.ldap.delete(userDn);
-    } catch (e) {
+    } catch {
       // ignore
     }
     try {
       await server.ldap.delete(trashDn);
-    } catch (e) {
+    } catch {
       // ignore
     }
   });
@@ -87,22 +88,22 @@ describe('Trash Plugin - Integration Tests', function () {
 
         // Verify both are in trash
         const trash1 = await server.ldap.search({ paged: false }, trashDn1);
-        // @ts-ignore
+        // @ts-expect-error: the search result is typed as a full entry
         expect(trash1.searchEntries).to.have.lengthOf(1);
 
         const trash2 = await server.ldap.search({ paged: false }, trashDn2);
-        // @ts-ignore
+        // @ts-expect-error: the search result is typed as a full entry
         expect(trash2.searchEntries).to.have.lengthOf(1);
       } finally {
         // Cleanup
         try {
           await server.ldap.delete(trashDn1);
-        } catch (e) {
+        } catch {
           // ignore
         }
         try {
           await server.ldap.delete(trashDn2);
-        } catch (e) {
+        } catch {
           // ignore
         }
       }
@@ -149,9 +150,9 @@ describe('Trash Plugin - Integration Tests', function () {
           { paged: false },
           trashDn2
         );
-        // @ts-ignore
+        // @ts-expect-error: the search result is typed as a full entry
         expect(trashResult.searchEntries).to.have.lengthOf(1);
-        // @ts-ignore
+        // @ts-expect-error: the search result is typed as a full entry
         const entry = trashResult.searchEntries[0];
         // Description should not exist or not contain "Deleted on"
         if (entry.description) {
@@ -161,7 +162,7 @@ describe('Trash Plugin - Integration Tests', function () {
         // Cleanup
         try {
           await server2.ldap.delete(trashDn2);
-        } catch (e) {
+        } catch {
           // ignore
         }
         // Restore original setting
@@ -209,7 +210,7 @@ describe('Trash Plugin - Integration Tests', function () {
         try {
           await server3.ldap.search({ paged: false }, userDn3);
           expect.fail('User should be permanently deleted');
-        } catch (error) {
+        } catch {
           // Expected: user not found
         }
 
@@ -220,9 +221,9 @@ describe('Trash Plugin - Integration Tests', function () {
             { paged: false },
             trashDn3
           );
-          // @ts-ignore
+          // @ts-expect-error: the search result is typed as a full entry
           expect(trashResult.searchEntries).to.have.lengthOf(0);
-        } catch (error) {
+        } catch {
           // Expected: not in trash
         }
       } finally {

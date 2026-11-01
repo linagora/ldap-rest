@@ -1,10 +1,11 @@
-import { DM } from '../../../src/bin';
 import type { Express, Response } from 'express';
 import request from 'supertest';
+import { expect } from 'chai';
+
+import { DM } from '../../../src/bin';
 import AuthFake from '../../../src/plugins/auth/fake';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 import type { DmRequest } from '../../../src/lib/auth/base';
-import { expect } from 'chai';
 
 describe('AuthFake', () => {
   let savedUser: string | undefined;

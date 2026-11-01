@@ -69,7 +69,6 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
       !process.env.DM_LDAP_PWD ||
       !process.env.DM_LDAP_BASE
     ) {
-      // eslint-disable-next-line no-console
       console.warn(
         'Skipping SCIM+authzDynamic integration tests: LDAP env vars missing'
       );

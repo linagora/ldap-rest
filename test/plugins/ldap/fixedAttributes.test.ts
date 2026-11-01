@@ -1,9 +1,7 @@
 import { expect } from 'chai';
+
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
-
-const { DM_LDAP_BASE } = process.env;
-const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
 
 describe('Fixed attributes validation', function () {
   let server: DM;
@@ -21,7 +19,7 @@ describe('Fixed attributes validation', function () {
   afterEach(async () => {
     try {
       await plugin.deleteEntry('testfixed').catch(() => {});
-    } catch (e) {
+    } catch {
       // Ignore cleanup errors
     }
   });

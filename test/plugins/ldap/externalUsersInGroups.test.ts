@@ -1,10 +1,11 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import { SearchResult } from 'ldapts';
+
 import ConfigApi from '../../../src/plugins/configApi';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
 import ExternalUsersInGroups from '../../../src/plugins/ldap/externalUsersInGroups';
-import { SearchResult } from 'ldapts';
 import { ConflictError } from '../../../src/lib/errors';
 import { waitFor } from '../../helpers/waitFor';
 
@@ -29,12 +30,12 @@ describe('External users in groups', function () {
   afterEach(async () => {
     try {
       await plugin.deleteGroup('testgroup');
-    } catch (e) {
+    } catch {
       // ignore
     }
     try {
       await plugin.ldap.delete(user1);
-    } catch (e) {
+    } catch {
       // ignore
     }
   });
@@ -107,12 +108,12 @@ describe('External users in groups', function () {
     afterEach(async () => {
       try {
         await plugin.deleteGroup('testgroup2');
-      } catch (e) {
+      } catch {
         // ignore
       }
       try {
         await plugin.ldap.delete(managedUser);
-      } catch (e) {
+      } catch {
         // ignore
       }
     });

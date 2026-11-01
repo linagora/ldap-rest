@@ -8,13 +8,14 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { SearchResult } from 'ldapts';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
-import type { SearchResult } from 'ldapts';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Schema copy without the generated markers', function () {

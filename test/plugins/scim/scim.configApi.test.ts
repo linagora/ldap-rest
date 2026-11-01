@@ -111,10 +111,12 @@ describe('SCIM schema URLs in the configuration API', () => {
 
   it('should name the one that holds them, and none when none does', async () => {
     // The console's own directory holds no SCIM schema.
-    let { urls, dm } = await announced([
+    const first = await announced([
       ['console', { static_name: 'console', static_path: empty }],
       ['static', {}],
     ]);
+    const dm = first.dm;
+    let urls = first.urls;
     expect(urls).to.deep.equal(under('/static'));
     await served(dm, urls);
     ({ urls } = await announced([

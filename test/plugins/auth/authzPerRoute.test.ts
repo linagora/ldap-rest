@@ -1,12 +1,13 @@
-import { DM } from '../../../src/bin';
 import type { Express } from 'express';
 import request from 'supertest';
+import { expect } from 'chai';
+
+import { DM } from '../../../src/bin';
 import AuthToken from '../../../src/plugins/auth/token';
 import AuthzPerRoute, {
   globToRegex,
 } from '../../../src/plugins/auth/authzPerRoute';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
-import { expect } from 'chai';
 
 describe('AuthzPerRoute', () => {
   describe('Basic rule enforcement', () => {

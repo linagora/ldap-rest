@@ -1,7 +1,7 @@
-import type { Hooks } from '../../../src/hooks';
 import { expect } from 'chai';
 import supertest from 'supertest';
 
+import type { Hooks } from '../../../src/hooks';
 import Scim from '../../../src/plugins/scim/scim';
 import { DM } from '../../../src/bin';
 
@@ -20,7 +20,6 @@ describe('SCIM Groups (integration)', function () {
       !process.env.DM_LDAP_PWD ||
       !process.env.DM_LDAP_BASE
     ) {
-      // eslint-disable-next-line no-console
       console.warn('Skipping SCIM Groups tests: LDAP env vars missing');
       this.skip();
       return;

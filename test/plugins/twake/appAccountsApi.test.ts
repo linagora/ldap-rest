@@ -1,11 +1,11 @@
 import { expect } from 'chai';
 import request from 'supertest';
+
 import { DM } from '../../../src/bin';
 import AppAccountsApi from '../../../src/plugins/twake/appAccountsApi';
 import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsistency';
 import OnChange from '../../../src/plugins/ldap/onChange';
 import AuthToken from '../../../src/plugins/auth/token';
-
 import { waitForEntry } from '../../helpers/waitFor';
 describe('App Accounts API Plugin', function () {
   const timestamp = Date.now();
@@ -51,7 +51,7 @@ describe('App Accounts API Plugin', function () {
         objectClass: ['organizationalUnit', 'top'],
         ou: 'users',
       });
-    } catch (err) {
+    } catch {
       // Ignore if already exists
     }
 
@@ -61,7 +61,7 @@ describe('App Accounts API Plugin', function () {
         objectClass: ['organizationalUnit', 'top'],
         ou: 'applicative',
       });
-    } catch (err) {
+    } catch {
       // Ignore if already exists
     }
 
@@ -105,14 +105,14 @@ describe('App Accounts API Plugin', function () {
       for (const entry of entries) {
         testDNs.push(entry.dn);
       }
-    } catch (err) {
+    } catch {
       // Ignore
     }
 
     for (const dn of testDNs) {
       try {
         await dm.ldap.delete(dn);
-      } catch (err) {
+      } catch {
         // Ignore if doesn't exist
       }
     }
@@ -120,7 +120,7 @@ describe('App Accounts API Plugin', function () {
 
   describe('GET /api/v1/users/:user/app-accounts', () => {
     it('should return 401 without authorization', async () => {
-      const res = await request(dm.app)
+      await request(dm.app)
         .get(`/api/v1/users/${principalEmail}/app-accounts`)
         .expect(401);
     });
@@ -206,7 +206,7 @@ describe('App Accounts API Plugin', function () {
 
   describe('POST /api/v1/users/:user/app-accounts', () => {
     it('should return 401 without authorization', async () => {
-      const res = await request(dm.app)
+      await request(dm.app)
         .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .send({ name: 'Test' })
         .expect(401);
@@ -388,7 +388,7 @@ describe('App Accounts API Plugin', function () {
 
   describe('DELETE /api/v1/users/:user/app-accounts/:uid', () => {
     it('should return 401 without authorization', async () => {
-      const res = await request(dm.app)
+      await request(dm.app)
         .delete(
           `/api/v1/users/${principalEmail}/app-accounts/${testUser}_c12345678`
         )
@@ -452,7 +452,7 @@ describe('App Accounts API Plugin', function () {
       const uid = createRes.body.uid;
 
       // Verify account exists
-      let searchRes = await dm.ldap.search(
+      const searchRes = await dm.ldap.search(
         {
           scope: 'base',
           paged: false,
@@ -592,7 +592,7 @@ describe('App Accounts API Plugin', function () {
             objectClass: ['organizationalUnit', 'top'],
             ou: ou.split(',')[0].replace('ou=', ''),
           });
-        } catch (err) {
+        } catch {
           // Ignore if already exists
         }
       }
@@ -629,17 +629,17 @@ describe('App Accounts API Plugin', function () {
         for (const entry of (result as any).searchEntries || []) {
           try {
             await dm.ldap.delete(entry.dn);
-          } catch (e) {
+          } catch {
             // Ignore
           }
         }
-      } catch (e) {
+      } catch {
         // Ignore
       }
       for (const dn of [dnA, dnB, ouA, ouB]) {
         try {
           await dm.ldap.delete(dn);
-        } catch (e) {
+        } catch {
           // Ignore
         }
       }
@@ -782,7 +782,7 @@ describe('App Accounts API Plugin', function () {
       try {
         const res = await dm.ldap.search({ scope: 'base', paged: false }, dn);
         return ((res as any).searchEntries || []).length === 1;
-      } catch (err) {
+      } catch {
         return false;
       }
     };
@@ -840,7 +840,7 @@ describe('App Accounts API Plugin', function () {
         const result: any = await realSearch(opts, base);
         if (base === applicativeBase && result?.searchEntries) {
           result.searchEntries = result.searchEntries.map((entry: any) => {
-            const { userPassword, ...rest } = entry;
+            const { userPassword: _userPassword, ...rest } = entry;
             return rest;
           });
         }

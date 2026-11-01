@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
@@ -87,7 +88,7 @@ describe('LdapFlatGeneric plugin', function () {
     afterEach(async () => {
       try {
         await plugin.instances[0].deleteEntry('TestTitle');
-      } catch (e) {
+      } catch {
         // Ignore
       }
     });

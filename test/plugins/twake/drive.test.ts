@@ -1,12 +1,12 @@
-import nock from 'nock';
 import type { ParsedUrlQuery } from 'querystring';
+
+import nock from 'nock';
+import { expect } from 'chai';
 
 import { DM } from '../../../src/bin';
 import Drive from '../../../src/plugins/twake/drive';
-import { expect } from 'chai';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
-
 import { waitFor } from '../../helpers/waitFor';
 // Default Drive webadmin URL for tests (using nock for mocking)
 const TWAKE_DRIVE_WEBADMIN_URL = 'http://localhost:6060';
@@ -66,12 +66,12 @@ describe('Drive Plugin', () => {
     // Clean up: delete the test entries if they exist
     try {
       await dm.ldap.delete(testDN);
-    } catch (err) {
+    } catch {
       // Ignore errors if the entry does not exist
     }
     try {
       await dm.ldap.delete(testDNDisplayName);
-    } catch (err) {
+    } catch {
       // Ignore errors if the entry does not exist
     }
   });

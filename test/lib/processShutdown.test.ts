@@ -4,9 +4,10 @@
  * done, whatever they do. Checked on a real child process, as
  * `process.emit` applies no default action.
  */
-import { expect } from 'chai';
 import { spawn } from 'child_process';
 import path from 'path';
+
+import { expect } from 'chai';
 
 const child = path.join(__dirname, '..', 'fixtures', 'shutdownChild.ts');
 

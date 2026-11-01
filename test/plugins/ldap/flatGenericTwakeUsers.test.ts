@@ -1,8 +1,9 @@
 import { expect } from 'chai';
+import supertest from 'supertest';
+
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import { DM } from '../../../src/bin';
-import supertest from 'supertest';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { NotFoundError } from '../../../src/lib/errors';
 
@@ -58,7 +59,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         ou: 'Test',
         twakeDepartmentPath: 'Test / SubTest',
       });
-    } catch (e) {
+    } catch {
       // already there
     }
   });
@@ -66,7 +67,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
   after(async () => {
     try {
       await server.ldap.delete(testDeptDn);
-    } catch (e) {
+    } catch {
       // ignore
     }
   });
@@ -74,7 +75,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
   afterEach(async () => {
     try {
       await plugin.deleteUser('testuser');
-    } catch (e) {
+    } catch {
       // ignore
     }
   });
@@ -97,7 +98,6 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         displayName: 'Test Person',
       });
       const listEntries = await plugin.listUsers({});
-      // @ts-ignore
       expect(listEntries).to.have.property('testuser');
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({
         testuser: {
@@ -186,7 +186,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
     this.afterEach(async () => {
       try {
         await plugin.deleteUser('testuserbis');
-      } catch (e) {
+      } catch {
         // ignore
       }
     });
@@ -271,7 +271,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         employeeNumber: 'FLA0007',
         givenName: 'Test',
       });
-      let res = await request
+      const res = await request
         .put('/api/v1/ldap/users/testuser')
         .type('json')
         .send({
@@ -332,7 +332,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           ou: 'TestOrg',
           twakeDepartmentPath: 'Test / Org',
         });
-      } catch (err) {
+      } catch {
         // Ignore if already exists
       }
 
@@ -342,7 +342,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'Test / Org2',
         });
-      } catch (err) {
+      } catch {
         // Ignore if already exists
       }
     });
@@ -351,12 +351,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       // Clean up test organizations
       try {
         await server.ldap.delete(testOrgDn);
-      } catch (err) {
+      } catch {
         // Ignore if doesn't exist
       }
       try {
         await server.ldap.delete(testOrg2Dn);
-      } catch (err) {
+      } catch {
         // Ignore if doesn't exist
       }
     });
@@ -530,7 +530,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           ou: 'TestOrg',
           twakeDepartmentPath: 'Test / Org',
         });
-      } catch (err) {
+      } catch {
         // Ignore if already exists
       }
 
@@ -540,7 +540,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'Test / Org2',
         });
-      } catch (err) {
+      } catch {
         // Ignore if already exists
       }
     });
@@ -549,12 +549,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       // Clean up test organizations
       try {
         await server.ldap.delete(testOrgDn);
-      } catch (err) {
+      } catch {
         // Ignore
       }
       try {
         await server.ldap.delete(testOrg2Dn);
-      } catch (err) {
+      } catch {
         // Ignore
       }
     });

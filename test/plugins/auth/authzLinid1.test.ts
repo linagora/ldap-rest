@@ -1,11 +1,12 @@
 import { expect } from 'chai';
+import type { Response } from 'express';
+import supertest from 'supertest';
+
 import { DM } from '../../../src/bin';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import LdapOrganization from '../../../src/plugins/ldap/organizations';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Response } from 'express';
 import type { Role } from '../../../src/abstract/plugin';
-import supertest from 'supertest';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 import { AmbiguousIdentityError } from '../../../src/lib/errors';
 
@@ -67,12 +68,12 @@ describe('AuthzLinid1 Plugin', () => {
     // Clean up test entries
     try {
       await dm.ldap.delete(getTestOrgDn());
-    } catch (err) {
+    } catch {
       // Ignore if doesn't exist
     }
     try {
       await dm.ldap.delete(getTestUserDn());
-    } catch (err) {
+    } catch {
       // Ignore if doesn't exist
     }
   });
@@ -322,17 +323,17 @@ describe('AuthzLinid1 Plugin', () => {
       // Clean up test users in users branch
       try {
         await dm.ldap.delete(getTestUserInOrgDn());
-      } catch (err) {
+      } catch {
         // Ignore if doesn't exist
       }
       try {
         await dm.ldap.delete(getTestUser2InOrgDn());
-      } catch (err) {
+      } catch {
         // Ignore if doesn't exist
       }
       try {
         await dm.ldap.delete(getTestOrg2Dn());
-      } catch (err) {
+      } catch {
         // Ignore if doesn't exist
       }
     });
@@ -536,17 +537,17 @@ describe('AuthzLinid1 Plugin', () => {
       // Clean up test entries
       try {
         await dm.ldap.delete(getTestSubOrg1Dn());
-      } catch (err) {
+      } catch {
         // Ignore if doesn't exist
       }
       try {
         await dm.ldap.delete(getTestSubOrg2Dn());
-      } catch (err) {
+      } catch {
         // Ignore if doesn't exist
       }
       try {
         await dm.ldap.delete(getTestOrg2Dn());
-      } catch (err) {
+      } catch {
         // Ignore if doesn't exist
       }
       delete process.env.DM_AUTH_TOKENS;
@@ -817,7 +818,7 @@ describe('AuthzLinid1 Plugin', () => {
       afterEach(async () => {
         try {
           await dm.ldap.delete(getTestUser1Dn());
-        } catch (err) {
+        } catch {
           // Ignore if doesn't exist
         }
       });
@@ -1054,12 +1055,12 @@ describe('AuthzLinid1 Plugin', () => {
       afterEach(async () => {
         try {
           await dm.ldap.delete(getTestUser1Dn());
-        } catch (err) {
+        } catch {
           // Ignore if doesn't exist
         }
         try {
           await dm.ldap.delete(getTestUser2Dn());
-        } catch (err) {
+        } catch {
           // Ignore if doesn't exist
         }
       });

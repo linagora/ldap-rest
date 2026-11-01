@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import request from 'supertest';
+
 import { DM } from '../src/bin/index';
 import { serverErrorBody, setDebug } from '../src/lib/expressFormatedResponses';
 import { AUTHZ_REFUSED } from '../src/lib/errors';
@@ -11,7 +12,6 @@ describe('Error Handling', () => {
     process.env.NODE_ENV = 'test';
     process.env.DM_PORT = '64323';
     process.env.DM_PLUGINS = '../../test/__plugins__/error-test/index.js';
-    // @ts-ignore
     server = new DM();
     await server.ready;
     await server.run();

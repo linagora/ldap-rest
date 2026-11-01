@@ -1,8 +1,8 @@
 import { expect } from 'chai';
+import supertest from 'supertest';
+
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import { DM } from '../../../src/bin';
-import supertest from 'supertest';
-import type { SearchResult } from 'ldapts';
 import { NotFoundError } from '../../../src/lib/errors';
 import type { Hooks } from '../../../src/hooks';
 import {
@@ -21,16 +21,10 @@ describe('LDAP Organizations Plugin', function () {
   let testOrgDn: string;
   let testSubOrgDn: string;
   let DM_LDAP_TOP_ORGANIZATION: string | undefined;
-  let DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE: string | undefined;
-  let DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE: string | undefined;
 
   before(async () => {
     // Initialize from env vars after they're set
     DM_LDAP_TOP_ORGANIZATION = process.env.DM_LDAP_TOP_ORGANIZATION;
-    DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE =
-      process.env.DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE;
-    DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE =
-      process.env.DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE;
     testOrgDn = `ou=testorg,${DM_LDAP_TOP_ORGANIZATION}`;
     testSubOrgDn = `ou=testsuborg,${DM_LDAP_TOP_ORGANIZATION}`;
     server = new DM();
@@ -45,12 +39,12 @@ describe('LDAP Organizations Plugin', function () {
     // Clean up test organizations
     try {
       await plugin.server.ldap.delete(testOrgDn);
-    } catch (e) {
+    } catch {
       // ignore
     }
     try {
       await plugin.server.ldap.delete(testSubOrgDn);
-    } catch (e) {
+    } catch {
       // ignore
     }
   });
@@ -503,22 +497,22 @@ describe('LDAP Organizations Plugin', function () {
       const newChildDn = `ou=child,${targetOrgDn}`;
       try {
         await plugin.server.ldap.delete(newChildDn);
-      } catch (e) {
+      } catch {
         // ignore
       }
       try {
         await plugin.server.ldap.delete(childOrgDn);
-      } catch (e) {
+      } catch {
         // ignore
       }
       try {
         await plugin.server.ldap.delete(parentOrgDn);
-      } catch (e) {
+      } catch {
         // ignore
       }
       try {
         await plugin.server.ldap.delete(targetOrgDn);
-      } catch (e) {
+      } catch {
         // ignore
       }
     });
@@ -880,22 +874,22 @@ describe('LDAP Organizations Plugin', function () {
         const newChildDn = `ou=child,${targetOrgDn}`;
         try {
           await plugin.server.ldap.delete(newChildDn);
-        } catch (e) {
+        } catch {
           // ignore
         }
         try {
           await plugin.server.ldap.delete(childOrgDn);
-        } catch (e) {
+        } catch {
           // ignore
         }
         try {
           await plugin.server.ldap.delete(parentOrgDn);
-        } catch (e) {
+        } catch {
           // ignore
         }
         try {
           await plugin.server.ldap.delete(targetOrgDn);
-        } catch (e) {
+        } catch {
           // ignore
         }
       });

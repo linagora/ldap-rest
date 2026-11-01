@@ -24,7 +24,6 @@ import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import { assertAuthzComposition } from '../../../src/lib/authz/composition';
 import { AuthzRefusedError } from '../../../src/lib/errors';
 import { asyncHandler } from '../../../src/lib/utils';
-import HookBus from '../../../src/lib/hookBus';
 import {
   getLogger,
   setLogger,

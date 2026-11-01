@@ -131,6 +131,64 @@ export default [
     },
   },
 
+  // Tests: the code they exercise, with Mocha's names in scope
+  {
+    files: ['test/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2020,
+        sourceType: 'module',
+        project: './tsconfig.json',
+      },
+      globals: {
+        ...globals.node,
+        ...globals.mocha,
+        // The namespaces tests name in a type
+        Mocha: 'readonly',
+        NodeJS: 'readonly',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      prettier: prettier,
+      import: importPlugin,
+    },
+    rules: {
+      ...tseslint.configs.recommended.rules,
+      ...prettierConfig.rules,
+      'prettier/prettier': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
+      '@typescript-eslint/explicit-function-return-type': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-var-requires': 'error',
+      // Chai's assertions are expressions whose value is unused
+      '@typescript-eslint/no-unused-expressions': 'off',
+      'import/order': [
+        'error',
+        {
+          groups: [
+            'builtin',
+            'external',
+            'internal',
+            'parent',
+            'sibling',
+            'index',
+          ],
+          'newlines-between': 'always',
+        },
+      ],
+      'prefer-const': 'error',
+      'no-var': 'error',
+    },
+  },
+
   // JavaScript-specific config
   {
     files: ['*.js', '*.mjs'],

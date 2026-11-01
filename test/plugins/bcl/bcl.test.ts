@@ -9,10 +9,11 @@
  * The behaviours below are the ones three review rounds settled on the
  * original plugins; the move must not lose any of them.
  */
-import { expect } from 'chai';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
+import { expect } from 'chai';
 
 import { DM } from '../../../src/bin';
 import Bcl from '../../../src/plugins/bcl';

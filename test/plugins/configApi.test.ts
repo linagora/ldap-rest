@@ -1,14 +1,16 @@
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
 import { expect } from 'chai';
 import supertest from 'supertest';
+
 import { DM } from '../../src/bin';
 import ConfigApi, { configApiResponse } from '../../src/plugins/configApi';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
 import LdapOrganization from '../../src/plugins/ldap/organizations';
 import Static from '../../src/plugins/static';
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 
 describe('ConfigApi Plugin', () => {

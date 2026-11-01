@@ -32,7 +32,6 @@ describe('authzDynamic behavioural regressions', function () {
       !process.env.DM_LDAP_PWD ||
       !process.env.DM_LDAP_BASE
     ) {
-      // eslint-disable-next-line no-console
       console.warn(
         'Skipping authzDynamic behavioural tests: LDAP env vars missing'
       );

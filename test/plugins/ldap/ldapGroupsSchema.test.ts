@@ -1,9 +1,10 @@
-import { expect } from 'chai';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import { DM } from '../../../src/bin';
-import supertest from 'supertest';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+
+import { expect } from 'chai';
+
+import LdapGroups from '../../../src/plugins/ldap/groups';
+import { DM } from '../../../src/bin';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
 
@@ -51,7 +52,7 @@ describe('LdapGroups validation', function () {
     try {
       await plugin.ldap.delete(user1);
       await plugin.ldap.delete(user2);
-    } catch (e) {
+    } catch {
       // ignore
     }
     if (previousGroupSchema === undefined) delete process.env.DM_GROUP_SCHEMA;
@@ -77,7 +78,6 @@ describe('LdapGroups validation', function () {
     it('should add/delete group with members', async () => {
       await plugin.addGroup('testgroup4', [user1], twakeAttr);
       const listEntries = await plugin.listGroups();
-      // @ts-ignore
       expect(listEntries).to.have.property('testgroup4');
       expect(await plugin.searchGroupsByName('testgroup4')).to.deep.equal({
         testgroup4: {

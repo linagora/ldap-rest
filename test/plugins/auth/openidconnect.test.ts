@@ -1,7 +1,6 @@
 import { expect } from 'chai';
-import request from 'supertest';
 import nock from 'nock';
-import type { Express, Request, Response } from 'express';
+import type { Express } from 'express';
 
 // Taken from `Hooks`: chai's supertest brings a second copy of express's types
 type AuthTuple = Parameters<NonNullable<Hooks['beforeAuth']>>[0];
@@ -303,7 +302,6 @@ describe('OpenID Connect Plugin', () => {
 
   describe('OIDC Server Integration', () => {
     const oidcServer = 'http://auth.test.local';
-    let app: Express;
     let dm: DM;
 
     beforeEach(async () => {
@@ -351,8 +349,6 @@ describe('OpenID Connect Plugin', () => {
 
       await dm.registerPlugin('openidconnect', oidcPlugin);
       await dm.registerPlugin('testProtectedResource', testPlugin);
-
-      app = dm.app;
     });
 
     afterEach(() => {
@@ -562,13 +558,8 @@ describe('OpenID Connect Plugin', () => {
 
   describe('Hook Execution', () => {
     let dm: DM;
-    let beforeAuthCalled = false;
-    let afterAuthCalled = false;
 
     beforeEach(async () => {
-      beforeAuthCalled = false;
-      afterAuthCalled = false;
-
       dm = new DM();
       await dm.ready;
 
@@ -594,12 +585,10 @@ describe('OpenID Connect Plugin', () => {
 
       // Add hooks
       dm.hookBus.set('beforeAuth', async (args: AuthTuple) => {
-        beforeAuthCalled = true;
         return [args[0], args[1]];
       });
 
       dm.hookBus.set('afterAuth', async (args: AuthTuple) => {
-        afterAuthCalled = true;
         return [args[0], args[1]];
       });
     });

@@ -12,9 +12,10 @@
  * so the rules that do are loaded here: without them the creation is refused
  * instead, which `generatedAttributeGuards` checks.
  */
-import { expect } from 'chai';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+
+import { expect } from 'chai';
 
 import { DM } from '../../../src/bin';
 import LdapGroups from '../../../src/plugins/ldap/groups';

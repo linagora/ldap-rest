@@ -1,9 +1,10 @@
 import { expect } from 'chai';
+import type { SearchResult } from 'ldapts';
+
 import LdapDepartmentSync from '../../../src/plugins/ldap/departmentSync';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
-import type { SearchResult } from 'ldapts';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
@@ -69,7 +70,7 @@ describe('LDAP Department Sync Plugin', function () {
     for (const dn of cleanupEntries) {
       try {
         await server.ldap.delete(dn);
-      } catch (e) {
+      } catch {
         // ignore
       }
     }

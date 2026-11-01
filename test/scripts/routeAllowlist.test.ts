@@ -1,6 +1,7 @@
-import { expect } from 'chai';
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
+
+import { expect } from 'chai';
 
 const root = path.join(__dirname, '..', '..');
 const allowlist: string[] = JSON.parse(

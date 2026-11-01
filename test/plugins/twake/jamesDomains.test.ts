@@ -1,9 +1,7 @@
 import { expect } from 'chai';
 import nock from 'nock';
-import type { Entry } from 'ldapts';
 
 import type { SearchResult } from '../../../src/lib/ldapActions';
-
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';

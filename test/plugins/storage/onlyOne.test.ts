@@ -8,10 +8,11 @@
  * rather than assumed. `core/auth/llng` makes the same call for the same
  * reason.
  */
-import { expect } from 'chai';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
+import { expect } from 'chai';
 
 import { DM } from '../../../src/bin';
 import priority from '../../../src/plugins/priority.json';

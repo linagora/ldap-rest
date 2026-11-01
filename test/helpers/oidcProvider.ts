@@ -3,6 +3,7 @@
  * the session cookie is the library's own.
  */
 import { generateKeyPairSync, sign } from 'crypto';
+
 import { expect } from 'chai';
 import nock from 'nock';
 import supertest from 'supertest';

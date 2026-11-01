@@ -6,11 +6,12 @@
  * came back logged in without asking anything: the logout did nothing a
  * caller could see.
  */
-import { expect } from 'chai';
-import type { Response } from 'express';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+import type { Response } from 'express';
+import { expect } from 'chai';
 import nock from 'nock';
 
 import type { DM } from '../../../src/bin';

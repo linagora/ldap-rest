@@ -6,11 +6,11 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { SearchResult } from 'ldapts';
 
 import { DM } from '../../../src/bin';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import type { SearchResult } from 'ldapts';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

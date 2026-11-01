@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
@@ -19,7 +20,6 @@ describe('GET APIs for individual entities', function () {
       !process.env.DM_LDAP_PWD ||
       !process.env.DM_LDAP_GROUP_BASE
     ) {
-      // eslint-disable-next-line no-console
       console.warn(
         'Skipping GET API tests: LDAP credentials and DM_LDAP_GROUP_BASE are required'
       );

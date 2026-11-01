@@ -1,14 +1,16 @@
-import { DM } from '../../../src/bin';
+import { createHmac, createHash } from 'crypto';
+
 import type { Express } from 'express';
 import request from 'supertest';
 import multer from 'multer';
+import { expect } from 'chai';
+
+import { DM } from '../../../src/bin';
 import AuthHmac from '../../../src/plugins/auth/hmac';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
-import { expect } from 'chai';
 import { scimBodyParser } from '../../../src/plugins/scim/scim';
 import { scimOptions } from '../../../src/plugins/scim/scim.options';
 import { readOptions } from '../../../src/config/options';
-import { createHmac, createHash } from 'crypto';
 
 /**
  * Helper function to generate HMAC signature for testing

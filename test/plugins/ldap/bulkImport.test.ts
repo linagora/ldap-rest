@@ -1,11 +1,13 @@
+import fs from 'fs';
+import path from 'path';
+
 import { expect } from 'chai';
+import supertest from 'supertest';
+
 import { DM } from '../../../src/bin';
 import LdapBulkImport from '../../../src/plugins/ldap/bulkImport';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import supertest from 'supertest';
-import fs from 'fs';
-import path from 'path';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
@@ -113,12 +115,12 @@ describe('LDAP Bulk Import Plugin', function () {
     // Clean up test organizations
     try {
       await server.ldap.delete(getTestOrg1Dn());
-    } catch (e) {
+    } catch {
       // ignore
     }
     try {
       await server.ldap.delete(getTestOrg2Dn());
-    } catch (e) {
+    } catch {
       // ignore
     }
 
@@ -138,7 +140,7 @@ describe('LDAP Bulk Import Plugin', function () {
     for (const uid of testUsers) {
       try {
         await server.ldap.delete(`uid=${uid},${process.env.DM_LDAP_BASE}`);
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -230,7 +232,7 @@ describe('LDAP Bulk Import Plugin', function () {
           `uid=bulkuser1,${process.env.DM_LDAP_BASE}`
         );
         expect.fail('User should not exist in dry run mode');
-      } catch (error) {
+      } catch {
         // Expected - user should not exist
       }
     });

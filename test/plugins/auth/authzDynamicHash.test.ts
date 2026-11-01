@@ -1,5 +1,6 @@
-import { expect } from 'chai';
 import crypto from 'crypto';
+
+import { expect } from 'chai';
 
 import {
   verifyLdapPassword,
