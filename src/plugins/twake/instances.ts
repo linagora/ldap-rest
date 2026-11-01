@@ -193,7 +193,7 @@ export default class TwakeInstances extends DmPlugin {
       return [dn, entry, req];
     },
     ldapaddafter: async (dn, entry) => {
-      const account = this.account(dn, entry);
+      const account = await this.account(dn, entry);
       if (!account) return;
       await this.serialized(this.key(dn), async () => {
         try {
@@ -335,7 +335,7 @@ export default class TwakeInstances extends DmPlugin {
     const state = await this.serialized(this.key(dn), async () => {
       const entry = await this.read(dn, req);
       if (!entry) throw new NotFoundError(`No entry at ${dn}`);
-      const account = this.account(dn, entry);
+      const account = await this.account(dn, entry);
       if (!account) throw new BadRequestError(`${dn} gets no instance`);
       orgId = account.orgId;
       if (first(this.value(entry, this.sentAttribute))) return 'ready';
@@ -518,7 +518,7 @@ export default class TwakeInstances extends DmPlugin {
   private async settle(dn: string, fqdn: string): Promise<void> {
     await this.serialized(this.key(dn), async () => {
       const entry = await this.read(dn);
-      const account = entry && this.account(dn, entry);
+      const account = entry && (await this.account(dn, entry));
       if (!entry || !account) return;
       if (first(this.value(entry, this.sentAttribute))) return;
       await this.ready(dn, entry, account, fqdn);
@@ -677,7 +677,7 @@ export default class TwakeInstances extends DmPlugin {
   /** Announce a held member, with the address rule ensureInstance applies */
   private async release(member: AttributesList): Promise<void> {
     const dn = member.dn as string;
-    const account = this.account(dn, member);
+    const account = await this.account(dn, member);
     const known = first(this.value(member, this.fqdnAttribute));
     if (!account || !known) return;
     const confirmed =
@@ -731,6 +731,17 @@ export default class TwakeInstances extends DmPlugin {
     return base ? isDirectChildOf(dn, base) : false;
   }
 
+  /**
+   * The id the organization's own entry spells, for an id captured from a
+   * client's DN: the caller may write the branch in another case, and the
+   * Cloudery branch and the slug should not follow it. The captured value
+   * stands when there is no entry or no organization base.
+   */
+  private async storedOrganizationId(id: string): Promise<string> {
+    const entry = await this.findOrganization(id).catch(() => undefined);
+    return (entry && first(this.value(entry, this.organizationId))) || id;
+  }
+
   private async findOrganization(
     id: string
   ): Promise<AttributesList | undefined> {
@@ -781,7 +792,10 @@ export default class TwakeInstances extends DmPlugin {
   }
 
   /** What to ask for this account, when it gets an instance at all. */
-  protected account(dn: string, entry: AttributesList): Account | undefined {
+  protected async account(
+    dn: string,
+    entry: AttributesList
+  ): Promise<Account | undefined> {
     const matched = this.match(dn);
     if (!matched) return undefined;
     const match = matched.exec;
@@ -802,7 +816,9 @@ export default class TwakeInstances extends DmPlugin {
     }
     const cozy = this.provider instanceof CozyStackProvider;
     const orgId =
-      match.groups?.org ||
+      (match.groups?.org
+        ? await this.storedOrganizationId(match.groups.org)
+        : undefined) ||
       (cozy ? this.settings.twake_instance_cozy_org_id : '') ||
       undefined;
     const orgDomain = match.groups?.org
@@ -847,17 +863,46 @@ export default class TwakeInstances extends DmPlugin {
   private match(dn: string): PatternMatch | undefined {
     let canonical: string | undefined;
     try {
-      canonical = canonicalDn(dn);
+      canonical = this.separators(canonicalDn(dn));
     } catch {
       canonical = undefined;
     }
+    const sent = this.separators(dn);
     for (const [index, pattern] of this.patterns.entries()) {
       const exec =
         (canonical !== undefined ? pattern.exec(canonical) : null) ??
-        pattern.exec(dn);
+        pattern.exec(sent);
       if (exec) return { exec, index };
     }
     return undefined;
+  }
+
+  /**
+   * The DN with a comma inside a value written `\2C`, as the directory writes
+   * it: an expression's `[^,]` cannot then read that comma as an RDN
+   * separator and name the branch of an entry beside it.
+   */
+  private separators(dn: string): string {
+    let out = '';
+    for (let i = 0; i < dn.length; i++) {
+      if (dn[i] !== '\\' || i + 1 === dn.length) {
+        out += dn[i];
+        continue;
+      }
+      const next = dn[i + 1];
+      const hex = dn.slice(i + 1, i + 3);
+      if (next === ',') {
+        out += '\\2C';
+        i++;
+      } else if (/^[0-9a-f]{2}$/i.test(hex) && parseInt(hex, 16) === 0x2c) {
+        out += '\\2C';
+        i += 2;
+      } else {
+        out += dn.slice(i, i + 2);
+        i++;
+      }
+    }
+    return out;
   }
 
   /** The uid of an account's DN, under any name or alias of the type. */

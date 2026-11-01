@@ -554,7 +554,7 @@ describe('Twake instances plugin', function () {
       ]);
     });
 
-    it('keeps the case of an organization captured from a respelled branch', async () => {
+    it('reads an organization id from its entry, whatever case the branch is spelled', async () => {
       const org = `ou=InAcme,${ORGS}`;
       await dm.ldap.add(org, {
         objectClass: ['top', 'organizationalUnit'],
@@ -575,7 +575,7 @@ describe('Twake instances plugin', function () {
         .reply(202, {});
       try {
         await dm.ldap.add(
-          `uid=in.y , ou=users , ou=InAcme,${ORGS}`,
+          `uid=in.y , ou=users , ou=INACME,${ORGS}`,
           { ...person('in.y'), mail: 'in.y@acme.example' },
           rest()
         );
@@ -1833,6 +1833,7 @@ describe('Twake instances plugin', function () {
         twake_instance_dn: [
           `^uid=in-[^,]+,ou=My Org,${BASE}$`,
           `^uid=in-[^,]+,ou=His  Org,${BASE}$`,
+          `^uid=[^,]+,ou=users,${BASE}$`,
         ],
         twake_instance_fqdn_attribute: 'description',
         twake_instance_sent_attribute: 'businessCategory',
@@ -1867,6 +1868,40 @@ describe('Twake instances plugin', function () {
       await dm.ldap.add(his, person('in-his'), rest());
       expect(scope.isDone()).to.equal(true);
       expect(await read(dm, his)).not.to.have.property('description');
+    });
+
+    it('does not take an escaped comma for a branch separator', async () => {
+      // This entry's uid holds the comma: it sits beside ou=users, not under
+      // it, and must not pass for an account
+      const dn = `uid=pr-f\\,ou=users,${BASE}`;
+      let asked = false;
+      nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(true)
+        .optionally()
+        .reply(200, () => {
+          asked = true;
+          return { items: [] };
+        });
+      try {
+        await dm.ldap.add(
+          dn,
+          person('pr-f,ou=users', {
+            description: 'evil.example.net',
+            businessCategory: '2026-01-01T00:00:00Z',
+          }),
+          rest()
+        );
+        expect(asked).to.equal(false);
+        const entry = await read(dm, dn);
+        expect(entry).to.have.property('description', 'evil.example.net');
+        expect(entry).to.have.property(
+          'businessCategory',
+          '2026-01-01T00:00:00Z'
+        );
+      } finally {
+        await dm.ldap.delete(dn).catch(() => undefined);
+      }
     });
 
     it('finds the account by mail when the directory answers another spelling', async () => {
@@ -2135,14 +2170,21 @@ describe('Twake instances plugin', function () {
             twake_instance_cloudery_offer: offer,
           })
         )() as unknown as {
-          account: (dn: string, entry: AttributesList) => { offer?: string };
+          account: (
+            dn: string,
+            entry: AttributesList
+          ) => Promise<{ offer?: string } | undefined>;
         };
-        return ['a', 'b', 'c'].map(
-          ou =>
-            instances.account(`uid=x,ou=${ou}`, {
-              uid: 'x',
-              mail: 'x@example.org',
-            }).offer
+        return Promise.all(
+          ['a', 'b', 'c'].map(
+            async ou =>
+              (
+                await instances.account(`uid=x,ou=${ou}`, {
+                  uid: 'x',
+                  mail: 'x@example.org',
+                })
+              )?.offer
+          )
         );
       };
       expect(await offersOf(' personal ;; business ;')).to.deep.equal([

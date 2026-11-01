@@ -23,7 +23,9 @@ gets no instance.
   is tried against the canonical DN first, then against the DN as sent: an
   account created under a branch written with other spacing or case is still
   one, and an expression written with the directory's own spelling (`\2C`, a
-  doubled space) still matches.
+  doubled space) still matches. An expression naming a value that holds a
+  comma writes it `\2C`: the matched form writes every comma inside a value
+  that way, so `[^,]` cannot read one as an RDN separator.
 - The address (`--twake-instance-fqdn-attribute`) and the mark
   (`--twake-instance-sent-attribute`) are this plugin's to write: an add that
   carries them has them removed, and an address written by a modify is taken
@@ -84,8 +86,10 @@ before it takes its members' `user.created`. Then `organization.created` is
 published on the b2b exchange, and the entry is marked. The message carries
 the organization's id, address, domain, and its name as `organization`, read
 from `--twake-instance-organization-name-attribute`, which
-`ensureOrganization` fills from `name` when the entry has none. The mark, not
-the address, says the organization is done.
+`ensureOrganization` fills from `name` when the entry has none. An id captured
+from a `--twake-instance-dn` group is read from the organization entry when
+one exists, so the case a caller spells the branch in is not sent. The mark,
+not the address, says the organization is done.
 
 With the Cloudery, a member's `user.created` waits for its organization's: a
 member under an organization entry that is not marked yet gets its address

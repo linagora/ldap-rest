@@ -100,6 +100,14 @@
   canonical DN: the address and mark a caller supplied are removed and its
   instance is provisioned
   ([#610](https://github.com/linagora/ldap-rest/issues/610)).
+- An escaped comma in a DN value no longer names the branch after it: the
+  instance expressions read every value comma as `\2C`, so an entry beside the
+  branch is not taken for an account
+  ([#617](https://github.com/linagora/ldap-rest/issues/617)).
+- An organization id captured from a `--twake-instance-dn` group is read from
+  the organization entry, so the case a caller spells the branch in no longer
+  reaches the Cloudery
+  ([#617](https://github.com/linagora/ldap-rest/issues/617)).
 - SCIM answers `400 invalidValue` for a reference the mapping declares a DN
   (`subDn`) when its value holds an escape RFC 4514 does not define, before
   the write: the directory refuses such a value on an attribute of DN syntax,
