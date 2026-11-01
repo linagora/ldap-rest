@@ -457,7 +457,8 @@ const results = await this.server.ldap.search(
   'ou=users,dc=example,dc=com'
 );
 
-// Search with pagination (returns AsyncGenerator)
+// Search with pagination (returns AsyncGenerator; the connection is taken
+// when the first page is read)
 const pagedResults = await this.server.ldap.search(
   {
     paged: true,

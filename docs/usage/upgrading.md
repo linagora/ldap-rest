@@ -35,6 +35,19 @@ holding `%` goes out as `100%25`. A parameter still encoded twice names the
 escaped text, so `/users/100%2525` addresses the entry `100%25`
 ([details](../client-development/api/rest-api.md#url-encoding)).
 
+### A paged search opens its connection on the first page
+
+**Who is affected:** a plugin calling `ldap.search()` with paging, leaving the
+returned generator unread and expecting a connection to have been opened, or
+expecting a connection or hook error from the call itself.
+
+A paged search takes its pooled connection when the first page is read, not
+when `search()` is called. A generator that is never walked holds no
+connection, and the next request can use the slot. A connection or bind
+failure, the 30 s wait for a pooled connection and an `ldapsearchresult` hook
+that refuses are answered on the first page, not by the call; a read that
+must fail when it is made uses `paged: false`.
+
 ## From 1.2.1
 
 ### A plugin written against the old hooks API

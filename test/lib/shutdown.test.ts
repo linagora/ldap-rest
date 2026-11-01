@@ -109,7 +109,7 @@ describe('Shutdown', function () {
       new Failing({} as DM)
     );
     // A pooled directory connection, to be closed with the rest
-    await server.ldap.search({ scope: 'one', sizeLimit: 1 });
+    await server.ldap.search({ scope: 'one', sizeLimit: 1, paged: false });
     const slow = get(port, '/slow');
     // The request is in: the route holds it until released
     await pause(100);
@@ -223,7 +223,7 @@ describe('Shutdown', function () {
       }
     }
     const { server, port } = await serve(2000, new Hanging({} as DM));
-    await server.ldap.search({ scope: 'one', sizeLimit: 1 });
+    await server.ldap.search({ scope: 'one', sizeLimit: 1, paged: false });
     const slow = get(port, '/slow');
     await pause(100);
     const asked = Date.now();

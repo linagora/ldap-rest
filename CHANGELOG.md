@@ -68,6 +68,12 @@
   DN: hex escapes, attribute aliases and OIDs, `;`, quotes and multi-valued
   RDN order all name the same entry
   ([#563](https://github.com/linagora/ldap-rest/issues/563)).
+- A paged search takes no pooled connection before its first page is read: a
+  generator obtained and never iterated holds none, where it kept a slot
+  until the pool closed. A connection or bind failure, the 30 s pool timeout
+  and a refusing `ldapsearchresult` hook answer on the first page rather than
+  by the call; a read that must fail when it is made uses `paged: false`
+  ([#460](https://github.com/linagora/ldap-rest/issues/460)).
 
 ## v1.3.0 (2026-10-31)
 

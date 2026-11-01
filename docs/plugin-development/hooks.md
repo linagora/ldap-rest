@@ -60,7 +60,7 @@ await server.hookBus.settled();
 - **hello**: raised by the [demo plugin](../../src/plugins/demo/helloworld.ts) for `/hello`, answered by the demo plugins
 - **ldapsearchopts**: chained before any search, with its options
 - **ldapsearchrequest**: chained before any search, with `[base, options, request]`; an authorization plugin refuses by throwing
-- **ldapsearchresult**: chained after any search, with its result, before it is cached
+- **ldapsearchresult**: chained after any search, with its result, before it is cached; for a paged search, when the first page is read
 - **ldapsearchfilter**: chained on the result of a search after the cache, once per page, with `[result, request, options]`, to drop what the caller may not see
 - **ldapaddrequest**: chained before any add, with `[dn, entry, request]`
 - **ldapadddone**: notified once an add has written the entry, with the DN, the entry and the context, one by one; not awaited

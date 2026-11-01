@@ -1013,6 +1013,66 @@ describe('ldapActions', function () {
       expect(pool.poolStats().opening).to.equal(0);
     });
 
+    it('takes no connection for a paged walk never started', async () => {
+      pool = build(1);
+      const walk = (await pool.search({
+        scope: 'base',
+        attributes: ['1.1'],
+      })) as AsyncGenerator<SearchResult>;
+
+      expect(pool.poolStats()).to.deep.include({
+        busy: 0,
+        idle: 0,
+        opening: 0,
+      });
+      await walk.return(undefined);
+      expect(pool.poolStats()).to.deep.include({
+        busy: 0,
+        idle: 0,
+        opening: 0,
+      });
+    });
+
+    it('opens a paged walk on its first page and releases it when returned', async () => {
+      pool = build(1);
+      const walk = (await pool.search({
+        scope: 'base',
+        attributes: ['1.1'],
+      })) as AsyncGenerator<SearchResult>;
+
+      const first = await walk.next();
+      expect(first.done).to.equal(false);
+      expect(pool.poolStats()).to.deep.include({ busy: 1, idle: 0 });
+
+      await walk.return(undefined);
+      expect(pool.poolStats()).to.deep.include({ busy: 0, idle: 1 });
+    });
+
+    it('releases a paged walk whose result hook fails before the first page', async () => {
+      pool = build(1);
+      const hooks = pool.parent.hookBus;
+      hooks.set('ldapsearchresult', () => {
+        throw new Error('no result');
+      });
+      try {
+        const walk = (await pool.search({
+          scope: 'base',
+          attributes: ['1.1'],
+        })) as AsyncGenerator<SearchResult>;
+
+        let refused: Error | undefined;
+        try {
+          await walk.next();
+        } catch (error) {
+          refused = error as Error;
+        }
+        expect(refused?.message).to.equal('no result');
+      } finally {
+        hooks.set('ldapsearchresult');
+      }
+      expect(pool.poolStats()).to.deep.include({ busy: 0, idle: 1 });
+    });
+
     it('opens once for two searches started together, sized at one', async () => {
       pool = build(1);
       const opening = watchOpening(pool);

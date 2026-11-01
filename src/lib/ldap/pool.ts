@@ -257,6 +257,11 @@ export default class LdapPool {
     }
   }
 
+  /** Throw when `close` ran: the pool hands out no connection any more. */
+  assertOpen(): void {
+    if (this.closed) throw new Error('LDAP connections closed');
+  }
+
   /** The pool as it is, for the metrics */
   stats(): {
     busy: number;
@@ -275,7 +280,7 @@ export default class LdapPool {
   }
 
   private async takeConnection(): Promise<PooledConnection> {
-    if (this.closed) throw new Error('LDAP connections closed');
+    this.assertOpen();
     // Clean up expired connections
     this.cleanupExpiredConnections();
 
