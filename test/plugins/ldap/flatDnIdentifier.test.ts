@@ -77,6 +77,19 @@ describe('A flat entry created under a DN', function () {
     expect((await stored(dn)).searchEntries).to.deep.equal([]);
   });
 
+  it('answers 400 for a DN value with an escape RFC 4514 does not define', async () => {
+    // The DN keeps the escape while the name is decoded: the directory
+    // would refuse it, or store an entry its own spelling does not name
+    const dn = `uid=uid=${B}q${B}x,ou=users,${base}`;
+    const res = await request.post(route).send({ uid: dn, cn: 'Q', sn: 'Q' });
+    expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(res.body.error).to.match(/escape RFC 4514/);
+    expect((await stored(dn)).searchEntries).to.deep.equal([]);
+    expect(
+      (await stored(`uid=qx,ou=users,${base}`)).searchEntries
+    ).to.deep.equal([]);
+  });
+
   it('writes the name the DN gives, escapes decoded', async () => {
     const dn = `uid=Smith${B},John,ou=users,${base}`;
     const res = await request

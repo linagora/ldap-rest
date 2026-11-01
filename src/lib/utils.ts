@@ -436,6 +436,49 @@ export function isDnSyntax(dn: string): boolean {
   });
 }
 
+/** The characters RFC 4514 §3 lets a backslash escape. */
+const RFC4514_ESCAPED = new Set([
+  '"',
+  '+',
+  ',',
+  ';',
+  '<',
+  '>',
+  '\\',
+  '#',
+  '=',
+  ' ',
+]);
+
+/**
+ * Whether every escape in `dn` is one RFC 4514 §3 defines: an escaped
+ * special (`" + , ; < > \ # =` or a space) or a pair of hex digits.
+ *
+ * {@link parseDn} and {@link unescapeDnValue} read a DN permissively, as a
+ * directory may answer one; a DN a caller writes is held to the grammar.
+ *
+ * @param dn - The DN to check
+ * @returns whether its escapes are RFC 4514 escapes
+ */
+export function hasOnlyRfc4514Escapes(dn: string): boolean {
+  for (let i = 0; i < dn.length; i++) {
+    if (dn[i] !== '\\') continue;
+    const next = dn[i + 1];
+    // A backslash at the end escapes nothing
+    if (next === undefined) return false;
+    if (RFC4514_ESCAPED.has(next)) {
+      i++;
+      continue;
+    }
+    if (/^[0-9a-fA-F]{2}$/.test(dn.slice(i + 1, i + 3))) {
+      i += 2;
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
 /**
  * Extract the parent DN from a DN
  * Removes the first RDN component to get the parent branch
