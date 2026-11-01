@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Plugins can provide a typed service under a token and reach another plugin's
+  service with `this.service(token)`, which returns the provided instance or
+  `null` ([details](docs/plugin-development/services.md)); a plugin that
+  already declares its own `service` or `provides` member must rename it
+  ([service](docs/usage/upgrading.md#a-plugin-with-its-own-service-member),
+  [provides](docs/usage/upgrading.md#a-plugin-with-its-own-provides-member)).
+
 ### Fixed
 
 - A password policy whose `pwdMaxAge` sets an expiry beyond the representable
