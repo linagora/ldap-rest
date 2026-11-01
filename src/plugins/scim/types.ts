@@ -180,6 +180,8 @@ export interface MappingEntry {
   ldapPrimary?: string;
   ldapSecondary?: string;
   sub?: Record<string, string>;
+  /** Sub-attributes whose value is a DN, held to RFC 4514 on write */
+  subDn?: string[];
   multi?: 'single' | 'array';
   readOnly?: boolean;
   operational?: boolean;
