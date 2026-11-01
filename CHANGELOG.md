@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A password policy integer — a duration or a count — is accepted from 0 to
+  9007199254740991 (2⁵³ − 1), the largest a JSON number holds exactly: `1e21`
+  was sent as `1e+21`, which the directory refuses with an error rather than
+  a 400 naming the attribute, and a value past 2⁵³ was written rounded. A
+  larger value is now refused with a 400 naming the bound
+  ([#558](https://github.com/linagora/ldap-rest/issues/558),
+  [details](docs/usage/plugins/ldap/password-policy.md#managing-policies)).
+
 ## v1.3.0 (2026-10-31)
 
 The October 2026 code-quality work and the five security findings it fixed.
