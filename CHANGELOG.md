@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A creation whose identifier is not a string — `{"uid": 1}`, an array, or
+  the object a form body such as `uid[a]=b` gives — is answered 400 naming
+  the attribute, rather than 500 from the DN escaping, on the flat and group
+  routes ([#556](https://github.com/linagora/ldap-rest/issues/556)).
+
 ## v1.3.0 (2026-10-31)
 
 The October 2026 code-quality work and the five security findings it fixed.
