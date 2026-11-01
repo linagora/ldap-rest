@@ -2,138 +2,85 @@
 
 ## Unreleased
 
+## v2.0.0 (2026-11-01)
+
+Plugin services, deprecation aliases and a series of directory-read fixes.
+Five breaking changes, each with a decision or a configuration change, are in
+[upgrading](docs/usage/upgrading.md#from-130).
+
+### Breaking Changes
+
+- A plugin with its own `service` member must rename it
+  ([upgrading](docs/usage/upgrading.md#a-plugin-with-its-own-service-member)).
+- A plugin with its own `provides` member must rename it
+  ([upgrading](docs/usage/upgrading.md#a-plugin-with-its-own-provides-member)).
+- A path parameter is percent-decoded once; a client that encoded one twice
+  now names the escaped value
+  ([upgrading](docs/usage/upgrading.md#a-path-parameter-is-percent-decoded-once)).
+- A paged search opens its connection on the first page, not when `search()`
+  is called
+  ([upgrading](docs/usage/upgrading.md#a-paged-search-opens-its-connection-on-the-first-page)).
+- A tombstone's deletion date is read only as a GeneralizedTime with its zone
+  or an ISO 8601 date
+  ([upgrading](docs/usage/upgrading.md#a-deletion-date-written-in-another-shape)).
+
 ### Added
 
 - Plugins can provide a typed service under a token and reach another plugin's
   service with `this.service(token)`, which returns the provided instance or
-  `null` ([details](docs/plugin-development/services.md)); a plugin that
-  already declares its own `service` or `provides` member must rename it
-  ([service](docs/usage/upgrading.md#a-plugin-with-its-own-service-member),
-  [provides](docs/usage/upgrading.md#a-plugin-with-its-own-provides-member)).
+  `null` ([details](docs/plugin-development/services.md)).
 - A renamed option can keep its former CLI name and environment variable as
   deprecated aliases, still read with a startup warning, a plugin's own options
-  included
-  ([details](docs/plugin-development/options.md#deprecating-an-option)).
+  included ([details](docs/plugin-development/options.md#deprecating-an-option)).
 
 ### Fixed
 
-- A password policy whose `pwdMaxAge` sets an expiry beyond the representable
-  date range is reported as never expiring instead of answering `500` on
-  `GET /v1/users/:id/password-status`
-  ([#553](https://github.com/linagora/ldap-rest/issues/553)).
-- An error carrying `status` instead of `statusCode`, such as a malformed
-  percent-encoded path parameter, is answered with that status instead of
-  `500` ([#555](https://github.com/linagora/ldap-rest/issues/555)).
-- A creation whose identifier is not a string — `{"uid": 1}`, an array, or
-  the object a form body such as `uid[a]=b` gives — is answered 400 naming
-  the attribute, rather than 500 from the DN escaping, on the flat and group
-  routes ([#556](https://github.com/linagora/ldap-rest/issues/556)).
-- A password policy integer — a duration or a count — is accepted from 0 to
-  9007199254740991 (2⁵³ − 1), the largest a JSON number holds exactly: `1e21`
-  was sent as `1e+21`, which the directory refuses with an error rather than
-  a 400 naming the attribute, and a value past 2⁵³ was written rounded. A
-  larger value is now refused with a 400 naming the bound
-  ([#558](https://github.com/linagora/ldap-rest/issues/558),
-  [details](docs/usage/plugins/ldap/password-policy.md#managing-policies)).
-- An entry or a group named by a DN is written under the name that DN gives
-  under the fold the directory applies: a decomposed accent is composed, the
-  spaces it ignores are dropped, and an LDAPv2 quoted value is read as the
-  value it holds — so two spellings of one name are one entry, and the RDN
-  and the naming attribute spell one value
+- Invalid DN syntax answers `400` instead of `500` on delete, read and move
+  ([#619](https://github.com/linagora/ldap-rest/issues/619),
+  [#621](https://github.com/linagora/ldap-rest/issues/621)); an escape RFC 4514
+  does not define is refused on creation
+  ([#500](https://github.com/linagora/ldap-rest/issues/500)); a DN whose parent
+  spells the branch differently is addressed by every flat route
+  ([#587](https://github.com/linagora/ldap-rest/issues/587)); a DN a client
+  writes is held to RFC 4514 on every route that writes one
+  ([#592](https://github.com/linagora/ldap-rest/issues/592)).
+- An entry or a group named by a DN is written under the name the directory
+  gives it, so two spellings of one name are one entry
   ([#501](https://github.com/linagora/ldap-rest/issues/501),
   [details](docs/usage/plugins/ldap/flat-generic.md#create-entry)).
-- A time the password policy plugin reads from an entry — `pwdChangedTime`,
-  `pwdAccountLockedTime` — is read as the rest of the server reads a
-  directory time: the zone offset and the fraction are honoured, a year below
-  100 is read as written, and the optional minutes and seconds are accepted.
-  A time written with an offset no longer shifts `lastChanged`, `lockedAt` or
-  `expiresAt` by hours, a lock with a duration ends when it should, and a
-  date the format refuses — a month 13 — leaves the password with no expiry
-  rather than one read from a rolled-over date
-  ([#557](https://github.com/linagora/ldap-rest/issues/557),
-  [details](docs/usage/plugins/ldap/password-policy.md#get-user-password-status)).
-- A DN-named identifier using an escape RFC 4514 does not define is refused
-  with `400` on creation instead of being written as the bare character
-  ([#500](https://github.com/linagora/ldap-rest/issues/500)).
-- A request whose `Content-Type` names no media type (`;application/json`) and
-  that carries a body is refused with `400` instead of letting the body
-  parser answer `500`
-  ([#554](https://github.com/linagora/ldap-rest/issues/554)).
-- A path parameter naming an entry is percent-decoded once; a client that
-  encoded one twice now names the escaped value instead of the entry it
-  used to reach
-  ([#552](https://github.com/linagora/ldap-rest/issues/552),
-  [upgrading](docs/usage/upgrading.md#a-path-parameter-is-percent-decoded-once)).
-- The LDAP search cache no longer merges searches whose attribute names hold
-  a separator: `['cn|mail']` and `['cn', 'mail']` — like `['a,b']` and
-  `['a', 'b']` — are now different cache keys
-  ([#562](https://github.com/linagora/ldap-rest/issues/562)).
-- The LDAP search cache now drops a cached read however the write spells the
-  DN: hex escapes, attribute aliases and OIDs, `;`, quotes and multi-valued
-  RDN order all name the same entry
+- The LDAP search cache no longer merges attribute names holding a separator
+  ([#562](https://github.com/linagora/ldap-rest/issues/562)) and drops a cached
+  read however the write spells the DN
   ([#563](https://github.com/linagora/ldap-rest/issues/563)).
-- A paged search takes no pooled connection before its first page is read: a
-  generator obtained and never iterated holds none, where it kept a slot
-  until the pool closed. A connection or bind failure, the 30 s pool timeout
-  and a refusing `ldapsearchresult` hook answer on the first page rather than
-  by the call; a read that must fail when it is made uses `paged: false`
-  ([#460](https://github.com/linagora/ldap-rest/issues/460)).
-- A directory time is read by one reader everywhere: a deletion date no
-  longer reads a year below 100 as 19xx nor refuses an offset or a fraction,
-  and a GeneralizedTime read by SCIM is written in UTC, at the instant the
-  directory stored ([#586](https://github.com/linagora/ldap-rest/issues/586)).
-- A DN whose parent names the branch under another spelling — case, spacing,
-  an escape the directory folds — is addressed by every flat route, not only
-  created by one: the parent is compared as a DN, as the creation path
-  already did ([#587](https://github.com/linagora/ldap-rest/issues/587)).
-- A DN a client writes is held to RFC 4514 on every route that writes one:
-  a pointer or branch attribute of a create or modify, and the destination of
-  a move, are refused with `400` naming the escape when it holds one RFC 4514
-  does not define
-  ([#592](https://github.com/linagora/ldap-rest/issues/592)).
-- The Twake instances plugin recognises an organization whose branch is
-  spelled with other spacing or escapes, or whose RDN holds an escaped comma:
-  such a creation no longer keeps an address or a mark the caller supplied
-  ([#601](https://github.com/linagora/ldap-rest/issues/601)).
-- The Twake instances plugin takes an account created under a branch spelled
-  with other spacing or case for one, as the directory stores it at its
-  canonical DN: the address and mark a caller supplied are removed and its
-  instance is provisioned
-  ([#610](https://github.com/linagora/ldap-rest/issues/610)).
-- A delete of a DN the directory cannot parse answers `400` naming the DN,
-  where it answered `500` and hid the directory's `invalidDNSyntax`
-  ([#619](https://github.com/linagora/ldap-rest/issues/619)).
-- A read or a move of a DN the directory cannot parse answers `400` naming
-  the DN, where it answered `500` and hid the directory's `invalidDNSyntax`
-  ([#621](https://github.com/linagora/ldap-rest/issues/621)).
-- A delete under another spelling of a tombstone's DN — spaces, case or
-  escapes — no longer removes the entry for good: the expressions are
-  compared as the directory compares DNs, so the delete writes a tombstone,
-  and a delete of an existing tombstone writes nothing
+- A password policy whose `pwdMaxAge` goes past the representable date range
+  reports no expiry ([#553](https://github.com/linagora/ldap-rest/issues/553));
+  a duration or count is bounded to 2⁵³ − 1
+  ([#558](https://github.com/linagora/ldap-rest/issues/558)); a time the
+  password policy reads honours its zone and fraction
+  ([#557](https://github.com/linagora/ldap-rest/issues/557),
+  [details](docs/usage/plugins/ldap/password-policy.md#managing-policies)).
+- A directory time is read by one reader everywhere: a deletion date no longer
+  reads a year below 100 as 19xx nor refuses an offset or a fraction, and a
+  GeneralizedTime read by SCIM is written in UTC
+  ([#586](https://github.com/linagora/ldap-rest/issues/586)).
+- A request carrying `status` instead of `statusCode` answers that status
+  ([#555](https://github.com/linagora/ldap-rest/issues/555)); a non-string
+  identifier answers `400` naming the attribute
+  ([#556](https://github.com/linagora/ldap-rest/issues/556)); a
+  `Content-Type` without a media type answers `400`
+  ([#554](https://github.com/linagora/ldap-rest/issues/554)).
+- The Twake instances plugin matches an account or organization under another
+  spelling of its branch, or with an escaped comma in its RDN, and reads the
+  organization id from the entry
+  ([#601](https://github.com/linagora/ldap-rest/issues/601),
+  [#610](https://github.com/linagora/ldap-rest/issues/610),
+  [#617](https://github.com/linagora/ldap-rest/issues/617)).
+- A delete under another spelling of a tombstone's DN writes a tombstone, and a
+  delete of an existing tombstone writes nothing
   ([#615](https://github.com/linagora/ldap-rest/issues/615)).
-- An escaped comma in a DN value no longer names the branch after it: the
-  instance expressions never read a comma inside a value as an RDN separator,
-  so an entry beside the branch is not taken for an account
-  ([#617](https://github.com/linagora/ldap-rest/issues/617)).
-- An organization id captured from a `--twake-instance-dn` group is read from
-  the organization entry, so the case a caller spells the branch in no longer
-  reaches the Cloudery
-  ([#617](https://github.com/linagora/ldap-rest/issues/617)).
-- SCIM answers `400 invalidValue` for a reference the mapping declares a DN
-  (`subDn`) when its value holds an escape RFC 4514 does not define, before
-  the write: the directory refuses such a value on an attribute of DN syntax,
-  but another syntax would store it as sent
-  ([#602](https://github.com/linagora/ldap-rest/issues/602),
+- SCIM answers `400 invalidValue` for a `subDn` holding an escape RFC 4514 does
+  not define ([#602](https://github.com/linagora/ldap-rest/issues/602),
   [details](docs/usage/plugins/integrations/scim.md#writing-a-custom-mapping-schema)).
-- A tombstone's deletion date is read only when it is written as a
-  GeneralizedTime with its zone or as an ISO 8601 date: a malformed value
-  another writer left (`1`, `Jan 1`) and the extra forms the default
-  `iso8601` mode took from `new Date()` — `2025-01-01 12:00:00`,
-  `Wed, 01 Jan 2025 12:00:00 GMT`, `01/02/2025` — are no longer read, so
-  `erase` refuses such a tombstone until forced instead of deleting it for
-  good
-  ([#611](https://github.com/linagora/ldap-rest/issues/611),
-  [upgrading](docs/usage/upgrading.md#a-deletion-date-written-in-another-shape)).
 
 ## v1.3.0 (2026-10-31)
 
