@@ -79,6 +79,17 @@ describe('SearchCache', () => {
       expect(key(['a,b'])).to.not.equal(key(['a', 'b']));
     });
 
+    it('does not merge a name that looks like a JSON list with one element', () => {
+      const cache = cacheFor();
+      const key = (attributes: string[]): string =>
+        cache.key('uid=jdoe,dc=example,dc=com', {
+          scope: 'base',
+          attributes,
+        });
+
+      expect(key(['["cn"]'])).to.not.equal(key(['cn']));
+    });
+
     it('does not merge buffer attribute names holding a comma', () => {
       const cache = cacheFor();
       const key = (explicitBufferAttributes: string[]): string =>

@@ -40,7 +40,8 @@
   ([#557](https://github.com/linagora/ldap-rest/issues/557),
   [details](docs/usage/plugins/ldap/password-policy.md#get-user-password-status)).
 - The LDAP search cache no longer merges searches whose attribute names hold
-  a separator: `cn|mail` and `cn,mail` are now different cache keys
+  a separator: `['cn|mail']` and `['cn', 'mail']` — like `['a,b']` and
+  `['a', 'b']` — are now different cache keys
   ([#562](https://github.com/linagora/ldap-rest/issues/562)).
 
 ## v1.3.0 (2026-10-31)
