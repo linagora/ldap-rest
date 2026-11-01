@@ -67,7 +67,4 @@ export type ServiceMap = Map<ServiceToken<unknown>, unknown>;
 export const providedService = <T>(
   services: ReadonlyMap<ServiceToken<unknown>, unknown>,
   token: ServiceToken<T>
-): T | undefined => {
-  if (!services.has(token)) return undefined;
-  return services.get(token) as T;
-};
+): T | undefined => services.get(token) as T | undefined;

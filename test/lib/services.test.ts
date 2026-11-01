@@ -34,6 +34,15 @@ class MultiProvider extends DmPlugin {
   ];
 }
 
+class GreeterPlugin extends DmPlugin implements GreeterApi {
+  name = 'greeterPlugin';
+  provides = [GreeterService.with(this)];
+
+  greet(name: string): string {
+    return `hello ${name}`;
+  }
+}
+
 class GreeterConsumer extends DmPlugin {
   name = 'greeterConsumer';
   lookup = (): GreeterApi | null => this.service(GreeterService);
@@ -125,6 +134,17 @@ describe('Plugin services', () => {
     ]);
   });
 
+  it('binds the plugin instance itself with with(this)', async () => {
+    const dm = new DM();
+    await dm.ready;
+    const plugin = new GreeterPlugin(dm);
+    await dm.registerPlugin('test/plugin', plugin, 'plugin');
+
+    const consumer = new GreeterConsumer(dm);
+    expect(consumer.lookup()).to.equal(plugin);
+    expect(consumer.lookup()?.greet('world')).to.equal('hello world');
+  });
+
   it('registers every service a plugin provides', async () => {
     const dm = new DM();
     await dm.ready;
@@ -158,7 +178,7 @@ describe('Plugin services', () => {
     ]);
   });
 
-  it('still registers a second provider other services', async () => {
+  it('still registers the other services of a second provider', async () => {
     const dm = new DM();
     await dm.ready;
     const warnings = captureWarnings(dm);
