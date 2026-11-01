@@ -25,7 +25,7 @@ import {
 } from '../../lib/instanceProviders';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import { escapeLdapFilter, rdnValue } from '../../lib/utils';
+import { escapeLdapFilter, isDirectChildOf, rdnValue } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
 import {
@@ -716,9 +716,7 @@ export default class TwakeInstances extends DmPlugin {
 
   private isOrganization(dn: string): boolean {
     const base = this.settings.twake_instance_organization_base;
-    if (!base) return false;
-    const rest = dn.slice(dn.indexOf(',') + 1);
-    return rest.toLowerCase() === base.toLowerCase();
+    return base ? isDirectChildOf(dn, base) : false;
   }
 
   private async findOrganization(

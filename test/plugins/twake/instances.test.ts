@@ -1026,6 +1026,36 @@ describe('Twake instances plugin', function () {
         });
       });
 
+      // The parent is compared as the directory compares DNs: a base spelled
+      // with other spaces or case, or an RDN holding an escaped comma, still
+      // names this branch.
+      it('recognises an organization under another spelling of its branch', async () => {
+        const respelled = `ou=acme9,${ORGS.toUpperCase().replace(/,/g, ' , ')}`;
+        const escaped = `ou=a\\,b,${ORGS}`;
+        try {
+          for (const [dn, ou] of [
+            [respelled, 'acme9'],
+            [escaped, 'a,b'],
+          ])
+            await dm.ldap.add(
+              dn,
+              {
+                objectClass: ['top', 'organizationalUnit'],
+                ou,
+                description: 'evil.example.net',
+              },
+              rest()
+            );
+          expect(await read(dm, `ou=acme9,${ORGS}`)).not.to.have.property(
+            'description'
+          );
+          expect(await read(dm, escaped)).not.to.have.property('description');
+        } finally {
+          for (const dn of [`ou=acme9,${ORGS}`, escaped])
+            await dm.ldap.delete(dn).catch(() => undefined);
+        }
+      });
+
       it('creates the Cloudery organization and its instance', async () => {
         let asked: Record<string, unknown> = {};
         const scope = search('acme1.example.org')
