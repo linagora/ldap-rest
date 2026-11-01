@@ -331,6 +331,23 @@ describe('Twake tombstone plugin', function () {
       expect(await read(flat('ts-alice'))).to.not.equal(undefined);
     });
 
+    it('refuses a deletion date it cannot read unless forced', async () => {
+      // `new Date()` reads `foo 1` as 2001-01-01, and a zone-less Unix
+      // timestamp reads as a year: both older than the minimum age
+      for (const value of ['foo 1', '1712011200']) {
+        await dm.ldap.modify(flat('ts-alice'), {
+          replace: { roomNumber: value },
+        });
+        let error: unknown;
+        await plugin.erase(flat('ts-alice')).catch(e => (error = e));
+        expect(error, value).to.have.property('statusCode', 409);
+        expect((error as Error).message).to.match(/no readable deletion date/);
+        expect(await read(flat('ts-alice'))).to.not.equal(undefined);
+      }
+      await plugin.erase(flat('ts-alice'), { force: true });
+      expect(await read(flat('ts-alice'))).to.equal(undefined);
+    });
+
     it('erases an old enough deletion, with its memberships, publishing nothing', async () => {
       await dm.ldap.modify(flat('ts-alice'), {
         replace: { roomNumber: '2020-01-01T00:00:00.000Z' },

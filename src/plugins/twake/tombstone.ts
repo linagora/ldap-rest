@@ -159,9 +159,10 @@ export default class TwakeTombstone extends DmPlugin {
      * @openapi
      * summary: Erase a tombstone
      * description: |
-     *   Removes a deleted account for good, with its group memberships. The
-     *   deletion must be older than `--twake-tombstone-erase-min-age`, unless
-     *   `force` is true. Nothing is published.
+     *   Removes a deleted account for good, with its group memberships. Its
+     *   deletion date must be readable and older than
+     *   `--twake-tombstone-erase-min-age`, unless `force` is true. Nothing is
+     *   published.
      * tags:
      *   - Twake
      * requestBody:
@@ -183,7 +184,7 @@ export default class TwakeTombstone extends DmPlugin {
      *   '404':
      *     description: No tombstone at this DN.
      *   '409':
-     *     description: The deletion is too recent and `force` is not set.
+     *     description: The deletion is too recent, or its date cannot be read, and `force` is not set.
      */
     defineRoute(app, {
       method: 'post',
@@ -215,8 +216,8 @@ export default class TwakeTombstone extends DmPlugin {
   }
 
   /**
-   * Remove a tombstone and its group memberships. Refused while the deletion
-   * is younger than the configured age, unless forced.
+   * Remove a tombstone and its group memberships. Refused when its deletion
+   * date is unreadable or younger than the configured age, unless forced.
    */
   async erase(
     dn: string,

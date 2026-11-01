@@ -62,8 +62,9 @@ Content-Type: application/json
 
 - `200`: erased.
 - `404`: no tombstone at this DN.
-- `409`: the deletion is younger than `--twake-tombstone-erase-min-age` and
-  `force` is not true.
+- `409`: `force` is not true, and either the deletion is younger than
+  `--twake-tombstone-erase-min-age` or its date cannot be read as
+  [lifecycle events](lifecycle-events.md) reads it.
 
 Other plugins call `erase(dn, { force, req })`.
 

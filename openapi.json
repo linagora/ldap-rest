@@ -6787,7 +6787,7 @@
     "/api/v1/twake/tombstones/erase": {
       "post": {
         "summary": "Erase a tombstone",
-        "description": "Removes a deleted account for good, with its group memberships. The\ndeletion must be older than `--twake-tombstone-erase-min-age`, unless\n`force` is true. Nothing is published.\n",
+        "description": "Removes a deleted account for good, with its group memberships. Its\ndeletion date must be readable and older than\n`--twake-tombstone-erase-min-age`, unless `force` is true. Nothing is\npublished.\n",
         "responses": {
           "200": {
             "description": "Erased.",
@@ -6820,7 +6820,7 @@
             "description": "No tombstone at this DN."
           },
           "409": {
-            "description": "The deletion is too recent and `force` is not set."
+            "description": "The deletion is too recent, or its date cannot be read, and `force` is not set."
           },
           "500": {
             "description": "Internal server error"
