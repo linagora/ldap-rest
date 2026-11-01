@@ -35,6 +35,7 @@ import {
   getCompiledRegex,
   getParentDn,
   hasOnlyRfc4514Escapes,
+  isDirectChildOf,
   isDummyMemberDn,
   normalizeDn,
   assertedRdnValue,
@@ -1417,7 +1418,7 @@ export default abstract class LdapFlat extends DmPlugin {
       // If the DN has a single RDN, getParentDn returns the DN itself; treat
       // that as "missing parent" rather than "parent equals base".
       const hasParent = parent !== id;
-      if (!hasParent || parent.toLowerCase() !== this.base.toLowerCase()) {
+      if (!isDirectChildOf(id, this.base)) {
         throw new BadRequestError(
           `DN must be a direct child of "${this.base}". ` +
             `Provided DN "${id}" has parent "${hasParent ? parent : '<none>'}"`

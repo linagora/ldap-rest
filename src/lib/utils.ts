@@ -623,10 +623,10 @@ export function assertedRdnValue(
   attribute: string,
   base?: string
 ): string | null {
-  // Splits once, on the first unescaped comma, and decodes one short RDN: a
-  // cost linear in the input, where a pattern of `\\.` against `[^,]` would
-  // try every way of splitting a run of escapes before failing
-  const [rdn, ...parent] = parseDn(dn);
+  // Linear in the input, where a pattern of `\\.` against `[^,]` would try
+  // every way of splitting a run of escapes before failing: the RDN is read
+  // once, and the parent only when a base is given
+  const [rdn] = parseDn(dn);
   const eq = rdn ? rdn.indexOf('=') : -1;
   if (eq <= 0) return null;
   if (rdn.slice(0, eq).trim().toLowerCase() !== attribute.toLowerCase())
@@ -634,8 +634,7 @@ export function assertedRdnValue(
   // A multi-valued RDN (`uid=a+cn=b`) is not what a naming attribute names;
   // `splitRdn` reads `uid="a+b"` as one assertion, as the rest of the code
   if (splitRdn(rdn).length > 1) return null;
-  if (base !== undefined && normalizeDn(parent.join(',')) !== normalizeDn(base))
-    return null;
+  if (base !== undefined && !isDirectChildOf(dn, base)) return null;
   return foldRdnValue(rdnValueOf(rdn));
 }
 
@@ -682,6 +681,36 @@ export function isChildOf(dn: string, parentDn: string): boolean {
   // is no child.
   try {
     return isDnInBranch(dn, parentDn) && !isDnInBranch(parentDn, dn);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether `dn` names a direct child of `base`: its parent is `base`, compared
+ * as the directory compares DNs.
+ *
+ * `isChildOf` answers ancestry; this answers parent equality, which is what a
+ * route that only serves one branch requires of a DN a client writes. The
+ * comparison folds case, spacing and the escapes the directory reads, so a
+ * DN created under one spelling is addressed under another.
+ *
+ * @param dn - The DN to check
+ * @param base - The branch its parent has to be
+ * @returns True when the DN has a parent and that parent is `base`
+ *
+ * @example
+ * ```typescript
+ * isDirectChildOf('uid=x,OU=Users , dc=example,dc=com', 'ou=users,dc=example,dc=com')
+ * // => true
+ * ```
+ */
+export function isDirectChildOf(dn: string, base: string): boolean {
+  try {
+    const [, ...parent] = parseDn(dn);
+    return (
+      parent.length > 0 && normalizeDn(parent.join(',')) === normalizeDn(base)
+    );
   } catch {
     return false;
   }

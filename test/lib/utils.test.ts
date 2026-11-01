@@ -12,6 +12,7 @@ import {
   rdnValue,
   normalizeDn,
   isDnInBranch,
+  isDirectChildOf,
   organizationLink,
   parseDirectoryDate,
 } from '../../src/lib/utils';
@@ -806,6 +807,49 @@ describe('LDAP Utils', () => {
       expect(parseDirectoryDate('20240930000000-1300')?.toISOString()).to.equal(
         '2024-09-30T13:00:00.000Z'
       );
+    });
+  });
+
+  describe('isDirectChildOf', () => {
+    it('reads the parent as the directory reads a DN', () => {
+      expect(
+        isDirectChildOf(
+          'uid=x,OU=Users , dc=example,dc=com',
+          'ou=users,dc=example,dc=com'
+        )
+      ).to.be.true;
+      expect(
+        isDirectChildOf(
+          'uid=x,ou=users,dc=example,dc=com',
+          'ou=Users, dc=Example, dc=Com'
+        )
+      ).to.be.true;
+    });
+
+    it('refuses another branch, a deeper entry and a lone RDN', () => {
+      expect(
+        isDirectChildOf(
+          'uid=x,ou=people,dc=example,dc=com',
+          'ou=users,dc=example,dc=com'
+        )
+      ).to.be.false;
+      expect(
+        isDirectChildOf(
+          'uid=x,ou=sub,ou=users,dc=example,dc=com',
+          'ou=users,dc=example,dc=com'
+        )
+      ).to.be.false;
+      expect(isDirectChildOf('uid=x', 'ou=users,dc=example,dc=com')).to.be
+        .false;
+    });
+
+    it('reads an escaped comma as part of the RDN, not as a separator', () => {
+      expect(
+        isDirectChildOf(
+          'uid=x\\,ou=users,dc=example,dc=com',
+          'ou=users,dc=example,dc=com'
+        )
+      ).to.be.false;
     });
   });
 });

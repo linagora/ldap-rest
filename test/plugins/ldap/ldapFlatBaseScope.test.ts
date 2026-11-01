@@ -167,6 +167,13 @@ describe('LdapFlat base-scope guard', function () {
       expect(res.body).to.have.property('cn', uid);
     });
 
+    it('accepts a parent that differs only in case and spacing', async () => {
+      await instance.addEntry(uid);
+      const spelled = `cn=${uid},  OU=TwakeTitle ,ou=Nomenclature,${BASE}`;
+      const res = await request.get(`/api/v1/ldap/titles/${enc(spelled)}`);
+      expect(res.status).to.equal(200);
+    });
+
     it('accepts the full DN with mixed-case suffix (LDAP is case-insensitive)', async () => {
       await instance.addEntry(uid);
       const mixedCase = `cn=${uid},OU=twakeTitle,ou=Nomenclature,${BASE}`;
