@@ -39,6 +39,10 @@
   rather than one read from a rolled-over date
   ([#557](https://github.com/linagora/ldap-rest/issues/557),
   [details](docs/usage/plugins/ldap/password-policy.md#get-user-password-status)).
+- A request whose `Content-Type` names no media type (`;application/json`) and
+  that carries a body is refused with `400` instead of letting the body
+  parser answer `500`
+  ([#554](https://github.com/linagora/ldap-rest/issues/554)).
 
 ## v1.3.0 (2026-10-31)
 

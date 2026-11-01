@@ -428,6 +428,53 @@ describe('Server internals', () => {
       expect(res.status).to.equal(413);
     });
 
+    it('should answer 400 to a Content-Type with no media type', async () => {
+      const dm = new DM();
+      await dm.ready;
+      dm.app.post('/probe', (_req, res) => {
+        res.json({});
+      });
+
+      const res = await request(dm.app)
+        .post('/probe')
+        .set('Content-Type', ';application/json')
+        .send('{}');
+      expect(res.status).to.equal(400);
+    });
+
+    it('should leave a request without a body alone', async () => {
+      const dm = new DM();
+      await dm.ready;
+      dm.app.get('/probe', (_req, res) => {
+        res.json({});
+      });
+      dm.app.delete('/probe', (_req, res) => {
+        res.json({});
+      });
+
+      const got = await request(dm.app)
+        .get('/probe')
+        .set('Content-Type', ';application/json');
+      expect(got.status).to.equal(200);
+
+      const removed = await request(dm.app)
+        .delete('/probe')
+        .set('Content-Type', ';application/json');
+      expect(removed.status).to.equal(200);
+    });
+
+    it('should still parse a well-formed JSON body', async () => {
+      const dm = new DM();
+      await dm.ready;
+      dm.app.post('/probe', (req, res) => {
+        res.json(req.body);
+      });
+
+      const res = await request(dm.app).post('/probe').send({ a: 1 });
+      expect(res.status).to.equal(200);
+      expect(res.body).to.deep.equal({ a: 1 });
+    });
+
     it('should run a registered parser ahead of the global ones', async () => {
       const dm = new DM();
       await dm.ready;
