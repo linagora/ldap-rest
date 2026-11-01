@@ -455,6 +455,11 @@ The identifier may also be the whole DN of the entry, in the entity's
 branch: `"uid": "uid=Smith\\,John,ou=users,dc=example,dc=com"` creates the
 entry `Smith,John`, whose DN spells the name with its escapes.
 
+The name written is the value the RDN gives under the folding the directory
+applies (Unicode NFKC, and its insignificant spaces): `uid=\ zoë` and
+`uid=zoë` name one entry, written `uid=zoë`, and a name sent decomposed is
+stored composed.
+
 ### Modify Entry
 
 ```bash

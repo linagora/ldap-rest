@@ -500,6 +500,22 @@ export function rdnValue(dn: string): string {
   return rdnValueOf(rdn);
 }
 
+/**
+ * A value without the quotes LDAPv2 (RFC 2253) wraps it in, where it is one
+ * value: the closing quote is not escaped. RFC 4514 has no quoting, but a
+ * DN written the old way reads as the value it holds.
+ */
+function unquotedValue(value: string): string {
+  let backslashes = 0;
+  for (let i = value.length - 2; i > 0 && value[i] === '\\'; i--) backslashes++;
+  const quoted =
+    value.length >= 2 &&
+    value.startsWith('"') &&
+    value.endsWith('"') &&
+    backslashes % 2 === 0;
+  return quoted ? value.slice(1, -1) : value;
+}
+
 /** The value of one RDN, trimmed as `parseDn` leaves it and decoded. */
 function rdnValueOf(rdn: string | undefined): string {
   if (!rdn) return '';
@@ -508,16 +524,44 @@ function rdnValueOf(rdn: string | undefined): string {
   // parseDn trimmed the end, keeping the space a backslash escapes
   let start = eq + 1;
   while (start < rdn.length && asciiSpace(rdn[start])) start++;
-  return unescapeDnValue(rdn.slice(start));
+  return unescapeDnValue(unquotedValue(rdn.slice(start)));
+}
+
+/**
+ * Insignificant spaces (RFC 4518 §2.6.1): none at either end, and one for a
+ * run of them.
+ */
+function dropSpaces(chars: string[]): string[] {
+  const kept = chars.filter((char, i) => char !== ' ' || chars[i - 1] !== ' ');
+  let start = 0;
+  let end = kept.length;
+  while (start < end && kept[start] === ' ') start++;
+  while (end > start && kept[end - 1] === ' ') end--;
+  return kept.slice(start, end);
+}
+
+/**
+ * A naming value as the directory folds it: Unicode compatibility
+ * equivalence (NFKC, which makes `cafe\u0301` `café`) and its insignificant
+ * spaces dropped ({@link dropSpaces}). Case is kept — the directory folds it
+ * too, but a name is written as the caller spells it.
+ *
+ * A value another spelling of which the directory calls the same name is
+ * written as this one, so the RDN and the naming attribute spell one value.
+ */
+function foldRdnValue(value: string): string {
+  return dropSpaces([...value.normalize('NFKC')]).join('');
 }
 
 /**
  * Read the name of an entry written as a DN: the value of its first RDN when
  * that RDN asserts `attribute` alone, under `base` when one is given.
  *
- * The value is decoded exactly as {@link rdnValue} decodes it: it is the
- * naming attribute's value, the one a write puts back in
- * `attribute=…,base`.
+ * The value is decoded as {@link rdnValue} decodes it, then folded as the
+ * directory folds it ({@link foldRdnValue}): it is the naming attribute's
+ * value, the one a write puts back in `attribute=…,base`, and a caller
+ * spelling it in a way the directory considers the same name gets that name,
+ * not a second one.
  *
  * @param dn - The DN to read
  * @param attribute - The attribute the first RDN must assert
@@ -549,7 +593,7 @@ export function assertedRdnValue(
   if (splitRdn(rdn).length > 1) return null;
   if (base !== undefined && normalizeDn(parent.join(',')) !== normalizeDn(base))
     return null;
-  return rdnValueOf(rdn);
+  return foldRdnValue(rdnValueOf(rdn));
 }
 
 /**
@@ -626,17 +670,7 @@ const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
 function canonicalValue(raw: string): string {
   const trimmed = trimUnescaped(raw);
   if (/^#(?:[0-9a-fA-F]{2})+$/.test(trimmed)) return trimmed;
-  // LDAPv2: in double quotes, every character is the value's
-  // The closing quote is not escaped: an even run of backslashes before it
-  let backslashes = 0;
-  for (let i = trimmed.length - 2; i > 0 && trimmed[i] === '\\'; i--)
-    backslashes++;
-  const quoted =
-    trimmed.length >= 2 &&
-    trimmed.startsWith('"') &&
-    trimmed.endsWith('"') &&
-    backslashes % 2 === 0;
-  raw = quoted ? trimmed.slice(1, -1) : trimmed;
+  raw = unquotedValue(trimmed);
   // Each character, decoded; hex pairs that are not, kept as `\xx`
   const chars: string[] = [];
   let last = 0;
@@ -676,23 +710,13 @@ function canonicalValue(raw: string): string {
     } else run += char;
   tokens.push(...run.toLowerCase().normalize('NFKC'));
 
-  // Insignificant spaces (RFC 4518 §2.6.1): none at either end, and one
-  // for a run of them
-  const folded = tokens.filter(
-    (char, i) => char !== ' ' || (i > 0 && tokens[i - 1] !== ' ')
-  );
-  let start = 0;
-  let end = folded.length;
-  while (start < end && folded[start] === ' ') start++;
-  while (end > start && folded[end - 1] === ' ') end--;
-
+  const folded = dropSpaces(tokens);
   let out = '';
-  for (let i = start; i < end; i++) {
-    const char = folded[i];
+  for (const [i, char] of folded.entries()) {
     if (kept(char)) out += char;
     else if (char.charCodeAt(0) < 0x20 || char.charCodeAt(0) === 0x7f)
       out += `\\${hexByte(char.charCodeAt(0))}`;
-    else if (',+"\\<>;='.includes(char) || (i === start && char === '#'))
+    else if (',+"\\<>;='.includes(char) || (i === 0 && char === '#'))
       out += `\\${char}`;
     else out += char;
   }

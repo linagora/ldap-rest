@@ -349,6 +349,9 @@ describe('LDAP Utils', () => {
       expect(rdnValue('ou=Sales\\20,dc=x')).to.equal('Sales ');
       expect(rdnValue('dc=example')).to.equal('example');
       expect(rdnValue('cn = x , dc=x')).to.equal('x');
+      // LDAPv2 quotes one value: the quotes are not part of it
+      expect(rdnValue('cn="a+b",dc=x')).to.equal('a+b');
+      expect(rdnValue('cn="a\\"b",dc=x')).to.equal('a"b');
       expect(rdnValue('')).to.equal('');
       expect(rdnValue('nonsense')).to.equal('');
     });

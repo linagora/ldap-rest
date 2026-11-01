@@ -22,6 +22,13 @@
   larger value is now refused with a 400 naming the bound
   ([#558](https://github.com/linagora/ldap-rest/issues/558),
   [details](docs/usage/plugins/ldap/password-policy.md#managing-policies)).
+- An entry or a group named by a DN is written under the name that DN gives
+  under the fold the directory applies: a decomposed accent is composed, the
+  spaces it ignores are dropped, and an LDAPv2 quoted value is read as the
+  value it holds — so two spellings of one name are one entry, and the RDN
+  and the naming attribute spell one value
+  ([#501](https://github.com/linagora/ldap-rest/issues/501),
+  [details](docs/usage/plugins/ldap/flat-generic.md#create-entry)).
 
 ## v1.3.0 (2026-10-31)
 

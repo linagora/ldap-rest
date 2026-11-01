@@ -843,8 +843,8 @@ export default class LdapGroups extends DmPlugin {
     let dn: string;
     if (namesByDn(cn, this.cn)) {
       // A bare RDN lies in the groups branch, as a name does; an escaped
-      // comma is one RDN, so the separators are counted, not the commas
-      dn = parseDn(cn).length > 1 ? cn : `${cn},${this.base as string}`;
+      // comma is one RDN, so `parseDn` splits on the separators it sees
+      const [, ...parent] = parseDn(cn);
       const name = assertedRdnValue(cn, this.cn);
       // As on a flat entry: a DN that cannot name the group is refused, not
       // kept whole as its name
@@ -853,6 +853,9 @@ export default class LdapGroups extends DmPlugin {
           `${this.cn} must be a value, or a "${this.cn}=…,${this.base as string}" DN`
         );
       cn = name;
+      // The RDN rebuilt from the folded name, the branch as sent: the RDN and
+      // the naming attribute spell one value, whichever spelling was sent
+      dn = `${this.cn}=${escapeDnValue(cn)},${parent.length ? parent.join(',') : (this.base as string)}`;
     } else {
       dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     }

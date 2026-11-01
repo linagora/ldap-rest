@@ -10,6 +10,7 @@ import type { SearchResult } from 'ldapts';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import { normalizeDn } from '../../../src/lib/utils';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 const B = String.fromCharCode(92);
@@ -88,6 +89,58 @@ describe('A flat entry created under a DN', function () {
       (await stored(`uid=Smith${B},John,ou=users,${base}`)).searchEntries[0]
         ?.uid
     ).to.equal('Smith,John');
+    await server.ldap.delete(dn).catch(() => undefined);
+  });
+
+  it('writes the name the directory folds the RDN to', async () => {
+    // `uid=\ zoë` and `uid=zoë` are one name for the directory: the entry is
+    // written under the folded one, with that value, and the other spelling
+    // is refused as taken instead of creating a second entry
+    const folded = `uid=zoë,ou=users,${base}`;
+    const first = await request
+      .post(route)
+      .send({ uid: `uid=${B} zoë,ou=users,${base}`, cn: 'Zoë', sn: 'Z' });
+    expect(first.status, JSON.stringify(first.body)).to.equal(201);
+    const written = await stored(folded);
+    expect(written.searchEntries[0]?.dn).to.equal(folded);
+    expect(written.searchEntries[0]?.uid).to.equal('zoë');
+
+    const second = await request
+      .post(route)
+      .send({ uid: folded, cn: 'Zoë', sn: 'Z' });
+    expect(second.status, JSON.stringify(second.body)).to.equal(409);
+    await server.ldap.delete(folded).catch(() => undefined);
+  });
+
+  it('writes the composed name for a decomposed one', async () => {
+    // NFKC: the two are one name to the directory, and the composed one is
+    // what the entry carries
+    const composed = `uid=café,ou=users,${base}`;
+    const res = await request
+      .post(route)
+      .send({ uid: `uid=cafe\u0301,ou=users,${base}`, cn: 'Café', sn: 'C' });
+    expect(res.status, JSON.stringify(res.body)).to.equal(201);
+    expect((await stored(composed)).searchEntries[0]?.uid).to.equal('café');
+
+    const second = await request
+      .post(route)
+      .send({ uid: composed, cn: 'Café', sn: 'C' });
+    expect(second.status, JSON.stringify(second.body)).to.equal(409);
+    await server.ldap.delete(composed).catch(() => undefined);
+  });
+
+  it('writes the value a quoted RDN holds, without the quotes', async () => {
+    // LDAPv2 quotes one value: `uid="a+b"` names `a+b`, and the entry is
+    // written under the DN that spells it that way, so it can be read back
+    const dn = `uid=a${B}+b,ou=users,${base}`;
+    const res = await request
+      .post(route)
+      .send({ uid: `uid="a+b",ou=users,${base}`, cn: 'Quoted', sn: 'Q' });
+    expect(res.status, JSON.stringify(res.body)).to.equal(201);
+    expect(res.body.uid).to.equal('a+b');
+    // The directory spells `+` in hex; the DN is the one written
+    expect(normalizeDn(res.body.dn as string)).to.equal(normalizeDn(dn));
+    expect((await stored(dn)).searchEntries[0]?.uid).to.equal('a+b');
     await server.ldap.delete(dn).catch(() => undefined);
   });
 });
