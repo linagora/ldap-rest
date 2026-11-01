@@ -62,8 +62,7 @@ export default class LdapDepartmentSync extends DmPlugin {
    */
   private organizationPathAttribute(): string {
     const organizations = this.server.loadedPlugins['ldapOrganizations'] as
-      | { schema?: Schema }
-      | undefined;
+      { schema?: Schema } | undefined;
     return (
       roleAttribute(organizations?.schema, 'organizationPath') || this.pathAttr
     );
@@ -79,12 +78,10 @@ export default class LdapDepartmentSync extends DmPlugin {
   private linkedAttributes(): LinkedAttributes[] {
     const schemas: (Schema | undefined)[] = [];
     const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
-      | { instances?: { schema?: Schema }[] }
-      | undefined;
+      { instances?: { schema?: Schema }[] } | undefined;
     for (const instance of flat?.instances || []) schemas.push(instance.schema);
     const groups = this.server.loadedPlugins['ldapGroups'] as
-      | { schema?: Schema }
-      | undefined;
+      { schema?: Schema } | undefined;
     schemas.push(groups?.schema);
 
     const pairs: LinkedAttributes[] = [];

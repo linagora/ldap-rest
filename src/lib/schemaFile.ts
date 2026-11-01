@@ -203,7 +203,7 @@ export function loadSchemaFile<T = unknown>(
   options: SchemaFileOptions = {}
 ): T {
   const chain = new SchemaChain(options);
-  for (let next: string | undefined = file; next; ) {
+  for (let next: string | undefined = file; next;) {
     let raw: string;
     try {
       raw = fs.readFileSync(next, 'utf8');
@@ -230,7 +230,7 @@ export async function loadSchemaFileAsync<T = unknown>(
   options: SchemaFileOptions = {}
 ): Promise<T> {
   const chain = new SchemaChain(options);
-  for (let next: string | undefined = file; next; ) {
+  for (let next: string | undefined = file; next;) {
     let raw: string;
     try {
       raw = await fs.promises.readFile(next, 'utf8');

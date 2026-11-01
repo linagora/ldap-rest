@@ -453,8 +453,7 @@ export class OpenAPIGenerator {
 
     // Look for `this.<field> = ...` assignment in constructor.
     const ctor = classNode.members.find(m => ts.isConstructorDeclaration(m)) as
-      | ts.ConstructorDeclaration
-      | undefined;
+      ts.ConstructorDeclaration | undefined;
     if (ctor?.body) {
       for (const stmt of ctor.body.statements) {
         if (!ts.isExpressionStatement(stmt)) continue;
@@ -832,8 +831,7 @@ export class OpenAPIGenerator {
     // schemas would leave a `$ref` next to the keys of the other.
     const documentedSchema = (
       overrides.requestBody as
-        | { content?: Record<string, { schema?: unknown }> }
-        | undefined
+        { content?: Record<string, { schema?: unknown }> } | undefined
     )?.content?.['application/json']?.schema;
     const body = await this.schemaOf(property('body'), sourceFile);
     if (body !== undefined && documentedSchema === undefined) {

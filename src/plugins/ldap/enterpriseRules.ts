@@ -444,8 +444,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     }
 
     const groups = this.server.loadedPlugins['ldapGroups'] as
-      | { base?: string; schema?: Schema }
-      | undefined;
+      { base?: string; schema?: Schema } | undefined;
     if (groups?.base && groups.schema)
       out.push({
         base: groups.base,
@@ -455,8 +454,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
       });
 
     const organizations = this.server.loadedPlugins['ldapOrganizations'] as
-      | { schema?: Schema }
-      | undefined;
+      { schema?: Schema } | undefined;
     if (organizations?.schema && this.topOrganization)
       out.push({
         base: this.topOrganization,

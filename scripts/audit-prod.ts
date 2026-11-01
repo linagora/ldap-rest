@@ -23,12 +23,7 @@ const allowlistPath = path.resolve(
 const BLOCKING = ['high', 'critical'];
 
 export type Severity =
-  | 'info'
-  | 'low'
-  | 'moderate'
-  | 'high'
-  | 'critical'
-  | 'unknown';
+  'info' | 'low' | 'moderate' | 'high' | 'critical' | 'unknown';
 
 export interface Advisory {
   /** The package npm reports the advisory under */

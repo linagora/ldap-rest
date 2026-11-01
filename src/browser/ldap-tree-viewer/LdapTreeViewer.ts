@@ -158,9 +158,7 @@ export class LdapTreeViewer {
   ): TreeNode {
     // Determine display name
     let displayName = (data.ou || data.cn || data.uid || data.dn) as
-      | string
-      | string[]
-      | undefined;
+      string | string[] | undefined;
     if (Array.isArray(displayName)) {
       displayName = displayName[0];
     }

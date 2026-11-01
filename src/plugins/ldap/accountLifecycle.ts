@@ -115,8 +115,7 @@ export default class LdapAccountLifecycle extends DmPlugin {
    */
   api(app: Express): void {
     const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
-      | { instances?: FlatEntity[] }
-      | undefined;
+      { instances?: FlatEntity[] } | undefined;
     if (!flat?.instances?.length) {
       this.logger.warn(
         'accountLifecycle: no flat entity is loaded, no endpoint registered'

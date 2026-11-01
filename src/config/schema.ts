@@ -17,13 +17,7 @@ import {
  * generalized time (`yyyyMMddHHmmss[.SSS]Z`).
  */
 export type SchemaAttributeType =
-  | 'string'
-  | 'number'
-  | 'integer'
-  | 'boolean'
-  | 'date'
-  | 'array'
-  | 'pointer';
+  'string' | 'number' | 'integer' | 'boolean' | 'date' | 'array' | 'pointer';
 
 /**
  * Semantic role of an attribute: what it *means*, independent of the concrete
@@ -633,7 +627,7 @@ export async function checkDnValues(
       try {
         exists = await entryExists(dn);
       } catch {
-        exists = false;
+        // A read that failed leaves it absent
       }
       if (!exists)
         throw new BadRequestError(

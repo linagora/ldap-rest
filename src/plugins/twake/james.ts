@@ -1035,11 +1035,9 @@ export default class James extends TwakePlugin {
    */
   private domainLinkAttributes(): string[] {
     const organizations = this.server.loadedPlugins['ldapOrganizations'] as
-      | { schema?: Schema }
-      | undefined;
+      { schema?: Schema } | undefined;
     const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
-      | { instances?: { schema?: Schema }[] }
-      | undefined;
+      { instances?: { schema?: Schema }[] } | undefined;
     const names = [
       organizations?.schema,
       ...(flat?.instances || []).map(instance => instance.schema),

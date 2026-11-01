@@ -860,8 +860,7 @@ class ldapActions {
     for (const [key, value] of Object.entries(entry)) {
       assertHasValue(key, value);
       const values = (Array.isArray(value) ? value : [value]) as
-        | string[]
-        | Buffer[];
+        string[] | Buffer[];
       attributes.push(
         new Attribute({
           type: key,

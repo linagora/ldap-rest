@@ -28,9 +28,7 @@ export interface PooledConnection {
  * it gets none.
  */
 type WaiterOutcome =
-  | { connection: PooledConnection }
-  | { retry: true }
-  | { error: Error };
+  { connection: PooledConnection } | { retry: true } | { error: Error };
 
 /** Opens a client; binding is the pool's, so a fake can stand in. */
 export type ClientFactory = (

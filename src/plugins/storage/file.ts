@@ -151,7 +151,7 @@ export default class FileStore extends Store {
         }
         continue;
       }
-      let record: StoredRecord | null = null;
+      let record: StoredRecord | null;
       try {
         record = FileStore.decode(await fs.readFile(file, 'utf8'));
       } catch {

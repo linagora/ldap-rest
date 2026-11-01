@@ -317,8 +317,7 @@ export default class AuthzScope extends DmPlugin {
       });
 
     const groups = this.server.loadedPlugins['ldapGroups'] as
-      | { base?: string; schema?: { attributes?: object } }
-      | undefined;
+      { base?: string; schema?: { attributes?: object } } | undefined;
     if (groups?.base)
       out.push({
         name: 'groups',
@@ -484,8 +483,7 @@ export default class AuthzScope extends DmPlugin {
   /** The password policy plugin, when loaded. */
   private policyPlugin(): { policyBase(): string } | undefined {
     return this.server.loadedPlugins['ldapPasswordPolicy'] as unknown as
-      | { policyBase(): string }
-      | undefined;
+      { policyBase(): string } | undefined;
   }
 
   /**
@@ -529,8 +527,7 @@ export default class AuthzScope extends DmPlugin {
     // The role first, as the enterprise rules read it: a deployment naming
     // the path attribute only through the schema got raw DNs in the sidebar.
     const organizations = this.server.loadedPlugins['ldapOrganizations'] as
-      | { schema?: Schema }
-      | undefined;
+      { schema?: Schema } | undefined;
     const pathAttr =
       roleAttribute(organizations?.schema, 'organizationPath') ||
       this.config.ldap_organization_path_attribute;

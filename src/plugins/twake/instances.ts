@@ -51,9 +51,7 @@ interface Account extends InstanceRequest {
 
 const first = (value: unknown): string | undefined => {
   const one = (Array.isArray(value) ? value[0] : value) as
-    | string
-    | Buffer
-    | undefined;
+    string | Buffer | undefined;
   const text = one === undefined || one === null ? '' : one.toString();
   return text || undefined;
 };

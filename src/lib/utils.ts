@@ -827,7 +827,7 @@ function hexByte(byte: number): string {
 function utf8Chars(bytes: number[]): (string | number)[] {
   const out: (string | number)[] = [];
   const buffer = Uint8Array.from(bytes);
-  for (let i = 0; i < bytes.length; ) {
+  for (let i = 0; i < bytes.length;) {
     const length = utf8Length(bytes[i]);
     let decoded: string | undefined;
     if (length && i + length <= bytes.length)

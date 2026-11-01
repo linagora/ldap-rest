@@ -168,15 +168,15 @@ describe('SCIM schema URLs in the configuration API', () => {
   it('should name the files SCIM reads, not those shipped', async () => {
     // --schemas-path elsewhere: the shipped copy is not what SCIM serves.
     const schemas_path = join(copy, 'schemas');
-    let { urls, dm } = await announced([['static', {}]], { schemas_path });
-    expect(urls).to.equal(undefined);
-    ({ urls, dm } = await announced(
+    const first = await announced([['static', {}]], { schemas_path });
+    expect(first.urls).to.equal(undefined);
+    const { urls, dm } = await announced(
       [
         ['static', {}],
         ['own', { static_name: 'own', static_path: copy }],
       ],
       { schemas_path }
-    ));
+    );
     expect(urls).to.deep.equal(under('/own'));
     await served(dm, urls);
     for (const url of Object.values(urls as Urls)) {

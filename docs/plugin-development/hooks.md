@@ -118,6 +118,7 @@ await server.hookBus.settled();
 - **scimgroupdeletedone**: notified once a SCIM group is deleted, with its id
 - **scimbulkdone**: notified once a SCIM bulk request is answered
 - **twakedeletionreplay**: notified with the DN, the entry and the context, one by one when a delete asks of an entry that is already a tombstone
+
 <!-- /hooks -->
 
 ## Flat entities
