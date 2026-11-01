@@ -616,6 +616,14 @@ describe('Twake instances plugin', function () {
           rest()
         );
         expect(asked).to.include({ org_id: 'Foo, Bar' });
+        // The member is held until its organization is announced, under the
+        // id the organization entry spells
+        await rabbit.handler!({
+          twakeId: 'inzfoo2cbar',
+          internalEmail: 'in.z@acme.example',
+          workplaceFqdn: 'inzfoo2cbar.example.org',
+        });
+        expect(rabbit.published).to.deep.equal([]);
       } finally {
         for (const dn of [`uid=in.z,ou=users,${org}`, `ou=users,${org}`, org])
           await dm.ldap.delete(dn).catch(() => undefined);

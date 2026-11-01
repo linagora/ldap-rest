@@ -741,9 +741,8 @@ export default class TwakeInstances extends DmPlugin {
    * stands when there is no entry or no organization base.
    */
   private async storedOrganizationId(id: string): Promise<string> {
-    const value = unescapeDnValue(id);
-    const entry = await this.findOrganization(value).catch(() => undefined);
-    return entry ? rdnValue(entry.dn as string) : value;
+    const entry = await this.findOrganization(id).catch(() => undefined);
+    return entry ? rdnValue(entry.dn as string) : id;
   }
 
   /** `account()`, with a captured organization id read from its entry. */
@@ -827,7 +826,7 @@ export default class TwakeInstances extends DmPlugin {
       return undefined;
     }
     const cozy = this.provider instanceof CozyStackProvider;
-    const captured = match.groups?.org;
+    const captured = match.groups?.org && unescapeDnValue(match.groups.org);
     const orgId =
       captured ||
       (cozy ? this.settings.twake_instance_cozy_org_id : '') ||
