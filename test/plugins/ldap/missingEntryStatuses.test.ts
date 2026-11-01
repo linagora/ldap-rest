@@ -189,6 +189,18 @@ describe('Writes to what the directory does not hold', function () {
       expect(res.body.error).to.equal(`Organization ${dn} not found`);
     });
 
+    it('should answer 400 to the deletion of a DN the directory cannot parse', async () => {
+      for (const dn of [
+        `uid=pl\\qain,ou=users,${base}`,
+        `uid=codes.none,ou=users,${base},`,
+      ]) {
+        const res = await request.delete(
+          `/api/v1/ldap/users/${encodeURIComponent(dn)}`
+        );
+        expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      }
+    });
+
     it('should answer 400 to a move towards something that is not a DN', async () => {
       const res = await request
         .post('/api/v1/ldap/users/codes.alice/move')

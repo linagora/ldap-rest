@@ -263,6 +263,14 @@ describe('Trash Plugin', function () {
   });
 
   describe('Error handling', () => {
+    it('keeps the 400 of a DN the directory cannot parse', async () => {
+      let error: unknown;
+      await server.ldap
+        .delete(`uid=pl\\qain,ou=users,${process.env.DM_LDAP_BASE}`)
+        .catch(e => (error = e));
+      expect(error).to.have.property('statusCode', 400);
+    });
+
     it('should handle missing LDAP permissions gracefully', async function () {
       // This test would require intentionally limiting permissions
       // which is difficult to do in a unit test environment

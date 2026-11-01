@@ -1309,7 +1309,7 @@ class ldapActions {
           const code = extractLdapCode(error);
           throw code === 32
             ? withCode(new NotFoundError(`Entry ${entry} not found`), code)
-            : ldapError(`LDAP delete error`, error);
+            : ldapWriteError('LDAP delete error', entry, error);
         }
         done.push(
           this.parent.hookBus.notifyAndWait(
