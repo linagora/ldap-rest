@@ -10,6 +10,7 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { SearchResult } from 'ldapts';
 
 import { DM } from '../../../src/bin';
 import DmPlugin from '../../../src/abstract/plugin';
@@ -23,7 +24,6 @@ import {
   schemaAttribute,
   type Schema,
 } from '../../../src/config/schema';
-import type { SearchResult } from 'ldapts';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

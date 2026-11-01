@@ -1,7 +1,8 @@
-import LdapActions, { type AttributesList } from '../../src/lib/ldapActions';
 import { expect } from 'chai';
 import { Client, SearchResult } from 'ldapts';
 import type { Request } from 'express';
+
+import LdapActions, { type AttributesList } from '../../src/lib/ldapActions';
 import { parseConfig } from '../../src/lib/parseConfig';
 import configTemplate from '../../src/config/args';
 import { DM } from '../../src/bin';
@@ -85,9 +86,7 @@ describe('ldapActions', function () {
     before(function () {
       // Skip tests if env vars are not set
       if (!process.env.DM_LDAP_BASE) {
-        // eslint-disable-next-line no-console
         console.warn('Skipping LDAP modify: DM_LDAP_BASE not set');
-        // @ts-ignore
         this.skip();
       }
       // Initialize DNs after env vars are set
@@ -189,7 +188,7 @@ describe('ldapActions', function () {
         // Clean up: delete the test entry if it exists
         try {
           await ldapActions.delete(testDN);
-        } catch (err) {
+        } catch (_err) {
           // Ignore errors if the entry does not exist
         }
       });
@@ -310,12 +309,12 @@ describe('ldapActions', function () {
         // Clean up: delete the test entry if it exists
         try {
           await ldapActions.delete(testDN);
-        } catch (err) {
+        } catch (_err) {
           // Ignore errors if the entry does not exist
         }
         try {
           await ldapActions.delete(newDN);
-        } catch (err) {
+        } catch (_err) {
           // Ignore errors if the entry does not exist
         }
       });
@@ -469,7 +468,7 @@ describe('ldapActions', function () {
         for (const dn of [testDN, newDN]) {
           try {
             await ldapActions.delete(dn);
-          } catch (err) {
+          } catch (_err) {
             // Ignore errors if the entry does not exist
           }
         }

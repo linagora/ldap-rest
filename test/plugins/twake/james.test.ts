@@ -1,13 +1,12 @@
 import nock from 'nock';
 import request from 'supertest';
+import { expect } from 'chai';
 
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
-import { expect } from 'chai';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import LdapGroups from '../../../src/plugins/ldap/groups';
-
 import { waitFor } from '../../helpers/waitFor';
 describe('James Plugin', () => {
   let testDN: string;
@@ -256,22 +255,22 @@ describe('James Plugin', () => {
     // Clean up: delete the test entries if they exist
     try {
       await dm.ldap.delete(testDN);
-    } catch (err) {
+    } catch (_err) {
       // Ignore errors if the entry does not exist
     }
     try {
       await dm.ldap.delete(testDNQuota);
-    } catch (err) {
+    } catch (_err) {
       // Ignore errors if the entry does not exist
     }
     try {
       await dm.ldap.delete(testDNAliases);
-    } catch (err) {
+    } catch (_err) {
       // Ignore errors if the entry does not exist
     }
     try {
       await dm.ldap.delete(testDNForwards);
-    } catch (err) {
+    } catch (_err) {
       // Ignore errors if the entry does not exist
     }
   });
@@ -508,7 +507,7 @@ describe('James Plugin', () => {
         // Cleanup
         try {
           await dm.ldap.delete(testDNNoAlias);
-        } catch (err) {
+        } catch (_err) {
           // Ignore
         }
         renameScope.persist(false);
@@ -578,7 +577,7 @@ describe('James Plugin', () => {
         // Cleanup
         try {
           await dm.ldap.delete(testDNNoAlias);
-        } catch (err) {
+        } catch (_err) {
           // Ignore
         }
         renameScope.persist(false);
@@ -737,7 +736,7 @@ describe('James Plugin', () => {
           uid: 'assistant',
           mail: 'assistant@test.org',
         });
-      } catch (err) {
+      } catch (_err) {
         // Ignore if already exists
       }
     });
@@ -745,22 +744,22 @@ describe('James Plugin', () => {
     afterEach(async () => {
       try {
         await dm.ldap.delete(userDN);
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await dm.ldap.delete(assistantDN);
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await dm.ldap.delete(assistant1DN);
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await dm.ldap.delete(assistant2DN);
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
     });
@@ -797,7 +796,6 @@ describe('James Plugin', () => {
     });
 
     it('should remove delegation when twakeDelegatedUsers is removed', async () => {
-      let addApiCalled = false;
       let removeApiCalled = false;
 
       const addScope = nock(
@@ -812,9 +810,7 @@ describe('James Plugin', () => {
         .delete('/users/delegate@test.org/authorizedUsers/assistant@test.org')
         .reply(200);
 
-      addScope.on('request', () => {
-        addApiCalled = true;
-      });
+      addScope.on('request', () => {});
 
       removeScope.on('request', () => {
         removeApiCalled = true;
@@ -914,11 +910,11 @@ describe('James Plugin', () => {
     });
     const testMail1 = `${testUser1}@test.org`;
     const testMail2 = `${testUser2}@test.org`;
-    let identityScope: nock.Scope;
+    let _identityScope: nock.Scope;
 
     before(function () {
       // Mock JMAP identity endpoints
-      identityScope = nock(
+      _identityScope = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
         .persist()
@@ -948,12 +944,12 @@ describe('James Plugin', () => {
       // Clean up: delete the test entries if they exist
       try {
         await dm.ldap.delete(testDN2);
-      } catch (err) {
+      } catch (_err) {
         // Ignore errors if the entry does not exist
       }
       try {
         await dm.ldap.delete(testDN3);
-      } catch (err) {
+      } catch (_err) {
         // Ignore errors if the entry does not exist
       }
     });
@@ -1030,7 +1026,7 @@ describe('James Plugin', () => {
         mail: testMail2,
         displayName: 'New User Display',
       };
-      let res = await dm.ldap.add(testDN3, entry);
+      const res = await dm.ldap.add(testDN3, entry);
       expect(res).to.be.true;
 
       // Wait for the ldapadddone hook to execute (with 1s delay in hook)
@@ -1040,7 +1036,7 @@ describe('James Plugin', () => {
 
   describe('Signature template', () => {
     let testDN4: string;
-    let signatureScope: nock.Scope;
+    let _signatureScope: nock.Scope;
     let savedTemplate: string | undefined;
 
     before(function () {
@@ -1051,7 +1047,7 @@ describe('James Plugin', () => {
         '--<br/>{givenName} {sn}<br/>{title}<br/>{departmentNumber}';
 
       // Mock JMAP identity endpoints for signature test
-      signatureScope = nock(
+      _signatureScope = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
         .persist()
@@ -1080,7 +1076,7 @@ describe('James Plugin', () => {
     afterEach(async () => {
       try {
         await dm.ldap.delete(testDN4);
-      } catch (err) {
+      } catch (_err) {
         // Ignore errors if the entry does not exist
       }
     });
@@ -1097,7 +1093,7 @@ describe('James Plugin', () => {
         departmentNumber: 'IT Department',
         displayName: 'John Doe',
       };
-      let res = await dm.ldap.add(testDN4, entry);
+      const res = await dm.ldap.add(testDN4, entry);
       expect(res).to.be.true;
 
       // Test signature generation directly
@@ -1143,7 +1139,7 @@ describe('James Plugin', () => {
         displayName: 'Jane Smith',
         // Note: title and departmentNumber are missing
       };
-      let res = await dm.ldap.add(testDN4, entry);
+      const res = await dm.ldap.add(testDN4, entry);
       expect(res).to.be.true;
 
       // Test signature generation with missing attributes

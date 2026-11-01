@@ -72,7 +72,6 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
       !process.env.DM_LDAP_PWD ||
       !process.env.DM_LDAP_BASE
     ) {
-      // eslint-disable-next-line no-console
       console.warn(
         'Skipping SCIM+authzPerBranch integration tests: LDAP env vars missing'
       );

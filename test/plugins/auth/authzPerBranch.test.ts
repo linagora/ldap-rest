@@ -1,12 +1,13 @@
 import { expect } from 'chai';
+import type { Response } from 'express';
+import supertest from 'supertest';
+
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { DM } from '../../../src/bin';
 import LdapOrganization from '../../../src/plugins/ldap/organizations';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Response } from 'express';
 import type { Role } from '../../../src/abstract/plugin';
 import type { ModifyRequest } from '../../../src/lib/ldapActions';
-import supertest from 'supertest';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
@@ -276,17 +277,17 @@ describe('AuthzPerBranch', function () {
       this.timeout(5000);
       try {
         await server.ldap.delete(getGroupDn());
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await server.ldap.delete(getGroupMemberDn());
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await server.ldap.delete(getNonMemberDn());
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
     });
@@ -381,7 +382,7 @@ describe('AuthzPerBranch', function () {
       for (const dn of [groupA(), groupB(), userDn(), homonymDn()]) {
         try {
           await server.ldap.delete(dn);
-        } catch (err) {
+        } catch (_err) {
           // Ignore
         }
       }
@@ -558,7 +559,7 @@ describe('AuthzPerBranch', function () {
     afterEach(async () => {
       try {
         await server.ldap.delete(target());
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
     });
@@ -752,32 +753,32 @@ describe('AuthzPerBranch', function () {
       // Clean up test entries
       try {
         await apiServer.ldap.delete(getTestUser1Dn());
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await apiServer.ldap.delete(getTestUser2Dn());
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await apiServer.ldap.delete(getTestSubOrg1Dn());
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await apiServer.ldap.delete(getTestSubOrg2Dn());
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await apiServer.ldap.delete(getTestOrgDn());
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await apiServer.ldap.delete(getTestOrg2Dn());
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
     });

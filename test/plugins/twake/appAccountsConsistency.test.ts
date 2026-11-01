@@ -1,8 +1,8 @@
+import { expect } from 'chai';
+
 import { DM } from '../../../src/bin';
 import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsistency';
 import OnChange from '../../../src/plugins/ldap/onChange';
-import { expect } from 'chai';
-
 import { waitForEntry, waitForNoEntry } from '../../helpers/waitFor';
 
 describe('App Accounts Consistency Plugin', function () {
@@ -48,7 +48,7 @@ describe('App Accounts Consistency Plugin', function () {
         objectClass: ['organizationalUnit', 'top'],
         ou: 'users',
       });
-    } catch (err) {
+    } catch (_err) {
       // Ignore if already exists
     }
 
@@ -62,7 +62,7 @@ describe('App Accounts Consistency Plugin', function () {
         objectClass: ['organizationalUnit', 'top'],
         ou: ouValue,
       });
-    } catch (err) {
+    } catch (_err) {
       // Ignore if already exists
     }
 
@@ -114,7 +114,7 @@ describe('App Accounts Consistency Plugin', function () {
     for (const dn of testDNs) {
       try {
         await dm.ldap.delete(dn);
-      } catch (err) {
+      } catch (_err) {
         // Ignore if doesn't exist
       }
     }
@@ -329,7 +329,7 @@ describe('App Accounts Consistency Plugin', function () {
       await waitForEntry(dm, testApplicativeDN);
 
       // Verify applicative account exists
-      let result = await dm.ldap.search(
+      const result = await dm.ldap.search(
         {
           scope: 'base',
           paged: false,
@@ -658,7 +658,7 @@ describe('App Accounts Consistency Plugin', function () {
           if ((checkResult as any).searchEntries?.length > 0) {
             principalCreated = true;
           }
-        } catch (err) {
+        } catch (_err) {
           // Not found yet, continue waiting
         }
       }
@@ -707,7 +707,7 @@ describe('App Accounts Consistency Plugin', function () {
           if ((checkResult as any).searchEntries?.length > 0) {
             principalRenamed = true;
           }
-        } catch (err) {
+        } catch (_err) {
           // Not renamed yet, continue waiting
         }
       }
@@ -715,7 +715,7 @@ describe('App Accounts Consistency Plugin', function () {
         .be.true;
 
       // Verify principal account changed uid
-      let result = await dm.ldap.search(
+      const result = await dm.ldap.search(
         {
           scope: 'base',
           paged: false,
@@ -723,7 +723,7 @@ describe('App Accounts Consistency Plugin', function () {
         newPrincipalDN
       );
       expect((result as any).searchEntries).to.have.lengthOf(1);
-      let entry = (result as any).searchEntries[0];
+      const entry = (result as any).searchEntries[0];
       expect(entry.uid).to.equal(`newemail-${timestamp}@example.com`);
       expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`);
 
@@ -744,17 +744,17 @@ describe('App Accounts Consistency Plugin', function () {
       // Cleanup - ignore errors if already deleted
       try {
         await dm.ldap.delete(newPrincipalDN);
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await dm.ldap.delete(appAccount1DN);
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
       try {
         await dm.ldap.delete(appAccount2DN);
-      } catch (err) {
+      } catch (_err) {
         // Ignore
       }
     });
@@ -871,7 +871,7 @@ describe('App Accounts Consistency Plugin', function () {
         for (const dn of [appDn, userDn]) {
           try {
             await dm2.ldap.delete(dn);
-          } catch (err) {
+          } catch (_err) {
             // Ignore
           }
         }

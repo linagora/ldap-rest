@@ -1,10 +1,10 @@
 import { expect } from 'chai';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 import { SearchResult } from 'ldapts';
 import type { Response } from 'express';
 
+import { DM } from '../../../src/bin';
+import LdapGroups from '../../../src/plugins/ldap/groups';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Role } from '../../../src/abstract/plugin';
 import type { ChangeContext } from '../../../src/lib/changeContext';
@@ -54,7 +54,7 @@ describe('LdapGroups Plugin', function () {
     try {
       await plugin.ldap.delete(user1);
       await plugin.ldap.delete(user2);
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
   });
@@ -62,7 +62,7 @@ describe('LdapGroups Plugin', function () {
   afterEach(async () => {
     try {
       await plugin.deleteGroup('testgroup');
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
   });
@@ -77,7 +77,6 @@ describe('LdapGroups Plugin', function () {
     it('should add/delete group with members', async () => {
       await plugin.addGroup('testgroup', [user1]);
       const listEntries = await plugin.listGroups();
-      // @ts-ignore
       expect(listEntries).to.have.property('testgroup');
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
         testgroup: {
@@ -158,7 +157,7 @@ describe('LdapGroups Plugin', function () {
     this.afterEach(async () => {
       try {
         await plugin.deleteGroup('testgroupbis');
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
     });
@@ -571,17 +570,17 @@ describe('LdapGroups Plugin', function () {
     afterEach(async () => {
       try {
         await plugin.ldap.delete(groupDn);
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
       try {
         await plugin.ldap.delete(org1Dn);
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
       try {
         await plugin.ldap.delete(org2Dn);
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
     });

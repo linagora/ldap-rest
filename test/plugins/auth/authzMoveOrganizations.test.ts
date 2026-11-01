@@ -1,16 +1,17 @@
 import { expect } from 'chai';
+import type { Response } from 'express';
+import supertest from 'supertest';
+import type { SearchResult } from 'ldapts';
+
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { DM } from '../../../src/bin';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Response } from 'express';
 import type { Role } from '../../../src/abstract/plugin';
-import supertest from 'supertest';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
 } from '../../helpers/env';
-import type { SearchResult } from 'ldapts';
 
 // Simple auth plugin for testing that sets user from X-Test-User header
 class TestAuthPlugin extends AuthBase {
@@ -131,7 +132,7 @@ describe('Authorization for Organization Move', function () {
         }
         // Then delete the parent
         await server.ldap.delete(dn);
-      } catch (e) {
+      } catch (_e) {
         // ignore if doesn't exist
       }
     };
@@ -155,12 +156,12 @@ describe('Authorization for Organization Move', function () {
   after(async () => {
     try {
       await server.ldap.delete(getParentOrg1Dn());
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
     try {
       await server.ldap.delete(getParentOrg2Dn());
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
   });
@@ -178,13 +179,13 @@ describe('Authorization for Organization Move', function () {
     try {
       // Try both possible locations
       await server.ldap.delete(getChildOrgDn());
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
     try {
       const movedChildDn = `ou=child,${getParentOrg2Dn()}`;
       await server.ldap.delete(movedChildDn);
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
   });

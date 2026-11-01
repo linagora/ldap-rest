@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import request from 'supertest';
+
 import { DM } from '../src/bin/index';
 
 describe('Plugin Loading', () => {
@@ -9,7 +10,6 @@ describe('Plugin Loading', () => {
     process.env.DM_PORT = '64322';
     process.env.DM_PLUGINS =
       '../../dist/plugins/demo/helloworld.js,../../test/__plugins__/hello/index.js';
-    // @ts-ignore
     server = new DM();
     await server.ready;
     await server.run();

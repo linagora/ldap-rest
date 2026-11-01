@@ -14,14 +14,10 @@ describe('Browser LDAP Unit Editor', () => {
 
   describe('Constructor', () => {
     it('should create instance with unit-specific options', () => {
-      let savedUnitDn: string | undefined;
-
       editor = new LdapUnitEditor({
         containerId,
         apiBaseUrl: baseUrl,
-        onUnitSaved: (unitDn: string) => {
-          savedUnitDn = unitDn;
-        },
+        onUnitSaved: () => undefined,
         onError: (error: Error) => {
           console.error(error);
         },
@@ -119,7 +115,7 @@ describe('Browser LDAP Unit Editor', () => {
 
   describe('Callback mapping', () => {
     it('should accept onUnitSaved callback in constructor', () => {
-      const callback = (unitDn: string) => {
+      const callback = (_unitDn: string) => {
         // Mock callback
       };
 
@@ -133,7 +129,7 @@ describe('Browser LDAP Unit Editor', () => {
     });
 
     it('should accept onError callback in constructor', () => {
-      const callback = (error: Error) => {
+      const callback = (_error: Error) => {
         // Mock callback
       };
 

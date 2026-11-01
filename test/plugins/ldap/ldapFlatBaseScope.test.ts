@@ -10,6 +10,7 @@
 
 import { expect } from 'chai';
 import supertest from 'supertest';
+
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
 import { BadRequestError } from '../../../src/lib/errors';
@@ -155,7 +156,7 @@ describe('LdapFlat base-scope guard', function () {
     afterEach(async () => {
       try {
         await instance.deleteEntry(uid);
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
     });

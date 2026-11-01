@@ -4,7 +4,7 @@
  */
 
 import { execSync, spawn, ChildProcess } from 'child_process';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 export interface LdapServerConfig {
@@ -185,7 +185,7 @@ export class LdapTestServer {
     // Check if Docker is available
     try {
       execSync('docker --version', { stdio: 'ignore' });
-    } catch (err) {
+    } catch {
       throw new Error(
         'Docker is not available. Please install Docker to run LDAP tests.'
       );
@@ -196,7 +196,7 @@ export class LdapTestServer {
     // Stop any existing container with the same name
     try {
       execSync(`docker rm -f ${this.containerName}`, { stdio: 'ignore' });
-    } catch (err) {
+    } catch {
       // Container doesn't exist, that's fine
     }
 
@@ -341,7 +341,7 @@ export class LdapTestServer {
       }
       // Wait for schema to be fully loaded
       await new Promise(resolve => setTimeout(resolve, 2000));
-    } catch (err: any) {
+    } catch {
       // Fallback to custom schema if official one doesn't exist
       const schemaPath = join(__dirname, '../fixtures/twake-schema.ldif');
       if (existsSync(schemaPath)) {
@@ -396,7 +396,7 @@ export class LdapTestServer {
           { stdio: 'ignore', timeout: 2000 }
         );
         return; // Success
-      } catch (err) {
+      } catch {
         // Not ready yet, wait
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
@@ -419,7 +419,7 @@ export class LdapTestServer {
           { stdio: 'ignore', timeout: 2000 }
         );
         return; // Success
-      } catch (err) {
+      } catch {
         // Not ready yet, wait
         await new Promise(resolve => setTimeout(resolve, 1000));
       }

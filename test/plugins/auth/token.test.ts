@@ -1,13 +1,13 @@
-import { DM } from '../../../src/bin';
 import type { Express } from 'express';
 import request from 'supertest';
+import { expect } from 'chai';
+
+import { DM } from '../../../src/bin';
 import AuthToken from '../../../src/plugins/auth/token';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
-import { expect } from 'chai';
 
 describe('AuthToken', () => {
   describe('Unnamed tokens (legacy)', () => {
-    let dm: DM;
     let app: Express;
 
     before(async () => {

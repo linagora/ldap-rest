@@ -3,9 +3,6 @@ import nock from 'nock';
 
 import { ResourceApiClient } from '../../src/browser/ldap-resource-editor/api/ResourceApiClient';
 
-const { DM_LDAP_BASE } = process.env;
-const LDAP_BASE = DM_LDAP_BASE || '${LDAP_BASE}';
-
 describe('Browser Resource API Client', () => {
   const baseUrl = 'http://localhost:8081';
 

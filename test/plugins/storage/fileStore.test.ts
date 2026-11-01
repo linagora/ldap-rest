@@ -11,11 +11,12 @@
  *  - the storage is reclaimed, and a temporary a write is still holding is
  *    not taken with it.
  */
-import { expect } from 'chai';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mkdtempSync, rmSync } from 'node:fs';
+
+import { expect } from 'chai';
 
 import FileStore from '../../../src/plugins/storage/file';
 

@@ -1,10 +1,12 @@
-import { DM } from '../../../src/bin';
+import { createHmac } from 'crypto';
+
 import type { Express } from 'express';
 import request from 'supertest';
+import { expect } from 'chai';
+
+import { DM } from '../../../src/bin';
 import AuthTotp from '../../../src/plugins/auth/totp';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
-import { expect } from 'chai';
-import { createHmac } from 'crypto';
 
 /**
  * Generate a TOTP code for testing

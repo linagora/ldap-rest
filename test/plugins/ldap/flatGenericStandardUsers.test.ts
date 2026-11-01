@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
@@ -84,7 +85,6 @@ describe('LdapUsersFlat validation with standard schema (via flatGeneric)', func
         mail: 'testuser2-schema@example.org',
       });
       const listEntries = await plugin.listUsers({});
-      // @ts-ignore
       expect(listEntries).to.have.property('testuser2');
       expect(await plugin.searchUsersByName('testuser2')).to.deep.equal({
         testuser2: {

@@ -1,6 +1,7 @@
-import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
+
+import { expect } from 'chai';
 
 import type { LocalizedText, Schema } from '../../src/config/schema';
 import { roleAttribute } from '../../src/config/schema';
@@ -17,14 +18,12 @@ describe('Twake schemas', () => {
   let users: Schema;
   let groups: Schema;
   let organizations: Schema;
-  let domains: Schema;
   let labelled: Schema[];
 
   before(() => {
     users = read('twake/users.json');
     groups = read('twake/groups.json');
     organizations = read('twake/organizations.json');
-    domains = read('twake/nomenclature/twakeDomain.json');
     // The nomenclature schemas reach a reader through the same selects, lists
     // and cards.
     labelled = [

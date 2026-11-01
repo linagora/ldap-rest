@@ -4,6 +4,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import Transport from 'winston-transport';
 import type { Express, Request, Response } from 'express';
+import type { SearchOptions } from 'ldapts';
 
 import { DM } from '../../src/bin';
 import DmPlugin from '../../src/abstract/plugin';
@@ -13,7 +14,6 @@ import ValkeyStore from '../../src/plugins/storage/valkey';
 import { changeContext, requestId } from '../../src/lib/changeContext';
 import HookBus from '../../src/lib/hookBus';
 import type { Hooks } from '../../src/hooks';
-import type { SearchOptions } from 'ldapts';
 import {
   currentLogContext,
   outsideAnyRequest,

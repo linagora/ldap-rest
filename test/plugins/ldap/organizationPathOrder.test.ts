@@ -21,7 +21,6 @@ import {
 } from '../../helpers/env';
 
 describe('Organization paths', function () {
-  let base: string;
   let topOrg: string;
   let previousOrgSchema: string | undefined;
 
@@ -30,7 +29,6 @@ describe('Organization paths', function () {
   });
 
   before(() => {
-    base = process.env.DM_LDAP_BASE as string;
     topOrg = process.env.DM_LDAP_TOP_ORGANIZATION as string;
     previousOrgSchema = process.env.DM_ORGANIZATION_SCHEMA;
   });

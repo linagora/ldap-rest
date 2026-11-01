@@ -1,16 +1,17 @@
 import { expect } from 'chai';
+import type { Response } from 'express';
+import supertest from 'supertest';
+import type { SearchResult } from 'ldapts';
+
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { DM } from '../../../src/bin';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Response } from 'express';
 import type { Role } from '../../../src/abstract/plugin';
-import supertest from 'supertest';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
 } from '../../helpers/env';
-import type { SearchResult } from 'ldapts';
 
 // Simple auth plugin for testing that sets user from X-Test-User header
 class TestAuthPlugin extends AuthBase {
@@ -144,12 +145,12 @@ describe('Authorization for Group Move', function () {
   after(async () => {
     try {
       await server.ldap.delete(getOrg1Dn());
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
     try {
       await server.ldap.delete(getOrg2Dn());
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
   });
@@ -168,7 +169,7 @@ describe('Authorization for Group Move', function () {
   afterEach(async () => {
     try {
       await server.ldap.delete(getGroupDn());
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
   });

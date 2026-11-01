@@ -14,14 +14,10 @@ describe('Browser LDAP Group Editor', () => {
 
   describe('Constructor', () => {
     it('should create instance with group-specific options', () => {
-      let savedGroupDn: string | undefined;
-
       editor = new LdapGroupEditor({
         containerId,
         apiBaseUrl: baseUrl,
-        onGroupSaved: (groupDn: string) => {
-          savedGroupDn = groupDn;
-        },
+        onGroupSaved: () => undefined,
         onError: (error: Error) => {
           console.error(error);
         },
@@ -119,7 +115,7 @@ describe('Browser LDAP Group Editor', () => {
 
   describe('Callback mapping', () => {
     it('should accept onGroupSaved callback in constructor', () => {
-      const callback = (groupDn: string) => {
+      const callback = (_groupDn: string) => {
         // Mock callback
       };
 
@@ -133,7 +129,7 @@ describe('Browser LDAP Group Editor', () => {
     });
 
     it('should accept onError callback in constructor', () => {
-      const callback = (error: Error) => {
+      const callback = (_error: Error) => {
         // Mock callback
       };
 

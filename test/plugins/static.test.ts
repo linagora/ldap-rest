@@ -1,12 +1,13 @@
 import fs from 'fs';
 import os from 'os';
 import { join, sep } from 'path';
+
 import supertest from 'supertest';
+import { expect } from 'chai';
 
 import { DM } from '../../src/bin';
 import Static from '../../src/plugins/static';
 import { schemaUrl } from '../../src/lib/schemaFile';
-import { expect } from 'chai';
 
 const dir = './test/__plugins__/static';
 let dm: DM;
@@ -35,13 +36,17 @@ describe('static', () => {
       await dm.ready;
       try {
         fs.rmSync(dir, { recursive: true });
-      } catch (e) {}
+      } catch {
+        // Nothing to remove
+      }
     });
 
     afterEach(() => {
       try {
         fs.rmSync(dir, { recursive: true });
-      } catch (e) {}
+      } catch {
+        // Nothing to remove
+      }
     });
 
     it('should fail when directory does not exist', async () => {

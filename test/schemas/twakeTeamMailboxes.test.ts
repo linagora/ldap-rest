@@ -1,5 +1,6 @@
-import { expect } from 'chai';
 import * as fs from 'fs';
+
+import { expect } from 'chai';
 import nock from 'nock';
 import supertest from 'supertest';
 

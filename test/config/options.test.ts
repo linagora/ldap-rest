@@ -11,8 +11,6 @@ import { ConfigParser } from '../../src/lib/parseConfig';
 import DmPlugin from '../../src/abstract/plugin';
 import { TwakePlugin } from '../../src/abstract/twakePlugin';
 import { DM } from '../../src/bin';
-import { bclOptions } from '../../src/plugins/bcl.options';
-import { storageOptions } from '../../src/plugins/storage.options';
 import {
   scimOptions,
   scimOptionsOf,

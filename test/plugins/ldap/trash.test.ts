@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+
 import { DM } from '../../../src/bin';
 import TrashPlugin from '../../../src/plugins/ldap/trash';
 
@@ -34,12 +35,12 @@ describe('Trash Plugin', function () {
     // Clean up: try to delete test entries from both locations
     try {
       await server.ldap.delete(userDn);
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
     try {
       await server.ldap.delete(trashDn);
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
   });
@@ -72,12 +73,12 @@ describe('Trash Plugin', function () {
       // Clean up
       try {
         await server.ldap.delete(userDn);
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
       try {
         await server.ldap.delete(trashDn);
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
     });
@@ -92,15 +93,15 @@ describe('Trash Plugin', function () {
       try {
         await server.ldap.search({ paged: false }, userDn);
         expect.fail('User should not exist in original location');
-      } catch (error) {
+      } catch (_error) {
         // Expected: user not found
       }
 
       // Verify user exists in trash
       const trashResult = await server.ldap.search({ paged: false }, trashDn);
-      // @ts-ignore
+      // @ts-expect-error: the search result is typed as a full entry
       expect(trashResult.searchEntries).to.have.lengthOf(1);
-      // @ts-ignore
+      // @ts-expect-error: the search result is typed as a full entry
       expect(trashResult.searchEntries[0].uid).to.equal(testUser);
     });
 
@@ -112,7 +113,7 @@ describe('Trash Plugin', function () {
 
       // Check trash entry for metadata
       const trashResult = await server.ldap.search({ paged: false }, trashDn);
-      // @ts-ignore
+      // @ts-expect-error: the search result is typed as a full entry
       const entry = trashResult.searchEntries[0];
 
       expect(entry.description).to.be.a('string');
@@ -128,9 +129,9 @@ describe('Trash Plugin', function () {
 
       // Verify entry is in trash
       let trashResult = await server.ldap.search({ paged: false }, trashDn);
-      // @ts-ignore
+      // @ts-expect-error: the search result is typed as a full entry
       expect(trashResult.searchEntries).to.have.lengthOf(1);
-      // @ts-ignore
+      // @ts-expect-error: the search result is typed as a full entry
       const firstDescription = trashResult.searchEntries[0].description;
 
       // Wait a bit to ensure different timestamp
@@ -154,11 +155,11 @@ describe('Trash Plugin', function () {
 
       // Verify entry is in trash
       trashResult = await server.ldap.search({ paged: false }, trashDn);
-      // @ts-ignore
+      // @ts-expect-error: the search result is typed as a full entry
       expect(trashResult.searchEntries).to.have.lengthOf(1);
 
       // Verify metadata was updated (different timestamp)
-      // @ts-ignore
+      // @ts-expect-error: the search result is typed as a full entry
       const secondDescription = trashResult.searchEntries[0].description;
       expect(secondDescription).to.not.equal(firstDescription);
     });
@@ -244,7 +245,7 @@ describe('Trash Plugin', function () {
 
       // Verify it's in trash
       let trashResult = await server.ldap.search({ paged: false }, trashDn);
-      // @ts-ignore
+      // @ts-expect-error: the search result is typed as a full entry
       expect(trashResult.searchEntries).to.have.lengthOf(1);
 
       // Now delete directly from trash - should REALLY delete, not move again
@@ -253,9 +254,9 @@ describe('Trash Plugin', function () {
       // Verify it's really gone from trash
       try {
         trashResult = await server.ldap.search({ paged: false }, trashDn);
-        // @ts-ignore
+        // @ts-expect-error: the search result is typed as a full entry
         expect(trashResult.searchEntries).to.have.lengthOf(0);
-      } catch (error) {
+      } catch (_error) {
         // Expected: entry not found
       }
     });

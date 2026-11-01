@@ -1,12 +1,11 @@
 import nock from 'nock';
+import { expect } from 'chai';
 
 import { DM } from '../../../src/bin';
 import Calendar from '../../../src/plugins/twake/calendar';
 import CalendarResources from '../../../src/plugins/twake/calendarResources';
-import { expect } from 'chai';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapFlat from '../../../src/plugins/ldap/flatGeneric';
-
 import { waitFor } from '../../helpers/waitFor';
 describe('Twake Calendar Plugin', function () {
   let resourceBase: string;
@@ -15,7 +14,6 @@ describe('Twake Calendar Plugin', function () {
   let calendar: Calendar;
   let ldapFlat: LdapFlat;
   let resourceInstance: any; // The resources instance from ldapFlat
-  let scope: nock.Scope;
 
   before(function () {
     nock.disableNetConnect();
@@ -48,7 +46,7 @@ describe('Twake Calendar Plugin', function () {
         objectClass: ['organizationalUnit', 'top'],
         ou: 'resources',
       });
-    } catch (err) {
+    } catch (_err) {
       // Ignore if already exists
     }
 
@@ -65,7 +63,7 @@ describe('Twake Calendar Plugin', function () {
     // Clean up test data
     try {
       await dm.ldap.delete(testResourceDN);
-    } catch (err) {
+    } catch (_err) {
       // Ignore errors if the entry does not exist
     }
   });
@@ -458,7 +456,7 @@ describe('Twake Calendar Plugin', function () {
           sn: 'TELLIER',
           mail: 'caluser@test.org',
         });
-      } catch (err) {
+      } catch (_err) {
         // Ignore if already exists
       }
       // Creating the entry fires onLdapChange with the mail attribute present,
@@ -469,7 +467,7 @@ describe('Twake Calendar Plugin', function () {
     afterEach(async () => {
       try {
         await dm.ldap.delete(userDN);
-      } catch (err) {
+      } catch (_err) {
         // Ignore if it does not exist
       }
       nock.cleanAll();

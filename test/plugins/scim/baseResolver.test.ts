@@ -1,7 +1,8 @@
-import { expect } from 'chai';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+
+import { expect } from 'chai';
 
 import { BaseResolver } from '../../../src/plugins/scim/baseResolver';
 import type { Config } from '../../../src/config/args';

@@ -68,7 +68,9 @@ export async function mochaGlobalTeardown() {
  * Use this in tests that need direct access to the server
  */
 export function getTestLdapServer(): LdapTestServer {
-  // Import from setup.ts which holds the actual reference
+  // Imported here rather than at the top: setup.ts holds the reference the
+  // runner fills, and a static import would read it before it is set
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const { globalServer } = require('../setup');
   if (!globalServer) {
     throw new Error('Global LDAP server not initialized. Did you run setup?');

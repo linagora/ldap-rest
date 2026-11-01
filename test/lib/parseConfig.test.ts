@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+
 import { ConfigParser, type ConfigEntry } from '../../src/lib/parseConfig';
 import configArgs from '../../src/config/args';
 

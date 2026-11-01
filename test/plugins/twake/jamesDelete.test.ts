@@ -1,6 +1,5 @@
 import { expect } from 'chai';
 import nock from 'nock';
-import type { Entry } from 'ldapts';
 
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
