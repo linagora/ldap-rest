@@ -837,6 +837,8 @@ export default class LdapGroups extends DmPlugin {
     additional: AttributesList = {},
     req?: Request
   ): Promise<boolean> {
+    if (typeof cn !== 'string')
+      throw new BadRequestError(`${this.cn} must be a string`);
     await this.server.ldap.canonicalAttributes(additional);
     let dn: string;
     if (namesByDn(cn, this.cn)) {

@@ -1430,6 +1430,8 @@ export default abstract class LdapFlat extends DmPlugin {
     additional: AttributesList = {},
     req?: Request
   ): Promise<boolean> {
+    if (typeof id !== 'string')
+      throw new BadRequestError(`${this.mainAttribute} must be a string`);
     // Checked below under the names the write will give them
     await this.ldap.canonicalAttributes(additional);
     let dn: string;
