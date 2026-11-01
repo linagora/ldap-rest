@@ -79,6 +79,11 @@
   by the call; a read that must fail when it is made uses `paged: false`
   ([#460](https://github.com/linagora/ldap-rest/issues/460)).
 
+- A directory time is read by one reader everywhere: a deletion date no
+  longer reads a year below 100 as 19xx nor refuses an offset or a fraction,
+  and a GeneralizedTime read by SCIM is written in UTC, at the instant the
+  directory stored ([#586](https://github.com/linagora/ldap-rest/issues/586)).
+
 ## v1.3.0 (2026-10-31)
 
 The October 2026 code-quality work and the five security findings it fixed.

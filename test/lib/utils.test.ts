@@ -13,6 +13,7 @@ import {
   normalizeDn,
   isDnInBranch,
   organizationLink,
+  parseDirectoryDate,
 } from '../../src/lib/utils';
 import { BadRequestError } from '../../src/lib/errors';
 
@@ -697,6 +698,114 @@ describe('LDAP Utils', () => {
       expect(organizationLink(['  ', 'ou=a,dc=x'])).to.equal('ou=a,dc=x');
       expect(organizationLink('')).to.equal(undefined);
       expect(organizationLink([])).to.equal(undefined);
+    });
+  });
+  describe('parseDirectoryDate', () => {
+    it('should read an LDAP generalized time', () => {
+      const date = parseDirectoryDate('20240930220000Z');
+      expect(date?.toISOString()).to.equal('2024-09-30T22:00:00.000Z');
+      expect(parseDirectoryDate('20240930220000.500Z')?.toISOString()).to.equal(
+        '2024-09-30T22:00:00.500Z'
+      );
+    });
+
+    it('should read an ISO date', () => {
+      expect(
+        parseDirectoryDate('2024-09-30T22:00:00Z')?.toISOString()
+      ).to.equal('2024-09-30T22:00:00.000Z');
+    });
+
+    it('should read an offset of bare hours, as RFC 4517 allows', () => {
+      expect(parseDirectoryDate('20240930000000+02')?.toISOString()).to.equal(
+        '2024-09-29T22:00:00.000Z'
+      );
+      expect(parseDirectoryDate('20240930000000-05')?.toISOString()).to.equal(
+        '2024-09-30T05:00:00.000Z'
+      );
+      expect(parseDirectoryDate('20240930000000+0530')?.toISOString()).to.equal(
+        '2024-09-29T18:30:00.000Z'
+      );
+      expect(
+        parseDirectoryDate('20240930000000+02:00')?.toISOString()
+      ).to.equal('2024-09-29T22:00:00.000Z');
+    });
+
+    it('should read the forms without minutes or seconds', () => {
+      expect(parseDirectoryDate('2024093012Z')?.toISOString()).to.equal(
+        '2024-09-30T12:00:00.000Z'
+      );
+      expect(parseDirectoryDate('202409301230Z')?.toISOString()).to.equal(
+        '2024-09-30T12:30:00.000Z'
+      );
+      // A fraction applies to the last unit given: half an hour here
+      expect(parseDirectoryDate('2024093012.5Z')?.toISOString()).to.equal(
+        '2024-09-30T12:30:00.000Z'
+      );
+    });
+
+    it('should read the year as written, below 100 too', () => {
+      expect(parseDirectoryDate('0029123123')?.toISOString()).to.equal(
+        '0029-12-31T23:00:00.000Z'
+      );
+      expect(
+        parseDirectoryDate('00950704115160.0996-11:51')?.toISOString()
+      ).to.equal('0095-07-04T23:43:00.100Z');
+      // Year 0 is a leap year: its February counts from year -1
+      expect(parseDirectoryDate('0000022913')?.toISOString()).to.equal(
+        '0000-02-29T13:00:00.000Z'
+      );
+      expect(parseDirectoryDate('0000010100Z')?.toISOString()).to.equal(
+        '0000-01-01T00:00:00.000Z'
+      );
+    });
+
+    it('should read a leap second at the end of a day', () => {
+      expect(parseDirectoryDate('20991231235960Z')?.toISOString()).to.equal(
+        '2100-01-01T00:00:00.000Z'
+      );
+      expect(
+        parseDirectoryDate('20991231235960.5+0530')?.toISOString()
+      ).to.equal('2099-12-31T18:30:00.500Z');
+      expect(parseDirectoryDate('20240630235960Z')?.toISOString()).to.equal(
+        '2024-07-01T00:00:00.000Z'
+      );
+    });
+
+    it('should return null for anything unreadable', () => {
+      expect(parseDirectoryDate('not a date')).to.be.null;
+      expect(parseDirectoryDate('20241340220000Z')).to.be.null;
+      expect(parseDirectoryDate('20240231000000Z')).to.be.null;
+      expect(parseDirectoryDate('000002300000Z')).to.be.null;
+      expect(parseDirectoryDate('20240930250000Z')).to.be.null;
+      expect(parseDirectoryDate('20240930225961Z')).to.be.null;
+      expect(parseDirectoryDate('20240930000000+25')).to.be.null;
+    });
+
+    it('should accept the offsets RFC 4517 allows', () => {
+      // UTC as tools spell it: `strftime('%z')`, Java's `Z`, ISO 8601
+      for (const zone of ['+0000', '-0000', '+00', '+00:00']) {
+        expect(
+          parseDirectoryDate(`20240930000000${zone}`)?.toISOString(),
+          zone
+        ).to.equal('2024-09-30T00:00:00.000Z');
+      }
+      // Zones in use today: the Line Islands all year, the Chatham Islands in
+      // summer and in winter
+      expect(
+        parseDirectoryDate('20240930000000+14:00')?.toISOString()
+      ).to.equal('2024-09-29T10:00:00.000Z');
+      expect(parseDirectoryDate('20240930000000+1345')?.toISOString()).to.equal(
+        '2024-09-29T10:15:00.000Z'
+      );
+      expect(parseDirectoryDate('20240930000000+1245')?.toISOString()).to.equal(
+        '2024-09-29T11:15:00.000Z'
+      );
+      expect(parseDirectoryDate('20240930000000+12')?.toISOString()).to.equal(
+        '2024-09-29T12:00:00.000Z'
+      );
+      expect(parseDirectoryDate('20240930000000-1300')?.toISOString()).to.equal(
+        '2024-09-30T13:00:00.000Z'
+      );
     });
   });
 });

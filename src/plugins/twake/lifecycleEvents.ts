@@ -533,7 +533,7 @@ export default class TwakeLifecycleEvents extends DmPlugin {
       this.attrs.deletedAt &&
       attr.toLowerCase() === this.attrs.deletedAt.toLowerCase()
     )
-      value = parseDeletedAt(value, this.attrs.deletedAtFormat)?.toISOString();
+      value = parseDeletedAt(value)?.toISOString();
     if (domain) value = value?.split('@')[1];
     return value;
   }

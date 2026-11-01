@@ -162,12 +162,12 @@ describe('SCIM mapping', () => {
         '2025-01-01T12:30:45.500Z'
       );
     });
-    it('converts a numeric offset', () => {
+    it('converts a numeric offset to the instant it names', () => {
       expect(ldapTimeToIso('20250101123045+0200')).to.equal(
-        '2025-01-01T12:30:45+02:00'
+        '2025-01-01T10:30:45Z'
       );
       expect(ldapTimeToIso('20250101123045-05')).to.equal(
-        '2025-01-01T12:30:45-05:00'
+        '2025-01-01T17:30:45Z'
       );
     });
     it('defaults the omitted minutes and seconds', () => {
