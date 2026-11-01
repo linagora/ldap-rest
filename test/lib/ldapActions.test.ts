@@ -1078,6 +1078,7 @@ describe('ldapActions', function () {
       const hooks = pool.parent.hookBus;
       const refused = new NotFoundError('gone');
       hooks.set('ldapsearchresult', async function* () {
+        yield { searchEntries: [] } as unknown as SearchResult;
         throw refused;
       } as unknown as ChainedHook<SearchResult>);
       try {
@@ -1086,6 +1087,8 @@ describe('ldapActions', function () {
           attributes: ['1.1'],
         })) as AsyncGenerator<SearchResult>;
 
+        const first = await walk.next();
+        expect(first.done).to.equal(false);
         let caught: unknown;
         try {
           await walk.next();
