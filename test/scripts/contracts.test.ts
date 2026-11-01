@@ -987,6 +987,69 @@ describe('OpenAPI contracts', () => {
     ).to.deep.equal([]);
   });
 
+  it('reports a response alternative that drops a field', () => {
+    const base = document();
+    base.paths['/api/v1/things'].get.responses['200'].content[
+      'application/json'
+    ].schema = {
+      type: 'object',
+      properties: { a: { type: 'string' } },
+    };
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].get.responses['200'].content[
+        'application/json'
+      ].schema = {
+        anyOf: [
+          { type: 'object', properties: { a: { type: 'string' } } },
+          { type: 'object', properties: { b: { type: 'string' } } },
+        ],
+      };
+    });
+
+    expect(
+      diffOpenApi(base as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'removed',
+      what: 'GET /api/v1/things 200 response application/json.a',
+    });
+  });
+
+  it('leaves a nullable response that a null alternative keeps', () => {
+    const base = document();
+    base.paths['/api/v1/things'].get.responses['200'].content[
+      'application/json'
+    ].schema.items.properties.name = { type: 'string', nullable: true };
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].get.responses['200'].content[
+        'application/json'
+      ].schema.items.properties.name = {
+        anyOf: [{ type: 'string' }, { type: 'null' }],
+      };
+    });
+
+    expect(
+      diffOpenApi(base as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.equal([]);
+  });
+
+  it('reports a oneOf alternative that excludes the base values', () => {
+    const spec = changed(document => {
+      document.paths['/api/v1/things'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name = {
+        oneOf: [{ type: 'string' }, { type: 'string', const: 'a' }],
+      };
+    });
+
+    expect(
+      diffOpenApi(document() as OpenApiDocument, spec as OpenApiDocument)
+    ).to.deep.include({
+      kind: 'changed',
+      what: 'POST /api/v1/things request application/json.name',
+      detail: 'const: undefined → "a"',
+    });
+  });
+
   it('keeps a const an alternative of the union carries', () => {
     const base = document();
     base.paths['/api/v1/things'].post.requestBody.content[

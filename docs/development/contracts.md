@@ -63,9 +63,10 @@ constraint, or — once the plugin snapshot exists — a removed export or a
 narrowed signature. Renaming an option is a deprecation, not a removal, as
 long as the old CLI name and environment variable stay in its `aliases` and
 `envAliases`. Adding a union variant, a field or an optional parameter is
-additive, and so is a union with an alternative that still accepts everything
-the base did. Documentation-only edits, such as a summary or description, are
-ignored.
+additive, and so is a request union with an alternative that still accepts
+everything the base did — in a response the client reads every alternative,
+so a field the others drop is still a removal. Documentation-only edits, such
+as a summary or description, are ignored.
 
 The job runs the scripts from the pull request, so a change to them is
 reviewed like any other code, as `.github/CODEOWNERS` requires.

@@ -386,8 +386,11 @@ export function shapeChanges(
       what: where,
       detail: `type: ${base.type} → ${current.type ?? 'none'}`,
     });
+  // A null the union still lets through is the nullable the base declared
   const nullableChanged =
-    base.nullable !== current.nullable && base.nullable !== undefined;
+    base.nullable !== current.nullable &&
+    base.nullable !== undefined &&
+    !(base.nullable === true && allowsNull(current));
   const nullAdded =
     direction === 'response' && allowsNull(current) && !allowsNull(base);
   const nullRemoved =
@@ -417,16 +420,34 @@ export function shapeChanges(
       ...(variant.enum ?? []),
       ...(variant.const !== undefined ? [variant.const] : []),
     ]);
+    // A null the union carries through another alternative is one the
+    // alternative compared here does not lose.
+    const unionAllowsNull = allowsNull(current);
     const reported = variantsKeepingType.map(variant => {
       const widened =
         base.enum !== undefined && accepted.length > 0
           ? { ...variant, const: undefined, enum: accepted }
           : variant;
-      return shapeChanges(where, base, widened, direction);
+      return shapeChanges(
+        where,
+        base,
+        unionAllowsNull ? { ...widened, nullable: true } : widened,
+        direction
+      );
     });
-    // An alternative that accepts everything the base did keeps the union
-    // additive, whatever the others add to it.
-    if (!reported.some(changes => changes.length === 0))
+    // In a request the client picks the alternative, so one that accepts
+    // everything the base did keeps the union additive whatever the others
+    // add. In a response the server picks and the client must read every
+    // alternative, so the same alternative leaves the others' removals to
+    // report. `oneOf` refuses a value two alternatives match, so an
+    // alternative as wide as the base narrows the others away rather than
+    // standing for them.
+    const exclusive = (current.oneOf?.length ?? 0) > 0;
+    if (
+      direction === 'response' ||
+      exclusive ||
+      !reported.some(changes => changes.length === 0)
+    )
       for (const changes of reported) differences.push(...changes);
   } else {
     if (base.format !== current.format && base.format !== undefined)
