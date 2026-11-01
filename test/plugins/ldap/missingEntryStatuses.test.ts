@@ -201,6 +201,30 @@ describe('Writes to what the directory does not hold', function () {
       }
     });
 
+    it('should answer 400 to the read of a DN the directory cannot parse', async () => {
+      for (const dn of [
+        `uid=pl\\qain,ou=users,${base}`,
+        `uid=codes.none,ou=users,${base},`,
+      ]) {
+        const res = await request.get(
+          `/api/v1/ldap/users/${encodeURIComponent(dn)}`
+        );
+        expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      }
+    });
+
+    it('should answer 400 to the move of a DN the directory cannot parse', async () => {
+      for (const dn of [
+        `uid=pl\\qain,ou=users,${base}`,
+        `uid=codes.none,ou=users,${base},`,
+      ]) {
+        const res = await request
+          .post(`/api/v1/ldap/users/${encodeURIComponent(dn)}/move`)
+          .send({ targetOrgDn: topOrg });
+        expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      }
+    });
+
     it('should answer 400 to a move towards something that is not a DN', async () => {
       const res = await request
         .post('/api/v1/ldap/users/codes.alice/move')
