@@ -9,6 +9,7 @@ import { DM } from '../../src/bin';
 import type { ChangeContext } from '../../src/lib/changeContext';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 import { NotFoundError } from '../../src/lib/errors';
+import type { ChainedHook } from '../../src/hooks';
 
 let ldapActions: LdapActions;
 
@@ -1066,6 +1067,32 @@ describe('ldapActions', function () {
           refused = error as Error;
         }
         expect(refused?.message).to.equal('no result');
+      } finally {
+        hooks.set('ldapsearchresult');
+      }
+      expect(pool.poolStats()).to.deep.include({ busy: 0, idle: 1 });
+    });
+
+    it('keeps a paged walk hook refusal as it was thrown', async () => {
+      pool = build(1);
+      const hooks = pool.parent.hookBus;
+      const refused = new NotFoundError('gone');
+      hooks.set('ldapsearchresult', async function* () {
+        throw refused;
+      } as unknown as ChainedHook<SearchResult>);
+      try {
+        const walk = (await pool.search({
+          scope: 'base',
+          attributes: ['1.1'],
+        })) as AsyncGenerator<SearchResult>;
+
+        let caught: unknown;
+        try {
+          await walk.next();
+        } catch (error) {
+          caught = error;
+        }
+        expect(caught).to.equal(refused);
       } finally {
         hooks.set('ldapsearchresult');
       }
