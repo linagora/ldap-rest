@@ -53,6 +53,15 @@ The image runs as its unprivileged `node` user: with `docker run`, a
 `DM_PORT` below 1024 stops the server at startup, where the default 8081
 changes nothing.
 
+The image is built in two stages: a builder produces the package and installs
+its production dependencies, the runtime stage copies them and carries no
+compiler nor package manager cache. Its base image is pinned by digest in
+`scripts/buildDockerfile.ts`, so the image built is the one reviewed even if
+the tag moves; the digest follows the tag it names, taken from the
+[Docker Hub tag page](https://hub.docker.com/_/node/tags?name=25-alpine) and
+updated by hand with it. Dependabot ignores the image: it would open a change
+to the generated `Dockerfile`, which the drift check refuses.
+
 ### What the shipped plugins report
 
 | Plugin           | `degraded` when                                                                                                                                                                                             |
