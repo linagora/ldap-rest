@@ -528,7 +528,7 @@ export default class LdapGroups extends DmPlugin {
       params: GroupParams,
       body: GroupMembersBody,
       handler: async ({ req, params, res, body }) => {
-        const cn = decodeURIComponent(params.cn);
+        const cn = params.cn;
         const dn = this.routeGroupDn(cn);
         const members = Array.isArray(body.member)
           ? body.member
@@ -570,8 +570,8 @@ export default class LdapGroups extends DmPlugin {
       responses: { 200: WriteResponse },
       params: GroupMemberParams,
       handler: async ({ req, params, res }) => {
-        const cn = decodeURIComponent(params.cn);
-        const member = decodeURIComponent(params.member);
+        const cn = params.cn;
+        const member = params.member;
         const dn = this.routeGroupDn(cn);
         await this.judgedGroup(dn, () =>
           this.ldap.authorize('ldapmodifyrequest', [
@@ -624,7 +624,7 @@ export default class LdapGroups extends DmPlugin {
         params: GroupParams,
         body: GroupMoveBody,
         handler: async ({ req, params, res, body }) => {
-          const cn = decodeURIComponent(params.cn);
+          const cn = params.cn;
           const dn = this.routeGroupDn(cn);
           const linkAttr = this.orgSettings.ldap_organization_link_attribute;
           await this.judgedGroup(dn, () =>
@@ -677,7 +677,7 @@ export default class LdapGroups extends DmPlugin {
       params: GroupParams,
       body: GroupRenameBody,
       handler: async ({ req, params, res, body }) => {
-        const cn = decodeURIComponent(params.cn);
+        const cn = params.cn;
         const dn = this.routeGroupDn(cn);
         // Renamed into the groups branch, as a group, or not at all
         const newDn = /,/.test(body.newCn)
@@ -731,7 +731,7 @@ export default class LdapGroups extends DmPlugin {
 
   async apiGet(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
-    const cn = decodeURIComponent(req.params.cn as string);
+    const cn = req.params.cn as string;
     const dn = this.routeGroupDn(cn);
     try {
       // A group only: another entry named alike is not one
@@ -803,7 +803,7 @@ export default class LdapGroups extends DmPlugin {
 
   async apiDelete(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
-    const cn = decodeURIComponent(req.params.cn as string);
+    const cn = req.params.cn as string;
     if (!cn) throw new BadRequestError('cn is required');
     const dn = this.routeGroupDn(cn);
     await this.judgedGroup(dn, () =>
@@ -816,7 +816,7 @@ export default class LdapGroups extends DmPlugin {
     const body = jsonBody(req, res) as postModify | false;
     if (!body) return;
     assertModifyRequest(body);
-    const cn = decodeURIComponent(req.params.cn as string);
+    const cn = req.params.cn as string;
     if (!cn) throw new BadRequestError('cn is required');
     const dn = this.routeGroupDn(cn);
     await this.server.ldap.canonicalChanges(body);

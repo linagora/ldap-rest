@@ -265,7 +265,7 @@ export default class LdapAccountLifecycle extends DmPlugin {
       );
     }
     const value = states[body.state];
-    const id = decodeURIComponent(req.params.id as string);
+    const id = req.params.id as string;
     await this.modify(entity, id, { replace: { [attribute]: value } }, req);
     res.json({ success: true, state: body.state });
   }
@@ -325,7 +325,7 @@ export default class LdapAccountLifecycle extends DmPlugin {
       replace[resetAttr] = value;
     }
 
-    const id = decodeURIComponent(req.params.id as string);
+    const id = req.params.id as string;
     await this.modify(entity, id, { replace }, req);
 
     // The generated password is shown once, here, and nowhere else: the

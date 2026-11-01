@@ -52,6 +52,11 @@
   that carries a body is refused with `400` instead of letting the body
   parser answer `500`
   ([#554](https://github.com/linagora/ldap-rest/issues/554)).
+- A path parameter naming an entry is percent-decoded once; a client that
+  encoded one twice now names the escaped value instead of the entry it
+  used to reach
+  ([#552](https://github.com/linagora/ldap-rest/issues/552),
+  [upgrading](docs/usage/upgrading.md#a-path-parameter-is-percent-decoded-once)).
 
 ## v1.3.0 (2026-10-31)
 

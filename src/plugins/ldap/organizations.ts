@@ -268,7 +268,7 @@ export default class LdapOrganizations extends DmPlugin {
       path: `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
       params: OrganizationParams,
       handler: async ({ req, params, res }) => {
-        const dn = decodeURIComponent(params.dn);
+        const dn = params.dn;
         await tryMethodData(res, async () =>
           this.hideNeverReturn(await this.getOrganisationByDn(dn, req))
         );
@@ -335,7 +335,7 @@ export default class LdapOrganizations extends DmPlugin {
       path: `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes`,
       params: OrganizationParams,
       handler: async ({ req, params, res }) => {
-        const dn = decodeURIComponent(params.dn);
+        const dn = params.dn;
         await tryMethodData(res, async () =>
           this.hideNeverReturn(await this.getOrganisationSubnodes(dn, req))
         );
@@ -388,7 +388,7 @@ export default class LdapOrganizations extends DmPlugin {
       params: OrganizationParams,
       query: OrganizationSearchQuery,
       handler: async ({ req, params, query, res }) => {
-        const dn = decodeURIComponent(params.dn);
+        const dn = params.dn;
         await tryMethodData(res, async () =>
           this.hideNeverReturn(
             await this.searchOrganisationSubnodes(dn, query.q, req)
@@ -453,7 +453,7 @@ export default class LdapOrganizations extends DmPlugin {
       params: OrganizationParams,
       query: OrganizationSearchQuery,
       handler: async ({ req, params, query, res }) => {
-        const dn = decodeURIComponent(params.dn);
+        const dn = params.dn;
         await tryMethodData(res, async () =>
           this.hideNeverReturn(
             await this.searchOrganisationTree(dn, query.q, req)
@@ -658,7 +658,7 @@ export default class LdapOrganizations extends DmPlugin {
     const body = jsonBody(req, res) as ModifyRequest | false;
     if (!body) return;
     assertModifyRequest(body);
-    const dn = decodeURIComponent(req.params.dn as string);
+    const dn = req.params.dn as string;
     if (!dn) throw new BadRequestError('dn is required');
     assertClientMaySet(this.schema, modifiedAttributeNames(body));
     await tryMethod(res, this.modifyOrganization.bind(this), dn, body, req);
@@ -666,7 +666,7 @@ export default class LdapOrganizations extends DmPlugin {
 
   async apiDelete(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
-    const dn = decodeURIComponent(req.params.dn as string);
+    const dn = req.params.dn as string;
     if (!dn) throw new BadRequestError('dn is required');
     await tryMethod(res, this.deleteOrganization.bind(this), dn, req);
   }
@@ -679,7 +679,7 @@ export default class LdapOrganizations extends DmPlugin {
       | false;
     if (!body) return;
 
-    const dn = decodeURIComponent(req.params.dn as string);
+    const dn = req.params.dn as string;
     if (!dn) throw new BadRequestError('dn is required');
 
     const { targetOrgDn } = body;
