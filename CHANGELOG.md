@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A password policy whose `pwdMaxAge` sets an expiry beyond the representable
+  date range is reported as never expiring instead of answering `500` on
+  `GET /v1/users/:id/password-status`
+  ([#553](https://github.com/linagora/ldap-rest/issues/553)).
+
 ## v1.3.0 (2026-10-31)
 
 The October 2026 code-quality work and the five security findings it fixed.

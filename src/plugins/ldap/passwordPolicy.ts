@@ -1093,9 +1093,14 @@ export default class PasswordPolicy extends DmPlugin {
     let daysUntilExpiration: number | null = null;
 
     if (policy.pwdMaxAge && lastChanged) {
-      expiresAt = new Date(lastChanged.getTime() + policy.pwdMaxAge * 1000);
-      isExpired = now > expiresAt.getTime();
-      daysUntilExpiration = Math.ceil((expiresAt.getTime() - now) / 86400000);
+      const expiry = new Date(lastChanged.getTime() + policy.pwdMaxAge * 1000);
+      // A pwdMaxAge large enough puts the expiry past the date range, which
+      // reads as no expiry rather than failing every status of the policy
+      if (!Number.isNaN(expiry.getTime())) {
+        expiresAt = expiry;
+        isExpired = now > expiry.getTime();
+        daysUntilExpiration = Math.ceil((expiry.getTime() - now) / 86400000);
+      }
     }
 
     // Check warning period
