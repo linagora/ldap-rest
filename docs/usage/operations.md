@@ -59,7 +59,8 @@ compiler nor package manager cache. Its base image is pinned by digest in
 `scripts/buildDockerfile.ts`, so the image built is the one reviewed even if
 the tag moves; the digest follows the tag it names, taken from the
 [Docker Hub tag page](https://hub.docker.com/_/node/tags?name=25-alpine) and
-updated by hand with it.
+updated by hand with it. Dependabot ignores the image: it would open a change
+to the generated `Dockerfile`, which the drift check refuses.
 
 ### What the shipped plugins report
 
