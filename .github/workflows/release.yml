@@ -61,6 +61,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # A minor or patch tag cannot carry a breaking change. See
+      # docs/development/contracts.md.
+      - name: Check the tag against the CHANGELOG
+        run: npx tsx scripts/check-release.ts "${GITHUB_REF#refs/tags/v}"
+
       # Build before testing: the suite imports the compiled plugins from dist/.
       - name: Build
         run: npm run build

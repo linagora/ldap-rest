@@ -34,6 +34,13 @@ Integrate LDAP-Rest into your web applications.
 - **[JSON Schemas](client-development/schemas/README.md)** - Schema structure and validation
 - **[Examples](client-development/examples/README.md)** - React, Vue.js, Vanilla JS integration
 
+### [Development](development/contracts.md)
+
+Work on ldap-rest itself.
+
+- **[Published contracts](development/contracts.md)** - What breaks a
+  contract, the snapshots that detect it and the deprecation window.
+
 ## API stability
 
 From 1.0.0, ldap-rest follows semantic versioning. These are its public
@@ -59,6 +66,11 @@ API, which a minor or a patch release does not break:
 
 Everything else — other exports, internal helpers, log messages — may
 change in any release.
+
+The options and the REST API are checked mechanically: committed snapshots
+are compared with the base branch of each pull request, and a non-additive
+change needs the `breaking` label. The plugin types are still reviewed by
+hand. See [Published contracts](development/contracts.md).
 
 ## Presentations
 

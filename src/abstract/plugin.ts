@@ -192,7 +192,9 @@ export default abstract class DmPlugin {
         `${this.constructor.name}: options() takes the definitions the ` +
           'plugin declares'
       );
-    return readOptions(declared, this.config, parsedOptionKeys) as OptionsOf<T>;
+    return readOptions(declared, this.config, parsedOptionKeys, message =>
+      this.logger.warn(message)
+    ) as OptionsOf<T>;
   }
 
   /**

@@ -250,6 +250,8 @@ export class DM {
   private readonly pluginLoads = new Map<string, Promise<boolean>>();
   /** CLI arguments no declared option matched, reported after the logger exists */
   private readonly unknownCliOptions: string[];
+  /** Configuration read through a deprecated name, reported once the logger exists */
+  private readonly deprecationWarnings: string[];
   /**
    * The request hooks of the authorization plugins, which `registerPlugin`
    * keeps ahead of every other plugin's. See {@link AUTHZ_FIRST_HOOKS}.
@@ -260,6 +262,7 @@ export class DM {
     const parser = new ConfigParser(configArgs);
     this.config = parser.parse();
     this.unknownCliOptions = parser.unknownOptions;
+    this.deprecationWarnings = parser.deprecationWarnings;
 
     this.app = express();
     // Nothing tells which framework answers, and no script or style is
@@ -308,6 +311,7 @@ export class DM {
     // Before the authentication: a probe carries no identity
     mountHealth(this.app, this);
     this.logger = buildLogger(this.config);
+    for (const warning of this.deprecationWarnings) this.logger.warn(warning);
     this.ldap = new ldapActions(this);
     setLogger(this.logger);
     setDebug(this.config.debug);
@@ -477,7 +481,14 @@ export class DM {
       plugin => (plugin.constructor as typeof DmPlugin).optionDefinitions ?? {}
     );
     const declared = new Set(
-      definitions.flatMap(optionSet => Object.keys(optionSet))
+      definitions.flatMap(optionSet =>
+        Object.entries(optionSet).flatMap(([key, spec]) => [
+          key,
+          ...(spec.aliases ?? []).map(name =>
+            name.replace(/^--?/, '').replace(/-/g, '_')
+          ),
+        ])
+      )
     );
     const unknownCli = this.unknownCliOptions.filter(
       name => !declared.has(name.replace(/^--?/, '').replace(/-/g, '_'))

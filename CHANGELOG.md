@@ -10,6 +10,10 @@
   already declares its own `service` or `provides` member must rename it
   ([service](docs/usage/upgrading.md#a-plugin-with-its-own-service-member),
   [provides](docs/usage/upgrading.md#a-plugin-with-its-own-provides-member)).
+- A renamed option can keep its former CLI name and environment variable as
+  deprecated aliases, still read with a startup warning, a plugin's own options
+  included
+  ([details](docs/plugin-development/options.md#deprecating-an-option)).
 
 ### Fixed
 

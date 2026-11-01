@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { ConfigParser } from '../../src/lib/parseConfig';
+import { ConfigParser, type ConfigEntry } from '../../src/lib/parseConfig';
 import configArgs from '../../src/config/args';
 
 describe('ConfigParser', () => {
@@ -523,6 +523,281 @@ describe('ConfigParser', () => {
     const parser = new ConfigParser(configArgs);
     const result = parser.parse(argv);
     expect(result).to.have.property('zig_zag').that.equals('test');
+  });
+
+  describe('deprecated aliases', () => {
+    const aliased: ConfigEntry[] = [
+      [
+        '--new-name',
+        'DM_NEW_NAME',
+        'default',
+        'string',
+        undefined,
+        undefined,
+        false,
+        ['--old-name'],
+        ['DM_OLD_NAME'],
+      ],
+      [
+        '--new-flag',
+        'DM_NEW_FLAG',
+        false,
+        'boolean',
+        undefined,
+        undefined,
+        false,
+        ['--old-flag'],
+        ['DM_OLD_FLAG'],
+      ],
+    ];
+
+    it('reads a CLI alias as the canonical option and warns once', () => {
+      const parser = new ConfigParser(aliased);
+      const result = parser.parse([
+        'node',
+        'script.js',
+        '--old-name',
+        'value',
+        '--old-name',
+        'again',
+      ]);
+
+      expect((result as unknown as Record<string, unknown>).new_name).to.equal(
+        'again'
+      );
+      expect(parser.unknownOptions).to.deep.equal([]);
+      expect(parser.deprecationWarnings).to.deep.equal([
+        'Configuration: --old-name is deprecated, use --new-name',
+      ]);
+    });
+
+    it('reads a boolean alias', () => {
+      const parser = new ConfigParser(aliased);
+      const result = parser.parse(['node', 'script.js', '--old-flag']);
+
+      expect((result as unknown as Record<string, unknown>).new_flag).to.equal(
+        true
+      );
+      expect(parser.deprecationWarnings).to.deep.equal([
+        'Configuration: --old-flag is deprecated, use --new-flag',
+      ]);
+    });
+
+    it('reads an environment alias when the canonical variable is unset', () => {
+      process.env.DM_OLD_NAME = 'from-env';
+      const parser = new ConfigParser(aliased);
+      const result = parser.parse(['node', 'script.js']);
+
+      expect((result as unknown as Record<string, unknown>).new_name).to.equal(
+        'from-env'
+      );
+      expect(parser.deprecationWarnings).to.deep.equal([
+        'Configuration: DM_OLD_NAME is deprecated, use DM_NEW_NAME',
+      ]);
+    });
+
+    it('prefers the canonical variable and does not warn', () => {
+      process.env.DM_NEW_NAME = 'canonical';
+      process.env.DM_OLD_NAME = 'deprecated';
+      const parser = new ConfigParser(aliased);
+      const result = parser.parse(['node', 'script.js']);
+
+      expect((result as unknown as Record<string, unknown>).new_name).to.equal(
+        'canonical'
+      );
+      expect(parser.deprecationWarnings).to.deep.equal([]);
+    });
+
+    it('splits an array alias like the singular form', () => {
+      const arrayed: ConfigEntry[] = [
+        [
+          '--new-item',
+          'DM_NEW_ITEM',
+          [],
+          'array',
+          '--new-items',
+          'identifiers',
+          false,
+          ['--old-item'],
+        ],
+      ];
+      const parser = new ConfigParser(arrayed);
+      const result = parser.parse(['node', 'script.js', '--old-item', 'a,b']);
+
+      expect(
+        (result as unknown as Record<string, unknown>).new_item
+      ).to.deep.equal(['a', 'b']);
+      expect(parser.deprecationWarnings).to.deep.equal([
+        'Configuration: --old-item is deprecated, use --new-item',
+      ]);
+    });
+
+    it('falls back to the alias when an empty canonical number is unset', () => {
+      const numbers: ConfigEntry[] = [
+        [
+          '--new-timeout',
+          'DM_NEW_TIMEOUT',
+          10,
+          'number',
+          undefined,
+          undefined,
+          false,
+          ['--old-timeout'],
+          ['DM_OLD_TIMEOUT'],
+        ],
+      ];
+      process.env.DM_NEW_TIMEOUT = '';
+      process.env.DM_OLD_TIMEOUT = '42';
+      const parser = new ConfigParser(numbers);
+      const result = parser.parse(['node', 'script.js']);
+
+      expect(
+        (result as unknown as Record<string, unknown>).new_timeout
+      ).to.equal(42);
+      expect(parser.deprecationWarnings).to.deep.equal([
+        'Configuration: DM_OLD_TIMEOUT is deprecated, use DM_NEW_TIMEOUT',
+      ]);
+    });
+
+    it('keeps an empty canonical string rather than the alias', () => {
+      process.env.DM_NEW_NAME = '';
+      process.env.DM_OLD_NAME = 'from-alias';
+      const parser = new ConfigParser(aliased);
+      const result = parser.parse(['node', 'script.js']);
+
+      expect((result as unknown as Record<string, unknown>).new_name).to.equal(
+        ''
+      );
+      expect(parser.deprecationWarnings).to.deep.equal([]);
+    });
+
+    it('refuses an environment alias that is already a declared name', () => {
+      const config: ConfigEntry[] = [
+        [
+          '--first',
+          'DM_FIRST',
+          'a',
+          'string',
+          undefined,
+          undefined,
+          false,
+          undefined,
+          ['DM_SECOND'],
+        ],
+        ['--second', 'DM_SECOND', 'b', 'string'],
+      ];
+
+      expect(() => new ConfigParser(config)).to.throw(
+        /alias DM_SECOND of --first is already a declared name/
+      );
+    });
+
+    it('refuses an environment alias declared twice', () => {
+      const config: ConfigEntry[] = [
+        [
+          '--first',
+          'DM_FIRST',
+          'a',
+          'string',
+          undefined,
+          undefined,
+          false,
+          undefined,
+          ['DM_OLD'],
+        ],
+        [
+          '--second',
+          'DM_SECOND',
+          'b',
+          'string',
+          undefined,
+          undefined,
+          false,
+          undefined,
+          ['DM_OLD'],
+        ],
+      ];
+
+      expect(() => new ConfigParser(config)).to.throw(
+        /alias DM_OLD of --second is declared twice/
+      );
+    });
+
+    it('forgets the warnings of a previous parse', () => {
+      process.env.DM_OLD_NAME = 'from-alias';
+      const parser = new ConfigParser(aliased);
+      parser.parse(['node', 'script.js']);
+      expect(parser.deprecationWarnings).to.have.length(1);
+
+      delete process.env.DM_OLD_NAME;
+      parser.parse(['node', 'script.js']);
+      expect(parser.deprecationWarnings).to.deep.equal([]);
+    });
+
+    it('refuses an alias that is already a declared name', () => {
+      const config: ConfigEntry[] = [
+        ['--first', 'DM_FIRST', 'a', 'string'],
+        [
+          '--second',
+          'DM_SECOND',
+          'b',
+          'string',
+          undefined,
+          undefined,
+          false,
+          ['--first'],
+        ],
+      ];
+
+      expect(() => new ConfigParser(config)).to.throw(
+        /alias --first of --second is already a declared name/
+      );
+    });
+
+    it('refuses an alias declared twice', () => {
+      const config: ConfigEntry[] = [
+        [
+          '--first',
+          'DM_FIRST',
+          'a',
+          'string',
+          undefined,
+          undefined,
+          false,
+          ['--old'],
+        ],
+        [
+          '--second',
+          'DM_SECOND',
+          'b',
+          'string',
+          undefined,
+          undefined,
+          false,
+          ['--old'],
+        ],
+      ];
+
+      expect(() => new ConfigParser(config)).to.throw(
+        /alias --old of --second is declared twice/
+      );
+    });
+
+    it('lets the CLI canonical name win over an environment alias', () => {
+      process.env.DM_OLD_NAME = 'from-env';
+      const parser = new ConfigParser(aliased);
+      const result = parser.parse([
+        'node',
+        'script.js',
+        '--new-name',
+        'from-cli',
+      ]);
+
+      expect((result as unknown as Record<string, unknown>).new_name).to.equal(
+        'from-cli'
+      );
+      expect(parser.deprecationWarnings).to.deep.equal([]);
+    });
   });
 
   /*

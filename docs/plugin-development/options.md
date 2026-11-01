@@ -42,17 +42,43 @@ export type ExampleOptions = OptionsOf<typeof exampleOptions>;
 The key is the `Config` name: `example_timeout` is `--example-timeout`,
 `DM_EXAMPLE_TIMEOUT` when the descriptor names that variable.
 
+### Deprecating an option
+
+Rename an option by giving the old name as an alias: the parser still reads
+it, and the server warns once at startup. Keep the alias for two minor
+releases, as [CONTRIBUTING.md](../../CONTRIBUTING.md#deprecating-a-published-contract)
+requires.
+
+```typescript
+export const exampleOptions = defineOptions({
+  example_url: opt.string({
+    env: 'DM_EXAMPLE_URL',
+    aliases: ['example-uri'],
+    envAliases: ['DM_EXAMPLE_URI'],
+  }),
+});
+```
+
+A CLI alias takes one value per occurrence, as the singular form does, and an
+array option's plural form has no alias: renaming it is a breaking change. An
+environment alias is read when `env` is unset, or empty for a type where an
+empty value means nothing, and only for a non-array option when its canonical
+CLI name is absent; an array option combines the environment value with the
+CLI one, so its alias is still read.
+
 Each declaration takes:
 
-| Field      | Meaning                                                             |
-| ---------- | ------------------------------------------------------------------- |
-| `env`      | Environment variable read when the CLI does not set the option      |
-| `default`  | Value kept when neither the CLI nor the environment sets the option |
-| `required` | Refuse an empty value instead of reading it as unset                |
-| `plural`   | Array only: CLI name of the plural form, without the leading `--`   |
-| `kind`     | Array only: how a value splits, see `ArrayKind` in `parseConfig.ts` |
-| `min/max`  | Number only: bounds checked when the option is read                 |
-| `choices`  | String only: the values the option accepts                          |
+| Field        | Meaning                                                               |
+| ------------ | --------------------------------------------------------------------- |
+| `env`        | Environment variable read when the CLI does not set the option        |
+| `default`    | Value kept when neither the CLI nor the environment sets the option   |
+| `required`   | Refuse an empty value instead of reading it as unset                  |
+| `plural`     | Array only: CLI name of the plural form, without the leading `--`     |
+| `kind`       | Array only: how a value splits, see `ArrayKind` in `parseConfig.ts`   |
+| `min/max`    | Number only: bounds checked when the option is read                   |
+| `choices`    | String only: the values the option accepts                            |
+| `aliases`    | Former CLI names still accepted, without the leading `--`             |
+| `envAliases` | Former environment variables still accepted, read when `env` is unset |
 
 ## Reading options
 
@@ -103,7 +129,8 @@ moved. A migrated plugin no longer reads them: it uses `options()`.
 
 Plugins outside the repository cannot add to `args.ts` yet, but they can
 declare options the same way and name them in `optionDefinitions`: the startup
-report subtracts those keys, and `options()` reads a declared `env` variable
-when the parser did not carry the key. An option without a declaration still
-reaches `this.config` from an unknown `--key value` pair, and the startup
-report names it.
+report subtracts those keys and their aliases, and `options()` reads a declared
+`env` variable or a deprecated CLI alias the parser did not carry, warning at
+startup for the alias as it does for a core option. An option without a
+declaration still reaches `this.config` from an unknown `--key value` pair, and
+the startup report names it.

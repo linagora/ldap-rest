@@ -9,6 +9,7 @@ on:
     branches:
       - master
   pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -116,6 +117,11 @@ jobs:
       - name: Check the OpenAPI document
         if: matrix.node-version == '24.x'
         run: npm run check:openapi
+
+      # See docs/development/contracts.md
+      - name: Check the options snapshot
+        if: matrix.node-version == '24.x'
+        run: npm run check:options
 
       # Runs the suite once and gates on coverage at the same time, rather
       # than running it twice. The threshold covers server code only: the
