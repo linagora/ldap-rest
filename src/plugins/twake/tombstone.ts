@@ -241,12 +241,11 @@ export default class TwakeTombstone extends DmPlugin {
           `${dn} was deleted less than ${this.eraseMinAge} seconds ago; force it to erase now`
         );
     }
-    const key = this.key(dn);
-    this.erasing.add(key);
+    this.erasing.add(dn);
     try {
       await this.server.ldap.delete(dn, req);
     } finally {
-      this.erasing.delete(key);
+      this.erasing.delete(dn);
     }
     // Only once the delete has been judged and has landed: a refused erase
     // keeps the memberships.
@@ -259,7 +258,7 @@ export default class TwakeTombstone extends DmPlugin {
    * reaching the directory: not when it erases one.
    */
   keeps(dn: string): boolean {
-    return !this.erasing.has(this.key(dn)) && this.matches(dn);
+    return !this.erasing.has(dn) && this.matches(dn);
   }
 
   /**
@@ -368,7 +367,9 @@ export default class TwakeTombstone extends DmPlugin {
   /**
    * Whether this DN names an entry the expressions keep. A client may spell
    * the DN differently from the expression; the directory stores the entry
-   * at its canonical DN, so the expressions read that too.
+   * at its canonical DN, so the expressions read that too. The DN as sent is
+   * still tried: an expression written with the directory's own spelling
+   * (`\2C`, a doubled space) matches only that form.
    */
   private matches(dn: string): boolean {
     if (this.patterns.some(p => p.test(dn))) return true;
@@ -379,15 +380,6 @@ export default class TwakeTombstone extends DmPlugin {
       return false;
     }
     return this.patterns.some(p => p.test(canonical));
-  }
-
-  /** One key per entry, whatever spelling its DN came in. */
-  private key(dn: string): string {
-    try {
-      return normalizeDn(dn);
-    } catch {
-      return dn.toLowerCase();
-    }
   }
 
   private isScim(req?: Request): boolean {
