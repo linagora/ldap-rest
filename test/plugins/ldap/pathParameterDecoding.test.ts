@@ -8,9 +8,11 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
+import LdapAccountLifecycle from '../../../src/plugins/ldap/accountLifecycle';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
+import LdapRaw from '../../../src/plugins/ldap/raw';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS,
@@ -56,6 +58,7 @@ describe('Route parameters decoded once', function () {
       await server?.ldap.delete(dn).catch(() => undefined);
     if (previousGroupSchema === undefined) delete process.env.DM_GROUP_SCHEMA;
     else process.env.DM_GROUP_SCHEMA = previousGroupSchema;
+    await server?.stop();
   });
 
   it('reads a name holding % as its escaping spells it', async () => {
@@ -135,5 +138,107 @@ describe('Route parameters decoded once: an organization DN', function () {
     const read = await request.get(`${route}/${encodeURIComponent(dn())}`);
     expect(read.status, JSON.stringify(read.body)).to.equal(200);
     expect(read.body.ou).to.equal('100%');
+  });
+});
+
+describe('Route parameters decoded once: a raw entry DN', function () {
+  let server: DM;
+  let request: ReturnType<typeof supertest>;
+  let base: string;
+  let prefix: string;
+  const dn = (): string => `ou=100%,${base}`;
+
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+  });
+
+  before(async () => {
+    base = process.env.DM_LDAP_BASE as string;
+    server = new DM();
+    await server.ready;
+    await server.registerPlugin('ldapRaw', new LdapRaw(server));
+    server.setupErrorMiddleware();
+    request = supertest(server.app);
+    prefix = `${server.config.api_prefix}/v1/ldap/raw`;
+    await server.ldap.add(dn(), {
+      objectClass: ['top', 'organizationalUnit'],
+      ou: '100%',
+    });
+  });
+
+  after(async () => {
+    await server?.ldap.delete(dn()).catch(() => undefined);
+    await server?.stop();
+  });
+
+  it('reads an entry DN holding % as its escaping spells it', async () => {
+    const read = await request.get(
+      `${prefix}/entry/${encodeURIComponent(dn())}`
+    );
+    expect(read.status, JSON.stringify(read.body)).to.equal(200);
+    expect(read.body.attributes.ou.values).to.deep.equal(['100%']);
+  });
+});
+
+describe('Route parameters decoded once: an account lifecycle id', function () {
+  let server: DM;
+  let request: ReturnType<typeof supertest>;
+  let base: string;
+  let prefix: string;
+  let previousFlatSchema: string | undefined;
+  const id = 'life.100%';
+  const userDn = (): string => `uid=${id},ou=users,${base}`;
+
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+  });
+
+  before(async () => {
+    base = process.env.DM_LDAP_BASE as string;
+    previousFlatSchema = process.env.DM_LDAP_FLAT_SCHEMA;
+    process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
+    server = new DM();
+    await server.ready;
+    await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
+    await server.registerPlugin(
+      'ldapAccountLifecycle',
+      new LdapAccountLifecycle(server)
+    );
+    server.setupErrorMiddleware();
+    request = supertest(server.app);
+    prefix = `${server.config.api_prefix}/v1/ldap`;
+    await server.ldap.add(userDn(), {
+      objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+      uid: id,
+      cn: 'Percent Lifecycle',
+      sn: 'Lifecycle',
+      mail: 'life.100@example.com',
+      employeeNumber: 'ACC0100',
+      twakeDepartmentPath: 'PercentLifecycle',
+      twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${base}`,
+    });
+  });
+
+  after(async () => {
+    await server?.ldap.delete(userDn()).catch(() => undefined);
+    if (previousFlatSchema === undefined)
+      delete process.env.DM_LDAP_FLAT_SCHEMA;
+    else process.env.DM_LDAP_FLAT_SCHEMA = previousFlatSchema;
+    await server?.stop();
+  });
+
+  it('changes the state of an id holding % as its escaping spells it', async () => {
+    const changed = await request
+      .post(`${prefix}/users/${encodeURIComponent(id)}/status`)
+      .send({ state: 'disabled' });
+    expect(changed.status, JSON.stringify(changed.body)).to.equal(200);
+    const read = await server.ldap.search(
+      { paged: false, scope: 'base', attributes: ['twakeAccountStatus'] },
+      userDn()
+    );
+    expect(
+      (read as { searchEntries: Array<Record<string, unknown>> })
+        .searchEntries[0].twakeAccountStatus
+    ).to.equal(`cn=disabled,ou=twakeAccountStatus,ou=nomenclature,${base}`);
   });
 });
