@@ -100,6 +100,11 @@
   canonical DN: the address and mark a caller supplied are removed and its
   instance is provisioned
   ([#610](https://github.com/linagora/ldap-rest/issues/610)).
+- A delete under another spelling of a tombstone's DN — spaces, case or
+  escapes — no longer removes the entry for good: the expressions are
+  compared as the directory compares DNs, so the delete writes a tombstone,
+  and a delete of an existing tombstone writes nothing
+  ([#615](https://github.com/linagora/ldap-rest/issues/615)).
 - An escaped comma in a DN value no longer names the branch after it: the
   instance expressions read every value comma as `\2C`, so an entry beside the
   branch is not taken for an account
