@@ -710,3 +710,54 @@ describe('PasswordPolicy Plugin: policy management', () => {
     }
   });
 });
+
+describe('PasswordPolicy.calculateStatus', () => {
+  interface Status {
+    expiresAt: string | null;
+    daysUntilExpiration: number | null;
+    isExpired: boolean;
+  }
+
+  const calculate = (pwdMaxAge: number): Status => {
+    const plugin = Object.create(PasswordPolicy.prototype) as {
+      settings: { ppolicy_warn_days: number };
+      calculateStatus(
+        dn: string,
+        entry: Record<string, unknown>,
+        policy: Record<string, unknown>
+      ): Status;
+    };
+    Object.defineProperty(plugin, 'settings', {
+      value: { ppolicy_warn_days: 14 },
+    });
+    return plugin.calculateStatus(
+      'uid=jdoe,ou=users,dc=example,dc=com',
+      {
+        dn: 'uid=jdoe,ou=users,dc=example,dc=com',
+        pwdChangedTime: '20261031120000Z',
+      },
+      {
+        dn: 'cn=default,ou=policies,dc=example,dc=com',
+        pwdMaxAge,
+      }
+    );
+  };
+
+  it('reports an expiry beyond the date range as no expiry', () => {
+    const status = calculate(9_000_000_000_000);
+
+    expect(status.expiresAt).to.equal(null);
+    expect(status.daysUntilExpiration).to.equal(null);
+    expect(status.isExpired).to.equal(false);
+  });
+
+  it('keeps an expiry inside the date range', () => {
+    const status = calculate(864000);
+
+    expect(status.expiresAt).to.not.equal(null);
+    expect(Number.isNaN(Date.parse(status.expiresAt as string))).to.equal(
+      false
+    );
+    expect(Number.isSafeInteger(status.daysUntilExpiration)).to.equal(true);
+  });
+});

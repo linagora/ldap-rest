@@ -155,6 +155,10 @@ curl "http://localhost:8081/api/v1/users/uid%3Djohn.doe%2Cou%3Dusers%2Cdc%3Dexam
 }
 ```
 
+A `pwdMaxAge` large enough to put the expiry beyond the representable date
+range is reported as no expiry: `expiresAt` and `daysUntilExpiration` are
+`null`, and `isExpired` stays `false`.
+
 ### Unlock User Account
 
 ```http
