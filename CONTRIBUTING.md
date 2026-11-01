@@ -42,8 +42,16 @@ npm run start:dev
 npm run test:dev                  # build, then the whole suite
 npm run test:one test/foo.test.ts # a subset
 npm run check                     # types, ESLint, Prettier, no client values
+npm run check:ts                  # types, with the TypeScript 5 compiler
+npm run check:ts7                 # types, with TypeScript 7
 npm run fix                       # ESLint and Prettier fixes
 ```
+
+CI runs both type checks, and both are blocking: a change must type-check
+under the `typescript` 5 line that the build loads and under the
+`typescript7` npm alias of the stable TypeScript 7 release. The two packages
+both ship a `tsc` binary, so each script runs the package entry rather than
+`node_modules/.bin/tsc`.
 
 Without `DM_LDAP_*` variables, the tests run against an embedded LDAP server
 in Docker; set them as above to use yours. How the embedded server works:
