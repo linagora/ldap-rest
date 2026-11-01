@@ -13,6 +13,12 @@ updates:
         dependency-type: development
         patterns: ['*']
     open-pull-requests-limit: 5
+    # `npm run check:ts7` loads TypeScript 7 through the `typescript7` alias,
+    # see CONTRIBUTING.md#tests-and-checks: the `typescript` package stays on
+    # the line the build and ESLint accept.
+    ignore:
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
 
   # The Maven dependencies of lsc-plugin, including lsc-core
   - package-ecosystem: maven
