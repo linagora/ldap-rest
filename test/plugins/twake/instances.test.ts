@@ -323,6 +323,32 @@ describe('Twake instances plugin', function () {
       expect(entry).not.to.have.property('businessCategory');
     });
 
+    it('takes an account under a respelled branch for one', async () => {
+      // The directory stores this entry at its canonical DN, which the
+      // expressions match; the DN as sent does not
+      const respelled = `uid=in-q2 , OU=USERS , ${process.env.DM_LDAP_BASE}`;
+      const scope = search('in-q2.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances')
+        .reply(202, {});
+      try {
+        await dm.ldap.add(
+          respelled,
+          person('in-q2', {
+            description: 'evil.example.net',
+            businessCategory: '2026-01-01T00:00:00Z',
+          }),
+          rest()
+        );
+        expect(scope.isDone()).to.equal(true);
+        const entry = await read(dm, dnOf('in-q2'));
+        expect(entry).not.to.have.property('description');
+        expect(entry).not.to.have.property('businessCategory');
+      } finally {
+        await dm.ldap.delete(dnOf('in-q2')).catch(() => undefined);
+      }
+    });
+
     it('asks nothing for a tombstone put back', async () => {
       await dm.ldap.add(
         dnOf('in-alice'),

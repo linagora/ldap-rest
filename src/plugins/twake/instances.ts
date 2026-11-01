@@ -25,7 +25,12 @@ import {
 } from '../../lib/instanceProviders';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import { escapeLdapFilter, isDirectChildOf, rdnValue } from '../../lib/utils';
+import {
+  escapeLdapFilter,
+  isDirectChildOf,
+  normalizeDn,
+  rdnValue,
+} from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
 import {
@@ -47,6 +52,12 @@ export interface WorkplaceCreated {
 /** An account's instance request, and the id `user.created` names it by. */
 interface Account extends InstanceRequest {
   twakeId: string;
+}
+
+/** A `--twake-instance-dn` expression that read a DN, and where it sits. */
+interface PatternMatch {
+  exec: RegExpExecArray;
+  index: number;
 }
 
 const first = (value: unknown): string | undefined => {
@@ -167,7 +178,7 @@ export default class TwakeInstances extends DmPlugin {
     // The address and the mark are this plugin's to write: one supplied by
     // the caller would skip the provider, or the event
     ldapaddrequest: ([dn, entry, req]) => {
-      if (this.patterns.some(p => p.test(dn)) || this.isOrganization(dn)) {
+      if (this.match(dn) || this.isOrganization(dn)) {
         const owned = [
           this.fqdnAttribute,
           this.sentAttribute,
@@ -205,7 +216,7 @@ export default class TwakeInstances extends DmPlugin {
         // Queued before a re-create of the same DN, whose add comes after
         await this.serialized(dn, async () => {
           try {
-            await provider.destroy(this.id(uid, match), uid);
+            await provider.destroy(this.id(uid, match.exec), uid);
           } catch (err) {
             this.logger.error({
               plugin: this.name,
@@ -768,8 +779,9 @@ export default class TwakeInstances extends DmPlugin {
 
   /** What to ask for this account, when it gets an instance at all. */
   protected account(dn: string, entry: AttributesList): Account | undefined {
-    const match = this.match(dn);
-    if (!match) return undefined;
+    const matched = this.match(dn);
+    if (!matched) return undefined;
+    const match = matched.exec;
     // A tombstone put back (a refused SCIM create restores it) is no account
     if (isTombstone(entry, this.lifecycle)) return undefined;
     const skip = this.settings.twake_instance_skip_attribute;
@@ -793,7 +805,7 @@ export default class TwakeInstances extends DmPlugin {
     const orgDomain = match.groups?.org
       ? email.split('@')[1]
       : (cozy && this.settings.twake_instance_cozy_org_domain) || undefined;
-    const offer = this.offers[this.patterns.findIndex(p => p.test(dn))];
+    const offer = this.offers[matched.index];
     const id = this.id(uid, match);
     if (!id) {
       this.logger.warn(
@@ -819,10 +831,30 @@ export default class TwakeInstances extends DmPlugin {
     };
   }
 
-  private match(dn: string): RegExpExecArray | undefined {
-    return this.patterns
-      .map(p => p.exec(dn))
-      .find((m): m is RegExpExecArray => m !== null);
+  /**
+   * The expression that takes this DN for an account's, and where it sits.
+   *
+   * A client may spell the branch differently from the configured expression:
+   * the directory stores the entry at its canonical DN, so the expressions
+   * are tried against that too. Captured values come lowercased from there,
+   * which the ids and slugs derived from them already fold.
+   */
+  private match(dn: string): PatternMatch | undefined {
+    for (const [index, pattern] of this.patterns.entries()) {
+      const exec = pattern.exec(dn);
+      if (exec) return { exec, index };
+    }
+    let canonical: string;
+    try {
+      canonical = normalizeDn(dn);
+    } catch {
+      return undefined;
+    }
+    for (const [index, pattern] of this.patterns.entries()) {
+      const exec = pattern.exec(canonical);
+      if (exec) return { exec, index };
+    }
+    return undefined;
   }
 
   private id(uid: string, match: RegExpExecArray): string {

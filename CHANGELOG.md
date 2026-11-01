@@ -95,6 +95,11 @@
   spelled with other spacing or escapes, or whose RDN holds an escaped comma:
   such a creation no longer keeps an address or a mark the caller supplied
   ([#601](https://github.com/linagora/ldap-rest/issues/601)).
+- The Twake instances plugin takes an account created under a branch spelled
+  with other spacing or case for one, as the directory stores it at its
+  canonical DN: the address and mark a caller supplied are removed and its
+  instance is provisioned
+  ([#610](https://github.com/linagora/ldap-rest/issues/610)).
 - A tombstone's deletion date is read only when it is written as a
   GeneralizedTime with its zone or as an ISO 8601 date: a malformed value
   another writer left (`1`, `Jan 1`) and the extra forms the default
