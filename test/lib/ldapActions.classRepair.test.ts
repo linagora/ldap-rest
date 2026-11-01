@@ -209,7 +209,7 @@ describe('Object class repair on modify', function () {
     }
     dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages'], true);
     dm.ldap.declareObjectClasses(usersBase, ['posixAccount']);
-    expect((dm.ldap as any).declaredClasses.size).to.equal(3);
+    expect((dm.ldap as any).schema.declaredClasses.size).to.equal(3);
   });
 
   it('should take classes a schema file gives as a single string', async () => {
@@ -226,7 +226,7 @@ describe('Object class repair on modify', function () {
 
   it('should not fail when a writer gave the entry the class in the meantime', async () => {
     const dm = bare();
-    (dm.ldap as any).classRepair = async (): Promise<string[]> => {
+    (dm.ldap as any).schema.classRepair = async (): Promise<string[]> => {
       // That writer lands between the repair's read and its write.
       await server.ldap.modify(accountDn, {
         add: { objectClass: 'twakeWhitePages' },
@@ -242,10 +242,9 @@ describe('Object class repair on modify', function () {
   it('should write when a writer gave the entry the class after the refusal', async () => {
     const dm = bare();
     dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
-    const repair = (dm.ldap as any).classRepair.bind(dm.ldap);
-    (dm.ldap as any).classRepair = async (
-      ...args: unknown[]
-    ): Promise<unknown> => {
+    const schema = (dm.ldap as any).schema;
+    const repair = schema.classRepair.bind(schema);
+    schema.classRepair = async (...args: unknown[]): Promise<unknown> => {
       // That writer lands between the refusal and the repair's read.
       await server.ldap.modify(accountDn, {
         add: { objectClass: 'twakeWhitePages' },
@@ -265,7 +264,7 @@ describe('Object class repair on modify', function () {
   it('should answer the refusal, warned once, when the schema cannot be read', async () => {
     const dm = bare();
     dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
-    (dm.ldap as any).schemaIndex = async (): Promise<never> => {
+    (dm.ldap as any).schema.schemaIndex = async (): Promise<never> => {
       throw new Error('cn=Subschema unreadable');
     };
     const warned: string[] = [];

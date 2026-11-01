@@ -118,8 +118,9 @@ describe('Attribute names of a write', function () {
     const other = new DM();
     await other.ready;
     (
-      other.ldap as unknown as { schemaIndex: () => Promise<never> }
-    ).schemaIndex = () => Promise.reject(new Error('cn=Subschema unreadable'));
+      other.ldap as unknown as { schema: { schemaIndex: () => Promise<never> } }
+    ).schema.schemaIndex = () =>
+      Promise.reject(new Error('cn=Subschema unreadable'));
     // Names no option spells, so the standard table answers them
     for (const [given, name] of [
       ['C', 'c'],
