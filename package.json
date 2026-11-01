@@ -809,7 +809,8 @@
     "check:hooks": "tsx scripts/hooks-doc.ts",
     "check:no-client-values": "sh scripts/check-no-client-values.sh",
     "check:openapi": "tsx scripts/check-openapi.ts",
-    "check:ts": "tsc --noEmit",
+    "check:ts": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "check:ts7": "node ./node_modules/typescript7/bin/tsc --noEmit",
     "clean": "rimraf dist/* static/browser/* coverage",
     "coverage": "c8 --config .c8rc.json mocha",
     "coverage:check": "npm run check:ts && c8 --config .c8rc.json --exclude 'src/browser/**' --check-coverage --statements 84 --lines 84 --branches 75 --functions 86 mocha",
@@ -882,7 +883,8 @@
     "tinyglobby": "^0.2.17",
     "tslib": "^2.8.1",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "typescript7": "npm:typescript@^7.0.2"
   },
   "optionalDependencies": {
     "@linagora/rabbitmq-client": "^0.7.2",

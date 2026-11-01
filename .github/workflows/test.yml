@@ -84,6 +84,10 @@ jobs:
         if: matrix.node-version == '24.x'
         run: npm run lint
 
+      - name: Type-check with TypeScript 7
+        if: matrix.node-version == '24.x'
+        run: npm run check:ts7
+
       - name: Check formatting
         if: matrix.node-version == '24.x'
         run: npm run format:check
