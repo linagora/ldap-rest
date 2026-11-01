@@ -95,6 +95,11 @@
   spelled with other spacing or escapes, or whose RDN holds an escaped comma:
   such a creation no longer keeps an address or a mark the caller supplied
   ([#601](https://github.com/linagora/ldap-rest/issues/601)).
+- A tombstone's deletion date is read only when it is written as a
+  GeneralizedTime or as an ISO 8601 date: a malformed value another writer
+  left (`1`, `Jan 1`) no longer reads as an old date, so `erase` refuses it
+  until forced instead of deleting the tombstone for good
+  ([#611](https://github.com/linagora/ldap-rest/issues/611)).
 
 ## v1.3.0 (2026-10-31)
 

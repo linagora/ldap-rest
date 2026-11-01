@@ -108,11 +108,44 @@ export function formatDeletedAt(date: Date, format: DeletedAtFormat): string {
 }
 
 /**
+ * The shapes a deletion date is written in: an LDAP GeneralizedTime, which
+ * the shared reader also takes with its zone, minutes and seconds left out,
+ * or an ISO 8601 date, alone or with a time.
+ */
+const GENERALIZED_TIME =
+  /^\d{10}(?:\d{2}(?:\d{2})?)?(?:[.,]\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/;
+const ISO_8601 =
+  /^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/** Whether a year, month and day name a day that exists. */
+function isCalendarDay(year: number, month: number, day: number): boolean {
+  if (month < 1 || month > 12 || day < 1) return false;
+  // Date.UTC() reads a year below 100 as 19xx
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  return date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+/**
  * A deletion date as the directory holds it, or undefined if unreadable.
  *
  * Read by the same reader as every other directory time: the format only says
  * how this deployment writes the date, not how it is read.
+ *
+ * A value of another shape is refused here rather than handed to that
+ * reader, whose fallback to `new Date()` reads `1` or `Jan 1` as a date: the
+ * erase guard takes an unreadable date for a refusal. The same fallback rolls
+ * `2025-02-31` over to March, where the shared reader refuses that day
+ * spelled as a GeneralizedTime.
  */
 export function parseDeletedAt(value: string): Date | undefined {
-  return parseDirectoryDate(value) ?? undefined;
+  const text = value.trim();
+  const iso = ISO_8601.exec(text);
+  if (iso) {
+    if (!isCalendarDay(Number(iso[1]), Number(iso[2]), Number(iso[3])))
+      return undefined;
+    return parseDirectoryDate(text) ?? undefined;
+  }
+  if (!GENERALIZED_TIME.test(text)) return undefined;
+  return parseDirectoryDate(text) ?? undefined;
 }

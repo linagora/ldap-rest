@@ -183,7 +183,8 @@ export default class TwakeTombstone extends DmPlugin {
      *   '404':
      *     description: No tombstone at this DN.
      *   '409':
-     *     description: The deletion is too recent and `force` is not set.
+     *     description: The deletion is too recent, or its date cannot be
+     *       read, and `force` is not set.
      */
     defineRoute(app, {
       method: 'post',

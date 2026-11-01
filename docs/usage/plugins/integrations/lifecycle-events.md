@@ -110,7 +110,11 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
   means entries are never tombstones, and only a removal publishes `deleted`.
 - `--twake-lifecycle-deleted-at-attribute`,
   `--twake-lifecycle-deleted-at-format` (`iso8601`, the default, or
-  `generalizedTime`): the deletion date. It is always published as ISO 8601.
+  `generalizedTime`): the deletion date. It is read whether it is written as
+  a GeneralizedTime or as an ISO 8601 date, and always published as ISO 8601;
+  a value of neither shape is left out. A date and time without a zone is read
+  in the server's time zone, where a GeneralizedTime without one is read as
+  UTC.
 - `--twake-lifecycle-member-attribute` (default `member`): the attribute
   `memberAdded`, `memberRemoved` and member lists read.
 - `--twake-lifecycle-rules`: a JSON file, or the JSON itself.
