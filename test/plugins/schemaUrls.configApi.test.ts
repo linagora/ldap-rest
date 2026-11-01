@@ -94,11 +94,9 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
     return {
       urls: {
         group: new LdapGroups(dm).getConfigApiData().schemaUrl as
-          | string
-          | undefined,
+          string | undefined,
         organization: new LdapOrganizations(dm).getConfigApiData().schemaUrl as
-          | string
-          | undefined,
+          string | undefined,
         flat: flat[0]?.schemaUrl,
       },
       dm,

@@ -321,8 +321,7 @@ export default class TwakeSpaces extends DmPlugin {
 
   private get tombstone(): TwakeTombstone | undefined {
     return this.server.loadedPlugins.twakeTombstone as unknown as
-      | TwakeTombstone
-      | undefined;
+      TwakeTombstone | undefined;
   }
 
   hooks: Hooks = {

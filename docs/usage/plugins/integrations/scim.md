@@ -715,18 +715,14 @@ Response shape (truncated):
             "id",
             "active"
           ],
-          "mapping": [
-            /* same shape as default-mapping.json */
-          ]
+          "mapping": [/* same shape as default-mapping.json */]
         },
         {
           "id": "Group",
           "endpoint": "/scim/v2/Groups",
           "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
           "rdnAttribute": "cn",
-          "mapping": [
-            /* ... */
-          ]
+          "mapping": [/* ... */]
         }
       ],
       "idStrategy": "rdn",

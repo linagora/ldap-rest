@@ -1868,8 +1868,7 @@ export default class Scim extends DmPlugin {
       file => join(this.scimSchemaDir, file)
     );
     let schemaUrls:
-      | { user: string; group: string; defaultMapping?: string }
-      | undefined;
+      { user: string; group: string; defaultMapping?: string } | undefined;
     for (const plugin of staticPlugins(this.server)) {
       const [user, group, defaultMapping] = files.map(file =>
         plugin.schemaUrlOf(file)

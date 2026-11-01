@@ -22,12 +22,7 @@ export const httpRequestDuration = new Histogram({
 });
 
 export type LdapOperation =
-  | 'bind'
-  | 'search'
-  | 'add'
-  | 'modify'
-  | 'rename'
-  | 'delete';
+  'bind' | 'search' | 'add' | 'modify' | 'rename' | 'delete';
 
 export const ldapOperationDuration = new Histogram({
   name: 'ldap_rest_ldap_operation_duration_seconds',

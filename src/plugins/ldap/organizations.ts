@@ -676,8 +676,7 @@ export default class LdapOrganizations extends DmPlugin {
     if (!wantJson(req, res)) return;
 
     const body = jsonBody(req, res, 'targetOrgDn') as
-      | { targetOrgDn: string }
-      | false;
+      { targetOrgDn: string } | false;
     if (!body) return;
 
     const dn = req.params.dn as string;
@@ -884,8 +883,7 @@ export default class LdapOrganizations extends DmPlugin {
       const ouValue = entry.ou;
       const ouName =
         ((Array.isArray(ouValue) ? ouValue[0] : ouValue) as
-          | string
-          | undefined) || nameFromDn;
+          string | undefined) || nameFromDn;
 
       let matchingPath = path;
       if ((this.isOu(entry) || nameFromDn !== undefined) && ouName) {

@@ -46,8 +46,7 @@ export const mailDomains = (values: string[] | undefined): string[] => [
  */
 export function domainBranches(server: DM): DomainBranch[] {
   const flat = server.loadedPlugins['ldapFlatGeneric'] as
-    | { instances?: { base: string; schema?: Schema }[] }
-    | undefined;
+    { instances?: { base: string; schema?: Schema }[] } | undefined;
   const branches: DomainBranch[] = [];
   for (const instance of flat?.instances || []) {
     const attribute = roleAttribute(instance.schema, 'domainName');

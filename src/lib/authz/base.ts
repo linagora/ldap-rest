@@ -687,8 +687,7 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   protected domainLinkAttribute(): string | undefined {
     const organizations = this.server.loadedPlugins['ldapOrganizations'] as
-      | { schema?: Schema }
-      | undefined;
+      { schema?: Schema } | undefined;
     return (
       roleAttribute(organizations?.schema, 'domainLink') ||
       this.config.enterprise_domain_link_attribute ||

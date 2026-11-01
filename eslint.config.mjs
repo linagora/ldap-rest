@@ -13,6 +13,10 @@ export default [
   // Node.js config
   js.configs.recommended,
 
+  // `statusCodeOf` answers with the first status a chain of causes holds: a
+  // cause attached to a translated error would answer in the wrapper's place
+  { rules: { 'preserve-caught-error': 'off' } },
+
   // TypeScript config (except browser)
   {
     files: ['src/**/*.{ts,tsx}'],

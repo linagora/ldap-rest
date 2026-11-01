@@ -1065,7 +1065,7 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<boolean> {
     const dn = this.toGroupDn(cn);
     if (!Array.isArray(member)) member = [member];
-    [cn, member] = await this.hookBus.chain('ldapgroupaddmember', [cn, member]);
+    [, member] = await this.hookBus.chain('ldapgroupaddmember', [cn, member]);
     // Before the members are looked for, and the external ones created
     await this.ldap.authorize('ldapmodifyrequest', [
       dn,
@@ -1104,7 +1104,7 @@ export default class LdapGroups extends DmPlugin {
     req?: Request
   ): Promise<boolean> {
     const dn = this.toGroupDn(cn);
-    [cn, member] = await this.hookBus.chain('ldapgroupdeletemember', [
+    [, member] = await this.hookBus.chain('ldapgroupdeletemember', [
       cn,
       member,
     ]);
@@ -1279,8 +1279,7 @@ export default class LdapGroups extends DmPlugin {
     }
 
     const targetPath = targetOrg.searchEntries[0][pathAttr] as
-      | string
-      | undefined;
+      string | undefined;
 
     if (!targetPath) {
       throw new Error(
@@ -1507,7 +1506,7 @@ export default class LdapGroups extends DmPlugin {
     members: string[],
     req?: Request
   ): Promise<void> {
-    [dn, members] = await this.hookBus.chain('ldapgroupvalidatemembers', [
+    [, members] = await this.hookBus.chain('ldapgroupvalidatemembers', [
       dn,
       members,
     ]);
@@ -1564,7 +1563,7 @@ export default class LdapGroups extends DmPlugin {
     dn: string,
     entry: AttributesList
   ): Promise<AttributesList> {
-    [dn, entry] = await this.hookBus.chain('ldapgroupvalidatenew', [dn, entry]);
+    [, entry] = await this.hookBus.chain('ldapgroupvalidatenew', [dn, entry]);
     return await this.validator().validateNew(entry);
   }
 
@@ -1578,7 +1577,7 @@ export default class LdapGroups extends DmPlugin {
     dn: string,
     changes: ModifyRequest
   ): Promise<ModifyRequest> {
-    [dn, changes] = await this.hookBus.chain('ldapgroupvalidatechanges', [
+    [, changes] = await this.hookBus.chain('ldapgroupvalidatechanges', [
       dn,
       changes,
     ]);
