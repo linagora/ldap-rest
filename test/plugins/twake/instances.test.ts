@@ -627,22 +627,35 @@ describe('Twake instances plugin', function () {
       });
 
       it('asks once when two spellings of one DN make sure at the same time', async () => {
-        search('in-alice.example.org').reply(200, { items: [] });
-        const create = nock(CLOUDERY)
+        // The second spelling may only read once the first creation has
+        // landed: a queue per spelling lets it read before
+        let created = false;
+        let readsAfterCreate = 0;
+        search('in-alice.example.org')
+          .twice()
+          .reply(200, () => {
+            if (created) readsAfterCreate++;
+            return {
+              items: created
+                ? [{ fqdn: 'in-alice.example.org', instantiated_at: null }]
+                : [],
+            };
+          });
+        nock(CLOUDERY)
           .post('/api/v1/instances')
-          .once()
-          .reply(202, {});
-        search('in-alice.example.org').reply(200, {
-          items: [{ fqdn: 'in-alice.example.org', instantiated_at: null }],
-        });
+          .twice()
+          .delay(100)
+          .reply(202, () => {
+            created = true;
+            return {};
+          });
         const respelled = `uid=in-alice , ${USERS.toUpperCase().replace(/,/g, ' , ')}`;
         const states = await Promise.all([
           plugin(dm).ensureInstance(dnOf('in-alice')),
           plugin(dm).ensureInstance(respelled),
         ]);
         expect(states).to.deep.equal(['pending', 'pending']);
-        expect(create.isDone()).to.equal(true);
-        expect(nock.pendingMocks()).to.deep.equal([]);
+        expect(readsAfterCreate).to.equal(1);
       });
 
       it('asks no organization about an instance at another address than the account’s', async () => {

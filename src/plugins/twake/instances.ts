@@ -837,16 +837,13 @@ export default class TwakeInstances extends DmPlugin {
   /**
    * The expression that takes this DN for an account's, and where it sits.
    *
-   * A client may spell the branch differently from the configured expression:
-   * the directory stores the entry at its canonical DN, so the expressions
-   * are tried against that too. Its captured values keep the caller's case,
-   * which an organization id is sent as.
+   * The expressions read the canonical DN: a client may spell the branch
+   * differently from the configured expression, and a space or an escape
+   * inside a captured value would otherwise be captured as written. The
+   * canonical form keeps the caller's case, which an organization id is sent
+   * as.
    */
   private match(dn: string): PatternMatch | undefined {
-    for (const [index, pattern] of this.patterns.entries()) {
-      const exec = pattern.exec(dn);
-      if (exec) return { exec, index };
-    }
     let canonical: string;
     try {
       canonical = canonicalDn(dn);
