@@ -20,7 +20,7 @@ import { dirname, join } from 'path';
 import express from 'express';
 import bodyParser from 'body-parser';
 import type winston from 'winston';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import { ConfigParser } from '../lib/parseConfig';
 import { unknownEnvironmentOptions } from '../config/options';
@@ -43,7 +43,7 @@ import {
   LDAP_JUDGING_HOOKS,
 } from '../lib/authz/composition';
 import { registerAttributeTypes } from '../lib/utils';
-import { errorChain } from '../lib/errors';
+import { BadRequestError, errorChain } from '../lib/errors';
 import HookBus, { recordHookOwner, type HookFn } from '../lib/hookBus';
 import { runForRequest, runWithLogContext } from '../lib/requestContext';
 import { requestId } from '../lib/changeContext';
@@ -58,6 +58,25 @@ import { registerProcessShutdown, shutdownTimeout } from '../lib/shutdown';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
+
+/**
+ * Refuse a `Content-Type` that names no media type, such as
+ * `;application/json`.
+ *
+ * `type-is` throws a `TypeError` on it where `body-parser` expects the type
+ * simply not to match, and the request would be answered `500`.
+ */
+const rejectEmptyMediaType: RequestHandler = (req, _res, next) => {
+  const contentType = req.headers['content-type'];
+  if (
+    typeof contentType === 'string' &&
+    contentType.split(';', 1)[0].trim() === ''
+  ) {
+    next(new BadRequestError('Content-Type names no media type'));
+    return;
+  }
+  next();
+};
 
 /**
  * Every stack of a chain of `cause`s, the wrapper's first: the outer stack
@@ -265,6 +284,7 @@ export class DM {
     });
     // Each parser keeps the bytes it read: core/auth/hmac hashes those, as
     // the client signed them, not the body re-serialized.
+    this.app.use(rejectEmptyMediaType);
     this.app.use(this.bodyParsers);
     this.app.use(bodyParser.json({ verify: keepRawBody }));
     this.app.use(

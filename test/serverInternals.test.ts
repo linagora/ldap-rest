@@ -428,6 +428,20 @@ describe('Server internals', () => {
       expect(res.status).to.equal(413);
     });
 
+    it('should answer 400 to a Content-Type with no media type', async () => {
+      const dm = new DM();
+      await dm.ready;
+      dm.app.post('/probe', (_req, res) => {
+        res.json({});
+      });
+
+      const res = await request(dm.app)
+        .post('/probe')
+        .set('Content-Type', ';application/json')
+        .send('{}');
+      expect(res.status).to.equal(400);
+    });
+
     it('should run a registered parser ahead of the global ones', async () => {
       const dm = new DM();
       await dm.ready;
