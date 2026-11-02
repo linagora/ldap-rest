@@ -24,8 +24,6 @@ import {
   rdnValue,
   validateDnValue,
 } from '../../lib/utils';
-
-import { BaseResolver } from './baseResolver';
 import {
   type ResourceMapping,
   type ScimGroup,
@@ -33,7 +31,9 @@ import {
   type PatchRequest,
   type MultiValued,
   SCHEMA_LIST_RESPONSE,
-} from './types';
+} from '../../lib/scim/types';
+
+import { BaseResolver } from './baseResolver';
 import {
   DEFAULT_GROUP_MAPPING,
   loadMappingFile,

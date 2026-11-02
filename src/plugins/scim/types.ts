@@ -4,5 +4,7 @@
  *
  * Re-export of the SCIM types, moved to `lib/scim/types` so the core can
  * name them without importing a plugin.
+ *
+ * @deprecated import from `ldap-rest/hooks`; removed in 4.0.0
  */
 export * from '../../lib/scim/types';

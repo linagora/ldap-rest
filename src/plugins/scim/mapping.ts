@@ -13,8 +13,6 @@ import fs from 'fs';
 
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 import { hasOnlyRfc4514Escapes, parseDirectoryDate } from '../../lib/utils';
-
-import { kindOf, scimInvalidValue } from './errors';
 import {
   type ScimUser,
   type ScimGroup,
@@ -23,7 +21,9 @@ import {
   type MultiValued,
   SCHEMA_USER,
   SCHEMA_GROUP,
-} from './types';
+} from '../../lib/scim/types';
+
+import { kindOf, scimInvalidValue } from './errors';
 
 const OPERATIONAL_ATTRIBUTES = [
   'createTimestamp',

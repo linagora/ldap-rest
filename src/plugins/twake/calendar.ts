@@ -1,7 +1,7 @@
 import TwakePlugin from '../../abstract/twakePlugin';
 import { type Role } from '../../abstract/plugin';
 import type { AttributesList, ModifyRequest } from '../../lib/ldapActions';
-import type { ChangesToNotify } from '../ldap/onChange';
+import type { ChangesToNotify } from '../../lib/changes';
 import { Hooks, MaybePromise } from '../../hooks';
 import { isDnInBranch, rdnValue } from '../../lib/utils';
 

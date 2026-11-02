@@ -16,6 +16,7 @@ import type { ChangeContext } from '../../lib/changeContext';
 import type { ChangesToNotify } from '../../lib/changes';
 import { currentOperation } from '../../lib/operation';
 
+/** @deprecated import from `ldap-rest/hooks`; removed in 4.0.0 */
 export type { ChangesToNotify } from '../../lib/changes';
 
 const normalize = (value: AttributeValue | undefined): string[] =>

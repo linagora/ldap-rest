@@ -8,6 +8,13 @@
   or `EntityRegistryService`, and declare their own with `declareEntities()`
   ([details](docs/plugin-development/services.md#the-entity-registry)).
 
+### Changed
+
+- The SCIM types, the `SCHEMA_*` constants and `ChangesToNotify` are exported
+  from `ldap-rest/hooks`; the former `./plugin-scim-types` and
+  `./plugin-ldap-onchange` entries are deprecated and will be removed in
+  4.0.0.
+
 ### Fixed
 
 - A plugin loaded with per-instance overrides no longer counts operations on

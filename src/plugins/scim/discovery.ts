@@ -12,8 +12,6 @@ import path from 'path';
 import type { Config } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
 import { loadSchemaFile } from '../../lib/schemaFile';
-
-import type { ScimOptions } from './scim.options';
 import {
   type ResourceTypeDefinition,
   type ServiceProviderConfig,
@@ -23,7 +21,9 @@ import {
   SCHEMA_RESOURCE_TYPE,
   SCHEMA_SCHEMA,
   SCHEMA_SERVICE_PROVIDER_CONFIG,
-} from './types';
+} from '../../lib/scim/types';
+
+import type { ScimOptions } from './scim.options';
 
 export interface DiscoveryOptions {
   config: Config;
