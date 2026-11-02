@@ -1559,6 +1559,12 @@ interface ScimAddress {
 }
 
 // @public (undocumented)
+export interface ScimApi {
+    readonly userLockAttribute: string;
+    readonly userLockValue: string;
+}
+
+// @public (undocumented)
 interface ScimErrorResponse {
     // (undocumented)
     detail?: string;
@@ -1606,6 +1612,9 @@ interface ScimName {
     // (undocumented)
     middleName?: string;
 }
+
+// @public (undocumented)
+export const ScimService: ServiceToken<ScimApi>;
 
 // @public (undocumented)
 interface ScimUser {
@@ -1753,6 +1762,14 @@ interface SyntaxDefinition {
     // (undocumented)
     oid: string;
 }
+
+// @public (undocumented)
+export interface TombstoneApi {
+    keeps(dn: string): boolean;
+}
+
+// @public (undocumented)
+export const TombstoneService: ServiceToken<TombstoneApi>;
 
 // @public (undocumented)
 export class TooManyRequestsError extends HttpError {
