@@ -184,7 +184,18 @@ export class DM {
   /** The plugin that provided each service, for the duplicate warning. */
   private readonly serviceOwners = new Map<ServiceToken<unknown>, string>();
   ldap: ldapActions;
-  operationSequence: number;
+  /**
+   * The next operation number, shared by the `withConfig` views. An accessor
+   * over an object because a field would be copied into each view — which
+   * would then count on its own — while an object is copied by reference.
+   */
+  private readonly _operations = { sequence: 0 };
+  get operationSequence(): number {
+    return this._operations.sequence;
+  }
+  set operationSequence(value: number) {
+    this._operations.sequence = value;
+  }
   logger: winston.Logger;
   /** Authentication plugins, in registration order */
   authenticators: AuthBase[] = [];
@@ -199,19 +210,31 @@ export class DM {
   private _authState: { dispatcherMounted: boolean } = {
     dispatcherMounted: false,
   };
-  private _errorMiddlewareSetup: boolean = false;
+  /**
+   * The mounted error middleware, if any. In an object, as `_authState` is: a
+   * view made during loading would copy a bare `undefined` field, so a route
+   * it registers after `ready` would land behind the handler — the one place
+   * Express never routes an error to.
+   */
+  private readonly _errorState: {
+    handler?: express.ErrorRequestHandler;
+  } = {};
   /** The parsers plugins mount ahead of the global ones, see registerBodyParser */
   private readonly bodyParsers = express.Router();
   /**
    * Whether the plugins of the configuration are loaded and their
    * composition checked. A plugin registered after that — a server
    * assembled by hand — is checked on its own as it arrives.
+   *
+   * In an object, as `_authState` is: a plain flag is copied into each
+   * `withConfig` view, and a view made during loading would keep `false` and
+   * let a plugin registered through it skip the composition check.
    */
-  private _composed: boolean = false;
+  private readonly _compositionState = { composed: false };
 
   /** Every plugin loaded and the composition checked */
   get composed(): boolean {
-    return this._composed;
+    return this._compositionState.composed;
   }
 
   /**
@@ -238,7 +261,6 @@ export class DM {
   get unhandledRejections(): number {
     return this.life.unhandledRejections;
   }
-  private _errorMiddleware?: express.ErrorRequestHandler;
   /**
    * The loads of `--plugin` entries without overrides, keyed by resolved
    * module and name. Regular plugins load in parallel and load their own
@@ -315,7 +337,6 @@ export class DM {
     this.ldap = new ldapActions(this);
     setLogger(this.logger);
     setDebug(this.config.debug);
-    this.operationSequence = 0;
     const promises: Promise<void | boolean>[] = [];
 
     if (this.config.plugin) {
@@ -397,7 +418,7 @@ export class DM {
             await assertAuthzComposition(this);
             assertEnforceable(this);
             await this.learnAttributeTypes();
-            this._composed = true;
+            this._compositionState.composed = true;
             this.reportUnknownOptions();
             this.afterLoad();
             resolve();
@@ -407,7 +428,7 @@ export class DM {
         // No plugin yet: a host assembling the server registers its own,
         // and answers for what they enforce
         this.setupErrorMiddleware();
-        this._composed = true;
+        this._compositionState.composed = true;
         resolve();
       }
     });
@@ -721,17 +742,16 @@ export class DM {
   }
 
   setupErrorMiddleware(): void {
+    const previous = this._errorState.handler;
     // Remove existing error middleware if already set up.
     // Express 5 renamed `_router` to `router`, so this lookup silently found
     // nothing and the old handler was never removed: one more was appended on
     // every registerPlugin. Only the first ever ran, so nothing broke — the
     // stack just kept growing.
-    if (this._errorMiddlewareSetup && this._errorMiddleware) {
+    if (previous) {
       const stack = this.routerStack();
       if (stack) {
-        const index = stack.findIndex(
-          layer => layer.handle === this._errorMiddleware
-        );
+        const index = stack.findIndex(layer => layer.handle === previous);
         if (index !== -1) {
           stack.splice(index, 1);
         }
@@ -739,7 +759,7 @@ export class DM {
     }
 
     // Create error handling middleware - must be after all routes
-    this._errorMiddleware = (
+    const handler: express.ErrorRequestHandler = (
       err: Error,
       req: Request,
       res: Response,
@@ -771,8 +791,8 @@ export class DM {
       if (!res.headersSent) res.status(status).json(body);
     };
 
-    this.app.use(this._errorMiddleware);
-    this._errorMiddlewareSetup = true;
+    this._errorState.handler = handler;
+    this.app.use(handler);
   }
 
   /**
@@ -1101,13 +1121,13 @@ export class DM {
         }
       }
     }
-    if (this._composed) await this.admitToComposition(obj);
+    if (this._compositionState.composed) await this.admitToComposition(obj);
     if (obj.api) {
       this.mountAuthDispatcher(obj);
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);
       await obj.api(this.app);
       // If error middleware was already setup, re-setup it to ensure it stays at the end
-      if (this._errorMiddlewareSetup) {
+      if (this._errorState.handler) {
         this.setupErrorMiddleware();
       }
     }

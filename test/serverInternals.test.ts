@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import request from 'supertest';
+import type { Express } from 'express';
 
 import { DM } from '../src/bin';
 import HelloWorld from '../src/plugins/demo/helloworld';
@@ -7,6 +8,7 @@ import RateLimit from '../src/plugins/auth/rateLimit';
 import AuthBase from '../src/lib/auth/base';
 import AuthToken from '../src/plugins/auth/token';
 import DmPlugin, { type Role } from '../src/abstract/plugin';
+import type { Hooks } from '../src/hooks';
 import TrustedProxy from '../src/plugins/auth/trustedProxy';
 import { jsonBodyParser } from '../src/lib/rawBody';
 
@@ -156,6 +158,79 @@ describe('Server internals', () => {
         'hello'
       );
       expect((await request(dm.app).get('/api/hello')).status).to.equal(200);
+    });
+  });
+
+  describe('server views', () => {
+    /** A judge that lets everything through, so two of them conflict */
+    class Judge extends DmPlugin {
+      name = 'judge';
+      roles: Role[] = ['authz'];
+      hooks: Hooks = {
+        ldapsearchrequest: ([base, opts, req]) => [base, opts, req],
+      };
+    }
+
+    /** A plugin that advances the operation counter, as any plugin does */
+    class Counter extends DmPlugin {
+      name = 'counter';
+    }
+
+    /** A plugin whose route fails, to see which error handler answers */
+    class Failing extends DmPlugin {
+      name = 'failing';
+      api(app: Express): void {
+        app.get('/view-boom', (_req, _res, next) => next(new Error('boom')));
+      }
+    }
+
+    it('shares the operation counter with a view', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const view = dm.withConfig({ ...dm.config });
+      const plugin = new Counter(view);
+
+      // The plugin counts on the view's copy; a number would leave the
+      // server's counter behind
+      const start = dm.ldap.opNumber();
+      expect(plugin.opNumber()).to.equal(start + 1);
+      expect(dm.ldap.opNumber()).to.equal(start + 2);
+    });
+
+    it('checks the composition of a plugin registered through a view made during loading', async () => {
+      const dm = new DM();
+      // Before `ready` settles, as a plugin loaded with overrides sees it
+      const view = dm.withConfig({ ...dm.config });
+      await dm.ready;
+      expect(view.composed).to.equal(true);
+
+      await dm.registerPlugin('firstJudge', new Judge(dm), 'firstJudge');
+      let refusal: unknown;
+      try {
+        await view.registerPlugin(
+          'secondJudge',
+          new Judge(view),
+          'secondJudge'
+        );
+      } catch (err) {
+        refusal = err;
+      }
+      // Two judges of everyone compose as an AND nobody decided: the second
+      // must be refused, through a view as through the server
+      expect(String(refusal)).to.match(/compose as an AND/);
+    });
+
+    it('keeps the error handler behind a route registered through a view', async () => {
+      const dm = new DM();
+      const view = dm.withConfig({ ...dm.config });
+      await dm.ready;
+      await view.registerPlugin('failing', new Failing(view));
+
+      const res = await request(dm.app).get('/view-boom');
+      // After the handler, Express's default answers HTML; the server's
+      // handler answers JSON and logs
+      expect(res.status).to.equal(500);
+      expect(String(res.headers['content-type'])).to.match(/application\/json/);
     });
   });
 
