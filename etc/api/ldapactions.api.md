@@ -794,6 +794,7 @@ abstract class DmPlugin {
     // (undocumented)
     config: Config;
     configApiKey?: string;
+    declareEntities(): EntityDeclaration[];
     // (undocumented)
     dependencies?: Record<string, string>;
     protected fetch(url: Parameters<typeof globalThis.fetch>[0], init?: RequestInit): Promise<Response>;
@@ -873,8 +874,6 @@ interface EntityRegistry {
 
 // @public
 interface EntitySource {
-    // (undocumented)
-    readonly base?: string;
     // (undocumented)
     readonly schema?: Schema;
 }

@@ -66,7 +66,7 @@ import { extractLdapCode } from '../lib/ldapCodes';
 import type { FlatHookBus } from '../lib/hookBus';
 import { loadSchemaFile } from '../lib/schemaFile';
 
-import DmPlugin, { defineRoute } from './plugin';
+import DmPlugin, { defineRoute, type EntityDeclaration } from './plugin';
 
 /** RFC 4511 `maxInt`: the most a search request's size limit can say. */
 const LDAP_MAX_INT = 2147483647;
@@ -421,8 +421,16 @@ export default abstract class LdapFlat extends DmPlugin {
         );
       }
     }
+  }
 
-    server.entities.register({
+  /**
+   * The entity this instance serves, declared when the server admits the
+   * plugin that owns it.
+   *
+   * @returns the declaration
+   */
+  entityDeclaration(): EntityDeclaration {
+    return {
       name: this.singularName,
       pluralName: this.pluralName,
       base: this.base,
@@ -430,7 +438,11 @@ export default abstract class LdapFlat extends DmPlugin {
       kind: 'flat',
       source: this,
       flat: this,
-    });
+    };
+  }
+
+  declareEntities(): EntityDeclaration[] {
+    return [this.entityDeclaration()];
   }
 
   /**

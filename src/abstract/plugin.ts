@@ -15,6 +15,7 @@ import {
   type ServiceToken,
 } from '../lib/services';
 import { timedOutbound } from '../lib/metrics';
+import type { EntityDeclaration } from '../lib/entities';
 import { neverReturnAttributes, withoutAttributes } from '../config/schema';
 import { readOptions, type OptionsOf, type OptionSet } from '../config/options';
 import configArgs from '../config/args';
@@ -35,9 +36,12 @@ export { serviceToken } from '../lib/services';
 export type { ServiceProvider, ServiceToken } from '../lib/services';
 export {
   EntityRegistryService,
+  type EntityDeclaration,
   type EntityDescriptor,
   type EntityKind,
   type EntityRegistry,
+  type EntitySource,
+  type FlatEntityApi,
 } from '../lib/entities';
 export {
   HttpError,
@@ -238,6 +242,17 @@ export default abstract class DmPlugin {
     return Object.fromEntries(
       Object.entries(data).map(([key, entry]) => [key, project(entry)])
     ) as T;
+  }
+
+  /**
+   * The entities this plugin serves, declared when the server admits it.
+   * A plugin that serves several — `LdapFlatGeneric` and its instances —
+   * returns one declaration per entity.
+   *
+   * @returns the entities to add to the server's registry
+   */
+  declareEntities(): EntityDeclaration[] {
+    return [];
   }
 
   /** Names already warned about by requirePlugin, so each warns at most once. */

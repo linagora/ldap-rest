@@ -7,7 +7,10 @@
  */
 import type { Express } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, {
+  type EntityDeclaration,
+  type Role,
+} from '../../abstract/plugin';
 import LdapFlat from '../../abstract/ldapFlat';
 import type { DM } from '../../bin';
 import { loadSchemaFile } from '../../lib/schemaFile';
@@ -242,6 +245,11 @@ export default class LdapFlatGeneric extends DmPlugin {
         this.logger.error(`Failed to load schema ${schemaPath}: ${err}`);
       }
     });
+  }
+
+  /** The entities of every instance this plugin created. */
+  declareEntities(): EntityDeclaration[] {
+    return this.instances.map(instance => instance.entityDeclaration());
   }
 
   /**

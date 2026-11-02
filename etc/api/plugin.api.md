@@ -816,6 +816,7 @@ abstract class DmPlugin {
     // (undocumented)
     config: Config;
     configApiKey?: string;
+    declareEntities(): EntityDeclaration[];
     // (undocumented)
     dependencies?: Record<string, string>;
     protected fetch(url: Parameters<typeof globalThis.fetch>[0], init?: RequestInit): Promise<Response>;
@@ -853,7 +854,7 @@ type DmRequest = Request_2 & {
 };
 
 // @public
-interface EntityDeclaration {
+export interface EntityDeclaration {
     // (undocumented)
     base: string;
     flat?: FlatEntityApi;
@@ -898,9 +899,7 @@ export interface EntityRegistry {
 export const EntityRegistryService: ServiceToken<EntityRegistry>;
 
 // @public
-interface EntitySource {
-    // (undocumented)
-    readonly base?: string;
+export interface EntitySource {
     // (undocumented)
     readonly schema?: Schema;
 }
@@ -912,7 +911,7 @@ export function escapeDnValue(value: string): string;
 export function escapeLdapFilter(value: string): string;
 
 // @public
-interface FlatEntityApi {
+export interface FlatEntityApi {
     // (undocumented)
     modifyEntry(id: string, changes: ModifyRequest, req: Request_2): Promise<boolean>;
 }

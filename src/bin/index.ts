@@ -293,6 +293,7 @@ export class DM {
 
   constructor() {
     this.services.set(EntityRegistryService, this.entities);
+    this.serviceOwners.set(EntityRegistryService, 'core');
     const parser = new ConfigParser(configArgs);
     this.config = parser.parse();
     this.unknownCliOptions = parser.unknownOptions;
@@ -1167,7 +1168,21 @@ export class DM {
     }
     this.loadedPlugins[obj.name] = obj;
     this.registerServices(obj);
+    this.registerEntities(obj);
     return true;
+  }
+
+  /**
+   * Record the entities a plugin serves. Declared here, not in the
+   * constructor, so an instance `registerPlugin` drops on a name collision
+   * does not replace the declaration of the one that is loaded.
+   *
+   * @param obj the plugin just registered
+   */
+  private registerEntities(obj: DmPlugin): void {
+    for (const declaration of obj.declareEntities?.() ?? []) {
+      this.entities.register(declaration);
+    }
   }
 
   /**

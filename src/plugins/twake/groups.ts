@@ -40,6 +40,7 @@ import {
   rdnValue,
   unescapeDnValue,
 } from '../../lib/utils';
+import type { EntityDeclaration } from '../../abstract/plugin';
 import LdapGroups from '../ldap/groups';
 import { BaseResolver } from '../scim/baseResolver';
 import {
@@ -285,9 +286,8 @@ export default class TwakeGroups extends LdapGroups {
   }
 
   /** Twake groups are served by this plugin's own API, not as `groups`. */
-  protected declareEntity(): void {
-    // Intentionally empty: the inherited declaration would name the wrong
-    // branch and collection.
+  declareEntities(): EntityDeclaration[] {
+    return [];
   }
 
   /**

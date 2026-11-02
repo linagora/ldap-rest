@@ -18,12 +18,11 @@ import { serviceToken } from '../services';
 export type EntityKind = 'flat' | 'groups' | 'organizations';
 
 /**
- * The part of a plugin an entity descriptor reads: its branch and its schema.
- * The schema is read through the source, not copied, because a plugin may
- * load it asynchronously after it registers the entity.
+ * The part of a plugin an entity descriptor reads: its schema. The schema is
+ * read through the source, not copied, because a plugin may load it
+ * asynchronously after it registers the entity.
  */
 export interface EntitySource {
-  readonly base?: string;
   readonly schema?: Schema;
 }
 
@@ -69,9 +68,9 @@ export interface EntityDeclaration {
 /** The entity types a server serves. */
 export interface EntityRegistry {
   /**
-   * Declare an entity. Registering the same kind and name again replaces the
-   * previous declaration, so a plugin loaded twice under two names does not
-   * list its entity twice.
+   * Declare an entity. The collection name is the key: it is the URL, and
+   * `LdapFlatGeneric` refuses two entities claiming the same one, so a
+   * declaration cannot evict another.
    *
    * @param declaration the entity and the plugin holding its schema
    */
@@ -96,7 +95,7 @@ class Registry implements EntityRegistry {
   register(declaration: EntityDeclaration): void {
     const { name, pluralName, base, mainAttribute, kind, source, flat } =
       declaration;
-    this.entities.set(`${kind}:${name}`, {
+    this.entities.set(pluralName, {
       name,
       pluralName,
       base,
