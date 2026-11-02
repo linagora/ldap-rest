@@ -26,6 +26,18 @@
   `./plugin-ldap-onchange` entries are deprecated and will be removed in
   4.0.0.
 
+## v2.0.1 (2026-11-02)
+
+Security update of the published image and a fix to plugin per-instance
+overrides.
+
+### Security
+
+- The published image upgrades the Alpine packages of its base image when it is
+  built, so security fixes published after the base image was built reach it
+  ([#634](https://github.com/linagora/ldap-rest/issues/634),
+  [details](docs/usage/operations.md#health-and-readiness)).
+
 ### Fixed
 
 - A plugin loaded with per-instance overrides no longer counts operations on

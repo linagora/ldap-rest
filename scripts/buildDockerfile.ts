@@ -34,6 +34,8 @@ RUN npm install --no-package-lock /tmp/app.tgz && rm -f /tmp/app.tgz && npm cach
 
 FROM ${NODE_IMAGE} AS runtime
 
+RUN apk upgrade --no-cache
+
 WORKDIR /app
 COPY --from=builder /app /app
 
