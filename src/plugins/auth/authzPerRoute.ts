@@ -210,7 +210,7 @@ export default class AuthzPerRoute extends DmPlugin {
   afterLoad(): void {
     warnUnmatchedRuleKeys(
       [...this.rules.keys()],
-      this.server.loadedPlugins,
+      this.server.authenticatorsInfo,
       this.name,
       this.logger
     );

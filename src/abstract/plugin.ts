@@ -44,6 +44,15 @@ export {
   type FlatEntityApi,
 } from '../lib/entities';
 export {
+  AuthenticatorsService,
+  type AuthenticatorsInfo,
+} from '../lib/services/authenticators';
+export {
+  PasswordPolicyService,
+  type PasswordPolicyApi,
+} from '../lib/services/passwordPolicy';
+export { TrashService, type TrashApi } from '../lib/services/trash';
+export {
   HttpError,
   BadRequestError,
   UnauthorizedError,

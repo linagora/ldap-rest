@@ -19,6 +19,7 @@ import type { ChangesToNotify } from '../ldap/onChange';
 import { wantJson } from '../../lib/expressFormatedResponses';
 import { roleAttribute } from '../../config/schema';
 import { domainBranches, mailDomains } from '../../lib/mailDomains';
+import { TrashService } from '../../lib/services/trash';
 import {
   escapeLdapFilter,
   isDnInBranch,
@@ -762,11 +763,9 @@ export default class James extends TwakePlugin {
    * were loaded in: say so when the trash watches the domains.
    */
   afterLoad(): void {
-    if (!this.server.loadedPlugins['trash']) return;
-    const watched = String(this.config.trash_watched_bases ?? '')
-      .split(';')
-      .map(base => base.trim())
-      .filter(Boolean);
+    const trash = this.service(TrashService);
+    if (!trash) return;
+    const watched = trash.watchedBases;
     for (const { base } of domainBranches(this.server)) {
       // Without a list, the trash watches every branch
       const by = watched.length

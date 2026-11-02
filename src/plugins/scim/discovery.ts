@@ -11,6 +11,7 @@ import path from 'path';
 
 import type { Config } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
+import type { AuthenticatorsInfo } from '../../lib/services/authenticators';
 import { loadSchemaFile } from '../../lib/schemaFile';
 
 import type { ScimOptions } from './scim.options';
@@ -30,7 +31,7 @@ export interface DiscoveryOptions {
   options: ScimOptions;
   schemaDir: string;
   scimPrefix: string;
-  loadedPlugins: { [name: string]: unknown };
+  authenticators: AuthenticatorsInfo;
 }
 
 interface AuthScheme {
@@ -47,14 +48,14 @@ export class ScimDiscovery {
   private readonly options: ScimOptions;
   private readonly schemaDir: string;
   private readonly scimPrefix: string;
-  private readonly loadedPlugins: { [name: string]: unknown };
+  private readonly authenticators: AuthenticatorsInfo;
 
   constructor(opts: DiscoveryOptions) {
     this.config = opts.config;
     this.options = opts.options;
     this.schemaDir = opts.schemaDir;
     this.scimPrefix = opts.scimPrefix;
-    this.loadedPlugins = opts.loadedPlugins;
+    this.authenticators = opts.authenticators;
   }
 
   private baseUrl(req?: DmRequest): string {
@@ -72,7 +73,7 @@ export class ScimDiscovery {
 
   private authSchemes(): AuthScheme[] {
     const schemes: AuthScheme[] = [];
-    if (this.loadedPlugins['authToken']) {
+    if (this.authenticators.has('authToken')) {
       schemes.push({
         name: 'OAuth Bearer Token',
         description:
@@ -81,7 +82,7 @@ export class ScimDiscovery {
         primary: schemes.length === 0,
       });
     }
-    if (this.loadedPlugins['openidconnect']) {
+    if (this.authenticators.has('openidconnect')) {
       schemes.push({
         name: 'OpenID Connect',
         description: 'OIDC-issued access token.',
@@ -90,7 +91,7 @@ export class ScimDiscovery {
         primary: schemes.length === 0,
       });
     }
-    if (this.loadedPlugins['authHmac']) {
+    if (this.authenticators.has('authHmac')) {
       schemes.push({
         name: 'HMAC',
         description: 'Signed request via HMAC-SHA256.',

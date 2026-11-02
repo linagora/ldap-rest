@@ -26,6 +26,10 @@ import {
 import type { BranchPermissions } from '../../config/args';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { UnauthorizedError } from '../../lib/errors';
+import {
+  PasswordPolicyService,
+  type PasswordPolicyApi,
+} from '../../lib/services/passwordPolicy';
 import { roleAttribute } from '../../config/schema';
 
 /** The part of an authorization plugin this endpoint needs. */
@@ -451,9 +455,8 @@ export default class AuthzScope extends DmPlugin {
   }
 
   /** The password policy plugin, when loaded. */
-  private policyPlugin(): { policyBase(): string } | undefined {
-    return this.server.loadedPlugins['ldapPasswordPolicy'] as unknown as
-      { policyBase(): string } | undefined;
+  private policyPlugin(): PasswordPolicyApi | null {
+    return this.service(PasswordPolicyService);
   }
 
   /**

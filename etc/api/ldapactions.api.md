@@ -96,6 +96,16 @@ interface AuthConfig {
     };
 }
 
+// @public (undocumented)
+interface AuthenticatorsInfo {
+    all(): readonly AuthBase[];
+    coverage(): {
+        known: Set<string>;
+        unverifiable: string[];
+    };
+    has(name: string): boolean;
+}
+
 // @public
 type AuthorizedHook = 'ldapaddrequest' | 'ldapmodifyrequest' | 'ldapdeleterequest' | 'ldaprenamerequest';
 
@@ -738,6 +748,7 @@ class DM {
     // (undocumented)
     app: express.Express;
     authenticators: AuthBase[];
+    readonly authenticatorsInfo: AuthenticatorsInfo;
     get composed(): boolean;
     // (undocumented)
     config: Config;

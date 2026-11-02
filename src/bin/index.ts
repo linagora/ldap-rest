@@ -36,7 +36,15 @@ import {
   setDebug,
   setLogger,
 } from '../lib/expressFormatedResponses';
-import AuthBase, { prefixCoversPath, type DmRequest } from '../lib/auth/base';
+import AuthBase, {
+  identityCoverage,
+  prefixCoversPath,
+  type DmRequest,
+} from '../lib/auth/base';
+import {
+  AuthenticatorsService,
+  type AuthenticatorsInfo,
+} from '../lib/services/authenticators';
 import {
   assertAuthzComposition,
   assertEnforceable,
@@ -211,6 +219,16 @@ export class DM {
   /** Authentication plugins, in registration order */
   authenticators: AuthBase[] = [];
   /**
+   * The authentication plugins as a service: a consumer asks which ones are
+   * loaded and what identities they can publish without reading the plugin
+   * registry.
+   */
+  readonly authenticatorsInfo: AuthenticatorsInfo = {
+    all: () => this.authenticators,
+    has: name => this.authenticators.some(plugin => plugin.name === name),
+    coverage: () => identityCoverage(this.authenticators),
+  };
+  /**
    * Held in an object, not a boolean field: `withConfig` copies own
    * properties, so a plain flag would be duplicated per configured plugin and
    * each clone would mount a dispatcher of its own — authentication running
@@ -294,6 +312,8 @@ export class DM {
   constructor() {
     this.services.set(EntityRegistryService, this.entities);
     this.serviceOwners.set(EntityRegistryService, 'core');
+    this.services.set(AuthenticatorsService, this.authenticatorsInfo);
+    this.serviceOwners.set(AuthenticatorsService, 'core');
     const parser = new ConfigParser(configArgs);
     this.config = parser.parse();
     this.unknownCliOptions = parser.unknownOptions;

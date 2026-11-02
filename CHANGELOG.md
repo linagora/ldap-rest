@@ -7,6 +7,10 @@
 - Plugins can read the entity types the server serves from `server.entities`
   or `EntityRegistryService`, and declare their own with `declareEntities()`
   ([details](docs/plugin-development/services.md#the-entity-registry)).
+- Plugins can reach the trash, the password policies and the loaded
+  authenticators through `TrashService`, `PasswordPolicyService` and
+  `AuthenticatorsService`
+  ([details](docs/plugin-development/services.md#services-the-server-provides)).
 
 ### Fixed
 
