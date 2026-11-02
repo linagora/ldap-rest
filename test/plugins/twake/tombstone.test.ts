@@ -9,6 +9,8 @@ import type {
   AttributesList,
   SearchResult,
 } from '../../../src/lib/ldapActions';
+import { providedService } from '../../../src/lib/services';
+import { TombstoneService } from '../../../src/lib/services/tombstone';
 import { TrashService } from '../../../src/lib/services/trash';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
@@ -167,6 +169,7 @@ describe('Twake tombstone plugin', function () {
     await dm.registerPlugin('core/twake/lifecycleEvents', events);
     plugin = new TwakeTombstone(dm);
     await dm.registerPlugin('core/twake/tombstone', plugin);
+    expect(providedService(dm.services, TombstoneService)).to.equal(plugin);
     // Registered after the tombstone on purpose: afterLoad has to put the
     // tombstone back at the end of the delete chain.
     groups = new LdapGroups(dm);
