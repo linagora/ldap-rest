@@ -91,8 +91,10 @@ The registry belongs to the server and is shared by the views `withConfig`
 builds for plugins loaded with overrides. It has no removal: a plugin
 registers once and keeps its services for the life of the server.
 
-`this.requirePlugin(name)` remains for a plugin whose interface is not yet
-declared as a service; new code reaches another plugin through a token.
+`this.requirePlugin(name)` remains for a third-party plugin whose target is
+not yet declared as a service. A core plugin reaches another one through a
+token, and ESLint refuses both `loadedPlugins` and `requirePlugin` under
+`src/plugins/`.
 
 ## The entity registry
 
@@ -141,4 +143,5 @@ A plugin family provides the others:
 - `ReferenceRewriterService`: the references a rename must rewrite.
 
 A consumer that only needs to know whether the feature is loaded calls
-`this.service(token)` and skips its work when the answer is `null`.
+`this.service(token)` and skips its work when the answer is `null`. A file
+under `src/plugins/` may not read `server.loadedPlugins`; ESLint refuses it.
