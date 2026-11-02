@@ -6,7 +6,8 @@ import { expect } from 'chai';
 const root = path.join(__dirname, '..', '..');
 
 const lines = (file: string): number =>
-  readFileSync(path.join(root, file), 'utf8').split('\n').length;
+  readFileSync(path.join(root, file), 'utf8').replace(/\n$/, '').split('\n')
+    .length;
 
 describe('LDAP operation file sizes', () => {
   it('keeps the façade under 400 lines', () => {

@@ -113,7 +113,12 @@ export default [
     rules: {
       'local/no-loaded-plugins': 'error',
       'local/no-plugin-family-import': 'error',
+      'local/no-ldap-internals': 'error',
     },
+  },
+  {
+    files: ['src/abstract/**/*.ts'],
+    rules: { 'local/no-ldap-internals': 'error' },
   },
 
   // Browser-specific config

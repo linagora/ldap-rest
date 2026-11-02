@@ -214,7 +214,6 @@ class ldapActions {
   }
 
   /** See {@link LdapPool.ping}. */
-  /** See {@link LdapPool.ping}. */
   async ping(timeoutMs: number): Promise<void> {
     await pingOperation(this.host, timeoutMs);
   }
