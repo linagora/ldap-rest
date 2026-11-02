@@ -1,0 +1,13 @@
+Attribute used to resolve the `:user` path param to the principal entry.
+Expand the tree down to a DN, loading every level on the way, then select it. Used to follow a search result or a DN typed by the user. @param dn DN to reveal
+Internal Express router structure (used to remove error middleware and to
+It can be used to save state before modify and launch the
+LDAP attribute used to resolve the `:user` path param of the app-account
+That the entry a route writes is a group, once the write is judged: another entry named alike is not one, and is not written as one (#395). Judged first, a caller who may not make the write gets the refusal whether the entry is there, a group or not; only one who may learns that it is none. @param dn the entry, from {@link routeGroupDn} @param judge the authorization of the write, as `ldap.authorize`
+The authenticated request being served. The authentication dispatcher runs everything downstream of a request it let through inside it, so an operation made while serving it, by whatever plugin, is judged as its caller even when the request was not handed down (#385). A call that forgets the request then fails closed instead of being let through unjudged.
+The directory as seen by one HTTP request. `ldapActions`'s own methods take the request as a trailing optional argument, which the authorization plugins judge by. One naming none is made for the request being served, if any (#385); this says which request is meant rather than leaving it to the context. These methods take no request parameter: it is captured once by `ldapActions.forRequest()`. Request handlers should bind once and use this; the server's own work goes through {@link ldapActions.system}.
+The server's logger, once the `DM` constructor has installed it. Undefined until then, and said so in the type: this module is loaded before any `DM` exists, and a caller reading it as always there throws from inside the error path it was reporting on (#182, #199). The compiler now holds every reader to a guard.
+cache stored nothing at all until #166, so no deployment has ever run
+globally unique (see #88). Set to `uid` to restore the pre-#89 contract
+module name, so every named instance used to leave this pass for the
+pre-#89 contract where `:user` is the LDAP uid. The app-account uid is

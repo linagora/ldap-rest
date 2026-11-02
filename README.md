@@ -81,7 +81,7 @@ See **[Configuration Guide](./docs/usage/configuration.md)** for all CLI options
 
 ## Documentation
 
-Documentation is organized into 3 categories:
+Documentation is organized into 4 categories:
 
 ### [Usage](./docs/usage/README.md)
 
@@ -109,6 +109,13 @@ Integrate LDAP-Rest into your web applications.
 - **[Browser Libraries](./docs/client-development/browser/libraries.md)** - Web components
 - **[Examples](./docs/client-development/examples/README.md)** - React, Vue.js, Vanilla JS
 - **[Browser Demos](./examples/web/)** - Interactive demos (TOTP client, LDAP tree viewer)
+
+### [Architecture](./docs/architecture/README.md)
+
+How the server is put together and why.
+
+- **[Overview](./docs/architecture/README.md)** - Module map, life of a request, life of a write
+- **[Decision records](./docs/architecture/adr/)** - The decisions the code embodies
 
 ## Copyright and license
 
