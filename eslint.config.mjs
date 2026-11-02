@@ -7,6 +7,7 @@ import importX from 'eslint-plugin-import-x';
 import globals from 'globals';
 
 import noConfigCast from './eslint-rules/no-config-cast.mjs';
+import noLoadedPlugins from './eslint-rules/no-loaded-plugins.mjs';
 import noRawRoute from './eslint-rules/no-raw-route.mjs';
 
 export default [
@@ -86,13 +87,24 @@ export default [
     files: ['src/plugins/**/*.ts', 'src/abstract/**/*.ts'],
     plugins: {
       local: {
-        rules: { 'no-raw-route': noRawRoute, 'no-config-cast': noConfigCast },
+        rules: {
+          'no-raw-route': noRawRoute,
+          'no-config-cast': noConfigCast,
+          'no-loaded-plugins': noLoadedPlugins,
+        },
       },
     },
     rules: {
       'local/no-raw-route': 'error',
       'local/no-config-cast': 'error',
     },
+  },
+
+  // A plugin reaches another one through its service: see
+  // docs/plugin-development/services.md.
+  {
+    files: ['src/plugins/**/*.ts'],
+    rules: { 'local/no-loaded-plugins': 'error' },
   },
 
   // Browser-specific config
