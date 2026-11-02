@@ -12,6 +12,10 @@
   through `TrashService`, `PasswordPolicyService`, `AuthenticatorsService`,
   `RabbitMqService`, `StorageService` and `TwakeGroupsService`
   ([details](docs/plugin-development/services.md#services-the-server-provides)).
+- Plugins can ask `PluginInfoService` whether a plugin is loaded, and which
+  ones serve configuration, operational attributes, generated attributes or
+  authorization
+  ([details](docs/plugin-development/services.md#services-the-server-provides)).
 
 ### Changed
 
