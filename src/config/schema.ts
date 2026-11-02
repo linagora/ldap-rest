@@ -777,23 +777,19 @@ export interface GeneratedAttributeFiller {
  *
  * @param schema entity schema, when one is loaded
  * @param entry entry as the client sent it
- * @param plugins loaded plugins, asked about each generated attribute
+ * @param fillers the loaded plugins able to fill a generated attribute
  * @returns the attribute name to complain about, or undefined
  */
 export function missingRequiredAttribute(
   schema: Schema | undefined,
   entry: Record<string, unknown>,
-  plugins: Record<string, unknown>
+  fillers: readonly GeneratedAttributeFiller[]
 ): string | undefined {
   if (!schema) return undefined;
   const filledByAPlugin = (field: string, attr: SchemaAttribute): boolean =>
-    Object.values(plugins).some(plugin => {
-      const filler = (plugin as GeneratedAttributeFiller)
-        .fillsGeneratedAttribute;
-      return (
-        typeof filler === 'function' && filler.call(plugin, field, attr, schema)
-      );
-    });
+    fillers.some(filler =>
+      filler.fillsGeneratedAttribute?.(field, attr, schema)
+    );
   for (const [field, attr] of Object.entries(schema.attributes)) {
     const value = entry[field];
     const missing =

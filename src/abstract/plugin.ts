@@ -60,6 +60,7 @@ export {
   type SubscribeOptions,
 } from '../lib/services/rabbitmq';
 export { StorageService, type StorageApi } from '../lib/services/storage';
+export { PluginInfoService, type PluginInfo } from '../lib/services/plugins';
 export { TrashService, type TrashApi } from '../lib/services/trash';
 export {
   TwakeGroupsService,

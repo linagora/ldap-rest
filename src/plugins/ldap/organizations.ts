@@ -1386,7 +1386,8 @@ export default class LdapOrganizations extends DmPlugin {
   private validator(): EntityValidator {
     return new EntityValidator(this.schema, {
       entryExists: dn => this.entryExists(dn),
-      loadedPlugins: this.server.loadedPlugins,
+      generatedAttributeFillers:
+        this.server.pluginInfo.generatedAttributeFillers(),
       singularName: 'organization',
     });
   }

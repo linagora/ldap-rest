@@ -121,7 +121,10 @@ API, so it overrides the declaration and does not register a `groups` entity.
 
 The server itself provides `AuthenticatorsService`
 (`server.authenticatorsInfo`): the loaded authentication plugins, whether one
-is loaded, and the identities they can publish.
+is loaded, and the identities they can publish. It also provides
+`PluginInfoService` (`server.pluginInfo`): whether a plugin is loaded, and the
+plugins serving configuration, operational attributes, generated attributes
+or authorization.
 
 A plugin family provides the others:
 

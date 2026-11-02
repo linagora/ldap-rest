@@ -419,7 +419,7 @@ export default class TwakeGroups extends LdapGroups {
    * SCIM group mapping leaves the RDN attribute alone.
    */
   afterLoad(): void {
-    if (!this.server.loadedPlugins.scim) return;
+    if (!this.server.pluginInfo.has('scim')) return;
     const scim = scimOptionsOf(this.config);
     const rdn = scim.scim_group_rdn_attribute;
     const override = scim.scim_group_mapping;
@@ -524,13 +524,14 @@ export default class TwakeGroups extends LdapGroups {
    * link: then a group needs one.
    */
   private judgedByAttachment(): boolean {
-    return Object.values(this.server.loadedPlugins).some(
-      plugin =>
-        plugin.roles?.includes('authz') &&
-        (
-          plugin as { judgesByAttachment?: () => boolean }
-        ).judgesByAttachment?.() === true
-    );
+    return this.server.pluginInfo
+      .authzPlugins()
+      .some(
+        plugin =>
+          (
+            plugin as { judgesByAttachment?: () => boolean }
+          ).judgesByAttachment?.() === true
+      );
   }
 
   /** The organization a group DN belongs to, if it is a group at all. */

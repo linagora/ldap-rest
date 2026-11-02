@@ -159,7 +159,7 @@ export default class LdapFlatGeneric extends DmPlugin {
     const claimedByPlugins = new Map<string, string>();
     for (const { plugin, modules, collection } of ldapPluginCollections) {
       if (
-        this.server.loadedPlugins[plugin] ||
+        this.server.pluginInfo.has(plugin) ||
         modules.some(module => declared.includes(module))
       )
         claimedByPlugins.set(collection, `plugin ${plugin}`);

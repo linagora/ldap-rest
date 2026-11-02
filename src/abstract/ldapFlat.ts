@@ -669,7 +669,8 @@ export default abstract class LdapFlat extends DmPlugin {
           return false;
         }
       },
-      loadedPlugins: this.server.loadedPlugins,
+      generatedAttributeFillers:
+        this.server.pluginInfo.generatedAttributeFillers(),
       singularName: this.singularName,
     });
   }

@@ -50,7 +50,7 @@ export default class RateLimit extends DmPlugin {
     // declared proxy. Without it, rotating the header defeats the limiter
     // entirely and the brute-force protection is decorative, with nothing to
     // show for it in the logs.
-    if (!this.server.loadedPlugins.trustedProxy)
+    if (!this.server.pluginInfo.has('trustedProxy'))
       this.logger.warn(
         'Auth rate limiting keys on X-Forwarded-For but core/auth/trustedProxy ' +
           'is not loaded: a client can forge that header and evade the limit. ' +

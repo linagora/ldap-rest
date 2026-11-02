@@ -194,9 +194,9 @@ class OnLdapChange extends DmPlugin {
 
   async read(dn: string): Promise<Entry | undefined> {
     const followed = new Set(
-      Object.values(this.server.loadedPlugins).flatMap(
-        p => p.followedOperationalAttributes || []
-      )
+      this.server.pluginInfo
+        .operationalAttributeFollowers()
+        .flatMap(p => p.followedOperationalAttributes || [])
     );
     try {
       // As the server: what changed is read whole for the change events, whoever made the change

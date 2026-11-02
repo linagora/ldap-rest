@@ -213,9 +213,9 @@ export default class AuthzScope extends DmPlugin {
 
   /** @returns the loaded plugins able to describe a scope, in load order */
   private describers(): AuthzLike[] {
-    return Object.values(this.server.loadedPlugins).filter(plugin =>
-      AuthzScope.canDescribe(plugin)
-    );
+    return this.server.pluginInfo
+      .authzPlugins()
+      .filter(plugin => AuthzScope.canDescribe(plugin));
   }
 
   /**
@@ -324,9 +324,7 @@ export default class AuthzScope extends DmPlugin {
     // identified caller of the same server does not get. Only a server with
     // no authorization at all is unrestricted, and it is for anyone.
     const describers = this.describers();
-    const authorizes = Object.values(this.server.loadedPlugins).some(plugin =>
-      plugin.roles?.includes('authz')
-    );
+    const authorizes = this.server.pluginInfo.authzPlugins().length > 0;
     if (authorizes && !req.user)
       throw new UnauthorizedError('No authenticated user');
 
@@ -334,10 +332,9 @@ export default class AuthzScope extends DmPlugin {
     // the one describing them: the named source when it judges them, the
     // first loaded otherwise. A describer that does not judge this caller
     // (`--authz-for`) is not their model, whatever it would answer.
-    const sources = Object.values(this.server.loadedPlugins).filter(
-      plugin =>
-        plugin.roles?.includes('authz') && AuthzScope.judges(plugin, req)
-    );
+    const sources = this.server.pluginInfo
+      .authzPlugins()
+      .filter(plugin => AuthzScope.judges(plugin, req));
     const judging = describers.filter(plugin => sources.includes(plugin));
     const named = this.config.authz_scope_source;
     const authz = judging.find(plugin => plugin.name === named) ?? judging[0];

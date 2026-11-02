@@ -120,7 +120,7 @@ describe('Schema patterns and long values', () => {
       } as unknown as Schema,
       {
         entryExists: async (): Promise<boolean> => true,
-        loadedPlugins: {},
+        generatedAttributeFillers: [],
         singularName: 'person',
       }
     );
@@ -145,7 +145,7 @@ describe('Schema patterns and long values', () => {
       } as unknown as Schema,
       {
         entryExists: async (): Promise<boolean> => true,
-        loadedPlugins: {},
+        generatedAttributeFillers: [],
         singularName: 'person',
       }
     );

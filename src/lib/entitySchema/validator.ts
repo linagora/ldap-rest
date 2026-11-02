@@ -5,7 +5,11 @@ import type {
 } from '../ldapActions';
 import { BadRequestError } from '../errors';
 import { knownAttributeName } from '../utils';
-import type { Schema, SchemaAttribute } from '../../config/schema';
+import type {
+  GeneratedAttributeFiller,
+  Schema,
+  SchemaAttribute,
+} from '../../config/schema';
 import {
   checkDnValues,
   invalidValueMessage,
@@ -26,7 +30,7 @@ export interface EntityValidatorDeps {
    */
   entryExists: (dn: string) => Promise<boolean>;
   /** Asked whether a `generated` attribute will be filled after validation */
-  loadedPlugins: Record<string, unknown>;
+  generatedAttributeFillers: readonly GeneratedAttributeFiller[];
   /** Names the entity in the messages */
   singularName: string;
 }
@@ -68,7 +72,7 @@ export class EntityValidator {
     const missing = missingRequiredAttribute(
       this.schema,
       candidate,
-      this.deps.loadedPlugins
+      this.deps.generatedAttributeFillers
     );
     if (missing)
       throw new BadRequestError(`Attribute "${missing}" is required`);
