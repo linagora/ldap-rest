@@ -236,7 +236,7 @@ export class DM {
    * authorization. A plugin's own operations go through its token instead.
    */
   readonly pluginInfo: PluginInfo = {
-    has: name => name in this.loadedPlugins,
+    has: name => Object.hasOwn(this.loadedPlugins, name),
     configurable: () =>
       Object.values(this.loadedPlugins).filter(
         plugin =>

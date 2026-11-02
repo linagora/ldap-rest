@@ -22,7 +22,7 @@ export interface PluginInfo {
   /** The plugins declaring operational attributes to follow. */
   operationalAttributeFollowers(): readonly DmPlugin[];
   /** The plugins able to fill a generated attribute. */
-  generatedAttributeFillers(): readonly GeneratedAttributeFiller[];
+  generatedAttributeFillers(): readonly (DmPlugin & GeneratedAttributeFiller)[];
   /** The authorization plugins. */
   authzPlugins(): readonly DmPlugin[];
 }
