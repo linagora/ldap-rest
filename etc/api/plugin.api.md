@@ -1329,7 +1329,7 @@ export const PasswordPolicyService: ServiceToken<PasswordPolicyApi>;
 export interface PluginInfo {
     authzPlugins(): readonly DmPlugin[];
     configurable(): readonly DmPlugin[];
-    generatedAttributeFillers(): readonly GeneratedAttributeFiller[];
+    generatedAttributeFillers(): readonly (DmPlugin & GeneratedAttributeFiller)[];
     has(name: string): boolean;
     operationalAttributeFollowers(): readonly DmPlugin[];
 }
