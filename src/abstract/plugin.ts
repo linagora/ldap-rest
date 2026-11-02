@@ -62,6 +62,11 @@ export {
 export { StorageService, type StorageApi } from '../lib/services/storage';
 export { TrashService, type TrashApi } from '../lib/services/trash';
 export {
+  TwakeGroupsService,
+  type Page,
+  type TwakeGroupsApi,
+} from '../lib/services/twakeGroups';
+export {
   HttpError,
   BadRequestError,
   UnauthorizedError,

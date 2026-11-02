@@ -1294,6 +1294,22 @@ interface OptionSpec<T> {
 // @public (undocumented)
 type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
 
+// @public
+export interface Page {
+    // (undocumented)
+    desc: boolean;
+    // (undocumented)
+    limit: number;
+    // (undocumented)
+    offset: number;
+    // (undocumented)
+    page: number;
+    // (undocumented)
+    search?: string;
+    // (undocumented)
+    sortBy?: string;
+}
+
 // @public (undocumented)
 export interface PasswordPolicyApi {
     policyBase(): string;
@@ -1732,6 +1748,46 @@ export interface TrashApi {
 
 // @public (undocumented)
 export const TrashService: ServiceToken<TrashApi>;
+
+// @public (undocumented)
+export interface TwakeGroupsApi {
+    // (undocumented)
+    checkOrganization(org: string, req?: Request_2): Promise<void>;
+    // (undocumented)
+    readonly cn: string;
+    // (undocumented)
+    groupBaseOf(org: string): string;
+    // (undocumented)
+    groupOf(org: string, entry: AttributesList): Record<string, unknown>;
+    // (undocumented)
+    groups(org: string, filter: string, attributes?: string[], req?: Request_2): Promise<AttributesList[]>;
+    // (undocumented)
+    readonly maxPage: number;
+    // (undocumented)
+    memberPage(p: Page, org: string, names: string[], extra?: (username: string) => Record<string, unknown>, req?: Request_2): Promise<{
+        members: Record<string, unknown>[];
+        pagination: Record<string, number | boolean>;
+    }>;
+    // (undocumented)
+    organizationOf(dn: string): string | undefined;
+    // (undocumented)
+    organizationRoute(context: string, handler: (req: Request_2, res: Response_2, org: string) => Promise<void>, plugin?: string): (req: Request_2, res: Response_2) => Promise<void>;
+    // (undocumented)
+    page(req: Request_2, sortable: string[]): Page;
+    // (undocumented)
+    sorted<T extends Record<string, unknown>>(items: T[], sortBy: string | undefined, desc: boolean): T[];
+    // (undocumented)
+    tombstonesOf(org: string): Promise<string[]>;
+    // (undocumented)
+    readonly userAttribute: string;
+    // (undocumented)
+    userBaseOf(org: string): string;
+    // (undocumented)
+    users(org: string, usernames: string[], attributes: string[], req?: Request_2): Promise<AttributesList[]>;
+}
+
+// @public (undocumented)
+export const TwakeGroupsService: ServiceToken<TwakeGroupsApi>;
 
 // @public (undocumented)
 export class UnauthorizedError extends HttpError {
