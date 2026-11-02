@@ -771,6 +771,7 @@ class DM {
     // (undocumented)
     get operationSequence(): number;
     set operationSequence(value: number);
+    readonly pluginInfo: PluginInfo;
     // (undocumented)
     ready: Promise<void>;
     registerAuthenticator(plugin: AuthBase): void;
@@ -899,6 +900,12 @@ interface FlatEntityApi {
 interface FlatHookBus {
     chain<T>(suffix: string, value: T): Promise<T>;
     notify(suffix: string, ...args: unknown[]): void;
+}
+
+// @public
+interface GeneratedAttributeFiller {
+    // (undocumented)
+    fillsGeneratedAttribute?: (name: string, attr: SchemaAttribute, schema: Schema) => boolean;
 }
 
 // @public
@@ -1232,6 +1239,15 @@ interface OptionSpec<T> {
 
 // @public (undocumented)
 type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
+
+// @public (undocumented)
+interface PluginInfo {
+    authzPlugins(): readonly DmPlugin[];
+    configurable(): readonly DmPlugin[];
+    generatedAttributeFillers(): readonly GeneratedAttributeFiller[];
+    has(name: string): boolean;
+    operationalAttributeFollowers(): readonly DmPlugin[];
+}
 
 // @public
 export interface RequestBoundLdap {

@@ -803,6 +803,7 @@ export class DM {
     // (undocumented)
     get operationSequence(): number;
     set operationSequence(value: number);
+    readonly pluginInfo: PluginInfo;
     // (undocumented)
     ready: Promise<void>;
     registerAuthenticator(plugin: AuthBase): void;
@@ -953,6 +954,12 @@ export class ForbiddenError extends HttpError {
 // @public (undocumented)
 export class GatewayTimeoutError extends HttpError {
     constructor(message?: string);
+}
+
+// @public
+interface GeneratedAttributeFiller {
+    // (undocumented)
+    fillsGeneratedAttribute?: (name: string, attr: SchemaAttribute, schema: Schema) => boolean;
 }
 
 // @public
@@ -1353,6 +1360,15 @@ export function parseDirectoryDate(raw: AttributeValue): Date | null;
 
 // @public
 export function parseDn(dn: string): string[];
+
+// @public (undocumented)
+interface PluginInfo {
+    authzPlugins(): readonly DmPlugin[];
+    configurable(): readonly DmPlugin[];
+    generatedAttributeFillers(): readonly GeneratedAttributeFiller[];
+    has(name: string): boolean;
+    operationalAttributeFollowers(): readonly DmPlugin[];
+}
 
 // @public
 export function rdnTypes(dn: string): string[];

@@ -45,6 +45,8 @@ import {
   AuthenticatorsService,
   type AuthenticatorsInfo,
 } from '../lib/services/authenticators';
+import { PluginInfoService, type PluginInfo } from '../lib/services/plugins';
+import type { GeneratedAttributeFiller } from '../config/schema';
 import {
   assertAuthzComposition,
   assertEnforceable,
@@ -229,6 +231,34 @@ export class DM {
     coverage: () => identityCoverage(this.authenticators),
   };
   /**
+   * The loaded plugins as the cross-cutting services read them: presence,
+   * configuration, operational attributes, generated attributes and
+   * authorization. A plugin's own operations go through its token instead.
+   */
+  readonly pluginInfo: PluginInfo = {
+    has: name => name in this.loadedPlugins,
+    configurable: () =>
+      Object.values(this.loadedPlugins).filter(
+        plugin =>
+          plugin.roles?.includes('configurable') &&
+          plugin.getConfigApiData !== undefined
+      ),
+    operationalAttributeFollowers: () =>
+      Object.values(this.loadedPlugins).filter(
+        plugin => (plugin.followedOperationalAttributes?.length ?? 0) > 0
+      ),
+    generatedAttributeFillers: () =>
+      Object.values(this.loadedPlugins).filter(
+        (plugin): plugin is DmPlugin & GeneratedAttributeFiller =>
+          typeof (plugin as DmPlugin & GeneratedAttributeFiller)
+            .fillsGeneratedAttribute === 'function'
+      ),
+    authzPlugins: () =>
+      Object.values(this.loadedPlugins).filter(plugin =>
+        plugin.roles?.includes('authz')
+      ),
+  };
+  /**
    * Held in an object, not a boolean field: `withConfig` copies own
    * properties, so a plain flag would be duplicated per configured plugin and
    * each clone would mount a dispatcher of its own — authentication running
@@ -314,6 +344,8 @@ export class DM {
     this.serviceOwners.set(EntityRegistryService, 'core');
     this.services.set(AuthenticatorsService, this.authenticatorsInfo);
     this.serviceOwners.set(AuthenticatorsService, 'core');
+    this.services.set(PluginInfoService, this.pluginInfo);
+    this.serviceOwners.set(PluginInfoService, 'core');
     const parser = new ConfigParser(configArgs);
     this.config = parser.parse();
     this.unknownCliOptions = parser.unknownOptions;

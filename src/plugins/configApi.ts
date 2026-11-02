@@ -170,25 +170,19 @@ export default class ConfigApi extends DmPlugin {
   private async collectPluginConfigs(): Promise<Record<string, unknown>> {
     const features: Record<string, unknown> = {};
 
-    // Iterate through all loaded plugins
-    for (const [pluginName, plugin] of Object.entries(
-      this.server.loadedPlugins
-    )) {
+    for (const plugin of this.server.pluginInfo.configurable()) {
       // Skip self
-      if (pluginName === 'configApi') continue;
+      if (plugin.name === 'configApi') continue;
 
-      // Check if plugin has 'configurable' role
-      if (plugin.roles?.includes('configurable') && plugin.getConfigApiData) {
-        try {
-          const pluginConfig = await plugin.getConfigApiData();
-          if (pluginConfig) {
-            features[plugin.configApiKey ?? pluginName] = pluginConfig;
-          }
-        } catch (err) {
-          this.logger.warn(
-            `Failed to get config from plugin ${pluginName}: ${String(err)}`
-          );
+      try {
+        const pluginConfig = await plugin.getConfigApiData?.();
+        if (pluginConfig) {
+          features[plugin.configApiKey ?? plugin.name] = pluginConfig;
         }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to get config from plugin ${plugin.name}: ${String(err)}`
+        );
       }
     }
 

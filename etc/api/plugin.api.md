@@ -796,6 +796,7 @@ class DM {
     // (undocumented)
     get operationSequence(): number;
     set operationSequence(value: number);
+    readonly pluginInfo: PluginInfo;
     // (undocumented)
     ready: Promise<void>;
     registerAuthenticator(plugin: AuthBase): void;
@@ -944,6 +945,12 @@ export class ForbiddenError extends HttpError {
 // @public (undocumented)
 export class GatewayTimeoutError extends HttpError {
     constructor(message?: string);
+}
+
+// @public
+interface GeneratedAttributeFiller {
+    // (undocumented)
+    fillsGeneratedAttribute?: (name: string, attr: SchemaAttribute, schema: Schema) => boolean;
 }
 
 // @public
@@ -1317,6 +1324,18 @@ export interface PasswordPolicyApi {
 
 // @public (undocumented)
 export const PasswordPolicyService: ServiceToken<PasswordPolicyApi>;
+
+// @public (undocumented)
+export interface PluginInfo {
+    authzPlugins(): readonly DmPlugin[];
+    configurable(): readonly DmPlugin[];
+    generatedAttributeFillers(): readonly GeneratedAttributeFiller[];
+    has(name: string): boolean;
+    operationalAttributeFollowers(): readonly DmPlugin[];
+}
+
+// @public (undocumented)
+export const PluginInfoService: ServiceToken<PluginInfo>;
 
 // @public
 export interface PublishOptions {

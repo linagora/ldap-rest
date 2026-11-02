@@ -1621,7 +1621,8 @@ export default class LdapGroups extends DmPlugin {
           return false;
         }
       },
-      loadedPlugins: this.server.loadedPlugins,
+      generatedAttributeFillers:
+        this.server.pluginInfo.generatedAttributeFillers(),
       singularName: 'group',
     });
   }

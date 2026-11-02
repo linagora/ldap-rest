@@ -40,7 +40,7 @@ const schema = {
 const validator = (loaded: Schema | null = schema): EntityValidator =>
   new EntityValidator(loaded ?? undefined, {
     entryExists: async dn => dn === bob,
-    loadedPlugins: {},
+    generatedAttributeFillers: [],
     singularName: 'person',
   });
 
@@ -200,7 +200,7 @@ describe('EntityValidator', () => {
       } as unknown as Schema;
       const v = new EntityValidator(people, {
         entryExists: async dn => dn === bob,
-        loadedPlugins: {},
+        generatedAttributeFillers: [],
         singularName: 'person',
       });
       const changes = { add: { PWDRESET: true } } as unknown as ModifyRequest;
@@ -233,7 +233,7 @@ describe('EntityValidator', () => {
       for (const field of ['pwdReset;binary', 'PWDRESET;BINARY', 'PWDRESET']) {
         const written = await new EntityValidator(people, {
           entryExists: async () => true,
-          loadedPlugins: {},
+          generatedAttributeFillers: [],
           singularName: 'person',
         }).validateNew(entry({ [field]: true }));
         const named = field.toLowerCase().includes(';binary')
