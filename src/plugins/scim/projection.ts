@@ -16,8 +16,7 @@
  * resource in its own right and is matched as-is.
  */
 import { SCHEMA_USER, SCHEMA_GROUP } from '../../lib/scim/types';
-
-import { scimInvalidValue } from './errors';
+import { scimInvalidValue } from '../../lib/scim/errors';
 
 /** Attributes RFC 7643 §7 marks `returned: always`. */
 const ALWAYS_RETURNED = ['schemas', 'id'];

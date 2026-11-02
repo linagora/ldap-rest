@@ -23,7 +23,7 @@ import AuthHmac from '../../../src/plugins/auth/hmac';
 import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
 import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
 import type { DmRequest } from '../../../src/lib/auth/base';
-import { BaseResolver } from '../../../src/plugins/scim/baseResolver';
+import { BaseResolver } from '../../../src/lib/scim/baseResolver';
 
 /** Reports what the authenticators left on the request */
 class Probe extends DmPlugin {

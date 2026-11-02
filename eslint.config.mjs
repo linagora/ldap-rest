@@ -8,6 +8,7 @@ import globals from 'globals';
 
 import noConfigCast from './eslint-rules/no-config-cast.mjs';
 import noLoadedPlugins from './eslint-rules/no-loaded-plugins.mjs';
+import noPluginFamilyImport from './eslint-rules/no-plugin-family-import.mjs';
 import noRawRoute from './eslint-rules/no-raw-route.mjs';
 
 export default [
@@ -91,6 +92,7 @@ export default [
           'no-raw-route': noRawRoute,
           'no-config-cast': noConfigCast,
           'no-loaded-plugins': noLoadedPlugins,
+          'no-plugin-family-import': noPluginFamilyImport,
         },
       },
     },
@@ -101,10 +103,15 @@ export default [
   },
 
   // A plugin reaches another one through its service: see
-  // docs/plugin-development/services.md.
+  // docs/plugin-development/services.md. Plugin families are separable: see
+  // docs/development/modularization-plan.md; `TwakeGroups extends LdapGroups`
+  // is the one exception, marked at its import.
   {
     files: ['src/plugins/**/*.ts'],
-    rules: { 'local/no-loaded-plugins': 'error' },
+    rules: {
+      'local/no-loaded-plugins': 'error',
+      'local/no-plugin-family-import': 'error',
+    },
   },
 
   // Browser-specific config

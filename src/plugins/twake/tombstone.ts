@@ -29,7 +29,7 @@ import { extractLdapCode } from '../../lib/ldapCodes';
 import { TombstoneService } from '../../lib/services/tombstone';
 import { TrashService } from '../../lib/services/trash';
 import { escapeLdapFilter, isDnInBranch, normalizeDn } from '../../lib/utils';
-import { scimOptionsOf } from '../scim/scim.options';
+import { scimOptionsOf } from '../../lib/scim/options';
 
 import {
   first,

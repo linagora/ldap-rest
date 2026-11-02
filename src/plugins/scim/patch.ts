@@ -30,14 +30,13 @@ import {
   type PatchOperation,
   type PatchRequest,
 } from '../../lib/scim/types';
-
 import {
   ScimError,
   kindOf,
   scimInvalidPath,
   scimNoTarget,
   scimInvalidValue,
-} from './errors';
+} from '../../lib/scim/errors';
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
@@ -46,7 +45,7 @@ import {
   isDnSubAttribute,
   readActive,
   scimPathToLdapAttribute,
-} from './mapping';
+} from '../../lib/scim/mapping';
 
 export interface PatchContext {
   mapping: ResourceMapping;

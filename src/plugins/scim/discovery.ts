@@ -23,8 +23,7 @@ import {
   SCHEMA_SCHEMA,
   SCHEMA_SERVICE_PROVIDER_CONFIG,
 } from '../../lib/scim/types';
-
-import type { ScimOptions } from './scim.options';
+import type { ScimOptions } from '../../lib/scim/options';
 
 export interface DiscoveryOptions {
   config: Config;

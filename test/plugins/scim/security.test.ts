@@ -12,8 +12,8 @@ import {
   applyPatchToResource,
 } from '../../../src/plugins/scim/patch';
 import { scimFilterToLdap } from '../../../src/plugins/scim/filter';
-import { DEFAULT_USER_MAPPING } from '../../../src/plugins/scim/mapping';
-import { ScimError } from '../../../src/plugins/scim/errors';
+import { DEFAULT_USER_MAPPING } from '../../../src/lib/scim/mapping';
+import { ScimError } from '../../../src/lib/scim/errors';
 
 describe('SCIM security hardening', () => {
   describe('prototype pollution via PATCH paths', () => {

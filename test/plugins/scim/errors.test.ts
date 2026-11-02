@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import { scimErrorFromException } from '../../../src/plugins/scim/errors';
+import { scimErrorFromException } from '../../../src/lib/scim/errors';
 import {
   BadRequestError,
   ConflictError,

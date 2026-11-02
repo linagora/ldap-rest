@@ -13,7 +13,7 @@ import { rabbitmqOptions } from '../plugins/rabbitmq.options';
 import { metricsOptions } from '../plugins/metrics.options';
 import { storageOptions } from '../plugins/storage.options';
 import { staticOptions } from '../plugins/static.options';
-import { scimOptions } from '../plugins/scim/scim.options';
+import { scimOptions } from '../lib/scim/options';
 import {
   crowdsecOptions,
   dynamicOptions,

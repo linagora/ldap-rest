@@ -26,19 +26,19 @@ import {
   type ScimGroup,
   type ScimUser,
 } from '../../lib/scim/types';
-
-import { scimOptions, type ScimOptions } from './scim.options';
-import { BaseResolver } from './baseResolver';
-import { ScimUsers } from './users';
-import { ScimGroups } from './groups';
-import { ScimBulk } from './bulk';
-import { ScimDiscovery } from './discovery';
+import { scimOptions, type ScimOptions } from '../../lib/scim/options';
+import { BaseResolver } from '../../lib/scim/baseResolver';
 import {
   scimAsyncHandler,
   writeScimError,
   writeScimErrorFromException,
   SCIM_CONTENT_TYPE,
-} from './errors';
+} from '../../lib/scim/errors';
+
+import { ScimUsers } from './users';
+import { ScimGroups } from './groups';
+import { ScimBulk } from './bulk';
+import { ScimDiscovery } from './discovery';
 import {
   type ProjectionQuery,
   assertProjection,

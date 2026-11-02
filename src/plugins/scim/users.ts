@@ -27,9 +27,8 @@ import {
   type PatchRequest,
   SCHEMA_LIST_RESPONSE,
 } from '../../lib/scim/types';
-
-import { BaseResolver } from './baseResolver';
-import type { ScimOptions } from './scim.options';
+import { BaseResolver } from '../../lib/scim/baseResolver';
+import type { ScimOptions } from '../../lib/scim/options';
 import {
   DEFAULT_USER_MAPPING,
   loadMappingFile,
@@ -40,10 +39,7 @@ import {
   resolveLockConfig,
   isLocked,
   type MappingContext,
-} from './mapping';
-import { scimFilterToLdap } from './filter';
-import { pagedSearch } from './list';
-import { patchToModifyRequest, writePatch } from './patch';
+} from '../../lib/scim/mapping';
 import {
   extractLdapCode,
   kindOf,
@@ -51,7 +47,11 @@ import {
   scimInvalidValue,
   scimNotFound,
   scimUniqueness,
-} from './errors';
+} from '../../lib/scim/errors';
+
+import { scimFilterToLdap } from './filter';
+import { pagedSearch } from './list';
+import { patchToModifyRequest, writePatch } from './patch';
 
 export interface ListQuery {
   filter?: string;

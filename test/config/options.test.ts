@@ -11,10 +11,7 @@ import { ConfigParser } from '../../src/lib/parseConfig';
 import DmPlugin from '../../src/abstract/plugin';
 import { TwakePlugin } from '../../src/abstract/twakePlugin';
 import { DM } from '../../src/bin';
-import {
-  scimOptions,
-  scimOptionsOf,
-} from '../../src/plugins/scim/scim.options';
+import { scimOptions, scimOptionsOf } from '../../src/lib/scim/options';
 import {
   perBranchOptions,
   crowdsecOptionsOf,

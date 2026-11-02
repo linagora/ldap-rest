@@ -9,7 +9,7 @@ import { DM } from '../../../src/bin';
 import AuthHmac from '../../../src/plugins/auth/hmac';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 import { scimBodyParser } from '../../../src/plugins/scim/scim';
-import { scimOptions } from '../../../src/plugins/scim/scim.options';
+import { scimOptions } from '../../../src/lib/scim/options';
 import { readOptions } from '../../../src/config/options';
 
 /**

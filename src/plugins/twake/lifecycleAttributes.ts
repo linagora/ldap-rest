@@ -12,8 +12,8 @@ import {
   DEFAULT_LOCK_ATTRIBUTE,
   holdsValue,
   resolveLockConfig,
-} from '../scim/mapping';
-import { scimOptionsOf } from '../scim/scim.options';
+} from '../../lib/scim/mapping';
+import { scimOptionsOf } from '../../lib/scim/options';
 
 import { twakeLifecycleOptionsOf } from './twakeLifecycle.options';
 

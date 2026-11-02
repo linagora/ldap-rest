@@ -1,0 +1,169 @@
+/**
+ * @module lib/scim/baseResolver
+ * @author Xavier Guimard <xguimard@linagora.com>
+ *
+ * Resolve per-request LDAP bases for SCIM Users and Groups.
+ *
+ * Resolution order (user → group identical):
+ *   1. Explicit map entry for req.user   (scim_base_map → { "<user>": { userBase, groupBase } })
+ *   2. Request header                    (scim_user_base_header / scim_group_base_header)
+ *   3. Wildcard map entry "*"            (scim_base_map → { "*": { ... } })
+ *   4. Template substitution             (scim_user_base_template / scim_group_base_template)
+ *   5. Static config value               (scim_user_base / scim_group_base)
+ *   6. Global fallback                   (ldap_base)
+ *
+ * The `{user}` placeholder in templates is substituted with req.user after
+ * `escapeDnValue()` sanitization, to prevent DN-injection.
+ *
+ * A header-supplied base is only honored when `scim_base_header_root` is
+ * explicitly configured AND the value sits at or under that root AND contains
+ * no control characters, so a header cannot redirect operations to an arbitrary
+ * DN or inject into the DN. An explicit per-user map entry still wins over the
+ * header, so identity-based pinning is never silently overridden.
+ */
+import fs from 'fs';
+
+import type { Config } from '../../config/args';
+import { readOptions } from '../../config/options';
+import { assertIdentityMode, identityFor, type DmRequest } from '../auth/base';
+import { escapeDnValue, fillPattern, isChildOf } from '../utils';
+
+import { scimOptions, type ScimOptions } from './options';
+
+export interface BaseMapEntry {
+  userBase?: string;
+  groupBase?: string;
+}
+export type BaseMap = Record<string, BaseMapEntry>;
+
+export class BaseResolver {
+  private readonly defaultUserBase: string;
+  private readonly defaultGroupBase: string;
+  private readonly userTemplate: string;
+  private readonly groupTemplate: string;
+  private readonly map: BaseMap | undefined;
+  private readonly userBaseHeader: string;
+  private readonly groupBaseHeader: string;
+  private readonly headerRoot: string;
+  /** Kept so a base is keyed on whatever `--authz-identity` names. */
+  private readonly config: Config;
+
+  constructor(
+    config: Config,
+    options: ScimOptions = readOptions(scimOptions, config)
+  ) {
+    // This resolver keys a base on the same value the authorization plugins
+    // key a rule on, so it refuses an unknown `--authz-identity` as they
+    // do: a deployment running SCIM without an authorization plugin would
+    // otherwise get no refusal at all, and the value would silently mean
+    // `req.user`.
+    assertIdentityMode(config, 'scim base resolver');
+    this.config = config;
+    const fallback = config.ldap_base || '';
+    this.defaultUserBase = options.scim_user_base || fallback;
+    this.defaultGroupBase = options.scim_group_base || fallback;
+    this.userTemplate = options.scim_user_base_template;
+    this.groupTemplate = options.scim_group_base_template;
+    this.userBaseHeader = options.scim_user_base_header.toLowerCase();
+    this.groupBaseHeader = options.scim_group_base_header.toLowerCase();
+    this.headerRoot = options.scim_base_header_root;
+
+    const mapPath = options.scim_base_map;
+    if (mapPath) {
+      try {
+        const content = fs.readFileSync(mapPath, 'utf8');
+        this.map = JSON.parse(content) as BaseMap;
+      } catch (err) {
+        throw new Error(
+          `Failed to load SCIM base map from ${mapPath}: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+    }
+  }
+
+  private applyTemplate(template: string, user: string | undefined): string {
+    return fillPattern(template, '{user}', user ? escapeDnValue(user) : '');
+  }
+
+  /** Read a request header by name, tolerating Express req or a plain object. */
+  private readHeader(
+    req: DmRequest | { user?: string } | undefined,
+    name: string
+  ): string | undefined {
+    if (!req || typeof req !== 'object') return undefined;
+    const r = req as {
+      get?: (n: string) => string | undefined;
+      headers?: Record<string, string | string[] | undefined>;
+    };
+    if (typeof r.get === 'function') {
+      const v = r.get(name);
+      if (typeof v === 'string' && v.length > 0) return v;
+    }
+    const h = r.headers?.[name];
+    if (typeof h === 'string' && h.length > 0) return h;
+    if (Array.isArray(h) && typeof h[0] === 'string' && h[0].length > 0) {
+      return h[0];
+    }
+    return undefined;
+  }
+
+  private resolve(
+    kind: 'user' | 'group',
+    req?: DmRequest | { user?: string }
+  ): string {
+    // Keyed on what `--authz-identity` names, as the authorization plugins
+    // are: a `scim_base_map` written on logins has to match the same value a
+    // branch rule does, or one of the two silently describes another person.
+    const user =
+      req && typeof req === 'object'
+        ? identityFor(req as DmRequest, this.config).value
+        : undefined;
+
+    // 1. Explicit map entry (identity pinning wins over a request header)
+    if (this.map && user && this.map[user]) {
+      const entry = this.map[user];
+      if (kind === 'user' && entry.userBase) return entry.userBase;
+      if (kind === 'group' && entry.groupBase) return entry.groupBase;
+    }
+    // 2. Request header — only when an explicit root is configured, the value
+    //    is at/under it, and it carries no control characters.
+    const headerName =
+      kind === 'user' ? this.userBaseHeader : this.groupBaseHeader;
+    if (headerName && this.headerRoot) {
+      const fromHeader = this.readHeader(req, headerName)?.trim();
+      if (
+        fromHeader &&
+        // eslint-disable-next-line no-control-regex
+        !/[\u0000-\u001f\u007f]/.test(fromHeader) &&
+        (fromHeader.toLowerCase() === this.headerRoot.toLowerCase() ||
+          isChildOf(fromHeader, this.headerRoot))
+      ) {
+        return fromHeader;
+      }
+      // No root, outside the root, or unsafe value: ignore, fall through.
+    }
+    // 3. Wildcard map entry
+    if (this.map && this.map['*']) {
+      const entry = this.map['*'];
+      if (kind === 'user' && entry.userBase)
+        return this.applyTemplate(entry.userBase, user);
+      if (kind === 'group' && entry.groupBase)
+        return this.applyTemplate(entry.groupBase, user);
+    }
+    // 3. Template
+    const template = kind === 'user' ? this.userTemplate : this.groupTemplate;
+    if (template) return this.applyTemplate(template, user);
+    // 4. Static / 5. Fallback
+    return kind === 'user' ? this.defaultUserBase : this.defaultGroupBase;
+  }
+
+  userBase(req?: DmRequest | { user?: string }): string {
+    return this.resolve('user', req);
+  }
+
+  groupBase(req?: DmRequest | { user?: string }): string {
+    return this.resolve('group', req);
+  }
+}

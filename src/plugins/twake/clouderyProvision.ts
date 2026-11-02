@@ -32,8 +32,8 @@ import { Hooks } from '../../hooks';
 import { instanceSlug } from '../../lib/instanceProviders';
 import { isChildOf } from '../../lib/utils';
 import { RabbitMqService } from '../../lib/services/rabbitmq';
-import { BaseResolver } from '../scim/baseResolver';
-import { scimOptionsOf } from '../scim/scim.options';
+import { BaseResolver } from '../../lib/scim/baseResolver';
+import { scimOptionsOf } from '../../lib/scim/options';
 import type { ScimUser } from '../../lib/scim/types';
 
 import { clouderyOptions, clouderyOptionsOf } from './cloudery.options';

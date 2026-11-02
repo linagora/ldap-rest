@@ -5,7 +5,7 @@ import {
   projectList,
   projectResource,
 } from '../../../src/plugins/scim/projection';
-import { ScimError } from '../../../src/plugins/scim/errors';
+import { ScimError } from '../../../src/lib/scim/errors';
 
 const user = {
   schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],

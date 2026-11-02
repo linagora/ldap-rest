@@ -32,7 +32,10 @@ import {
 import { RabbitMqService } from '../../lib/services/rabbitmq';
 import { providedService } from '../../lib/services';
 import { ScimService } from '../../lib/services/scim';
-import { DEFAULT_LOCK_ATTRIBUTE, DEFAULT_LOCK_VALUE } from '../scim/mapping';
+import {
+  DEFAULT_LOCK_ATTRIBUTE,
+  DEFAULT_LOCK_VALUE,
+} from '../../lib/scim/mapping';
 
 import {
   first,

@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 
 import { scimFilterToLdap } from '../../../src/plugins/scim/filter';
-import { DEFAULT_USER_MAPPING } from '../../../src/plugins/scim/mapping';
-import { ScimError } from '../../../src/plugins/scim/errors';
+import { DEFAULT_USER_MAPPING } from '../../../src/lib/scim/mapping';
+import { ScimError } from '../../../src/lib/scim/errors';
 
 describe('SCIM filter parser', () => {
   // `active` is a Users-only pseudo-attribute.

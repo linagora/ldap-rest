@@ -21,13 +21,12 @@
  */
 import { escapeLdapFilter } from '../../lib/utils';
 import type { ResourceMapping } from '../../lib/scim/types';
-
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
   scimPathToLdapAttribute,
-} from './mapping';
-import { scimInvalidFilter } from './errors';
+} from '../../lib/scim/mapping';
+import { scimInvalidFilter } from '../../lib/scim/errors';
 
 type TokenKind =
   | 'LPAREN'

@@ -13,6 +13,7 @@ import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
 
+import type { EntityDeclaration } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Schema, SchemaAttribute } from '../../config/schema';
 import type { Hooks } from '../../hooks';
@@ -40,18 +41,19 @@ import {
   rdnValue,
   unescapeDnValue,
 } from '../../lib/utils';
-import type { EntityDeclaration } from '../../abstract/plugin';
-import LdapGroups from '../ldap/groups';
-import { BaseResolver } from '../scim/baseResolver';
+import { BaseResolver } from '../../lib/scim/baseResolver';
 import {
   DEFAULT_GROUP_MAPPING,
   loadMappingFile,
   mergeMapping,
-} from '../scim/mapping';
-import { scimOptionsOf } from '../scim/scim.options';
+} from '../../lib/scim/mapping';
+import { scimOptionsOf } from '../../lib/scim/options';
 import type { ScimGroup } from '../../lib/scim/types';
 import { outsideRequest } from '../../lib/requestContext';
 import { TwakeGroupsService, type Page } from '../../lib/services/twakeGroups';
+// TwakeGroups extends LdapGroups, the one documented family exception
+// eslint-disable-next-line local/no-plugin-family-import
+import LdapGroups from '../ldap/groups';
 
 import {
   first,

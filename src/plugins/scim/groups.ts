@@ -32,8 +32,7 @@ import {
   type MultiValued,
   SCHEMA_LIST_RESPONSE,
 } from '../../lib/scim/types';
-
-import { BaseResolver } from './baseResolver';
+import { BaseResolver } from '../../lib/scim/baseResolver';
 import {
   DEFAULT_GROUP_MAPPING,
   loadMappingFile,
@@ -43,10 +42,7 @@ import {
   scimGroupToLdap,
   requiredLdapAttributes,
   type MappingContext,
-} from './mapping';
-import { scimFilterToLdap } from './filter';
-import { pagedSearch } from './list';
-import { patchToModifyRequest, writePatch } from './patch';
+} from '../../lib/scim/mapping';
 import {
   extractLdapCode,
   kindOf,
@@ -54,9 +50,13 @@ import {
   scimInvalidValue,
   scimNotFound,
   scimUniqueness,
-} from './errors';
+} from '../../lib/scim/errors';
+import type { ScimOptions } from '../../lib/scim/options';
+
+import { scimFilterToLdap } from './filter';
+import { pagedSearch } from './list';
+import { patchToModifyRequest, writePatch } from './patch';
 import type { ScimUsers } from './users';
-import type { ScimOptions } from './scim.options';
 
 export interface GroupListQuery {
   filter?: string;

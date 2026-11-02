@@ -4,7 +4,7 @@ import path from 'path';
 
 import { expect } from 'chai';
 
-import { BaseResolver } from '../../../src/plugins/scim/baseResolver';
+import { BaseResolver } from '../../../src/lib/scim/baseResolver';
 import type { Config } from '../../../src/config/args';
 
 function cfg(overrides: Partial<Config> = {}): Config {

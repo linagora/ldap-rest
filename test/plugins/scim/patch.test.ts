@@ -5,8 +5,8 @@ import {
   applyPatchToResource,
   writePatch,
 } from '../../../src/plugins/scim/patch';
-import { DEFAULT_USER_MAPPING } from '../../../src/plugins/scim/mapping';
-import { ScimError } from '../../../src/plugins/scim/errors';
+import { DEFAULT_USER_MAPPING } from '../../../src/lib/scim/mapping';
+import { ScimError } from '../../../src/lib/scim/errors';
 
 describe('SCIM PATCH applicator', () => {
   // The entry the operations are played against. Empty unless a case needs

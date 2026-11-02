@@ -1,0 +1,170 @@
+/**
+ * @module lib/scim/errors
+ * @author Xavier Guimard <xguimard@linagora.com>
+ *
+ * SCIM 2.0 error envelope (RFC 7644 §3.12) and async handler wrapper.
+ */
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
+
+import {
+  AUTHZ_REFUSED,
+  HttpError,
+  errorChain,
+  isAuthzRefusal,
+} from '../errors';
+import { messageOf } from '../expressFormatedResponses';
+// Moved to `lib`: nothing in it is SCIM's business, and an LDAP plugin needs
+// it too. Imported and re-exported, so this module stays the one SCIM reads
+// it from.
+import { extractLdapCode, isSchemaRefusal } from '../ldapCodes';
+
+import {
+  type ScimErrorResponse,
+  type ScimErrorType,
+  SCHEMA_ERROR,
+} from './types';
+
+export { extractLdapCode };
+
+export const SCIM_CONTENT_TYPE = 'application/scim+json';
+
+export class ScimError extends HttpError {
+  scimType?: ScimErrorType;
+  constructor(status: number, detail: string, scimType?: ScimErrorType) {
+    super(detail, status);
+    this.name = 'ScimError';
+    this.scimType = scimType;
+  }
+}
+
+/** The kind of a client value, for an error that quotes none of it */
+export const kindOf = (v: unknown): string => {
+  if (v === null) return 'null';
+  if (Array.isArray(v)) return 'an array';
+  const type = typeof v;
+  return `${/^[aeiou]/.test(type) ? 'an' : 'a'} ${type}`;
+};
+
+export const scimInvalidFilter = (detail = 'Invalid filter'): ScimError =>
+  new ScimError(400, detail, 'invalidFilter');
+export const scimInvalidPath = (detail = 'Invalid path'): ScimError =>
+  new ScimError(400, detail, 'invalidPath');
+export const scimInvalidValue = (detail = 'Invalid value'): ScimError =>
+  new ScimError(400, detail, 'invalidValue');
+export const scimInvalidSyntax = (detail = 'Invalid syntax'): ScimError =>
+  new ScimError(400, detail, 'invalidSyntax');
+export const scimNoTarget = (detail = 'No target'): ScimError =>
+  new ScimError(400, detail, 'noTarget');
+export const scimMutability = (detail = 'Immutable attribute'): ScimError =>
+  new ScimError(400, detail, 'mutability');
+export const scimUniqueness = (detail = 'Uniqueness violation'): ScimError =>
+  new ScimError(409, detail, 'uniqueness');
+export const scimTooMany = (detail = 'Too many results'): ScimError =>
+  new ScimError(400, detail, 'tooMany');
+export const scimNotFound = (detail = 'Resource not found'): ScimError =>
+  new ScimError(404, detail);
+
+export function writeScimError(
+  res: Response,
+  status: number,
+  detail: string,
+  scimType?: ScimErrorType
+): void {
+  const body: ScimErrorResponse = {
+    schemas: [SCHEMA_ERROR],
+    status: String(status),
+    ...(scimType ? { scimType } : {}),
+    detail,
+  };
+  res.status(status).type(SCIM_CONTENT_TYPE).json(body);
+}
+
+/**
+ * Turn any thrown thing into the SCIM error body it deserves.
+ *
+ * Split out from `writeScimErrorFromException` so `/Bulk`, which reports a
+ * status per operation instead of writing a response, applies exactly the
+ * same translations — including the ones that matter: an authorization
+ * refusal is a 403 saying `AUTHZ_REFUSED`, not a 500 quoting the branch it
+ * judged.
+ */
+export function scimErrorFromException(
+  err: unknown,
+  fallbackStatus = 500
+): ScimErrorResponse {
+  const body = (
+    status: number,
+    detail: string,
+    scimType?: ScimErrorType
+  ): ScimErrorResponse => ({
+    schemas: [SCHEMA_ERROR],
+    status: String(status),
+    ...(scimType ? { scimType } : {}),
+    detail,
+  });
+
+  const message = messageOf(err);
+  // An authorization plugin's refusal is a `ForbiddenError` whatever a plugin
+  // wrapped it in, and its message names the model and the branch it judged.
+  if (isAuthzRefusal(err)) return body(403, AUTHZ_REFUSED);
+  if (err instanceof ScimError) {
+    return body(err.statusCode, message, err.scimType);
+  }
+  // A hook wraps what it caught with `cause`; the status and the directory's
+  // refusal are read through the chain, as the REST answers do.
+  const http = errorChain(err).find(e => e instanceof HttpError);
+  if (http) {
+    // `ldapActions` answers a schema refusal with a 400 of its own
+    const scimType =
+      http.statusCode === 400 && isSchemaRefusal(extractLdapCode(http))
+        ? 'invalidValue'
+        : undefined;
+    return body(http.statusCode, message, scimType);
+  }
+  const ldapCode = extractLdapCode(err);
+  if (ldapCode === 32) return body(404, 'Resource not found');
+  if (ldapCode === 68) return body(409, message, 'uniqueness');
+  // The request named something the directory's schema does not allow here.
+  // That is the client's or the operator's doing, not a server fault, so it
+  // is a 400 rather than a bare 500 — but which of the two, and which flag to
+  // reach for, depends on the route. The caller that knows adds that; this
+  // stays generic, having only the error to go on.
+  if (isSchemaRefusal(ldapCode)) {
+    return body(
+      400,
+      `The directory rejected this write against its schema: ${message}`,
+      'invalidValue'
+    );
+  }
+  return body(fallbackStatus, message || 'Internal error');
+}
+
+export function writeScimErrorFromException(
+  res: Response,
+  err: unknown,
+  fallbackStatus = 500
+): void {
+  const body = scimErrorFromException(err, fallbackStatus);
+  res.status(Number(body.status)).type(SCIM_CONTENT_TYPE).json(body);
+}
+
+/**
+ * Express wrapper that catches errors, serializes them as SCIM
+ * envelope and short-circuits the default Express error middleware.
+ * Accepts both sync and async handlers.
+ */
+export const scimAsyncHandler = (
+  fn: (req: Request, res: Response, next: NextFunction) => void | Promise<void>
+): RequestHandler => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve()
+      .then(() => fn(req, res, next))
+      .catch(err => {
+        if (!res.headersSent) {
+          writeScimErrorFromException(res, err);
+        } else {
+          next(err);
+        }
+      });
+  };
+};

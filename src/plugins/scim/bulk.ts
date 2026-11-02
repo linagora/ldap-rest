@@ -24,16 +24,16 @@ import {
   type PatchRequest,
   SCHEMA_BULK_RESPONSE,
 } from '../../lib/scim/types';
-
-import type { ScimUsers } from './users';
-import type { ScimOptions } from './scim.options';
-import type { ScimGroups } from './groups';
+import type { ScimOptions } from '../../lib/scim/options';
 import {
   kindOf,
   scimErrorFromException,
   scimInvalidValue,
   writeScimErrorFromException,
-} from './errors';
+} from '../../lib/scim/errors';
+
+import type { ScimUsers } from './users';
+import type { ScimGroups } from './groups';
 
 export interface ScimBulkOptions {
   options: ScimOptions;
