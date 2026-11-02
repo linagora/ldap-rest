@@ -29,7 +29,7 @@ import {
   parseDn,
   unescapeDnValue,
 } from '../../lib/utils';
-import type RabbitMq from '../rabbitmq';
+import { RabbitMqService } from '../../lib/services/rabbitmq';
 import { DEFAULT_LOCK_ATTRIBUTE, DEFAULT_LOCK_VALUE } from '../scim/mapping';
 
 import {
@@ -313,7 +313,7 @@ export default class TwakeLifecycleEvents extends DmPlugin {
    */
   async assertComposition(): Promise<void> {
     if (this.rules.length === 0) return;
-    if (!(await this.requirePlugin<RabbitMq>('rabbitmq')?.getRawClient()))
+    if (!(await this.service(RabbitMqService)?.getRawClient()))
       throw new Error(
         `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached`
       );
@@ -545,7 +545,7 @@ export default class TwakeLifecycleEvents extends DmPlugin {
   ): Promise<void> {
     const targets = rule.targets[event];
     if (!targets?.length) return;
-    const rabbitmq = this.requirePlugin<RabbitMq>('rabbitmq');
+    const rabbitmq = this.service(RabbitMqService);
     if (!rabbitmq) return;
     for (const target of targets) {
       const applies = Object.entries(target.when).every(([source, wanted]) => {

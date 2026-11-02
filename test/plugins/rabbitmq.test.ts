@@ -7,6 +7,8 @@ import {
   currentLogContext,
   runWithLogContext,
 } from '../../src/lib/requestContext';
+import { providedService } from '../../src/lib/services';
+import { RabbitMqService } from '../../src/lib/services/rabbitmq';
 
 interface PublishCall {
   exchange: string;
@@ -81,6 +83,14 @@ class FlakyRabbitMq extends RabbitMq {
 }
 
 describe('RabbitMq plugin', () => {
+  it('provides RabbitMqService', async () => {
+    const dm = new DM();
+    await dm.ready;
+    const rmq = new RabbitMq(dm);
+    await dm.registerPlugin('rabbitmq', rmq);
+    expect(providedService(dm.services, RabbitMqService)).to.equal(rmq);
+  });
+
   describe('with a configured broker URL', () => {
     let dm: DM;
     let plugin: TestableRabbitMq;

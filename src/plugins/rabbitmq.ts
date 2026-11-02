@@ -10,40 +10,33 @@
  * `@linagora/rabbitmq-client` is an optional dependency; if the package is not
  * installed or `rabbitmq_url` is empty, every method is a logged no-op.
  *
- * Consumers declare it as a dependency and reach it through the loaded-plugin
- * registry:
+ * Consumers declare it as a dependency and reach it through its service:
  *
  *   dependencies = { rabbitmq: 'core/rabbitmq' };
- *   const rmq = this.server.loadedPlugins['rabbitmq'] as RabbitMq;
- *   await rmq.publish('auth', 'user.created', message);
+ *   const rmq = this.service(RabbitMqService);
+ *   await rmq?.publish('auth', 'user.created', message);
  */
 
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import { outsideAnyRequest } from '../lib/requestContext';
 import type { HealthStatus } from '../lib/health';
+import {
+  RabbitMqService,
+  type PublishOptions,
+  type RabbitMessage,
+  type RabbitMessageHandler,
+  type SubscribeOptions,
+} from '../lib/services/rabbitmq';
 
 import { rabbitmqOptions } from './rabbitmq.options';
 
-/** JSON-serialisable message payload. */
-export type RabbitMessage = Record<string, unknown>;
-
-/** Async handler invoked for each consumed message. */
-export type RabbitMessageHandler = (message: RabbitMessage) => Promise<void>;
-
-/** Options forwarded to the underlying client's `publish()`. */
-export interface PublishOptions {
-  maxAttempts?: number;
-  headers?: Record<string, unknown>;
-  correlationId?: string;
-  messageId?: string;
-  expiration?: string;
-}
-
-/** Options forwarded to the underlying client's `subscribe()`. */
-export interface SubscribeOptions {
-  queueArguments?: Record<string, unknown>;
-}
+export type {
+  PublishOptions,
+  RabbitMessage,
+  RabbitMessageHandler,
+  SubscribeOptions,
+} from '../lib/services/rabbitmq';
 
 /**
  * Subset of `@linagora/rabbitmq-client`'s `RabbitMQClient` that this plugin
@@ -87,6 +80,7 @@ export default class RabbitMq extends DmPlugin {
   static optionDefinitions = rabbitmqOptions;
 
   name = 'rabbitmq';
+  provides = [RabbitMqService.with(this)];
 
   private readonly rabbitmqUrl: string;
 

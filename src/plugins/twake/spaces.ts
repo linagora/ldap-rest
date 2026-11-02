@@ -32,7 +32,7 @@ import {
   rdnValue,
   unescapeDnValue,
 } from '../../lib/utils';
-import type RabbitMq from '../rabbitmq';
+import { RabbitMqService, type RabbitMqApi } from '../../lib/services/rabbitmq';
 
 import type TwakeGroups from './groups';
 import type TwakeTombstone from './tombstone';
@@ -1668,14 +1668,12 @@ export default class TwakeSpaces extends DmPlugin {
     return domain ? { organizationDomain: domain } : {};
   }
 
-  private get rabbitmq(): RabbitMq | null {
-    return this.config.rabbitmq_url
-      ? this.requirePlugin<RabbitMq>('rabbitmq')
-      : null;
+  private get rabbitmq(): RabbitMqApi | null {
+    return this.config.rabbitmq_url ? this.service(RabbitMqService) : null;
   }
 
   private async publish(
-    rabbitmq: RabbitMq,
+    rabbitmq: RabbitMqApi,
     event: string,
     message: Record<string, unknown>
   ): Promise<void> {

@@ -17,6 +17,7 @@ import type {
 import TwakeInstances, {
   type WorkplaceCreated,
 } from '../../../src/plugins/twake/instances';
+import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
 
 const USERS = `ou=users,${process.env.DM_LDAP_BASE}`;
 const ORGS = `ou=in-orgs,${process.env.DM_LDAP_BASE}`;
@@ -73,6 +74,7 @@ async function server(
   const rabbit = new StubRabbitMq();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dm.loadedPlugins['rabbitmq'] = rabbit as any;
+  dm.services.set(RabbitMqService, rabbit);
   await dm.registerPlugin('core/twake/instances', new TwakeInstances(dm));
   return { dm, rabbit };
 }
@@ -368,8 +370,10 @@ describe('Twake instances plugin', function () {
         twake_instance_sent_attribute: 'twakeNoSuchMark',
       });
       await dm2.ready;
+      const rabbit2 = new StubRabbitMq();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dm2.loadedPlugins['rabbitmq'] = new StubRabbitMq() as any;
+      dm2.loadedPlugins['rabbitmq'] = rabbit2 as any;
+      dm2.services.set(RabbitMqService, rabbit2);
       expect(
         String(
           await refusal(
@@ -385,8 +389,10 @@ describe('Twake instances plugin', function () {
         twake_instance_organization_name_attribute: 'description',
       });
       await dm2.ready;
+      const rabbit2 = new StubRabbitMq();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dm2.loadedPlugins['rabbitmq'] = new StubRabbitMq() as any;
+      dm2.loadedPlugins['rabbitmq'] = rabbit2 as any;
+      dm2.services.set(RabbitMqService, rabbit2);
       expect(
         String(
           await refusal(
@@ -2165,6 +2171,7 @@ describe('Twake instances plugin', function () {
       down.up = false;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       dm2.loadedPlugins['rabbitmq'] = down as any;
+      dm2.services.set(RabbitMqService, down);
       expect(
         String(
           await refusal(

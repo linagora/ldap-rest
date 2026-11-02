@@ -35,7 +35,7 @@ import {
   rdnValue,
   unescapeDnValue,
 } from '../../lib/utils';
-import type RabbitMq from '../rabbitmq';
+import { RabbitMqService } from '../../lib/services/rabbitmq';
 
 import {
   isTombstone,
@@ -241,7 +241,7 @@ export default class TwakeInstances extends DmPlugin {
    * no address would ever arrive: the server does not start.
    */
   async api(app: Express): Promise<void> {
-    const rabbitmq = this.requirePlugin<RabbitMq>('rabbitmq');
+    const rabbitmq = this.service(RabbitMqService);
     if (!rabbitmq || !(await rabbitmq.getRawClient()))
       throw new Error(`${this.name}: RabbitMQ is required and unreachable`);
     // Without them every add would stay pending, with an error log only
@@ -797,7 +797,7 @@ export default class TwakeInstances extends DmPlugin {
     key: string,
     message: Record<string, unknown>
   ): Promise<void> {
-    const rabbitmq = this.requirePlugin<RabbitMq>('rabbitmq');
+    const rabbitmq = this.service(RabbitMqService);
     // publish() drops a message silently without a client
     if (!rabbitmq || !(await rabbitmq.getRawClient()))
       throw new Error(`${this.name}: RabbitMQ unreachable, ${key} not sent`);

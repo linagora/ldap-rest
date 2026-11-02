@@ -31,7 +31,7 @@ import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
 import { instanceSlug } from '../../lib/instanceProviders';
 import { isChildOf } from '../../lib/utils';
-import type RabbitMq from '../rabbitmq';
+import { RabbitMqService } from '../../lib/services/rabbitmq';
 import { BaseResolver } from '../scim/baseResolver';
 import { scimOptionsOf } from '../scim/scim.options';
 import type { ScimUser } from '../../lib/scim/types';
@@ -940,7 +940,7 @@ export default class ClouderyProvision extends DmPlugin {
     email: string | null;
     mobile: string | null;
   }): Promise<void> {
-    const rabbitmq = this.requirePlugin<RabbitMq>('rabbitmq');
+    const rabbitmq = this.service(RabbitMqService);
     this.logger.info({
       plugin: this.name,
       event: 'publishUserCreated',
@@ -1000,7 +1000,7 @@ export default class ClouderyProvision extends DmPlugin {
     domain: string
   ): Promise<void> {
     if (!this.userDeletedRoutingKey) return;
-    const rabbitmq = this.requirePlugin<RabbitMq>('rabbitmq');
+    const rabbitmq = this.service(RabbitMqService);
     this.logger.info({
       plugin: this.name,
       event: 'publishUserDeleted',

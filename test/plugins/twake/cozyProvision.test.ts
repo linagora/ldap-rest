@@ -4,6 +4,7 @@ import { expect } from 'chai';
 import { DM } from '../../../src/bin';
 import CozyProvision from '../../../src/plugins/twake/cozyProvision';
 import type { ScimUser } from '../../../src/lib/scim/types';
+import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
 
 interface PublishCall {
   exchange: string;
@@ -62,6 +63,7 @@ describe('CozyProvision plugin', () => {
     rabbit = new StubRabbitMq();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dm.loadedPlugins['rabbitmq'] = rabbit as any;
+    dm.services.set(RabbitMqService, rabbit);
     plugin = new CozyProvision(dm);
   });
 
@@ -422,6 +424,7 @@ describe('CozyProvision plugin', () => {
       const rabbit2 = new StubRabbitMq();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       dm2.loadedPlugins['rabbitmq'] = rabbit2 as any;
+      dm2.services.set(RabbitMqService, rabbit2);
       const p = new CozyProvision(dm2);
 
       const user: ScimUser = {

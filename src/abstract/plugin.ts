@@ -51,6 +51,15 @@ export {
   PasswordPolicyService,
   type PasswordPolicyApi,
 } from '../lib/services/passwordPolicy';
+export {
+  RabbitMqService,
+  type PublishOptions,
+  type RabbitMessage,
+  type RabbitMessageHandler,
+  type RabbitMqApi,
+  type SubscribeOptions,
+} from '../lib/services/rabbitmq';
+export { StorageService, type StorageApi } from '../lib/services/storage';
 export { TrashService, type TrashApi } from '../lib/services/trash';
 export {
   HttpError,

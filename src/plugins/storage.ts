@@ -13,12 +13,11 @@
  * is unwell. Registration order is invisible in a configuration, which is a
  * poor place to keep a behaviour.
  *
- * A consumer reaches it with `requirePlugin('storage')` and works through
- * `store`; it should not index `loadedPlugins` itself. And one that makes a
- * security decision must not read "no storage" as "nothing to check":
- * `requirePlugin` answers null and warns once, which is right for an optional
- * feature and wrong for, say, a logout check — such a consumer refuses to
- * load instead.
+ * A consumer reaches it through `StorageService` and works through `store`; it
+ * should not index `loadedPlugins` itself. And one that makes a security
+ * decision must not read "no storage" as "nothing to check": the service
+ * answers null and warns once, which is right for an optional feature and
+ * wrong for, say, a logout check — such a consumer refuses to load instead.
  *
  * What a consumer must not expect of this layer: it does not decide how long
  * anything lives. A deadline comes in with the record, because retention is
@@ -30,6 +29,7 @@
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import type { HealthStatus } from '../lib/health';
+import { StorageService } from '../lib/services/storage';
 import type Store from '../lib/storage/store';
 
 import FileStore from './storage/file';
@@ -56,6 +56,7 @@ export default class Storage extends DmPlugin {
   static optionDefinitions = storageOptions;
 
   name = 'storage';
+  provides = [StorageService.with(this)];
   store: Store;
 
   constructor(server: DM) {

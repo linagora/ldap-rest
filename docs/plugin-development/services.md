@@ -127,6 +127,9 @@ A plugin family provides the others:
 
 - `TrashService`: the trash branch and the branches it watches.
 - `PasswordPolicyService`: the branch holding the password policies.
+- `RabbitMqService`: the shared broker, its publish, subscribe and
+  reachability check.
+- `StorageService`: the one keyed store and its backend.
 
 A consumer that only needs to know whether the feature is loaded calls
 `this.service(token)` and skips its work when the answer is `null`.
