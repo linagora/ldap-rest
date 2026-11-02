@@ -211,15 +211,14 @@ export class DM {
     dispatcherMounted: false,
   };
   /**
-   * The error middleware, and whether one is mounted. In an object, as
-   * `_authState` is: a view made during loading would copy a `false` flag and
-   * no handler, so a route it registers after `ready` would land behind the
-   * handler — the one place Express never routes an error to.
+   * The mounted error middleware, if any. In an object, as `_authState` is: a
+   * view made during loading would copy a bare `undefined` field, so a route
+   * it registers after `ready` would land behind the handler — the one place
+   * Express never routes an error to.
    */
   private readonly _errorState: {
-    mounted: boolean;
     handler?: express.ErrorRequestHandler;
-  } = { mounted: false };
+  } = {};
   /** The parsers plugins mount ahead of the global ones, see registerBodyParser */
   private readonly bodyParsers = express.Router();
   /**
@@ -743,16 +742,16 @@ export class DM {
   }
 
   setupErrorMiddleware(): void {
-    const { handler: mounted } = this._errorState;
+    const previous = this._errorState.handler;
     // Remove existing error middleware if already set up.
     // Express 5 renamed `_router` to `router`, so this lookup silently found
     // nothing and the old handler was never removed: one more was appended on
     // every registerPlugin. Only the first ever ran, so nothing broke — the
     // stack just kept growing.
-    if (this._errorState.mounted && mounted) {
+    if (previous) {
       const stack = this.routerStack();
       if (stack) {
-        const index = stack.findIndex(layer => layer.handle === mounted);
+        const index = stack.findIndex(layer => layer.handle === previous);
         if (index !== -1) {
           stack.splice(index, 1);
         }
@@ -794,7 +793,6 @@ export class DM {
 
     this._errorState.handler = handler;
     this.app.use(handler);
-    this._errorState.mounted = true;
   }
 
   /**
@@ -1129,7 +1127,7 @@ export class DM {
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);
       await obj.api(this.app);
       // If error middleware was already setup, re-setup it to ensure it stays at the end
-      if (this._errorState.mounted) {
+      if (this._errorState.handler) {
         this.setupErrorMiddleware();
       }
     }
