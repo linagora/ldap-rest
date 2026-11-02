@@ -9,6 +9,7 @@ import TrashPlugin from '../../../src/plugins/ldap/trash';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
 import { waitFor } from '../../helpers/waitFor';
+import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
 
 const ORGS = `ou=tse-orgs,${process.env.DM_LDAP_BASE}`;
 const orgDn = `ou=acme,${ORGS}`;
@@ -216,6 +217,7 @@ const suite = (role: string) => (): void => {
     rabbit = new StubRabbitMq();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dm.loadedPlugins['rabbitmq'] = rabbit as any;
+    dm.services.set(RabbitMqService, rabbit);
     await dm.registerPlugin('core/ldap/onChange', new OnLdapChange(dm));
     const groups = new TwakeGroups(dm);
     await dm.registerPlugin('core/twake/groups', groups);

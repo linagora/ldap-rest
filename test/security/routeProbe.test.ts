@@ -67,6 +67,7 @@ import ExternalUsersInGroups from '../../src/plugins/ldap/externalUsersInGroups'
 import TwakeTombstone from '../../src/plugins/twake/tombstone';
 import TwakeInstances from '../../src/plugins/twake/instances';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
+import { RabbitMqService } from '../../src/lib/services/rabbitmq';
 
 /** Authentication reduced to a header */
 class TestAuth extends AuthBase {
@@ -460,7 +461,8 @@ for (const model of MODELS)
         twake_instance_fqdn_attribute: 'carLicense',
         twake_instance_sent_attribute: 'businessCategory',
       });
-      server.loadedPlugins['rabbitmq'] = new StubRabbitMq() as never;
+      server.loadedPlugins['rabbitmq'] = new StubRabbitMq() as any;
+      server.services.set(RabbitMqService, new StubRabbitMq());
       await wipe();
       const add = (dn: string, entry: Record<string, unknown>) =>
         server.ldap.add(dn, entry as never);

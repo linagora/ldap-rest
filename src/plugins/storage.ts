@@ -30,6 +30,7 @@
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import type { HealthStatus } from '../lib/health';
+import { StorageService } from '../lib/services/storage';
 import type Store from '../lib/storage/store';
 
 import FileStore from './storage/file';
@@ -56,6 +57,7 @@ export default class Storage extends DmPlugin {
   static optionDefinitions = storageOptions;
 
   name = 'storage';
+  provides = [StorageService.with(this)];
   store: Store;
 
   constructor(server: DM) {

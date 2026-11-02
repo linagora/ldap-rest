@@ -19,9 +19,9 @@
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../hooks';
+import { StorageService, type StorageApi } from '../lib/services/storage';
 import type Store from '../lib/storage/store';
 
-import type Storage from './storage';
 import { bclOptions } from './bcl.options';
 
 /** One namespace, so nothing else in the store can answer for a logout. */
@@ -32,7 +32,7 @@ export default class Bcl extends DmPlugin {
 
   name = 'bcl';
   dependencies = { storage: 'core/storage' };
-  private storage?: Storage;
+  private storage?: StorageApi;
   /** How long a tombstone is kept, in milliseconds. */
   private retention: number;
 
@@ -50,13 +50,13 @@ export default class Bcl extends DmPlugin {
    * arguments rather than for the configuration: `core/bcl` listed first
    * would be refused for a storage that is right there, and the declaration
    * above — the thing meant to make order irrelevant — would have loaded it
-   * a moment later. `api()` runs after that loop, which is where
-   * `requirePlugin`'s own promise starts holding.
+   * a moment later. `api()` runs after that loop, which is where the service
+   * is registered.
    */
   api(): void {
-    const storage = this.requirePlugin<Storage>('storage');
+    const storage = this.service(StorageService);
     if (!storage) {
-      // `requirePlugin` warns and answers null, which is right for a feature
+      // The service answers null and warns, which is right for a feature
       // that can be skipped. This one cannot: skipping it means every
       // session survives the logout that closed it, silently. A refusal to
       // start is the honest failure.

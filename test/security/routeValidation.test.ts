@@ -23,6 +23,7 @@ import AppAccountsApi from '../../src/plugins/twake/appAccountsApi';
 import TwakeInstances from '../../src/plugins/twake/instances';
 import TwakeTombstone from '../../src/plugins/twake/tombstone';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS_WITH_ORG } from '../helpers/env';
+import { RabbitMqService } from '../../src/lib/services/rabbitmq';
 
 /** A JSON schema, as the registry keeps it */
 interface Schema {
@@ -144,7 +145,8 @@ describe('Every route refuses the input it cannot take', function () {
       twake_instance_fqdn_attribute: 'carLicense',
       twake_instance_sent_attribute: 'businessCategory',
     });
-    server.loadedPlugins['rabbitmq'] = new StubRabbitMq() as never;
+    server.loadedPlugins['rabbitmq'] = new StubRabbitMq() as any;
+    server.services.set(RabbitMqService, new StubRabbitMq());
     for (const [name, Plugin] of [
       ['ldapFlatGeneric', LdapFlatGeneric],
       ['ldapAccountLifecycle', LdapAccountLifecycle],

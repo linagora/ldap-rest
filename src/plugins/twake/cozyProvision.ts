@@ -22,7 +22,7 @@ import { Buffer } from 'buffer';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
-import type RabbitMq from '../rabbitmq';
+import { RabbitMqService, type RabbitMqApi } from '../../lib/services/rabbitmq';
 import type { ScimUser } from '../../lib/scim/types';
 
 import { cozyOptions, cozyOptionsOf } from './cozy.options';
@@ -414,8 +414,8 @@ export default class CozyProvision extends DmPlugin {
    * first). Returns null and warns once if it is absent, letting the publish
    * paths no-op cleanly.
    */
-  private rabbitmq(): RabbitMq | null {
-    return this.requirePlugin<RabbitMq>('rabbitmq');
+  private rabbitmq(): RabbitMqApi | null {
+    return this.service(RabbitMqService);
   }
 
   private extractId(user: ScimUser): string | null {

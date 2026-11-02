@@ -18,6 +18,7 @@ import TwakeLifecycleEvents from '../../../src/plugins/twake/lifecycleEvents';
 import TwakeInstances from '../../../src/plugins/twake/instances';
 import TwakeTombstone from '../../../src/plugins/twake/tombstone';
 import { waitFor } from '../../helpers/waitFor';
+import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
 
 const LDAP_BASE = process.env.DM_LDAP_BASE as string;
 const USERS = `ou=users,${LDAP_BASE}`;
@@ -146,6 +147,7 @@ describe('Twake tombstone plugin', function () {
     rabbit = new StubRabbitMq();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dm.loadedPlugins['rabbitmq'] = rabbit as any;
+    dm.services.set(RabbitMqService, rabbit);
     await dm.registerPlugin('core/ldap/onChange', new OnLdapChange(dm));
     const events = new TwakeLifecycleEvents(dm);
     // Count the events plugin's work, so a test waits for it rather than for

@@ -4,6 +4,7 @@ import { expect } from 'chai';
 import { DM } from '../../../src/bin';
 import ClouderyProvision from '../../../src/plugins/twake/clouderyProvision';
 import type { ScimUser } from '../../../src/lib/scim/types';
+import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
 
 const CLOUDERY = 'http://cloudery.test';
 const B2B_BRANCH = 'ou=b2b,dc=twake,dc=local';
@@ -114,6 +115,7 @@ describe('ClouderyProvision plugin', () => {
     ldap = new StubLdap();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dm.loadedPlugins['rabbitmq'] = rabbit as any;
+    dm.services.set(RabbitMqService, rabbit);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dm.ldap = ldap as any;
     plugin = new ClouderyProvision(dm);

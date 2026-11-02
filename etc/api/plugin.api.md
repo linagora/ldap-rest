@@ -1303,6 +1303,40 @@ export interface PasswordPolicyApi {
 export const PasswordPolicyService: ServiceToken<PasswordPolicyApi>;
 
 // @public
+export interface PublishOptions {
+    // (undocumented)
+    correlationId?: string;
+    // (undocumented)
+    expiration?: string;
+    // (undocumented)
+    headers?: Record<string, unknown>;
+    // (undocumented)
+    maxAttempts?: number;
+    // (undocumented)
+    messageId?: string;
+}
+
+// @public
+export type RabbitMessage = Record<string, unknown>;
+
+// @public
+export type RabbitMessageHandler = (message: RabbitMessage) => Promise<void>;
+
+// @public (undocumented)
+export interface RabbitMqApi {
+    getRawClient(): Promise<object | null>;
+    // (undocumented)
+    publish(exchange: string, routingKey: string, message: RabbitMessage, options?: PublishOptions): Promise<void>;
+    // (undocumented)
+    subscribe(exchange: string, routingKey: string, queue: string, handler: RabbitMessageHandler, options?: SubscribeOptions): Promise<void>;
+    // (undocumented)
+    unsubscribe(queue: string): Promise<void>;
+}
+
+// @public (undocumented)
+export const RabbitMqService: ServiceToken<RabbitMqApi>;
+
+// @public
 interface Refusal {
     attribute?: string;
     code: 'unique' | 'mailDomain' | 'forbidden';
@@ -1625,6 +1659,56 @@ export class ServiceUnavailableError extends HttpError {
 
 // @public
 type Settled<T> = T extends Promise<infer P> ? P : T;
+
+// @public (undocumented)
+export interface StorageApi {
+    // (undocumented)
+    readonly store: Store;
+}
+
+// @public (undocumented)
+export const StorageService: ServiceToken<StorageApi>;
+
+// @public (undocumented)
+abstract class Store {
+    constructor(logger: winston.Logger);
+    close(): Promise<void>;
+    protected closed: boolean;
+    // (undocumented)
+    protected static decodeRecord(value: unknown): StoredRecord | null;
+    delete(namespace: string, key: string): Promise<void>;
+    protected abstract drop(key: string): Promise<void>;
+    protected static encodeRecord(key: string, record: StoredRecord): string;
+    get(namespace: string, key: string): Promise<string | null>;
+    health(): Promise<HealthStatus>;
+    protected abstract load(key: string): Promise<StoredRecord | null>;
+    // (undocumented)
+    protected logger: winston.Logger;
+    abstract name: string;
+    open(): Promise<void>;
+    protected static readable(scoped: string): string;
+    protected abstract save(key: string, record: StoredRecord): Promise<void>;
+    protected static scoped(namespace: string, key: string): string;
+    set(namespace: string, key: string, value: string, deadline: number): Promise<void>;
+    startSweeping(seconds: number): void;
+    // (undocumented)
+    stopSweeping(): void;
+    abstract sweep(): Promise<number>;
+}
+
+// @public
+interface StoredRecord {
+    // (undocumented)
+    deadline: number;
+    // (undocumented)
+    value: string;
+}
+
+// @public
+export interface SubscribeOptions {
+    // (undocumented)
+    queueArguments?: Record<string, unknown>;
+}
 
 // @public
 interface SyntaxDefinition {
