@@ -61,6 +61,10 @@ export {
 } from '../lib/services/rabbitmq';
 export { StorageService, type StorageApi } from '../lib/services/storage';
 export { PluginInfoService, type PluginInfo } from '../lib/services/plugins';
+export {
+  ReferenceRewriterService,
+  type ReferenceRewriterApi,
+} from '../lib/services/referenceRewriter';
 export { ScimService, type ScimApi } from '../lib/services/scim';
 export { TombstoneService, type TombstoneApi } from '../lib/services/tombstone';
 export { TrashService, type TrashApi } from '../lib/services/trash';

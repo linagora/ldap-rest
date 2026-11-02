@@ -63,6 +63,10 @@ import {
   UnprocessableEntityError,
 } from '../lib/errors';
 import { extractLdapCode } from '../lib/ldapCodes';
+import {
+  ReferenceRewriterService,
+  type ReferenceRewriterApi,
+} from '../lib/services/referenceRewriter';
 import type { FlatHookBus } from '../lib/hookBus';
 import { loadSchemaFile } from '../lib/schemaFile';
 
@@ -120,33 +124,6 @@ export interface ListEntriesOptions {
   req?: Request;
   /** keep at most this many entries, all when absent */
   limit?: number;
-}
-
-/**
- * What a rename needs from the plugin that knows what references what.
- *
- * Declared here by its shape rather than imported from
- * `plugins/ldap/enterpriseRules`: nothing under `abstract/` depends on a
- * plugin, and a server that does not load the rules must still be able to
- * rename — it just renames without a cascade, which is what
- * {@link DmPlugin.requirePlugin} answers.
- *
- * The references themselves are opaque: they are found on one side and handed
- * back on the other, and this class has no business reading them.
- */
-interface ReferenceRewriter extends DmPlugin {
-  /** Every reference the directory holds to an entry, before it is renamed */
-  findReferences(dn: string): Promise<unknown[]>;
-  /** Point them all at the new DN, collecting what could not be written */
-  rewriteReferences(
-    references: unknown[],
-    oldDn: string,
-    newDn: string,
-    req?: Request
-  ): Promise<{
-    updated: number;
-    failed: { attribute: string; count: number }[];
-  }>;
 }
 
 export interface LdapFlatConfig {
@@ -1339,7 +1316,9 @@ export default abstract class LdapFlat extends DmPlugin {
     const source = await this.entryExists(dn);
     const target = sameName ? source : await this.entryExists(newDn);
 
-    const rules = this.requirePlugin<ReferenceRewriter>('ldapEnterpriseRules');
+    const rules: ReferenceRewriterApi | null = this.service(
+      ReferenceRewriterService
+    );
     let references: unknown[] = [];
 
     if (sameName) {

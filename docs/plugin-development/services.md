@@ -138,6 +138,7 @@ A plugin family provides the others:
 - `TombstoneService`: whether the Twake tombstone keeps a DN from a plain
   delete.
 - `ScimService`: the lock attribute and value SCIM writes.
+- `ReferenceRewriterService`: the references a rename must rewrite.
 
 A consumer that only needs to know whether the feature is loaded calls
 `this.service(token)` and skips its work when the answer is `null`.

@@ -75,6 +75,7 @@ import {
 import type { ChangeContext } from '../../lib/changeContext';
 import { BadRequestError, ConflictError } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
+import { ReferenceRewriterService } from '../../lib/services/referenceRewriter';
 
 /** One entity the rules apply to: its branch and the schema describing it. */
 interface EntityBinding {
@@ -376,6 +377,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
   static optionDefinitions = enterpriseRulesOptions;
 
   name = 'ldapEnterpriseRules';
+  provides = [ReferenceRewriterService.with(this)];
   roles: Role[] = ['consistency'] as const;
 
   /** Placeholder member some directories keep to satisfy `groupOfNames` */
