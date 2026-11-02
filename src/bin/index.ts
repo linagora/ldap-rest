@@ -184,7 +184,18 @@ export class DM {
   /** The plugin that provided each service, for the duplicate warning. */
   private readonly serviceOwners = new Map<ServiceToken<unknown>, string>();
   ldap: ldapActions;
-  operationSequence: number;
+  /**
+   * The next operation number, shared by the `withConfig` views. An accessor
+   * over an object because a field would be copied into each view — which
+   * would then count on its own — while an object is copied by reference.
+   */
+  private readonly _operations = { sequence: 0 };
+  get operationSequence(): number {
+    return this._operations.sequence;
+  }
+  set operationSequence(value: number) {
+    this._operations.sequence = value;
+  }
   logger: winston.Logger;
   /** Authentication plugins, in registration order */
   authenticators: AuthBase[] = [];
@@ -206,12 +217,16 @@ export class DM {
    * Whether the plugins of the configuration are loaded and their
    * composition checked. A plugin registered after that — a server
    * assembled by hand — is checked on its own as it arrives.
+   *
+   * In an object, as `_authState` is: a plain flag is copied into each
+   * `withConfig` view, and a view made during loading would keep `false` and
+   * let a plugin registered through it skip the composition check.
    */
-  private _composed: boolean = false;
+  private readonly _compositionState = { composed: false };
 
   /** Every plugin loaded and the composition checked */
   get composed(): boolean {
-    return this._composed;
+    return this._compositionState.composed;
   }
 
   /**
@@ -315,7 +330,6 @@ export class DM {
     this.ldap = new ldapActions(this);
     setLogger(this.logger);
     setDebug(this.config.debug);
-    this.operationSequence = 0;
     const promises: Promise<void | boolean>[] = [];
 
     if (this.config.plugin) {
@@ -397,7 +411,7 @@ export class DM {
             await assertAuthzComposition(this);
             assertEnforceable(this);
             await this.learnAttributeTypes();
-            this._composed = true;
+            this._compositionState.composed = true;
             this.reportUnknownOptions();
             this.afterLoad();
             resolve();
@@ -407,7 +421,7 @@ export class DM {
         // No plugin yet: a host assembling the server registers its own,
         // and answers for what they enforce
         this.setupErrorMiddleware();
-        this._composed = true;
+        this._compositionState.composed = true;
         resolve();
       }
     });
@@ -1101,7 +1115,7 @@ export class DM {
         }
       }
     }
-    if (this._composed) await this.admitToComposition(obj);
+    if (this._compositionState.composed) await this.admitToComposition(obj);
     if (obj.api) {
       this.mountAuthDispatcher(obj);
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);

@@ -7,6 +7,7 @@ import RateLimit from '../src/plugins/auth/rateLimit';
 import AuthBase from '../src/lib/auth/base';
 import AuthToken from '../src/plugins/auth/token';
 import DmPlugin, { type Role } from '../src/abstract/plugin';
+import type { Hooks } from '../src/hooks';
 import TrustedProxy from '../src/plugins/auth/trustedProxy';
 import { jsonBodyParser } from '../src/lib/rawBody';
 
@@ -156,6 +157,52 @@ describe('Server internals', () => {
         'hello'
       );
       expect((await request(dm.app).get('/api/hello')).status).to.equal(200);
+    });
+  });
+
+  describe('server views', () => {
+    /** A judge that lets everything through, so two of them conflict */
+    class Judge extends DmPlugin {
+      name = 'judge';
+      roles: Role[] = ['authz'];
+      hooks: Hooks = {
+        ldapsearchrequest: ([base, opts, req]) => [base, opts, req],
+      };
+    }
+
+    it('shares the operation counter with a view', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const view = dm.withConfig({ ...dm.config });
+
+      const start = dm.operationSequence;
+      view.operationSequence++;
+      // A counter copied into the view would have left the server's alone
+      expect(dm.operationSequence).to.equal(start + 1);
+      expect(view.operationSequence).to.equal(start + 1);
+    });
+
+    it('checks the composition of a plugin registered through a view made during loading', async () => {
+      const dm = new DM();
+      // Before `ready` settles, as a plugin loaded with overrides sees it
+      const view = dm.withConfig({ ...dm.config });
+      await dm.ready;
+      expect(view.composed).to.equal(true);
+
+      await dm.registerPlugin('firstJudge', new Judge(dm), 'firstJudge');
+      let refusal: unknown;
+      try {
+        await view.registerPlugin(
+          'secondJudge',
+          new Judge(view),
+          'secondJudge'
+        );
+      } catch (err) {
+        refusal = err;
+      }
+      // Two judges of everyone compose as an AND nobody decided: the second
+      // must be refused, through a view as through the server
+      expect(String(refusal)).to.match(/compose as an AND/);
     });
   });
 
