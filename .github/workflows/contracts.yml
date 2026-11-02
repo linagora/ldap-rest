@@ -1,9 +1,10 @@
 name: Published contracts
 
-# A pull request shows what it does to the options and the REST API that were
-# published. Kept out of test.yml: the `breaking` label changes the verdict, so
-# a label event has to run this job again, and its own concurrency group keeps
-# that event from cancelling the test matrix. See docs/development/contracts.md.
+# A pull request shows what it does to the options, the REST API and the
+# plugin API types that were published. Kept out of test.yml: the `breaking`
+# label changes the verdict, so a label event has to run this job again, and
+# its own concurrency group keeps that event from cancelling the test matrix.
+# See docs/development/contracts.md.
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]

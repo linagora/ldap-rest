@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "emitDeclarationOnly": true,
+    "declarationDir": "./temp/api/declarations",
+    "outDir": "./temp/api/declarations"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

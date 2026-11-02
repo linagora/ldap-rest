@@ -128,6 +128,10 @@ jobs:
         if: matrix.node-version == '24.x'
         run: npm run check:options
 
+      - name: Check the API reports
+        if: matrix.node-version == '24.x'
+        run: npm run check:api
+
       # Runs the suite once and gates on coverage at the same time, rather
       # than running it twice. The threshold covers server code only: the
       # browser libraries have no DOM in the suite, so a global number would
