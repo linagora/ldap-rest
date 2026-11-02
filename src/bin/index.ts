@@ -210,7 +210,16 @@ export class DM {
   private _authState: { dispatcherMounted: boolean } = {
     dispatcherMounted: false,
   };
-  private _errorMiddlewareSetup: boolean = false;
+  /**
+   * The error middleware, and whether one is mounted. In an object, as
+   * `_authState` is: a view made during loading would copy a `false` flag and
+   * no handler, so a route it registers after `ready` would land behind the
+   * handler — the one place Express never routes an error to.
+   */
+  private readonly _errorState: {
+    mounted: boolean;
+    handler?: express.ErrorRequestHandler;
+  } = { mounted: false };
   /** The parsers plugins mount ahead of the global ones, see registerBodyParser */
   private readonly bodyParsers = express.Router();
   /**
@@ -253,7 +262,6 @@ export class DM {
   get unhandledRejections(): number {
     return this.life.unhandledRejections;
   }
-  private _errorMiddleware?: express.ErrorRequestHandler;
   /**
    * The loads of `--plugin` entries without overrides, keyed by resolved
    * module and name. Regular plugins load in parallel and load their own
@@ -735,17 +743,16 @@ export class DM {
   }
 
   setupErrorMiddleware(): void {
+    const { handler: mounted } = this._errorState;
     // Remove existing error middleware if already set up.
     // Express 5 renamed `_router` to `router`, so this lookup silently found
     // nothing and the old handler was never removed: one more was appended on
     // every registerPlugin. Only the first ever ran, so nothing broke — the
     // stack just kept growing.
-    if (this._errorMiddlewareSetup && this._errorMiddleware) {
+    if (this._errorState.mounted && mounted) {
       const stack = this.routerStack();
       if (stack) {
-        const index = stack.findIndex(
-          layer => layer.handle === this._errorMiddleware
-        );
+        const index = stack.findIndex(layer => layer.handle === mounted);
         if (index !== -1) {
           stack.splice(index, 1);
         }
@@ -753,7 +760,7 @@ export class DM {
     }
 
     // Create error handling middleware - must be after all routes
-    this._errorMiddleware = (
+    const handler: express.ErrorRequestHandler = (
       err: Error,
       req: Request,
       res: Response,
@@ -785,8 +792,9 @@ export class DM {
       if (!res.headersSent) res.status(status).json(body);
     };
 
-    this.app.use(this._errorMiddleware);
-    this._errorMiddlewareSetup = true;
+    this._errorState.handler = handler;
+    this.app.use(handler);
+    this._errorState.mounted = true;
   }
 
   /**
@@ -1121,7 +1129,7 @@ export class DM {
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);
       await obj.api(this.app);
       // If error middleware was already setup, re-setup it to ensure it stays at the end
-      if (this._errorMiddlewareSetup) {
+      if (this._errorState.mounted) {
         this.setupErrorMiddleware();
       }
     }

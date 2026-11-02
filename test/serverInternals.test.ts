@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import request from 'supertest';
+import type { Express } from 'express';
 
 import { DM } from '../src/bin';
 import HelloWorld from '../src/plugins/demo/helloworld';
@@ -170,16 +171,30 @@ describe('Server internals', () => {
       };
     }
 
+    /** A plugin that advances the operation counter, as any plugin does */
+    class Counter extends DmPlugin {
+      name = 'counter';
+    }
+
+    /** A plugin whose route fails, to see which error handler answers */
+    class Failing extends DmPlugin {
+      name = 'failing';
+      api(app: Express): void {
+        app.get('/view-boom', (_req, _res, next) => next(new Error('boom')));
+      }
+    }
+
     it('shares the operation counter with a view', async () => {
       const dm = new DM();
       await dm.ready;
       const view = dm.withConfig({ ...dm.config });
+      const plugin = new Counter(view);
 
-      const start = dm.operationSequence;
-      view.operationSequence++;
-      // A counter copied into the view would have left the server's alone
-      expect(dm.operationSequence).to.equal(start + 1);
-      expect(view.operationSequence).to.equal(start + 1);
+      // The plugin counts on the view's copy; a number would leave the
+      // server's counter behind
+      const start = dm.ldap.opNumber();
+      expect(plugin.opNumber()).to.equal(start + 1);
+      expect(dm.ldap.opNumber()).to.equal(start + 2);
     });
 
     it('checks the composition of a plugin registered through a view made during loading', async () => {
@@ -203,6 +218,19 @@ describe('Server internals', () => {
       // Two judges of everyone compose as an AND nobody decided: the second
       // must be refused, through a view as through the server
       expect(String(refusal)).to.match(/compose as an AND/);
+    });
+
+    it('keeps the error handler behind a route registered through a view', async () => {
+      const dm = new DM();
+      const view = dm.withConfig({ ...dm.config });
+      await dm.ready;
+      await view.registerPlugin('failing', new Failing(view));
+
+      const res = await request(dm.app).get('/view-boom');
+      // After the handler, Express's default answers HTML; the server's
+      // handler answers JSON and logs
+      expect(res.status).to.equal(500);
+      expect(String(res.headers['content-type'])).to.match(/application\/json/);
     });
   });
 

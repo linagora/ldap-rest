@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- A plugin loaded with per-instance overrides no longer counts operations on
+  its own, skips the authorization composition check, or places its routes
+  after the error handler, where a failure answered as HTML and went unlogged
+  ([#625](https://github.com/linagora/ldap-rest/issues/625),
+  [#626](https://github.com/linagora/ldap-rest/issues/626)).
+
 ## v2.0.0 (2026-11-01)
 
 Plugin services, deprecation aliases and a series of directory-read fixes.
