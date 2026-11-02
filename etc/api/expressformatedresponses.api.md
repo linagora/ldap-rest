@@ -60,6 +60,14 @@ export const notFound: (res: Response_2, message?: string) => void;
 // @public (undocumented)
 export const ok: (res: Response_2, data?: object) => void;
 
+// @public
+interface Refusal {
+    attribute?: string;
+    code: 'unique' | 'mailDomain' | 'forbidden';
+    domains?: string[];
+    value?: string;
+}
+
 // @public (undocumented)
 export const serverError: (res: Response_2, err: unknown) => void;
 

@@ -35,8 +35,11 @@ contract shows up as a diff instead of a surprise after the release:
   #595 covers first — `ldap-rest`, `./plugin`, `./hooks`, `./ldapactions` and
   `./expressformatedresponses` — one file per sub-path. Regenerate them with
   `npm run snapshot:api`; `npm run check:api`, part of `npm run check`, fails
-  when one is stale. The 66 `./plugin-*` entries come with the modularization,
-  see [the plan](../development/modularization-plan.md).
+  when one is stale. A report lists what the entry exports and the shapes of
+  the types those exports reference, including the types the entry does not
+  export itself, so a change to `RouteDefinition` or `OptionSet` shows up even
+  though a plugin cannot name them. The 66 `./plugin-*` entries come with the
+  modularization, see [the plan](modularization-plan.md).
 
 The snapshot records what the parser reads. A narrowed `choices` list, a
 raised `min` or a lowered `max` is checked when a plugin reads its options,

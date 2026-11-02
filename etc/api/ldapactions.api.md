@@ -16,13 +16,958 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public
+type AnswersVoid<F> = [
+Settled<F extends (...args: never[]) => infer R ? R : never>
+] extends [void | undefined] ? true : false;
+
+// @public
+type Args<K extends keyof Hooks> = NonNullable<Hooks[K]> extends (...args: infer A) => unknown ? A : never;
+
+// @public
 export function assertModifyRequest(body: object): asserts body is ModifyRequest;
 
 // @public (undocumented)
 export type AttributesList = Record<string, AttributeValue>;
 
+// @public
+interface AttributeTypeDefinition {
+    // (undocumented)
+    collective: boolean;
+    // (undocumented)
+    desc?: string;
+    // (undocumented)
+    equality?: string;
+    // (undocumented)
+    names: string[];
+    // (undocumented)
+    noUserModification: boolean;
+    // (undocumented)
+    obsolete: boolean;
+    // (undocumented)
+    oid: string;
+    // (undocumented)
+    ordering?: string;
+    // (undocumented)
+    singleValue: boolean;
+    // (undocumented)
+    substr?: string;
+    // (undocumented)
+    sup?: string;
+    // (undocumented)
+    syntax?: string;
+    syntaxLength?: number;
+    usage: string;
+}
+
 // @public (undocumented)
 export type AttributeValue = Buffer | Buffer[] | string[] | string;
+
+// @public (undocumented)
+abstract class AuthBase extends DmPlugin {
+    afterChain?(req: DmRequest, res: Response_2, next: () => void): void;
+    afterLoad(): void;
+    api(_app: Express_2): void;
+    authenticate(req: Request_2, res: Response_2, next: () => void): Promise<void>;
+    // (undocumented)
+    abstract authMethod(req: DmRequest, res: Response_2, next: () => void): void;
+    protected identitySource(): string;
+    protected knownIdentities(): string[] | undefined;
+    protected passThrough(req: Request_2, next: () => void): void;
+    get pathPrefixes(): string[];
+    protected publishIdentity(req: DmRequest, user: string, userName?: string): void;
+    vouchedFor(req: Request_2): boolean;
+}
+
+// @public (undocumented)
+interface AuthConfig {
+    // (undocumented)
+    default?: BranchPermissions;
+    // (undocumented)
+    groups?: {
+        [groupDn: string]: {
+            [branch: string]: BranchPermissions;
+        };
+    };
+    // (undocumented)
+    users?: {
+        [uid: string]: {
+            [branch: string]: BranchPermissions;
+        };
+    };
+}
+
+// @public
+type AuthorizedHook = 'ldapaddrequest' | 'ldapmodifyrequest' | 'ldapdeleterequest' | 'ldaprenamerequest';
+
+// @public (undocumented)
+interface BranchPermissions {
+    // (undocumented)
+    delete?: boolean;
+    // (undocumented)
+    read?: boolean;
+    // (undocumented)
+    write?: boolean;
+}
+
+// @public (undocumented)
+interface BulkOperationResponse {
+    // (undocumented)
+    bulkId?: string;
+    // (undocumented)
+    location?: string;
+    method?: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+    // (undocumented)
+    response?: ScimErrorResponse;
+    // (undocumented)
+    status: string;
+    // (undocumented)
+    version?: string;
+}
+
+// @public (undocumented)
+interface BulkResponse {
+    // (undocumented)
+    Operations: BulkOperationResponse[];
+    // (undocumented)
+    schemas: [typeof SCHEMA_BULK_RESPONSE];
+}
+
+// @public (undocumented)
+type ChainedHook<T> = (arg: T) => MaybePromise<T>;
+
+// @public
+type ChainedName = {
+    [K in keyof Hooks]-?: AnswersVoid<NonNullable<Hooks[K]>> extends true ? never : K;
+}[keyof Hooks];
+
+// @public
+type ChainedNameOf<K extends keyof Hooks> = K extends ChainedName ? K : never;
+
+// @public
+type ChainedValue<K extends keyof Hooks> = NonNullable<Hooks[K]> extends (arg: infer A) => unknown ? A : never;
+
+// @public (undocumented)
+interface ChangeContext {
+    actor?: string;
+    requestId?: string;
+    source?: string;
+}
+
+// @public (undocumented)
+type ChangesToNotify = Record<string, [
+AttributeValue | null,
+AttributeValue | null
+]>;
+
+// @public
+interface Config {
+    // (undocumented)
+    alias_attribute?: string;
+    // (undocumented)
+    api_prefix: string;
+    // (undocumented)
+    app_accounts_user_attribute?: string;
+    // (undocumented)
+    applicative_account_attribute?: string[];
+    // (undocumented)
+    applicative_account_base?: string;
+    // (undocumented)
+    auth_fake_user?: string;
+    // (undocumented)
+    auth_hmac?: string[];
+    // (undocumented)
+    auth_hmac_window?: number;
+    // (undocumented)
+    auth_path_prefix?: string | string[];
+    // (undocumented)
+    auth_token?: string[];
+    // (undocumented)
+    auth_totp?: string[];
+    // (undocumented)
+    auth_totp_step?: number;
+    // (undocumented)
+    auth_totp_window?: number;
+    authz_combine?: boolean;
+    // (undocumented)
+    authz_dynamic_base?: string;
+    // (undocumented)
+    authz_dynamic_bypass?: string[];
+    // (undocumented)
+    authz_dynamic_cache_ttl?: number;
+    // (undocumented)
+    authz_dynamic_config_attribute?: string;
+    // (undocumented)
+    authz_dynamic_reload_endpoint?: boolean;
+    // (undocumented)
+    authz_dynamic_tenant_attribute?: string;
+    // (undocumented)
+    authz_dynamic_token_attribute?: string;
+    authz_filter_attached_entries?: boolean;
+    authz_for?: string[];
+    authz_global_branch?: string[];
+    authz_global_organization?: string;
+    authz_global_write_branch?: string[];
+    // (undocumented)
+    authz_identity?: string;
+    // (undocumented)
+    authz_local_admin_attribute?: string;
+    // (undocumented)
+    authz_per_branch_cache_ttl?: number;
+    // (undocumented)
+    authz_per_branch_config?: AuthConfig;
+    // (undocumented)
+    authz_per_route?: string[];
+    authz_scope_source?: string;
+    authz_transit_branch?: string;
+    authz_transit_origin_attribute?: string;
+    // (undocumented)
+    authz_unresolved_user?: string;
+    // (undocumented)
+    base_url?: string;
+    // (undocumented)
+    bcl_retention?: number;
+    // (undocumented)
+    bulk_import_batch_size?: string;
+    // (undocumented)
+    bulk_import_max_file_size?: string;
+    // (undocumented)
+    bulk_import_schemas?: string;
+    // (undocumented)
+    calendar_concurrency?: number;
+    // (undocumented)
+    calendar_firstname_attribute?: string;
+    // (undocumented)
+    calendar_lastname_attribute?: string;
+    // (undocumented)
+    calendar_resource_base?: string;
+    // (undocumented)
+    calendar_resource_creator?: string;
+    // (undocumented)
+    calendar_resource_domain?: string;
+    // (undocumented)
+    calendar_resource_objectclass?: string;
+    // (undocumented)
+    calendar_webadmin_token?: string;
+    // (undocumented)
+    calendar_webadmin_url?: string;
+    // (undocumented)
+    cloudery_default_locale?: string;
+    // (undocumented)
+    cloudery_default_org_role?: string;
+    // (undocumented)
+    cloudery_domain?: string;
+    // (undocumented)
+    cloudery_fqdn_attribute?: string;
+    // (undocumented)
+    cloudery_invited_attribute?: string;
+    // (undocumented)
+    cloudery_manager_token?: string;
+    // (undocumented)
+    cloudery_manager_url?: string;
+    // (undocumented)
+    cloudery_offer?: string;
+    // (undocumented)
+    cloudery_org_id_attribute?: string;
+    // (undocumented)
+    cloudery_org_id_header?: string;
+    // (undocumented)
+    cloudery_org_role_attribute?: string;
+    // (undocumented)
+    cloudery_org_role_header?: string;
+    // (undocumented)
+    cloudery_phones_attribute?: string;
+    // (undocumented)
+    cloudery_user_branch?: string;
+    // (undocumented)
+    cloudery_workflow_max_attempts?: number;
+    // (undocumented)
+    cloudery_workflow_poll_interval_ms?: number;
+    // (undocumented)
+    cozy_admin_passphrase?: string;
+    // (undocumented)
+    cozy_admin_url?: string;
+    // (undocumented)
+    cozy_admin_user?: string;
+    // (undocumented)
+    cozy_apps?: string;
+    // (undocumented)
+    cozy_auth_exchange?: string;
+    // (undocumented)
+    cozy_b2b_exchange?: string;
+    // (undocumented)
+    cozy_context_name?: string;
+    // (undocumented)
+    cozy_default_locale?: string;
+    // (undocumented)
+    cozy_org_domain?: string;
+    // (undocumented)
+    cozy_org_id?: string;
+    // (undocumented)
+    cozy_user_created_routing_key?: string;
+    // (undocumented)
+    cozy_user_deleted_routing_key?: string;
+    // (undocumented)
+    crowdsec_api_key?: string;
+    // (undocumented)
+    crowdsec_cache_ttl?: number;
+    // (undocumented)
+    crowdsec_url?: string;
+    // (undocumented)
+    debug: boolean;
+    // (undocumented)
+    delegation_attribute?: string;
+    // (undocumented)
+    display_name_attribute?: string;
+    // (undocumented)
+    drive_quota_attribute?: string;
+    // (undocumented)
+    enterprise_domain_link_attribute?: string;
+    // (undocumented)
+    enterprise_domain_name_attribute?: string;
+    // (undocumented)
+    external_branch_class?: string[];
+    // (undocumented)
+    external_members_branch?: string;
+    // (undocumented)
+    forward_attribute?: string;
+    // (undocumented)
+    group_class?: string[];
+    // (undocumented)
+    group_classes?: string[];
+    // (undocumented)
+    group_default_attributes?: AttributesList;
+    // (undocumented)
+    group_dummy_user?: string;
+    // (undocumented)
+    group_schema?: string;
+    // (undocumented)
+    groups_allow_unexistent_members?: boolean;
+    // (undocumented)
+    james_concurrency?: number;
+    // (undocumented)
+    james_init_delay?: number;
+    // (undocumented)
+    james_mailbox_type_attribute?: string;
+    // (undocumented)
+    james_mailing_list_branch?: string[];
+    // (undocumented)
+    james_retry_attempts?: number;
+    // (undocumented)
+    james_retry_delay?: number;
+    // (undocumented)
+    james_signature_template?: string;
+    // (undocumented)
+    james_sync_forwards?: boolean;
+    // (undocumented)
+    james_team_mailbox_any_domain?: boolean;
+    // (undocumented)
+    james_webadmin_token?: string;
+    // (undocumented)
+    james_webadmin_url?: string;
+    // (undocumented)
+    ldap_base?: string;
+    // (undocumented)
+    ldap_cache_max?: number;
+    // (undocumented)
+    ldap_cache_ttl?: number;
+    // (undocumented)
+    ldap_concurrency?: number;
+    // (undocumented)
+    ldap_connection_ttl?: number;
+    // (undocumented)
+    ldap_dn?: string;
+    ldap_flat_auto_repair?: boolean;
+    // (undocumented)
+    ldap_flat_schema?: string[];
+    // (undocumented)
+    ldap_group_base?: string;
+    // (undocumented)
+    ldap_groups_main_attribute?: string;
+    // (undocumented)
+    ldap_operational_attribute?: string[];
+    // (undocumented)
+    ldap_organization_class?: string[];
+    // (undocumented)
+    ldap_organization_link_attribute?: string;
+    // (undocumented)
+    ldap_organization_max_subnodes?: number;
+    // (undocumented)
+    ldap_organization_path_attribute?: string;
+    // (undocumented)
+    ldap_organization_path_separator?: string;
+    // (undocumented)
+    ldap_pool_size?: number;
+    // (undocumented)
+    ldap_pwd?: string;
+    // (undocumented)
+    ldap_raw_base?: string[];
+    // (undocumented)
+    ldap_raw_hidden_attribute?: string[];
+    // (undocumented)
+    ldap_raw_max_results?: number;
+    // (undocumented)
+    ldap_raw_schema_cache_ttl?: number;
+    // (undocumented)
+    ldap_raw_show_secrets?: boolean;
+    // (undocumented)
+    ldap_top_organization?: string;
+    // (undocumented)
+    ldap_url?: string[];
+    // (undocumented)
+    ldap_user_main_attribute?: string;
+    // (undocumented)
+    ldap_users_base?: string;
+    // (undocumented)
+    llng_ini?: string;
+    // (undocumented)
+    llng_username_header?: string;
+    // (undocumented)
+    log_file?: string;
+    // (undocumented)
+    log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
+    // (undocumented)
+    logger: 'console' | 'file';
+    // (undocumented)
+    mail_attribute?: string;
+    // (undocumented)
+    mail_domain?: string[];
+    // (undocumented)
+    max_app_accounts?: number;
+    metrics_port?: number;
+    // (undocumented)
+    migration_proxy_branch?: string[];
+    // (undocumented)
+    migration_proxy_concurrency?: number;
+    // (undocumented)
+    migration_proxy_retry_attempts?: number;
+    // (undocumented)
+    migration_proxy_retry_delay?: number;
+    // (undocumented)
+    migration_proxy_token?: string;
+    // (undocumented)
+    migration_proxy_url?: string;
+    // (undocumented)
+    oidc_client_id?: string;
+    // (undocumented)
+    oidc_client_secret?: string;
+    // (undocumented)
+    oidc_server?: string;
+    // (undocumented)
+    oidc_username_claim?: string;
+    // (undocumented)
+    organization_schema?: string;
+    // (undocumented)
+    plugin?: string[];
+    // (undocumented)
+    port: number;
+    // (undocumented)
+    ppolicy_base?: string;
+    // (undocumented)
+    ppolicy_default_dn?: string;
+    // (undocumented)
+    ppolicy_min_length?: number;
+    // (undocumented)
+    ppolicy_require_digit?: boolean;
+    // (undocumented)
+    ppolicy_require_lowercase?: boolean;
+    // (undocumented)
+    ppolicy_require_special?: boolean;
+    // (undocumented)
+    ppolicy_require_uppercase?: boolean;
+    // (undocumented)
+    ppolicy_validate_complexity?: boolean;
+    // (undocumented)
+    ppolicy_warn_days?: number;
+    // (undocumented)
+    quota_attribute?: string;
+    // (undocumented)
+    rabbitmq_url?: string;
+    // (undocumented)
+    rate_limit_max?: number;
+    // (undocumented)
+    rate_limit_window_ms?: number;
+    // (undocumented)
+    schemas_path: string;
+    // (undocumented)
+    scim_base_header_root?: string;
+    // (undocumented)
+    scim_base_map?: string;
+    // (undocumented)
+    scim_base_url?: string;
+    // (undocumented)
+    scim_bulk_max_operations?: number;
+    // (undocumented)
+    scim_bulk_max_payload_size?: number;
+    // (undocumented)
+    scim_etag?: boolean;
+    // (undocumented)
+    scim_group_base?: string;
+    // (undocumented)
+    scim_group_base_header?: string;
+    // (undocumented)
+    scim_group_base_template?: string;
+    // (undocumented)
+    scim_group_external_id_attribute?: string;
+    // (undocumented)
+    scim_group_mapping?: string;
+    // (undocumented)
+    scim_group_object_class?: string[];
+    // (undocumented)
+    scim_group_rdn_attribute?: string;
+    // (undocumented)
+    scim_id_attribute?: string;
+    // (undocumented)
+    scim_max_results?: number;
+    // (undocumented)
+    scim_max_scanned?: number;
+    // (undocumented)
+    scim_prefix?: string;
+    // (undocumented)
+    scim_user_base?: string;
+    // (undocumented)
+    scim_user_base_header?: string;
+    // (undocumented)
+    scim_user_base_template?: string;
+    // (undocumented)
+    scim_user_lock_attribute?: string;
+    // (undocumented)
+    scim_user_lock_value?: string;
+    // (undocumented)
+    scim_user_mapping?: string;
+    // (undocumented)
+    scim_user_object_class?: string[];
+    // (undocumented)
+    scim_user_rdn_attribute?: string;
+    // (undocumented)
+    shutdown_timeout?: number;
+    // (undocumented)
+    static_csp?: string;
+    // (undocumented)
+    static_frame_options?: string;
+    // (undocumented)
+    static_name?: string;
+    // (undocumented)
+    static_path?: string;
+    storage_backend?: string;
+    // (undocumented)
+    storage_file_directory?: string;
+    // (undocumented)
+    storage_ldap_base?: string;
+    // (undocumented)
+    storage_ldap_object_class?: string;
+    // (undocumented)
+    storage_postgres_table?: string;
+    // (undocumented)
+    storage_postgres_url?: string;
+    // (undocumented)
+    storage_sweep_interval?: number;
+    // (undocumented)
+    storage_valkey_prefix?: string;
+    // (undocumented)
+    storage_valkey_url?: string;
+    // (undocumented)
+    strict_options?: boolean;
+    // (undocumented)
+    trash_add_metadata?: string;
+    // (undocumented)
+    trash_auto_create?: string;
+    // (undocumented)
+    trash_base?: string;
+    // (undocumented)
+    trash_watched_bases?: string;
+    // (undocumented)
+    trusted_proxy?: string[];
+    // (undocumented)
+    trusted_proxy_auth_header?: string;
+    // (undocumented)
+    twake_drive_concurrency?: number;
+    // (undocumented)
+    twake_drive_default_domain_template?: string;
+    // (undocumented)
+    twake_drive_domain_attribute?: string;
+    // (undocumented)
+    twake_drive_webadmin_token?: string;
+    // (undocumented)
+    twake_drive_webadmin_url?: string;
+    // (undocumented)
+    twake_group_base?: string;
+    // (undocumented)
+    twake_group_color_attribute?: string;
+    // (undocumented)
+    twake_group_created_at_attribute?: string;
+    // (undocumented)
+    twake_group_display_name_attribute?: string;
+    // (undocumented)
+    twake_group_max_page_limit?: number;
+    // (undocumented)
+    twake_group_member_fields?: Record<string, string>;
+    // (undocumented)
+    twake_group_organization_deleted_value?: string;
+    // (undocumented)
+    twake_group_organization_dn?: string;
+    // (undocumented)
+    twake_group_organization_status_attribute?: string;
+    // (undocumented)
+    twake_group_user_base?: string;
+    // (undocumented)
+    twake_instance_auth_exchange?: string;
+    // (undocumented)
+    twake_instance_b2b_exchange?: string;
+    // (undocumented)
+    twake_instance_cloudery_domain?: string;
+    // (undocumented)
+    twake_instance_cloudery_offer?: string;
+    // (undocumented)
+    twake_instance_cloudery_organization_offer?: string;
+    // (undocumented)
+    twake_instance_cloudery_token?: string;
+    // (undocumented)
+    twake_instance_cloudery_url?: string;
+    // (undocumented)
+    twake_instance_cozy_apps?: string;
+    // (undocumented)
+    twake_instance_cozy_context?: string;
+    // (undocumented)
+    twake_instance_cozy_domain?: string;
+    // (undocumented)
+    twake_instance_cozy_org_domain?: string;
+    // (undocumented)
+    twake_instance_cozy_org_id?: string;
+    // (undocumented)
+    twake_instance_cozy_passphrase?: string;
+    // (undocumented)
+    twake_instance_cozy_url?: string;
+    // (undocumented)
+    twake_instance_cozy_user?: string;
+    // (undocumented)
+    twake_instance_dn?: string[];
+    // (undocumented)
+    twake_instance_fqdn_attribute?: string;
+    // (undocumented)
+    twake_instance_id?: string;
+    // (undocumented)
+    twake_instance_locale?: string;
+    // (undocumented)
+    twake_instance_organization_base?: string;
+    // (undocumented)
+    twake_instance_organization_created_key?: string;
+    // (undocumented)
+    twake_instance_organization_domain_attribute?: string;
+    // (undocumented)
+    twake_instance_organization_fqdn_attribute?: string;
+    // (undocumented)
+    twake_instance_organization_id_attribute?: string;
+    // (undocumented)
+    twake_instance_organization_name_attribute?: string;
+    // (undocumented)
+    twake_instance_provider?: string;
+    // (undocumented)
+    twake_instance_queue?: string;
+    // (undocumented)
+    twake_instance_sent_attribute?: string;
+    // (undocumented)
+    twake_instance_skip_attribute?: string;
+    // (undocumented)
+    twake_instance_skip_value?: string;
+    // (undocumented)
+    twake_instance_timeout?: number;
+    // (undocumented)
+    twake_instance_user_created_key?: string;
+    // (undocumented)
+    twake_instance_workplace_created_key?: string;
+    // (undocumented)
+    twake_lifecycle_deleted_at_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_deleted_at_format?: string;
+    // (undocumented)
+    twake_lifecycle_deleted_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_deleted_value?: string;
+    // (undocumented)
+    twake_lifecycle_lock_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_lock_value?: string;
+    // (undocumented)
+    twake_lifecycle_member_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_reason_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_role_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_rules?: string;
+    // (undocumented)
+    twake_space_admin_attribute?: string;
+    // (undocumented)
+    twake_space_base?: string;
+    // (undocumented)
+    twake_space_class?: string[];
+    // (undocumented)
+    twake_space_display_name_attribute?: string;
+    // (undocumented)
+    twake_space_editor_attribute?: string;
+    // (undocumented)
+    twake_space_exchange?: string;
+    // (undocumented)
+    twake_space_sync_queue?: string;
+    // (undocumented)
+    twake_space_user_role_attribute?: string;
+    // (undocumented)
+    twake_space_viewer_attribute?: string;
+    // (undocumented)
+    twake_tombstone_clear_attributes?: string[];
+    // (undocumented)
+    twake_tombstone_default_reason?: string;
+    // (undocumented)
+    twake_tombstone_dn?: string[];
+    // (undocumented)
+    twake_tombstone_erase_min_age?: number;
+    // (undocumented)
+    twake_tombstone_group_bases?: string[];
+    // (undocumented)
+    twake_tombstone_reason_header?: string;
+    // (undocumented)
+    twake_tombstone_reasons?: string[];
+    // (undocumented)
+    user_class?: string[];
+}
+
+// @public
+class DM {
+    constructor();
+    afterLoad(): void;
+    // (undocumented)
+    app: express.Express;
+    authenticators: AuthBase[];
+    get composed(): boolean;
+    // (undocumented)
+    config: Config;
+    dispatchAuth(req: Request_2, res: Response_2, next: () => void): void;
+    exitOnCrash(): void;
+    // (undocumented)
+    readonly hookBus: HookBus;
+    hooks: Hooks;
+    // (undocumented)
+    ldap: ldapActions;
+    // (undocumented)
+    loadedPlugins: {
+        [key: string]: DmPlugin;
+    };
+    // (undocumented)
+    loadPlugin(pluginName: string): Promise<boolean>;
+    // (undocumented)
+    logger: winston.Logger;
+    // (undocumented)
+    get operationSequence(): number;
+    set operationSequence(value: number);
+    // (undocumented)
+    ready: Promise<void>;
+    registerAuthenticator(plugin: AuthBase): void;
+    registerBodyParser(path: string, parser: express.RequestHandler): void;
+    // (undocumented)
+    registerPlugin(pluginName: string, obj: DmPlugin, name?: string): Promise<boolean>;
+    // (undocumented)
+    run(): Promise<void>;
+    get server(): Server | undefined;
+    set server(server: Server | undefined);
+    readonly services: ServiceMap;
+    // (undocumented)
+    setupErrorMiddleware(): void;
+    shutdown(): Promise<void>;
+    shutdownOnSignals(): void;
+    // (undocumented)
+    stop(): void;
+    get stopping(): boolean;
+    get unhandledRejections(): number;
+    warnUnauthenticatedRoutes(): string[];
+    withConfig(config: Config): DM;
+}
+
+// @public (undocumented)
+abstract class DmPlugin {
+    constructor(server: DM);
+    afterLoad?(): void;
+    // (undocumented)
+    api?(app: Express_2): MaybePromise<void>;
+    assertComposition?(): MaybePromise<void>;
+    close?(): MaybePromise<void>;
+    // (undocumented)
+    config: Config;
+    configApiKey?: string;
+    // (undocumented)
+    dependencies?: Record<string, string>;
+    protected fetch(url: Parameters<typeof globalThis.fetch>[0], init?: RequestInit): Promise<Response>;
+    followedOperationalAttributes?: string[];
+    // (undocumented)
+    getConfigApiData?(): MaybePromise<Record<string, unknown> | undefined>;
+    health?(): MaybePromise<HealthStatus>;
+    protected hideNeverReturn<T>(data: T): T;
+    // (undocumented)
+    hookBus: HookBus;
+    hooks?: Hooks;
+    // (undocumented)
+    logger: winston.Logger;
+    // (undocumented)
+    abstract name: string;
+    opNumber(): number;
+    static optionDefinitions: OptionSet;
+    options<T extends OptionSet>(definitions: T): OptionsOf<T>;
+    provides?: ServiceProvider<unknown>[];
+    // (undocumented)
+    registeredHooks: Hooks;
+    protected requirePlugin<T extends DmPlugin>(name: string): T | null;
+    // (undocumented)
+    roles?: Role[] | undefined;
+    server: DM;
+    protected service<T>(token: ServiceToken<T>): T | null;
+}
+
+// @public
+type DmRequest = Request_2 & {
+    user?: string;
+    userName?: string;
+    authenticators?: string[];
+};
+
+// @public
+interface FlatHookBus {
+    chain<T>(suffix: string, value: T): Promise<T>;
+    notify(suffix: string, ...args: unknown[]): void;
+}
+
+// @public
+type HealthStatus = 'ok' | 'degraded';
+
+// @public (undocumented)
+class HookBus implements FlatHookBus {
+    constructor(hooks: {
+        [K in keyof Hooks]?: HookValue<K>;
+    });
+    call<K extends keyof Hooks>(name: K, ...args: Args<K>): Promise<unknown[]>;
+    chain<K extends keyof Hooks>(name: ChainedNameOf<K>, value: ChainedValue<K>): Promise<ChainedValue<K>>;
+    has(name: keyof Hooks): boolean;
+    insert<K extends keyof Hooks>(name: K, fn: NonNullable<Hooks[K]>, at: number): void;
+    notify<K extends NotifiedName>(name: K, ...args: Args<K>): void;
+    notifyAndWait<K extends NotifiedName>(name: K, ...args: Args<K>): Promise<void>;
+    notifyStrict<K extends NotifiedName>(name: K, ...args: Args<K>): Promise<void>;
+    prefixed(prefix: string): FlatHookBus;
+    set<K extends keyof Hooks>(name: K, ...fn: NonNullable<Hooks[K]>[]): void;
+    settled(): Promise<void>;
+    subscribe<K extends keyof Hooks>(name: K, fn: NonNullable<Hooks[K]>): void;
+    subscribers(name: keyof Hooks): readonly HookFn[];
+    toLast(name: keyof Hooks, hook: HookFn): boolean;
+    unsubscribe<K extends keyof Hooks>(name: K, fn: NonNullable<Hooks[K]>): void;
+}
+
+// @public (undocumented)
+type HookFn = Function;
+
+// @public
+interface Hooks {
+    // (undocumented)
+    afterAuth?: ChainedHook<[Request_2, Response_2]>;
+    beforeAuth?: ChainedHook<[Request_2, Response_2]>;
+    externaluseradded?: (dn: string, entry: AttributesList) => MaybePromise<void>;
+    externaluserentry?: ChainedHook<[string, AttributesList]>;
+    getOrganisationTop?: ChainedHook<[Request_2 | undefined, AttributesList]>;
+    hello?: () => string;
+    ldapaddafter?: (dn: string, entry: AttributesList, context?: ChangeContext) => MaybePromise<void>;
+    // (undocumented)
+    ldapadddone?: (dn: string, entry: AttributesList, context?: ChangeContext) => MaybePromise<void>;
+    // (undocumented)
+    ldapaddrequest?: ChainedHook<[string, AttributesList, Request_2?]>;
+    // (undocumented)
+    ldapdeletedone?: (dn: string | string[], context?: ChangeContext) => MaybePromise<void>;
+    ldapdeleteend?: (op: number) => MaybePromise<void>;
+    // (undocumented)
+    ldapdeleterequest?: ChainedHook<[string | string[], Request_2?]>;
+    // (undocumented)
+    ldapgroupadd?: ChainedHook<[string, AttributesList]>;
+    // (undocumented)
+    ldapgroupadddone?: (dn: string, entry: AttributesList) => MaybePromise<void>;
+    // (undocumented)
+    ldapgroupaddmember?: ChainedHook<[string, string[]]>;
+    // (undocumented)
+    ldapgroupdelete?: ChainedHook<string>;
+    // (undocumented)
+    ldapgroupdeletedone?: (dn: string) => MaybePromise<void>;
+    // (undocumented)
+    ldapgroupdeletemember?: ChainedHook<[string, string]>;
+    // (undocumented)
+    _ldapgrouplist?: ChainedHook<LdapList>;
+    // (undocumented)
+    ldapgroupmodify?: ChainedHook<[string, ModifyRequest, number]>;
+    // (undocumented)
+    ldapgroupmodifydone?: (dn: string, changes: ModifyRequest, op: number) => MaybePromise<void>;
+    // (undocumented)
+    ldapgrouprename?: ChainedHook<[string, string]>;
+    // (undocumented)
+    ldapgrouprenamedone?: (dn: string, newDn: string) => MaybePromise<void>;
+    ldapgroupvalidatechanges?: ChainedHook<[string, ModifyRequest]>;
+    ldapgroupvalidatemembers?: ChainedHook<[string, string[]]>;
+    ldapgroupvalidatenew?: ChainedHook<[string, AttributesList]>;
+    // (undocumented)
+    ldapmodifydone?: (dn: string, changes: ModifyRequest, op: number, context?: ChangeContext) => MaybePromise<void>;
+    ldapmodifyend?: (op: number) => MaybePromise<void>;
+    // (undocumented)
+    ldapmodifyrequest?: ChainedHook<[string, ModifyRequest, number, Request_2?]>;
+    // (undocumented)
+    ldaprenamedone?: (dn: string, newDn: string, context?: ChangeContext) => MaybePromise<void>;
+    ldaprenameend?: (op: number) => MaybePromise<void>;
+    // (undocumented)
+    ldaprenamerequest?: ChainedHook<[string, string, Request_2?]>;
+    ldapsearchfilter?: ChainedHook<[SearchResult, Request_2?, SearchOptions?]>;
+    ldapsearchopts?: ChainedHook<SearchOptions>;
+    // (undocumented)
+    ldapsearchrequest?: ChainedHook<[string, SearchOptions, Request_2?]>;
+    // (undocumented)
+    ldapsearchresult?: ChainedHook<SearchResult>;
+    oidclogin?: VoidHook<[OidcSessionClaims]>;
+    oidclogouttoken?: VoidHook<[OidcLogoutToken]>;
+    oidcsessionvalid?: ChainedHook<[OidcSessionClaims, boolean]>;
+    // (undocumented)
+    onLdapAliasChange?: (dn: string, mail: string, oldAliases: string[], newAliases: string[]) => MaybePromise<void>;
+    // (undocumented)
+    onLdapChange?: (dn: string, changes: ChangesToNotify) => MaybePromise<void>;
+    // (undocumented)
+    onLdapDisplayNameChange?: (dn: string, oldDisplayName: string | null, newDisplayName: string | null) => MaybePromise<void>;
+    // (undocumented)
+    onLdapDriveQuotaChange?: (dn: string, oldDriveQuota: number | null, newDriveQuota: number | null) => MaybePromise<void>;
+    onLdapEntryChange?: (dn: string, before: Entry | null, after: Entry | null, context: ChangeContext) => MaybePromise<void>;
+    // (undocumented)
+    onLdapForwardChange?: (dn: string, mail: string, oldForwards: string[], newForwards: string[]) => MaybePromise<void>;
+    // (undocumented)
+    onLdapMailChange?: (dn: string, oldMail: AttributeValue | null, newMail: AttributeValue | null) => MaybePromise<void>;
+    // (undocumented)
+    onLdapQuotaChange?: (dn: string, mail: string, oldQuota: number, newQuota: number) => MaybePromise<void>;
+    // (undocumented)
+    scimbulkdone?: VoidHook<[BulkResponse]>;
+    scimgroupcreate?: ChainedHook<[ScimGroup, Request_2, string]>;
+    // (undocumented)
+    scimgroupcreatedone?: VoidHook<[ScimGroup]>;
+    // (undocumented)
+    scimgroupdelete?: ChainedHook<[string, Request_2?]>;
+    // (undocumented)
+    scimgroupdeletedone?: VoidHook<[string]>;
+    // (undocumented)
+    scimgroupupdate?: ChainedHook<[string, ScimGroup, Request_2?]>;
+    // (undocumented)
+    scimgroupupdatedone?: VoidHook<[string, ScimGroup]>;
+    scimusercreate?: ChainedHook<[ScimUser, Request_2?]>;
+    // (undocumented)
+    scimusercreatedone?: VoidHook<[ScimUser]>;
+    // (undocumented)
+    scimuserdelete?: ChainedHook<[string, Request_2?]>;
+    // (undocumented)
+    scimuserdeletedone?: VoidHook<[string]>;
+    // (undocumented)
+    scimuserupdate?: ChainedHook<[string, ScimUser, Request_2?]>;
+    // (undocumented)
+    scimuserupdatedone?: VoidHook<[string, ScimUser]>;
+    twakedeletionreplay?: (dn: string, entry: AttributesList, context: ChangeContext) => MaybePromise<void>;
+}
+
+// @public
+type HookValue<K extends keyof Hooks = keyof Hooks> = Hooks[K] | Function[] | undefined;
 
 // @public (undocumented)
 class ldapActions {
@@ -76,6 +1021,47 @@ export default ldapActions;
 // @public (undocumented)
 export type LdapList = Record<string, AttributesList>;
 
+// @public
+interface LdapSchema {
+    // (undocumented)
+    attributeTypes: AttributeTypeDefinition[];
+    // (undocumented)
+    matchingRules: MatchingRuleDefinition[];
+    // (undocumented)
+    objectClasses: ObjectClassDefinition[];
+    // (undocumented)
+    syntaxes: SyntaxDefinition[];
+}
+
+// @public
+interface MatchingRuleDefinition {
+    // (undocumented)
+    desc?: string;
+    // (undocumented)
+    names: string[];
+    // (undocumented)
+    oid: string;
+    // (undocumented)
+    syntax?: string;
+}
+
+// @public (undocumented)
+type MaybePromise<T> = Promise<T> | T;
+
+// @public (undocumented)
+interface Meta {
+    // (undocumented)
+    created?: string;
+    // (undocumented)
+    lastModified?: string;
+    // (undocumented)
+    location?: string;
+    // (undocumented)
+    resourceType: 'User' | 'Group';
+    // (undocumented)
+    version?: string;
+}
+
 // @public (undocumented)
 export interface ModifyOptions {
     context?: ChangeContext;
@@ -93,6 +1079,81 @@ export interface ModifyRequest {
     replace?: AttributesList;
 }
 
+// @public (undocumented)
+interface MultiValued<T extends string = string> {
+    // (undocumented)
+    $ref?: string;
+    // (undocumented)
+    display?: string;
+    // (undocumented)
+    primary?: boolean;
+    // (undocumented)
+    type?: string;
+    // (undocumented)
+    value: T;
+}
+
+// @public
+type NotifiedName = Exclude<keyof Hooks, ChainedName>;
+
+// @public
+interface ObjectClassDefinition {
+    // (undocumented)
+    desc?: string;
+    // (undocumented)
+    kind: 'STRUCTURAL' | 'ABSTRACT' | 'AUXILIARY';
+    // (undocumented)
+    may: string[];
+    // (undocumented)
+    must: string[];
+    // (undocumented)
+    names: string[];
+    // (undocumented)
+    obsolete: boolean;
+    // (undocumented)
+    oid: string;
+    // (undocumented)
+    sup: string[];
+}
+
+// @public (undocumented)
+type OidcLogoutToken = OidcSessionClaims;
+
+// @public
+interface OidcSessionClaims {
+    // (undocumented)
+    iss: string;
+    // (undocumented)
+    session?: string;
+    // (undocumented)
+    sid?: string;
+    // (undocumented)
+    sub?: string;
+}
+
+// @public (undocumented)
+type OptionSet = Record<string, OptionSpec<unknown>>;
+
+// @public
+type OptionsOf<T extends OptionSet> = {
+    [K in keyof T]: T[K] extends OptionSpec<infer V> ? V : never;
+};
+
+// @public (undocumented)
+interface OptionSpec<T> {
+    readonly aliases?: readonly string[];
+    readonly default?: T;
+    readonly emptyIsValue?: boolean;
+    readonly env?: string;
+    readonly envAliases?: readonly string[];
+    readonly required?: boolean;
+    // (undocumented)
+    readonly type: OptionType;
+}
+
+// @public (undocumented)
+type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
+
 // @public
 export interface RequestBoundLdap {
     // (undocumented)
@@ -107,9 +1168,198 @@ export interface RequestBoundLdap {
     search(options: SearchOptions, base?: string): Promise<SearchResult | AsyncGenerator<SearchResult>>;
 }
 
+// @public (undocumented)
+type Role = 'auth' | 'authz' | 'protect' | 'api' | 'logging' | 'demo' | 'consistency' | 'configurable';
+
+// @public (undocumented)
+const SCHEMA_BULK_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:BulkResponse";
+
+// @public (undocumented)
+const SCHEMA_ERROR = "urn:ietf:params:scim:api:messages:2.0:Error";
+
+// @public
+class SchemaIndex {
+    constructor(schema: LdapSchema);
+    getAttributeSyntax(name: string): string | undefined;
+    getAttributeType(name: string): AttributeTypeDefinition | undefined;
+    getObjectClass(name: string): ObjectClassDefinition | undefined;
+    isBinaryAttribute(name: string): boolean;
+    missingClasses(declared: string[], present: string[]): {
+        auxiliary: ObjectClassDefinition[];
+        structural: string[];
+    };
+    resolveAttributes(objectClasses: string[]): {
+        must: string[];
+        may: string[];
+    };
+    // (undocumented)
+    readonly schema: LdapSchema;
+}
+
+// @public (undocumented)
+interface ScimAddress {
+    // (undocumented)
+    country?: string;
+    // (undocumented)
+    formatted?: string;
+    // (undocumented)
+    locality?: string;
+    // (undocumented)
+    postalCode?: string;
+    // (undocumented)
+    primary?: boolean;
+    // (undocumented)
+    region?: string;
+    // (undocumented)
+    streetAddress?: string;
+    // (undocumented)
+    type?: string;
+}
+
+// @public (undocumented)
+interface ScimErrorResponse {
+    // (undocumented)
+    detail?: string;
+    // (undocumented)
+    schemas: [typeof SCHEMA_ERROR];
+    // (undocumented)
+    scimType?: ScimErrorType;
+    // (undocumented)
+    status: string;
+}
+
+// @public (undocumented)
+type ScimErrorType = 'invalidFilter' | 'tooMany' | 'uniqueness' | 'mutability' | 'invalidSyntax' | 'invalidPath' | 'noTarget' | 'invalidValue' | 'invalidVers' | 'sensitive';
+
+// @public (undocumented)
+interface ScimGroup {
+    // (undocumented)
+    [ext: string]: unknown;
+    // (undocumented)
+    displayName?: string;
+    // (undocumented)
+    externalId?: string;
+    // (undocumented)
+    id?: string;
+    // (undocumented)
+    members?: MultiValued[];
+    // (undocumented)
+    meta?: Meta;
+    // (undocumented)
+    schemas: string[];
+}
+
+// @public (undocumented)
+interface ScimName {
+    // (undocumented)
+    familyName?: string;
+    // (undocumented)
+    formatted?: string;
+    // (undocumented)
+    givenName?: string;
+    // (undocumented)
+    honorificPrefix?: string;
+    // (undocumented)
+    honorificSuffix?: string;
+    // (undocumented)
+    middleName?: string;
+}
+
+// @public (undocumented)
+interface ScimUser {
+    // (undocumented)
+    [ext: string]: unknown;
+    // (undocumented)
+    active?: boolean;
+    // (undocumented)
+    addresses?: ScimAddress[];
+    // (undocumented)
+    displayName?: string;
+    // (undocumented)
+    emails?: MultiValued[];
+    // (undocumented)
+    entitlements?: MultiValued[];
+    // (undocumented)
+    externalId?: string;
+    // (undocumented)
+    groups?: MultiValued[];
+    // (undocumented)
+    id?: string;
+    // (undocumented)
+    ims?: MultiValued[];
+    // (undocumented)
+    locale?: string;
+    // (undocumented)
+    meta?: Meta;
+    // (undocumented)
+    name?: ScimName;
+    // (undocumented)
+    nickName?: string;
+    // (undocumented)
+    password?: string;
+    // (undocumented)
+    phoneNumbers?: MultiValued[];
+    // (undocumented)
+    photos?: MultiValued[];
+    // (undocumented)
+    preferredLanguage?: string;
+    // (undocumented)
+    profileUrl?: string;
+    // (undocumented)
+    roles?: MultiValued[];
+    // (undocumented)
+    schemas: string[];
+    // (undocumented)
+    timezone?: string;
+    // (undocumented)
+    title?: string;
+    // (undocumented)
+    userName?: string;
+    // (undocumented)
+    userType?: string;
+    // (undocumented)
+    x509Certificates?: MultiValued[];
+}
+
 export { SearchOptions }
 
 export { SearchResult }
+
+// @public
+type ServiceMap = Map<ServiceToken<unknown>, unknown>;
+
+// @public
+interface ServiceProvider<T> {
+    // (undocumented)
+    readonly service: T;
+    // (undocumented)
+    readonly token: ServiceToken<T>;
+}
+
+// @public
+interface ServiceToken<T> {
+    readonly [serviceType]?: T;
+    readonly name: string;
+    with(provider: T): ServiceProvider<T>;
+}
+
+// @public
+const serviceType: unique symbol;
+
+// @public
+type Settled<T> = T extends Promise<infer P> ? P : T;
+
+// @public
+interface SyntaxDefinition {
+    binary: boolean;
+    // (undocumented)
+    desc?: string;
+    // (undocumented)
+    oid: string;
+}
+
+// @public (undocumented)
+type VoidHook<T extends unknown[]> = (...args: T) => MaybePromise<void>;
 
 // (No @packageDocumentation comment for this package)
 

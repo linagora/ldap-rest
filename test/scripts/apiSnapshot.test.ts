@@ -2,13 +2,13 @@ import { expect } from 'chai';
 
 import { diffApiReports } from '../../scripts/api-snapshot';
 
-function report(...blocks: string[]): string {
+function reportWith(imports: string[], ...blocks: string[]): string {
   return [
     '## API Report File for "ldap-rest"',
     '',
     '```ts',
     '',
-    'import type { Entry } from "ldapts";',
+    ...imports,
     '',
     ...blocks,
     '',
@@ -17,7 +17,32 @@ function report(...blocks: string[]): string {
   ].join('\n');
 }
 
+function report(...blocks: string[]): string {
+  return reportWith(
+    ['import type { Entry } from "ldapts";', 'import pLimit from "p-limit";'],
+    ...blocks
+  );
+}
+
 describe('API reports', () => {
+  it('does not read the import header as a declaration', () => {
+    const changes = diffApiReports(
+      reportWith(
+        ['import type { Entry } from "ldapts";'],
+        '// @public\nexport type A = Entry;'
+      ),
+      reportWith(
+        [
+          'import type { Change } from "ldapts";',
+          'import type { Entry } from "ldapts";',
+        ],
+        '// @public\nexport type A = Entry;'
+      )
+    );
+
+    expect(changes).to.deep.equal({ removed: [], added: [], changed: [] });
+  });
+
   it('reports a declaration that disappeared', () => {
     const changes = diffApiReports(
       report(
@@ -68,12 +93,16 @@ describe('API reports', () => {
     expect(changes.changed).to.deep.equal([]);
   });
 
-  it('names an unnamed declaration by its line', () => {
+  it('keeps overloads of one name apart', () => {
     const changes = diffApiReports(
-      report('export { Removed }'),
-      report('export { Kept }')
+      report(
+        '// @public\nexport function f(a: string): void;',
+        '// @public\nexport function f(a: number): void;'
+      ),
+      report('// @public\nexport function f(a: string): void;')
     );
 
-    expect(changes.removed).to.deep.equal(['export { Removed }']);
+    expect(changes.removed).to.deep.equal(['f #2']);
+    expect(changes.changed).to.deep.equal([]);
   });
 });

@@ -31,6 +31,26 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const OPTIONS_SNAPSHOT = 'docs/usage/options.snapshot.json';
 export const OPENAPI_SNAPSHOT = 'openapi.json';
 
+function baseApiEntries(base: string): string[] {
+  try {
+    const listed = execFileSync(
+      'git',
+      ['ls-tree', '--name-only', `${base}:etc/api`],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }
+    );
+    return listed
+      .split('\n')
+      .filter(line => line.endsWith('.api.md'))
+      .map(line => line.replace(/\.api\.md$/, ''));
+  } catch {
+    return [];
+  }
+}
+
 function readApiReport(entry: string): string | null {
   try {
     return readFileSync(reportPath(entry), 'utf8');
@@ -899,7 +919,12 @@ async function main(): Promise<void> {
   }
 
   let introducedReports = false;
-  for (const entry of Object.keys(API_ENTRIES)) {
+  // The base's reports as well: dropping an entry from the snapshot list is a
+  // removed sub-path, and only a report in the base can show it
+  for (const entry of new Set([
+    ...Object.keys(API_ENTRIES),
+    ...baseApiEntries(base),
+  ])) {
     const baseReport = gitShow(base, path.relative(root, reportPath(entry)));
     if (baseReport === null) {
       introducedReports = true;
@@ -907,6 +932,10 @@ async function main(): Promise<void> {
     }
     const current = readApiReport(entry);
     if (current === null) {
+      if (!(entry in API_ENTRIES)) {
+        differences.push({ kind: 'removed', what: `${entry} entry` });
+        continue;
+      }
       console.error(
         `${path.relative(root, reportPath(entry))} is missing: run ` +
           '`npm run snapshot:api` and commit it.'

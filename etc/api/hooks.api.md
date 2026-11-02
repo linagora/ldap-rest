@@ -21,11 +21,653 @@ function assertRfc4514Escapes(dn: string, what: string): void;
 // @public
 const asyncHandler: (fn: (req: Request_2, res: Response_2, next: NextFunction) => Promise<void>) => RequestHandler;
 
+// @public (undocumented)
+type AttributesList = Record<string, AttributeValue>;
+
+// @public (undocumented)
+type AttributeValue = Buffer | Buffer[] | string[] | string;
+
+// @public (undocumented)
+interface AuthConfig {
+    // (undocumented)
+    default?: BranchPermissions;
+    // (undocumented)
+    groups?: {
+        [groupDn: string]: {
+            [branch: string]: BranchPermissions;
+        };
+    };
+    // (undocumented)
+    users?: {
+        [uid: string]: {
+            [branch: string]: BranchPermissions;
+        };
+    };
+}
+
+// @public (undocumented)
+interface BranchPermissions {
+    // (undocumented)
+    delete?: boolean;
+    // (undocumented)
+    read?: boolean;
+    // (undocumented)
+    write?: boolean;
+}
+
+// @public (undocumented)
+interface BulkOperationResponse {
+    // (undocumented)
+    bulkId?: string;
+    // (undocumented)
+    location?: string;
+    method?: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+    // (undocumented)
+    response?: ScimErrorResponse;
+    // (undocumented)
+    status: string;
+    // (undocumented)
+    version?: string;
+}
+
+// @public (undocumented)
+interface BulkResponse {
+    // (undocumented)
+    Operations: BulkOperationResponse[];
+    // (undocumented)
+    schemas: [typeof SCHEMA_BULK_RESPONSE];
+}
+
 // @public
 function canonicalDn(dn: string): string;
 
 // @public (undocumented)
 export type ChainedHook<T> = (arg: T) => MaybePromise<T>;
+
+// @public (undocumented)
+interface ChangeContext {
+    actor?: string;
+    requestId?: string;
+    source?: string;
+}
+
+// @public (undocumented)
+type ChangesToNotify = Record<string, [
+AttributeValue | null,
+AttributeValue | null
+]>;
+
+// @public
+interface Config {
+    // (undocumented)
+    alias_attribute?: string;
+    // (undocumented)
+    api_prefix: string;
+    // (undocumented)
+    app_accounts_user_attribute?: string;
+    // (undocumented)
+    applicative_account_attribute?: string[];
+    // (undocumented)
+    applicative_account_base?: string;
+    // (undocumented)
+    auth_fake_user?: string;
+    // (undocumented)
+    auth_hmac?: string[];
+    // (undocumented)
+    auth_hmac_window?: number;
+    // (undocumented)
+    auth_path_prefix?: string | string[];
+    // (undocumented)
+    auth_token?: string[];
+    // (undocumented)
+    auth_totp?: string[];
+    // (undocumented)
+    auth_totp_step?: number;
+    // (undocumented)
+    auth_totp_window?: number;
+    authz_combine?: boolean;
+    // (undocumented)
+    authz_dynamic_base?: string;
+    // (undocumented)
+    authz_dynamic_bypass?: string[];
+    // (undocumented)
+    authz_dynamic_cache_ttl?: number;
+    // (undocumented)
+    authz_dynamic_config_attribute?: string;
+    // (undocumented)
+    authz_dynamic_reload_endpoint?: boolean;
+    // (undocumented)
+    authz_dynamic_tenant_attribute?: string;
+    // (undocumented)
+    authz_dynamic_token_attribute?: string;
+    authz_filter_attached_entries?: boolean;
+    authz_for?: string[];
+    authz_global_branch?: string[];
+    authz_global_organization?: string;
+    authz_global_write_branch?: string[];
+    // (undocumented)
+    authz_identity?: string;
+    // (undocumented)
+    authz_local_admin_attribute?: string;
+    // (undocumented)
+    authz_per_branch_cache_ttl?: number;
+    // (undocumented)
+    authz_per_branch_config?: AuthConfig;
+    // (undocumented)
+    authz_per_route?: string[];
+    authz_scope_source?: string;
+    authz_transit_branch?: string;
+    authz_transit_origin_attribute?: string;
+    // (undocumented)
+    authz_unresolved_user?: string;
+    // (undocumented)
+    base_url?: string;
+    // (undocumented)
+    bcl_retention?: number;
+    // (undocumented)
+    bulk_import_batch_size?: string;
+    // (undocumented)
+    bulk_import_max_file_size?: string;
+    // (undocumented)
+    bulk_import_schemas?: string;
+    // (undocumented)
+    calendar_concurrency?: number;
+    // (undocumented)
+    calendar_firstname_attribute?: string;
+    // (undocumented)
+    calendar_lastname_attribute?: string;
+    // (undocumented)
+    calendar_resource_base?: string;
+    // (undocumented)
+    calendar_resource_creator?: string;
+    // (undocumented)
+    calendar_resource_domain?: string;
+    // (undocumented)
+    calendar_resource_objectclass?: string;
+    // (undocumented)
+    calendar_webadmin_token?: string;
+    // (undocumented)
+    calendar_webadmin_url?: string;
+    // (undocumented)
+    cloudery_default_locale?: string;
+    // (undocumented)
+    cloudery_default_org_role?: string;
+    // (undocumented)
+    cloudery_domain?: string;
+    // (undocumented)
+    cloudery_fqdn_attribute?: string;
+    // (undocumented)
+    cloudery_invited_attribute?: string;
+    // (undocumented)
+    cloudery_manager_token?: string;
+    // (undocumented)
+    cloudery_manager_url?: string;
+    // (undocumented)
+    cloudery_offer?: string;
+    // (undocumented)
+    cloudery_org_id_attribute?: string;
+    // (undocumented)
+    cloudery_org_id_header?: string;
+    // (undocumented)
+    cloudery_org_role_attribute?: string;
+    // (undocumented)
+    cloudery_org_role_header?: string;
+    // (undocumented)
+    cloudery_phones_attribute?: string;
+    // (undocumented)
+    cloudery_user_branch?: string;
+    // (undocumented)
+    cloudery_workflow_max_attempts?: number;
+    // (undocumented)
+    cloudery_workflow_poll_interval_ms?: number;
+    // (undocumented)
+    cozy_admin_passphrase?: string;
+    // (undocumented)
+    cozy_admin_url?: string;
+    // (undocumented)
+    cozy_admin_user?: string;
+    // (undocumented)
+    cozy_apps?: string;
+    // (undocumented)
+    cozy_auth_exchange?: string;
+    // (undocumented)
+    cozy_b2b_exchange?: string;
+    // (undocumented)
+    cozy_context_name?: string;
+    // (undocumented)
+    cozy_default_locale?: string;
+    // (undocumented)
+    cozy_org_domain?: string;
+    // (undocumented)
+    cozy_org_id?: string;
+    // (undocumented)
+    cozy_user_created_routing_key?: string;
+    // (undocumented)
+    cozy_user_deleted_routing_key?: string;
+    // (undocumented)
+    crowdsec_api_key?: string;
+    // (undocumented)
+    crowdsec_cache_ttl?: number;
+    // (undocumented)
+    crowdsec_url?: string;
+    // (undocumented)
+    debug: boolean;
+    // (undocumented)
+    delegation_attribute?: string;
+    // (undocumented)
+    display_name_attribute?: string;
+    // (undocumented)
+    drive_quota_attribute?: string;
+    // (undocumented)
+    enterprise_domain_link_attribute?: string;
+    // (undocumented)
+    enterprise_domain_name_attribute?: string;
+    // (undocumented)
+    external_branch_class?: string[];
+    // (undocumented)
+    external_members_branch?: string;
+    // (undocumented)
+    forward_attribute?: string;
+    // (undocumented)
+    group_class?: string[];
+    // (undocumented)
+    group_classes?: string[];
+    // (undocumented)
+    group_default_attributes?: AttributesList;
+    // (undocumented)
+    group_dummy_user?: string;
+    // (undocumented)
+    group_schema?: string;
+    // (undocumented)
+    groups_allow_unexistent_members?: boolean;
+    // (undocumented)
+    james_concurrency?: number;
+    // (undocumented)
+    james_init_delay?: number;
+    // (undocumented)
+    james_mailbox_type_attribute?: string;
+    // (undocumented)
+    james_mailing_list_branch?: string[];
+    // (undocumented)
+    james_retry_attempts?: number;
+    // (undocumented)
+    james_retry_delay?: number;
+    // (undocumented)
+    james_signature_template?: string;
+    // (undocumented)
+    james_sync_forwards?: boolean;
+    // (undocumented)
+    james_team_mailbox_any_domain?: boolean;
+    // (undocumented)
+    james_webadmin_token?: string;
+    // (undocumented)
+    james_webadmin_url?: string;
+    // (undocumented)
+    ldap_base?: string;
+    // (undocumented)
+    ldap_cache_max?: number;
+    // (undocumented)
+    ldap_cache_ttl?: number;
+    // (undocumented)
+    ldap_concurrency?: number;
+    // (undocumented)
+    ldap_connection_ttl?: number;
+    // (undocumented)
+    ldap_dn?: string;
+    ldap_flat_auto_repair?: boolean;
+    // (undocumented)
+    ldap_flat_schema?: string[];
+    // (undocumented)
+    ldap_group_base?: string;
+    // (undocumented)
+    ldap_groups_main_attribute?: string;
+    // (undocumented)
+    ldap_operational_attribute?: string[];
+    // (undocumented)
+    ldap_organization_class?: string[];
+    // (undocumented)
+    ldap_organization_link_attribute?: string;
+    // (undocumented)
+    ldap_organization_max_subnodes?: number;
+    // (undocumented)
+    ldap_organization_path_attribute?: string;
+    // (undocumented)
+    ldap_organization_path_separator?: string;
+    // (undocumented)
+    ldap_pool_size?: number;
+    // (undocumented)
+    ldap_pwd?: string;
+    // (undocumented)
+    ldap_raw_base?: string[];
+    // (undocumented)
+    ldap_raw_hidden_attribute?: string[];
+    // (undocumented)
+    ldap_raw_max_results?: number;
+    // (undocumented)
+    ldap_raw_schema_cache_ttl?: number;
+    // (undocumented)
+    ldap_raw_show_secrets?: boolean;
+    // (undocumented)
+    ldap_top_organization?: string;
+    // (undocumented)
+    ldap_url?: string[];
+    // (undocumented)
+    ldap_user_main_attribute?: string;
+    // (undocumented)
+    ldap_users_base?: string;
+    // (undocumented)
+    llng_ini?: string;
+    // (undocumented)
+    llng_username_header?: string;
+    // (undocumented)
+    log_file?: string;
+    // (undocumented)
+    log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
+    // (undocumented)
+    logger: 'console' | 'file';
+    // (undocumented)
+    mail_attribute?: string;
+    // (undocumented)
+    mail_domain?: string[];
+    // (undocumented)
+    max_app_accounts?: number;
+    metrics_port?: number;
+    // (undocumented)
+    migration_proxy_branch?: string[];
+    // (undocumented)
+    migration_proxy_concurrency?: number;
+    // (undocumented)
+    migration_proxy_retry_attempts?: number;
+    // (undocumented)
+    migration_proxy_retry_delay?: number;
+    // (undocumented)
+    migration_proxy_token?: string;
+    // (undocumented)
+    migration_proxy_url?: string;
+    // (undocumented)
+    oidc_client_id?: string;
+    // (undocumented)
+    oidc_client_secret?: string;
+    // (undocumented)
+    oidc_server?: string;
+    // (undocumented)
+    oidc_username_claim?: string;
+    // (undocumented)
+    organization_schema?: string;
+    // (undocumented)
+    plugin?: string[];
+    // (undocumented)
+    port: number;
+    // (undocumented)
+    ppolicy_base?: string;
+    // (undocumented)
+    ppolicy_default_dn?: string;
+    // (undocumented)
+    ppolicy_min_length?: number;
+    // (undocumented)
+    ppolicy_require_digit?: boolean;
+    // (undocumented)
+    ppolicy_require_lowercase?: boolean;
+    // (undocumented)
+    ppolicy_require_special?: boolean;
+    // (undocumented)
+    ppolicy_require_uppercase?: boolean;
+    // (undocumented)
+    ppolicy_validate_complexity?: boolean;
+    // (undocumented)
+    ppolicy_warn_days?: number;
+    // (undocumented)
+    quota_attribute?: string;
+    // (undocumented)
+    rabbitmq_url?: string;
+    // (undocumented)
+    rate_limit_max?: number;
+    // (undocumented)
+    rate_limit_window_ms?: number;
+    // (undocumented)
+    schemas_path: string;
+    // (undocumented)
+    scim_base_header_root?: string;
+    // (undocumented)
+    scim_base_map?: string;
+    // (undocumented)
+    scim_base_url?: string;
+    // (undocumented)
+    scim_bulk_max_operations?: number;
+    // (undocumented)
+    scim_bulk_max_payload_size?: number;
+    // (undocumented)
+    scim_etag?: boolean;
+    // (undocumented)
+    scim_group_base?: string;
+    // (undocumented)
+    scim_group_base_header?: string;
+    // (undocumented)
+    scim_group_base_template?: string;
+    // (undocumented)
+    scim_group_external_id_attribute?: string;
+    // (undocumented)
+    scim_group_mapping?: string;
+    // (undocumented)
+    scim_group_object_class?: string[];
+    // (undocumented)
+    scim_group_rdn_attribute?: string;
+    // (undocumented)
+    scim_id_attribute?: string;
+    // (undocumented)
+    scim_max_results?: number;
+    // (undocumented)
+    scim_max_scanned?: number;
+    // (undocumented)
+    scim_prefix?: string;
+    // (undocumented)
+    scim_user_base?: string;
+    // (undocumented)
+    scim_user_base_header?: string;
+    // (undocumented)
+    scim_user_base_template?: string;
+    // (undocumented)
+    scim_user_lock_attribute?: string;
+    // (undocumented)
+    scim_user_lock_value?: string;
+    // (undocumented)
+    scim_user_mapping?: string;
+    // (undocumented)
+    scim_user_object_class?: string[];
+    // (undocumented)
+    scim_user_rdn_attribute?: string;
+    // (undocumented)
+    shutdown_timeout?: number;
+    // (undocumented)
+    static_csp?: string;
+    // (undocumented)
+    static_frame_options?: string;
+    // (undocumented)
+    static_name?: string;
+    // (undocumented)
+    static_path?: string;
+    storage_backend?: string;
+    // (undocumented)
+    storage_file_directory?: string;
+    // (undocumented)
+    storage_ldap_base?: string;
+    // (undocumented)
+    storage_ldap_object_class?: string;
+    // (undocumented)
+    storage_postgres_table?: string;
+    // (undocumented)
+    storage_postgres_url?: string;
+    // (undocumented)
+    storage_sweep_interval?: number;
+    // (undocumented)
+    storage_valkey_prefix?: string;
+    // (undocumented)
+    storage_valkey_url?: string;
+    // (undocumented)
+    strict_options?: boolean;
+    // (undocumented)
+    trash_add_metadata?: string;
+    // (undocumented)
+    trash_auto_create?: string;
+    // (undocumented)
+    trash_base?: string;
+    // (undocumented)
+    trash_watched_bases?: string;
+    // (undocumented)
+    trusted_proxy?: string[];
+    // (undocumented)
+    trusted_proxy_auth_header?: string;
+    // (undocumented)
+    twake_drive_concurrency?: number;
+    // (undocumented)
+    twake_drive_default_domain_template?: string;
+    // (undocumented)
+    twake_drive_domain_attribute?: string;
+    // (undocumented)
+    twake_drive_webadmin_token?: string;
+    // (undocumented)
+    twake_drive_webadmin_url?: string;
+    // (undocumented)
+    twake_group_base?: string;
+    // (undocumented)
+    twake_group_color_attribute?: string;
+    // (undocumented)
+    twake_group_created_at_attribute?: string;
+    // (undocumented)
+    twake_group_display_name_attribute?: string;
+    // (undocumented)
+    twake_group_max_page_limit?: number;
+    // (undocumented)
+    twake_group_member_fields?: Record<string, string>;
+    // (undocumented)
+    twake_group_organization_deleted_value?: string;
+    // (undocumented)
+    twake_group_organization_dn?: string;
+    // (undocumented)
+    twake_group_organization_status_attribute?: string;
+    // (undocumented)
+    twake_group_user_base?: string;
+    // (undocumented)
+    twake_instance_auth_exchange?: string;
+    // (undocumented)
+    twake_instance_b2b_exchange?: string;
+    // (undocumented)
+    twake_instance_cloudery_domain?: string;
+    // (undocumented)
+    twake_instance_cloudery_offer?: string;
+    // (undocumented)
+    twake_instance_cloudery_organization_offer?: string;
+    // (undocumented)
+    twake_instance_cloudery_token?: string;
+    // (undocumented)
+    twake_instance_cloudery_url?: string;
+    // (undocumented)
+    twake_instance_cozy_apps?: string;
+    // (undocumented)
+    twake_instance_cozy_context?: string;
+    // (undocumented)
+    twake_instance_cozy_domain?: string;
+    // (undocumented)
+    twake_instance_cozy_org_domain?: string;
+    // (undocumented)
+    twake_instance_cozy_org_id?: string;
+    // (undocumented)
+    twake_instance_cozy_passphrase?: string;
+    // (undocumented)
+    twake_instance_cozy_url?: string;
+    // (undocumented)
+    twake_instance_cozy_user?: string;
+    // (undocumented)
+    twake_instance_dn?: string[];
+    // (undocumented)
+    twake_instance_fqdn_attribute?: string;
+    // (undocumented)
+    twake_instance_id?: string;
+    // (undocumented)
+    twake_instance_locale?: string;
+    // (undocumented)
+    twake_instance_organization_base?: string;
+    // (undocumented)
+    twake_instance_organization_created_key?: string;
+    // (undocumented)
+    twake_instance_organization_domain_attribute?: string;
+    // (undocumented)
+    twake_instance_organization_fqdn_attribute?: string;
+    // (undocumented)
+    twake_instance_organization_id_attribute?: string;
+    // (undocumented)
+    twake_instance_organization_name_attribute?: string;
+    // (undocumented)
+    twake_instance_provider?: string;
+    // (undocumented)
+    twake_instance_queue?: string;
+    // (undocumented)
+    twake_instance_sent_attribute?: string;
+    // (undocumented)
+    twake_instance_skip_attribute?: string;
+    // (undocumented)
+    twake_instance_skip_value?: string;
+    // (undocumented)
+    twake_instance_timeout?: number;
+    // (undocumented)
+    twake_instance_user_created_key?: string;
+    // (undocumented)
+    twake_instance_workplace_created_key?: string;
+    // (undocumented)
+    twake_lifecycle_deleted_at_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_deleted_at_format?: string;
+    // (undocumented)
+    twake_lifecycle_deleted_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_deleted_value?: string;
+    // (undocumented)
+    twake_lifecycle_lock_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_lock_value?: string;
+    // (undocumented)
+    twake_lifecycle_member_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_reason_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_role_attribute?: string;
+    // (undocumented)
+    twake_lifecycle_rules?: string;
+    // (undocumented)
+    twake_space_admin_attribute?: string;
+    // (undocumented)
+    twake_space_base?: string;
+    // (undocumented)
+    twake_space_class?: string[];
+    // (undocumented)
+    twake_space_display_name_attribute?: string;
+    // (undocumented)
+    twake_space_editor_attribute?: string;
+    // (undocumented)
+    twake_space_exchange?: string;
+    // (undocumented)
+    twake_space_sync_queue?: string;
+    // (undocumented)
+    twake_space_user_role_attribute?: string;
+    // (undocumented)
+    twake_space_viewer_attribute?: string;
+    // (undocumented)
+    twake_tombstone_clear_attributes?: string[];
+    // (undocumented)
+    twake_tombstone_default_reason?: string;
+    // (undocumented)
+    twake_tombstone_dn?: string[];
+    // (undocumented)
+    twake_tombstone_erase_min_age?: number;
+    // (undocumented)
+    twake_tombstone_group_bases?: string[];
+    // (undocumented)
+    twake_tombstone_reason_header?: string;
+    // (undocumented)
+    twake_tombstone_reasons?: string[];
+    // (undocumented)
+    user_class?: string[];
+}
 
 // @public
 function escapeDnValue(value: string): string;
@@ -53,6 +695,9 @@ function getRdn(dn: string): string;
 
 // @public
 function hasOnlyRfc4514Escapes(dn: string): boolean;
+
+// @public (undocumented)
+type HookFn = Function;
 
 // @public
 const hookOwner: (fn: HookFn) => {
@@ -184,10 +829,51 @@ function isDummyMemberDn(member: unknown, dummy: string | undefined): boolean;
 function knownAttributeName(type: string): string | undefined;
 
 // @public (undocumented)
+type LdapList = Record<string, AttributesList>;
+
+// @public (undocumented)
 export type MaybePromise<T> = Promise<T> | T;
+
+// @public (undocumented)
+interface Meta {
+    // (undocumented)
+    created?: string;
+    // (undocumented)
+    lastModified?: string;
+    // (undocumented)
+    location?: string;
+    // (undocumented)
+    resourceType: 'User' | 'Group';
+    // (undocumented)
+    version?: string;
+}
+
+// @public (undocumented)
+interface ModifyRequest {
+    // (undocumented)
+    add?: AttributesList;
+    // (undocumented)
+    delete?: string[] | AttributesList;
+    // (undocumented)
+    replace?: AttributesList;
+}
 
 // @public
 function movedToTrash(trashBase: string | undefined, oldDn: string, newDn: string): boolean;
+
+// @public (undocumented)
+interface MultiValued<T extends string = string> {
+    // (undocumented)
+    $ref?: string;
+    // (undocumented)
+    display?: string;
+    // (undocumented)
+    primary?: boolean;
+    // (undocumented)
+    type?: string;
+    // (undocumented)
+    value: T;
+}
 
 // @public
 function namesByDn(id: string, attribute: string): boolean;
@@ -236,6 +922,137 @@ function registerAttributeTypes(types: Iterable<{
 
 // @public
 const runAsHookOwner: <T>(hook: HookFn, fn: () => T) => T;
+
+// @public (undocumented)
+const SCHEMA_BULK_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:BulkResponse";
+
+// @public (undocumented)
+const SCHEMA_ERROR = "urn:ietf:params:scim:api:messages:2.0:Error";
+
+// @public (undocumented)
+interface ScimAddress {
+    // (undocumented)
+    country?: string;
+    // (undocumented)
+    formatted?: string;
+    // (undocumented)
+    locality?: string;
+    // (undocumented)
+    postalCode?: string;
+    // (undocumented)
+    primary?: boolean;
+    // (undocumented)
+    region?: string;
+    // (undocumented)
+    streetAddress?: string;
+    // (undocumented)
+    type?: string;
+}
+
+// @public (undocumented)
+interface ScimErrorResponse {
+    // (undocumented)
+    detail?: string;
+    // (undocumented)
+    schemas: [typeof SCHEMA_ERROR];
+    // (undocumented)
+    scimType?: ScimErrorType;
+    // (undocumented)
+    status: string;
+}
+
+// @public (undocumented)
+type ScimErrorType = 'invalidFilter' | 'tooMany' | 'uniqueness' | 'mutability' | 'invalidSyntax' | 'invalidPath' | 'noTarget' | 'invalidValue' | 'invalidVers' | 'sensitive';
+
+// @public (undocumented)
+interface ScimGroup {
+    // (undocumented)
+    [ext: string]: unknown;
+    // (undocumented)
+    displayName?: string;
+    // (undocumented)
+    externalId?: string;
+    // (undocumented)
+    id?: string;
+    // (undocumented)
+    members?: MultiValued[];
+    // (undocumented)
+    meta?: Meta;
+    // (undocumented)
+    schemas: string[];
+}
+
+// @public (undocumented)
+interface ScimName {
+    // (undocumented)
+    familyName?: string;
+    // (undocumented)
+    formatted?: string;
+    // (undocumented)
+    givenName?: string;
+    // (undocumented)
+    honorificPrefix?: string;
+    // (undocumented)
+    honorificSuffix?: string;
+    // (undocumented)
+    middleName?: string;
+}
+
+// @public (undocumented)
+interface ScimUser {
+    // (undocumented)
+    [ext: string]: unknown;
+    // (undocumented)
+    active?: boolean;
+    // (undocumented)
+    addresses?: ScimAddress[];
+    // (undocumented)
+    displayName?: string;
+    // (undocumented)
+    emails?: MultiValued[];
+    // (undocumented)
+    entitlements?: MultiValued[];
+    // (undocumented)
+    externalId?: string;
+    // (undocumented)
+    groups?: MultiValued[];
+    // (undocumented)
+    id?: string;
+    // (undocumented)
+    ims?: MultiValued[];
+    // (undocumented)
+    locale?: string;
+    // (undocumented)
+    meta?: Meta;
+    // (undocumented)
+    name?: ScimName;
+    // (undocumented)
+    nickName?: string;
+    // (undocumented)
+    password?: string;
+    // (undocumented)
+    phoneNumbers?: MultiValued[];
+    // (undocumented)
+    photos?: MultiValued[];
+    // (undocumented)
+    preferredLanguage?: string;
+    // (undocumented)
+    profileUrl?: string;
+    // (undocumented)
+    roles?: MultiValued[];
+    // (undocumented)
+    schemas: string[];
+    // (undocumented)
+    timezone?: string;
+    // (undocumented)
+    title?: string;
+    // (undocumented)
+    userName?: string;
+    // (undocumented)
+    userType?: string;
+    // (undocumented)
+    x509Certificates?: MultiValued[];
+}
 
 // @public
 function substringSearchFilter(match: string, attribute: string): string;

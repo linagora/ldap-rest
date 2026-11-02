@@ -45,7 +45,10 @@ export function reportPath(name: string): string {
   return path.join(API_REPORT_DIR, `${name}.api.md`);
 }
 
-/** TSDoc, forgotten exports and a fresh report folder leave the types alone */
+/**
+ * TSDoc, release tags and a fresh report folder leave the types alone. A
+ * forgotten export is reported in the report itself, so its shape is pinned.
+ */
 function ignoreNoise(message: ExtractorMessage): void {
   if (
     message.messageId.startsWith('tsdoc-') ||
@@ -75,6 +78,7 @@ function extract(name: string, entryPoint: string, folder: string): void {
       reportFileName: `${name}.api.md`,
       reportFolder: folder,
       reportTempFolder: reportTempDir,
+      includeForgottenExports: true,
     },
     newlineKind: 'lf',
     docModel: { enabled: false },
@@ -121,17 +125,25 @@ function declarationsIn(report: string): Map<string, string> {
   const found = new Map<string, string>();
   const lines = report.split('\n');
   const fence = lines.findIndex(line => line.startsWith('```'));
+  // The import header names the dependencies, not the declarations: the first
+  // release tag opens the report
+  const start = lines.findIndex(line => line.startsWith('// @'));
   const end = lines.findIndex(
     (line, index) => index > fence && line.startsWith('```')
   );
+  if (start === -1) return found;
   let current: string[] = [];
   const flush = (): void => {
     if (current.length === 0) return;
     const block = current.join('\n').trimEnd();
-    found.set(declarationName(block), block);
+    const name = declarationName(block);
+    // Overloads and merged declarations share a name; keep them apart
+    let key = name;
+    for (let rank = 2; found.has(key); rank++) key = `${name} #${rank}`;
+    found.set(key, block);
     current = [];
   };
-  for (const line of lines.slice(fence + 1, end === -1 ? undefined : end)) {
+  for (const line of lines.slice(start, end === -1 ? undefined : end)) {
     // A release tag or a re-export line opens the next declaration
     if (line.startsWith('// @') || line.startsWith('export {')) flush();
     current.push(line);
