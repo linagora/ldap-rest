@@ -7,6 +7,7 @@ import importX from 'eslint-plugin-import-x';
 import globals from 'globals';
 
 import noConfigCast from './eslint-rules/no-config-cast.mjs';
+import noLdapInternals from './eslint-rules/no-ldap-internals.mjs';
 import noLoadedPlugins from './eslint-rules/no-loaded-plugins.mjs';
 import noPluginFamilyImport from './eslint-rules/no-plugin-family-import.mjs';
 import noRawRoute from './eslint-rules/no-raw-route.mjs';
@@ -93,6 +94,7 @@ export default [
           'no-config-cast': noConfigCast,
           'no-loaded-plugins': noLoadedPlugins,
           'no-plugin-family-import': noPluginFamilyImport,
+          'no-ldap-internals': noLdapInternals,
         },
       },
     },
@@ -239,7 +241,11 @@ export default [
   // than adding to them: the SCIM block below repeats the fetch selector.
   {
     files: ['src/**/*.ts'],
-    ignores: ['src/browser/**', 'src/lib/ldapActions.ts'],
+    ignores: [
+      'src/browser/**',
+      'src/lib/ldap/operations.ts',
+      'src/lib/ldap/read.ts',
+    ],
     rules: {
       'no-restricted-syntax': [
         'error',
