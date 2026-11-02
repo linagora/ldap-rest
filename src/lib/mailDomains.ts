@@ -7,7 +7,7 @@
  * @group Libraries
  */
 import type { DM } from '../bin';
-import { type Schema, roleAttribute } from '../config/schema';
+import { roleAttribute } from '../config/schema';
 
 import { getLogger } from './expressFormatedResponses';
 import { extractLdapCode } from './ldapCodes';
@@ -45,12 +45,10 @@ export const mailDomains = (values: string[] | undefined): string[] => [
  * @returns the domain branches
  */
 export function domainBranches(server: DM): DomainBranch[] {
-  const flat = server.loadedPlugins['ldapFlatGeneric'] as
-    { instances?: { base: string; schema?: Schema }[] } | undefined;
   const branches: DomainBranch[] = [];
-  for (const instance of flat?.instances || []) {
-    const attribute = roleAttribute(instance.schema, 'domainName');
-    if (attribute) branches.push({ base: instance.base, attribute });
+  for (const entity of server.entities.ofKind('flat')) {
+    const attribute = roleAttribute(entity.schema, 'domainName');
+    if (attribute) branches.push({ base: entity.base, attribute });
   }
   if (branches.length || !server.config.ldap_base) return branches;
   return [

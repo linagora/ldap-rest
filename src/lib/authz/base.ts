@@ -11,7 +11,7 @@ import type { SearchOptions } from 'ldapts';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { BranchPermissions } from '../../config/args';
-import { roleAttribute, type Schema } from '../../config/schema';
+import { roleAttribute } from '../../config/schema';
 import type { Hooks } from '../../hooks';
 import { assertIdentityMode, identityFor, type DmRequest } from '../auth/base';
 import type {
@@ -690,8 +690,7 @@ export default abstract class AuthzBase extends DmPlugin {
    * @returns the attribute name, or undefined when no domain is linked
    */
   protected domainLinkAttribute(): string | undefined {
-    const organizations = this.server.loadedPlugins['ldapOrganizations'] as
-      { schema?: Schema } | undefined;
+    const organizations = this.server.entities.ofKind('organizations')[0];
     return (
       roleAttribute(organizations?.schema, 'domainLink') ||
       this.config.enterprise_domain_link_attribute ||

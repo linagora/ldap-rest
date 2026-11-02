@@ -17,7 +17,7 @@ describe('declaredMailDomains', () => {
       };
     };
     const server = {
-      loadedPlugins: {},
+      entities: { ofKind: () => [] },
       config: {
         ldap_base: 'dc=example,dc=com',
         enterprise_domain_name_attribute: 'associateddomain',

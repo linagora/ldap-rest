@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Plugins can read the entity types the server serves from `server.entities`
+  or `EntityRegistryService`, and declare their own with `declareEntities()`
+  ([details](docs/plugin-development/services.md#the-entity-registry)).
+
 ### Fixed
 
 - A plugin loaded with per-instance overrides no longer counts operations on

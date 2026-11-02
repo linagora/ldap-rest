@@ -2,7 +2,11 @@ import type { SearchResult } from 'ldapts';
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
+import DmPlugin, {
+  defineRoute,
+  type EntityDeclaration,
+  type Role,
+} from '../../abstract/plugin';
 import { DM } from '../../bin';
 import { Hooks } from '../../hooks';
 import {
@@ -191,6 +195,20 @@ export default class LdapOrganizations extends DmPlugin {
           )
         );
     }
+  }
+
+  /** Declare the organization branch to the entity registry. */
+  declareEntities(): EntityDeclaration[] {
+    return [
+      {
+        name: 'organization',
+        pluralName: 'organizations',
+        base: this.settings.ldap_top_organization,
+        mainAttribute: 'ou',
+        kind: 'organizations',
+        source: this,
+      },
+    ];
   }
 
   /**

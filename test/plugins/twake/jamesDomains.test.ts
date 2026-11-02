@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import nock from 'nock';
 
+import type { Schema } from '../../../src/config/schema';
 import type { SearchResult } from '../../../src/lib/ldapActions';
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
@@ -314,34 +315,34 @@ describe('James Plugin - mail domains', () => {
   });
 
   describe('between two domain branches', () => {
-    let restore: () => void;
-
     // `dc=mn` stands for a branch of its own, whose domains another
     // attribute names
     beforeEach(() => {
-      const loaded = dm.loadedPlugins as Record<string, unknown>;
-      const previous = loaded.ldapFlatGeneric;
-      loaded.ldapFlatGeneric = {
-        instances: [
-          {
-            base: branch,
-            schema: {
-              attributes: { associatedDomain: { role: 'domainName' } },
-            },
-          },
-          {
-            base: mn,
-            schema: { attributes: { description: { role: 'domainName' } } },
-          },
-        ],
-      };
-      restore = () => {
-        if (previous) loaded.ldapFlatGeneric = previous;
-        else delete loaded.ldapFlatGeneric;
-      };
+      dm.entities.register({
+        name: 'jamesDomainsBranch',
+        pluralName: 'jamesDomainsBranches',
+        base: branch,
+        mainAttribute: 'dc',
+        kind: 'flat',
+        source: {
+          schema: {
+            attributes: { associatedDomain: { role: 'domainName' } },
+          } as unknown as Schema,
+        },
+      });
+      dm.entities.register({
+        name: 'jamesDomainsMn',
+        pluralName: 'jamesDomainsMns',
+        base: mn,
+        mainAttribute: 'dc',
+        kind: 'flat',
+        source: {
+          schema: {
+            attributes: { description: { role: 'domainName' } },
+          } as unknown as Schema,
+        },
+      });
     });
-
-    afterEach(() => restore());
 
     it('refuses a move dropping a domain addresses are at', async () => {
       await addDomain(`dc=customs,${branch}`, 'customs.gov.mn');

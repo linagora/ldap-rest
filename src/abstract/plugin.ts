@@ -15,11 +15,8 @@ import {
   type ServiceToken,
 } from '../lib/services';
 import { timedOutbound } from '../lib/metrics';
-import {
-  neverReturnAttributes,
-  withoutAttributes,
-  type Schema,
-} from '../config/schema';
+import type { EntityDeclaration } from '../lib/entities';
+import { neverReturnAttributes, withoutAttributes } from '../config/schema';
 import { readOptions, type OptionsOf, type OptionSet } from '../config/options';
 import configArgs from '../config/args';
 
@@ -37,6 +34,15 @@ export {
 export { defineRoute, registeredRoutes } from '../lib/route';
 export { serviceToken } from '../lib/services';
 export type { ServiceProvider, ServiceToken } from '../lib/services';
+export {
+  EntityRegistryService,
+  type EntityDeclaration,
+  type EntityDescriptor,
+  type EntityKind,
+  type EntityRegistry,
+  type EntitySource,
+  type FlatEntityApi,
+} from '../lib/entities';
 export {
   HttpError,
   BadRequestError,
@@ -222,20 +228,7 @@ export default abstract class DmPlugin {
    * @returns the same shape, without the hidden attributes
    */
   protected hideNeverReturn<T>(data: T): T {
-    const schemas: (Schema | undefined)[] = [];
-    const isSchema = (value: unknown): value is Schema =>
-      typeof (value as Schema | undefined)?.attributes === 'object';
-    for (const plugin of Object.values(this.server.loadedPlugins)) {
-      const candidate = plugin as unknown as {
-        schema?: unknown;
-        instances?: { schema?: unknown }[];
-      };
-      if (isSchema(candidate.schema)) schemas.push(candidate.schema);
-      if (Array.isArray(candidate.instances))
-        for (const instance of candidate.instances)
-          if (isSchema(instance.schema)) schemas.push(instance.schema);
-    }
-    const hidden = neverReturnAttributes(schemas);
+    const hidden = neverReturnAttributes(this.server.entities.schemas());
     if (hidden.size === 0 || !data || typeof data !== 'object') return data;
     // Only a plain object is an entry: projecting an array as one turns it
     // into an object keyed by index.
@@ -249,6 +242,17 @@ export default abstract class DmPlugin {
     return Object.fromEntries(
       Object.entries(data).map(([key, entry]) => [key, project(entry)])
     ) as T;
+  }
+
+  /**
+   * The entities this plugin serves, declared when the server admits it.
+   * A plugin that serves several — `LdapFlatGeneric` and its instances —
+   * returns one declaration per entity.
+   *
+   * @returns the entities to add to the server's registry
+   */
+  declareEntities(): EntityDeclaration[] {
+    return [];
   }
 
   /** Names already warned about by requirePlugin, so each warns at most once. */

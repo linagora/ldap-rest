@@ -10,7 +10,11 @@
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
+import DmPlugin, {
+  defineRoute,
+  type EntityDeclaration,
+  type Role,
+} from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { OptionSet } from '../../config/options';
 import type { Hooks } from '../../hooks';
@@ -245,6 +249,24 @@ export default class LdapGroups extends DmPlugin {
           this.logger.error(`Failed to load group schema from ${file}: ${err}`)
         );
     }
+  }
+
+  /**
+   * Declare the group branch to the entity registry. `TwakeGroups` overrides
+   * this method: its groups are served by its own API, not as the `groups`
+   * entity.
+   */
+  declareEntities(): EntityDeclaration[] {
+    return [
+      {
+        name: 'group',
+        pluralName: 'groups',
+        base: this.base as string,
+        mainAttribute: this.cn,
+        kind: 'groups',
+        source: this,
+      },
+    ];
   }
 
   /**

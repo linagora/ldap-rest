@@ -742,6 +742,7 @@ class DM {
     // (undocumented)
     config: Config;
     dispatchAuth(req: Request_2, res: Response_2, next: () => void): void;
+    readonly entities: EntityRegistry;
     exitOnCrash(): void;
     // (undocumented)
     readonly hookBus: HookBus;
@@ -793,6 +794,7 @@ abstract class DmPlugin {
     // (undocumented)
     config: Config;
     configApiKey?: string;
+    declareEntities(): EntityDeclaration[];
     // (undocumented)
     dependencies?: Record<string, string>;
     protected fetch(url: Parameters<typeof globalThis.fetch>[0], init?: RequestInit): Promise<Response>;
@@ -829,9 +831,72 @@ type DmRequest = Request_2 & {
 };
 
 // @public
+interface EntityDeclaration {
+    // (undocumented)
+    base: string;
+    flat?: FlatEntityApi;
+    // (undocumented)
+    kind: EntityKind;
+    // (undocumented)
+    mainAttribute: string;
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    pluralName: string;
+    source: EntitySource;
+}
+
+// @public
+interface EntityDescriptor {
+    readonly base: string;
+    readonly flat?: FlatEntityApi;
+    // (undocumented)
+    readonly kind: EntityKind;
+    readonly mainAttribute: string;
+    readonly name: string;
+    readonly pluralName: string;
+    readonly schema: Schema | undefined;
+}
+
+// @public
+type EntityKind = 'flat' | 'groups' | 'organizations';
+
+// @public
+interface EntityRegistry {
+    // (undocumented)
+    all(): readonly EntityDescriptor[];
+    // (undocumented)
+    ofKind(kind: EntityKind): readonly EntityDescriptor[];
+    register(declaration: EntityDeclaration): void;
+    // (undocumented)
+    schemas(): readonly (Schema | undefined)[];
+}
+
+// @public
+interface EntitySource {
+    // (undocumented)
+    readonly schema?: Schema;
+}
+
+// @public
+interface FlatEntityApi {
+    // (undocumented)
+    modifyEntry(id: string, changes: ModifyRequest, req: Request_2): Promise<boolean>;
+}
+
+// @public
 interface FlatHookBus {
     chain<T>(suffix: string, value: T): Promise<T>;
     notify(suffix: string, ...args: unknown[]): void;
+}
+
+// @public
+interface GeneratedFrom {
+    attribute: string;
+    extract?: string;
+    lowercase?: boolean;
+    onCollision?: 'error' | 'suffix';
+    strip?: string;
 }
 
 // @public
@@ -1034,6 +1099,9 @@ interface LdapSchema {
 }
 
 // @public
+type LocalizedText = string | Record<string, string>;
+
+// @public
 interface MatchingRuleDefinition {
     // (undocumented)
     desc?: string;
@@ -1172,10 +1240,70 @@ export interface RequestBoundLdap {
 type Role = 'auth' | 'authz' | 'protect' | 'api' | 'logging' | 'demo' | 'consistency' | 'configurable';
 
 // @public (undocumented)
+interface Schema {
+    // (undocumented)
+    attributes: {
+        [key: string]: SchemaAttribute;
+    };
+    entity?: {
+        label?: LocalizedText;
+        singularLabel?: LocalizedText;
+        valueLabels?: Record<string, LocalizedText>;
+    };
+    // (undocumented)
+    strict: boolean;
+}
+
+// @public (undocumented)
 const SCHEMA_BULK_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:BulkResponse";
 
 // @public (undocumented)
 const SCHEMA_ERROR = "urn:ietf:params:scim:api:messages:2.0:Error";
+
+// @public (undocumented)
+interface SchemaAttribute {
+    allowSubdomains?: boolean;
+    // (undocumented)
+    branch?: string[];
+    // (undocumented)
+    default?: AttributeValue;
+    deleteGuard?: 'nonEmpty';
+    // (undocumented)
+    fixed?: boolean;
+    generated?: boolean;
+    generatedFrom?: GeneratedFrom;
+    group?: LocalizedText;
+    help?: LocalizedText;
+    hint?: LocalizedText;
+    // (undocumented)
+    items?: {
+        type: string;
+        test?: string | RegExp;
+        hint?: LocalizedText;
+        branch?: string[];
+        maxLength?: number;
+    };
+    label?: LocalizedText;
+    mailDomainScope?: 'organization' | 'directory';
+    maxLength?: number;
+    neverReturn?: boolean;
+    normalize?: 'byteSize';
+    readOnly?: boolean;
+    referentialIntegrity?: 'restrict' | 'remove' | 'ignore';
+    // (undocumented)
+    required?: boolean;
+    role?: SchemaRole | SchemaRole[];
+    searchable?: boolean;
+    states?: Record<string, AttributeValue>;
+    // (undocumented)
+    test?: string | RegExp;
+    // (undocumented)
+    type: SchemaAttributeType;
+    unique?: boolean | UniqueConstraint;
+}
+
+// @public
+type SchemaAttributeType = 'string' | 'number' | 'integer' | 'boolean' | 'date' | 'array' | 'pointer';
 
 // @public
 class SchemaIndex {
@@ -1195,6 +1323,9 @@ class SchemaIndex {
     // (undocumented)
     readonly schema: LdapSchema;
 }
+
+// @public
+type SchemaRole = string;
 
 // @public (undocumented)
 interface ScimAddress {
@@ -1356,6 +1487,14 @@ interface SyntaxDefinition {
     desc?: string;
     // (undocumented)
     oid: string;
+}
+
+// @public
+interface UniqueConstraint {
+    attributes?: string[];
+    branches?: string[];
+    filter?: string;
+    sentinel?: string;
 }
 
 // @public (undocumented)

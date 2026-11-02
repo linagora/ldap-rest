@@ -93,3 +93,26 @@ registers once and keeps its services for the life of the server.
 
 `this.requirePlugin(name)` remains for a plugin whose interface is not yet
 declared as a service; new code reaches another plugin through a token.
+
+## The entity registry
+
+The server owns one registry of the entity types the loaded plugins serve:
+flat entities, groups and organizations. A plugin declares its entities as it
+loads, and a consumer reads them from `server.entities` or through
+`EntityRegistryService` instead of indexing `server.loadedPlugins`:
+
+```typescript
+for (const entity of this.server.entities.ofKind('flat')) {
+  const attribute = roleAttribute(entity.schema, 'domainName');
+  if (attribute) branches.push({ base: entity.base, attribute });
+}
+```
+
+A descriptor carries the singular and collection names, the branch, the main
+attribute, the kind and the schema. The schema is read through the declaring
+plugin, so a plugin that loads it asynchronously is still described once it
+arrives. A flat descriptor also carries the write path (`flat.modifyEntry`),
+for a plugin driving the entity.
+
+`TwakeGroups` is the one exception: it extends `LdapGroups` but serves its own
+API, so it overrides the declaration and does not register a `groups` entity.
