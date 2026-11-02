@@ -33,8 +33,11 @@ import {
   unescapeDnValue,
 } from '../../lib/utils';
 import { RabbitMqService, type RabbitMqApi } from '../../lib/services/rabbitmq';
+import {
+  TwakeGroupsService,
+  type TwakeGroupsApi,
+} from '../../lib/services/twakeGroups';
 
-import type TwakeGroups from './groups';
 import type TwakeTombstone from './tombstone';
 import {
   bodyOf,
@@ -316,8 +319,13 @@ export default class TwakeSpaces extends DmPlugin {
     return Boolean(this.userRole || this.config.rabbitmq_url);
   }
 
-  private get groups(): TwakeGroups {
-    return this.server.loadedPlugins.twakeGroups as unknown as TwakeGroups;
+  private get groups(): TwakeGroupsApi {
+    const groups = this.service(TwakeGroupsService);
+    if (!groups)
+      throw new Error(
+        'twakeSpaces: TwakeGroupsService is not provided; load core/twake/groups'
+      );
+    return groups;
   }
 
   private get tombstone(): TwakeTombstone | undefined {
@@ -440,6 +448,10 @@ export default class TwakeSpaces extends DmPlugin {
    * and no event would say it went.
    */
   async assertComposition(): Promise<void> {
+    if (!this.service(TwakeGroupsService))
+      throw new Error(
+        `${this.name}: needs core/twake/groups loaded, which serves the groups of a space`
+      );
     if (this.config.rabbitmq_url && !(await this.rabbitmq?.getRawClient()))
       throw new Error(
         `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached`

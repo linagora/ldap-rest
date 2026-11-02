@@ -51,6 +51,7 @@ import {
 import { scimOptionsOf } from '../scim/scim.options';
 import type { ScimGroup } from '../../lib/scim/types';
 import { outsideRequest } from '../../lib/requestContext';
+import { TwakeGroupsService, type Page } from '../../lib/services/twakeGroups';
 
 import {
   first,
@@ -150,14 +151,7 @@ export function bodyOf(req: Request): Record<string, unknown> {
   return body as Record<string, unknown>;
 }
 
-export interface Page {
-  page: number;
-  limit: number;
-  offset: number;
-  search?: string;
-  sortBy?: string;
-  desc: boolean;
-}
+export type { Page } from '../../lib/services/twakeGroups';
 
 /** The values of an attribute, whatever shape the directory gave them. */
 export function values(value: AttributeValue | undefined): string[] {
@@ -249,6 +243,7 @@ export default class TwakeGroups extends LdapGroups {
   static optionDefinitions = twakeGroupsOptions;
 
   name = 'twakeGroups';
+  provides = [TwakeGroupsService.with(this)];
 
   protected readonly groupBase: string;
   protected readonly userBase: string;

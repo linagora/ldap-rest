@@ -130,6 +130,8 @@ A plugin family provides the others:
 - `RabbitMqService`: the shared broker, its publish, subscribe and
   reachability check.
 - `StorageService`: the one keyed store and its backend.
+- `TwakeGroupsService`: the groups of a Twake space, their branches and the
+  pages the space routes read.
 
 A consumer that only needs to know whether the feature is loaded calls
 `this.service(token)` and skips its work when the answer is `null`.
