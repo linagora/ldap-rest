@@ -145,8 +145,9 @@ describe('Every route refuses the input it cannot take', function () {
       twake_instance_fqdn_attribute: 'carLicense',
       twake_instance_sent_attribute: 'businessCategory',
     });
-    server.loadedPlugins['rabbitmq'] = new StubRabbitMq() as any;
-    server.services.set(RabbitMqService, new StubRabbitMq());
+    const rabbit = new StubRabbitMq();
+    server.loadedPlugins['rabbitmq'] = rabbit as never;
+    server.services.set(RabbitMqService, rabbit);
     for (const [name, Plugin] of [
       ['ldapFlatGeneric', LdapFlatGeneric],
       ['ldapAccountLifecycle', LdapAccountLifecycle],

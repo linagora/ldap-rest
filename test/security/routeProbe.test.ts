@@ -461,8 +461,9 @@ for (const model of MODELS)
         twake_instance_fqdn_attribute: 'carLicense',
         twake_instance_sent_attribute: 'businessCategory',
       });
-      server.loadedPlugins['rabbitmq'] = new StubRabbitMq() as any;
-      server.services.set(RabbitMqService, new StubRabbitMq());
+      const rabbit = new StubRabbitMq();
+      server.loadedPlugins['rabbitmq'] = rabbit as never;
+      server.services.set(RabbitMqService, rabbit);
       await wipe();
       const add = (dn: string, entry: Record<string, unknown>) =>
         server.ldap.add(dn, entry as never);

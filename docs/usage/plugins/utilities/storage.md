@@ -135,16 +135,16 @@ directory, table or instance.
 ## For Plugin Authors
 
 ```ts
-const storage = this.requirePlugin<Storage>('storage');
-await storage.store.set('myplugin', key, value, Date.now() + 3600_000);
-const kept = await storage.store.get('myplugin', key); // null once expired
-await storage.store.delete('myplugin', key);
+const storage = this.service(StorageService);
+await storage?.store.set('myplugin', key, value, Date.now() + 3600_000);
+const kept = await storage?.store.get('myplugin', key); // null once expired
+await storage?.store.delete('myplugin', key);
 ```
 
-`requirePlugin` warns and answers `null` when storage is absent, which is
-right for a feature that can be skipped. A plugin making a **security**
-decision must not read "no storage" as "nothing to check": it refuses to load
-instead, as [Back-Channel Logout](../auth/back-channel-logout.md) does.
+`service` warns and answers `null` when storage is absent, which is right for
+a feature that can be skipped. A plugin making a **security** decision must
+not read "no storage" as "nothing to check": it refuses to load instead, as
+[Back-Channel Logout](../auth/back-channel-logout.md) does.
 
 ## See Also
 

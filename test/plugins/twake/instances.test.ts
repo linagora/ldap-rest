@@ -370,9 +370,10 @@ describe('Twake instances plugin', function () {
         twake_instance_sent_attribute: 'twakeNoSuchMark',
       });
       await dm2.ready;
+      const rabbit2 = new StubRabbitMq();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dm2.loadedPlugins['rabbitmq'] = new StubRabbitMq() as any;
-      dm2.services.set(RabbitMqService, new StubRabbitMq());
+      dm2.loadedPlugins['rabbitmq'] = rabbit2 as any;
+      dm2.services.set(RabbitMqService, rabbit2);
       expect(
         String(
           await refusal(
@@ -388,9 +389,10 @@ describe('Twake instances plugin', function () {
         twake_instance_organization_name_attribute: 'description',
       });
       await dm2.ready;
+      const rabbit2 = new StubRabbitMq();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dm2.loadedPlugins['rabbitmq'] = new StubRabbitMq() as any;
-      dm2.services.set(RabbitMqService, new StubRabbitMq());
+      dm2.loadedPlugins['rabbitmq'] = rabbit2 as any;
+      dm2.services.set(RabbitMqService, rabbit2);
       expect(
         String(
           await refusal(
