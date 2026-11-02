@@ -24,7 +24,8 @@ subscriber answers:
 A chained hook is handed its arguments as one value, a tuple when it has
 several. A notified hook is handed them one by one: its subscriber is
 `(dn, entry, context) => …`, never `([dn, entry], context) => …` — that form
-still compiles, the parameters being bivariant, but then reads the DN's first
+still compiles without annotation, since its parameter takes the declared
+`string` and a string can be destructured, but then reads the DN's first
 character as the DN.
 
 - **Chained.** The value goes from one subscriber to the next, each getting

@@ -34,12 +34,21 @@ Integrate LDAP-Rest into your web applications.
 - **[JSON Schemas](client-development/schemas/README.md)** - Schema structure and validation
 - **[Examples](client-development/examples/README.md)** - React, Vue.js, Vanilla JS integration
 
+### [Architecture](architecture/README.md)
+
+How the server is put together.
+
+- **[Overview](architecture/README.md)** - Module map, life of a request, life of a write
+- **[Decision records](architecture/adr/)** - Why the code is the way it is
+
 ### [Development](development/contracts.md)
 
 Work on ldap-rest itself.
 
 - **[Published contracts](development/contracts.md)** - What breaks a
   contract, the snapshots that detect it and the deprecation window.
+- **[Modularization plan](development/modularization-plan.md)** - How the
+  `@ldap-rest/*` split and the remaining code-quality issues are sequenced.
 
 ## API stability
 
