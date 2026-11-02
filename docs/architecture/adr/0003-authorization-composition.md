@@ -4,11 +4,12 @@
 
 Every plugin that judges directory operations registers the same request
 hooks (`ldapsearchrequest`, `ldapaddrequest`, `ldapmodifyrequest`,
-`ldapdeleterequest`, `ldaprenamerequest`). Chained hooks run every subscriber
-and the first refusal wins, so two loaded authorization plugins compose as an
-AND. That rule is sound when it is meant. It is a refusal nobody can explain
-when it is not: `authzPerBranch` next to `authzDynamic` judges a machine token
-by a branch configuration written for administrators and refuses a write the
+`ldapdeleterequest`, `ldaprenamerequest`). Chained hooks run their
+subscribers in order and stop at the first refusal, so two loaded
+authorization plugins compose as an AND: the first to refuse answers. That
+rule is sound when it is meant. It is a refusal nobody can explain when it is
+not: `authzPerBranch` next to `authzDynamic` judges a machine token by a
+branch configuration written for administrators and refuses a write the
 token's ACLs grant.
 
 ## Decision
@@ -21,12 +22,17 @@ requests: its hooks read the credential it verified.
 `assertAuthzComposition` runs once every configured plugin is loaded, and
 again for each plugin registered later. It refuses:
 
-- an `--authz-for` naming no loaded authentication plugin;
-- two judges whose populations can share a request, unless `--authz-combine`
-  makes the AND deliberate.
+- an `authz_for` naming a plugin that is not a loaded authenticator — the
+  plugin would judge nobody. A server-wide `--authz-for` that no loaded plugin
+  reads only warns, as does an `authz_for` on a plugin that also
+  authenticates;
+- two judges whose populations overlap on an authenticator — the same one, or
+  one of them judging everyone — unless `--authz-combine` makes the AND
+  deliberate.
 
-Two judges whose authenticators run on the same prefix are reported, not
-refused: asking for two credentials is already a decision. A judge on
+Two judges whose authenticators can run on the same prefix, without sharing an
+authenticator name, are reported, not refused: asking for two credentials is
+already a decision, and a request carrying both is judged by both. A judge on
 `authzPerRoute` gates URLs and registers no LDAP hook, so it is not part of
 this AND — route plus branch is a documented combination.
 
@@ -43,8 +49,9 @@ AND, including the filters: two filters narrow the result twice.
   authorization must agree.
 - A plugin registered by an embedding host is checked before its routes and
   hooks exist, so a refused plugin leaves nothing behind.
-- Judges run first, and all of them run: the first refusal answers, so the
-  order matters and is the load order of the judges.
+- Judges run first, in their load order. The chain stops at the first refusal,
+  so a judge after a refusing one does not run; the refusal is the answer.
+  No judge is skipped while the request is still allowed.
 - A judge that also authenticates judges only its own requests; a request it
   did not vouch for passes its hooks untouched, because the absence of its
   credential is not a refusal it makes.

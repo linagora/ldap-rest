@@ -4,12 +4,12 @@
 
 Plugins are listed with `--plugin`, in the order the administrator writes
 them, and a plugin may declare `dependencies` naming modules that must be
-registered before it. Two kinds of plugin cannot simply be imported in
-parallel with the rest: a guard whose Express middleware must sit ahead of the
-routes it protects (`rateLimit`, `crowdsec`, `trustedProxy`), and a plugin
-others must find registered when they register (`core/storage`). Import order
-in the parallel batch is the order the imports happen to complete, which is
-not a configuration.
+registered before it. Some plugins cannot simply be imported in parallel with
+the rest: a guard whose Express middleware must sit ahead of the routes it
+protects, an access log that must see every request, an authenticator or URL
+gate other plugins must find registered when they register. Import order in
+the parallel batch is the order the imports happen to complete, which is not a
+configuration.
 
 ## Decision
 
@@ -22,6 +22,14 @@ on demand when the plugin that needs it registers. A module requested twice
 under the same name without overrides is loaded once; a second instance needs
 its own name. Two plugins with the same instance name are refused, and the
 second is dropped with a warning. `configApi` loads last.
+
+The list holds four kinds of plugin: the guards whose middleware must run
+before the routes (`trustedProxy`, `crowdsec`, `rateLimit`), the access log
+that must see every request (`weblogs`), the authenticators the dispatcher and
+the authorization plugins naming them have to find registered (`token`,
+`fake`, `llng`, `openidconnect`), and the URL gate whose rules must exist
+before the routes they judge (`authzPerRoute`). `core/storage` is there
+because others must find it registered when they register.
 
 Hooks run in load order, except the request hooks of authorization plugins,
 which run before every other subscriber's.

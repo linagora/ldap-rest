@@ -17,10 +17,11 @@ plugins and the routes. For each request it selects the plugins whose prefix
 is the longest match. Several plugins sharing that winning prefix all run, in
 registration order, and every one must let the request through. When no
 plugin claims the path, the unscoped plugins (no prefix) run; when there is
-none, the request passes unauthenticated. A plugin's `afterChain` runs after
-the whole chain and before the route. `runForRequest` then wraps everything
-downstream, and the dispatcher records which plugins vouched for the request
-in `req.authenticators`.
+none, the request passes through unauthenticated, outside any request
+context. A plugin's `afterChain` runs after the whole chain and before the
+route. `runForRequest` then wraps everything downstream of a request an
+authenticator let through, and the dispatcher records which plugins vouched
+for the request in `req.authenticators`.
 
 `warnUnauthenticatedRoutes` lists, at startup, the routes that no
 authentication plugin covers. An unscoped authenticator guards everything and

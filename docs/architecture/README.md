@@ -13,15 +13,16 @@ roadmap; this page describes the code as it is.
 | Path                   | Role                                                                                                                                                                               |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/bin/index.ts`     | `DM`: the Express app, plugin loading, the authentication dispatcher, `ready` and `stop`, `withConfig`                                                                             |
-| `src/config/`          | Command-line and environment parsing (`args.ts`), option specs (`options.ts`), the directory schema (`schema.ts`)                                                                  |
+| `src/config/`          | Command-line and environment parsing (`args.ts`), option specs (`options.ts`), the entity-schema model (`schema.ts`; the directory's own schema is `src/lib/ldap/schema.ts`)       |
 | `src/abstract/`        | `DmPlugin` base class; `LdapFlat`, the entity CRUD built on it; `TwakePlugin`                                                                                                      |
 | `src/hooks.ts`         | The hook type map: one entry per hook, with its arguments and its answer                                                                                                           |
 | `src/lib/`             | Core services: `ldapActions` and `lib/ldap/` (pool, search cache, schema), `lib/auth/`, `lib/authz/`, `lib/services/`, `lib/storage/`, `hookBus`, `requestContext`, errors, routes |
 | `src/plugins/auth/`    | Authentication plugins, authorization plugins, and the guards that sit before them                                                                                                 |
 | `src/plugins/ldap/`    | Directory plugins: groups, organizations, entities, change detection, trash, password policy                                                                                       |
 | `src/plugins/scim/`    | The SCIM 2.0 API                                                                                                                                                                   |
-| `src/plugins/storage/` | Storage backends (file, LDAP, SQL, Valkey, RabbitMQ)                                                                                                                               |
-| `src/plugins/twake/`   | Twake integrations: mail, calendar, chat, tombstones, lifecycle events                                                                                                             |
+| `src/plugins/storage/` | Storage backends (`file`, `ldap`, `postgres`, `valkey`), each a `Store`                                                                                                            |
+| `src/plugins/twake/`   | Twake integrations: mail, calendar, spaces, drives, tombstones, lifecycle events                                                                                                   |
+| `src/plugins/*.ts`     | Standalone plugins: `static`, `weblogs`, `configApi`, `metrics`, `bcl`, and `rabbitmq` (a shared broker connection, not a store)                                                   |
 | `src/plugins/demo/`    | Example plugins                                                                                                                                                                    |
 | `src/browser/`         | Browser libraries shipped with the package                                                                                                                                         |
 | `src/logger/`          | Log formatting and levels                                                                                                                                                          |
@@ -49,7 +50,7 @@ flowchart TD
     J --> K[ldap.forRequest or ldap.system]
     K --> L[request hooks, authorization first]
     L --> M[(directory)]
-    M --> N[done hooks, then end hooks]
+    M --> N[done hooks of a write, then end hooks]
     N --> O[onLdap* notifications]
     J --> P[error middleware]
 ```
@@ -63,25 +64,27 @@ flowchart TD
 2. The dispatcher picks the authentication whose path prefix is the most
    specific. Several plugins sharing that winning prefix all run, in
    registration order, and every one must let the request through: two
-   credentials on one branch are an AND. A path nobody claims is served
-   unauthenticated if an unscoped authenticator is loaded, and otherwise the
-   dispatcher passes it through — `warnUnauthenticatedRoutes` names those
-   routes at startup.
+   credentials on one branch are an AND. A path nobody claims is guarded by
+   the unscoped authenticators (no prefix), if any are loaded; with none, the
+   request passes through unauthenticated, and `warnUnauthenticatedRoutes`
+   names those routes at startup.
 3. A plugin's `afterChain` runs after the whole selected chain and before any
    route: it is the only place where a verdict can depend on several
    authenticators without registration order deciding the answer.
-4. `runForRequest(req, next)` wraps everything downstream. A directory
-   operation made there, by whatever plugin, is judged as that caller even if
-   the request object was not handed down. Hooks are the exception: they run
-   as the server (see below), and a hook acting as the caller names the
-   request it received. `ldap.system` is the explicit escape anywhere else.
+4. `runForRequest(req, next)` wraps everything downstream of a request an
+   authenticator let through — not the pass-through path, which has no
+   caller. A directory operation made there, by whatever plugin, is judged as
+   that caller even if the request object was not handed down. Hooks are the
+   exception: they run as the server (see below), and a hook acting as the
+   caller names the request it received. `ldap.system` is the explicit escape
+   anywhere else.
 5. A route declares its input schemas with `defineRoute`; the handler receives
    checked `params`, `query` and `body`, and reaches the directory through
    `ldap.forRequest(req)`. Work the server does for itself goes through
    `ldap.system`.
 6. `ldapActions` raises the request hooks (authorization plugins first), makes
-   the operation, then raises the "done" and "end" hooks. The next section
-   follows a write.
+   the operation, then raises the "done" and "end" hooks of a write. The next
+   section follows one.
 
 The decisions behind these steps: [authentication
 dispatch](adr/0002-authentication-dispatch.md), [authorization
@@ -141,10 +144,14 @@ sequenceDiagram
 The configuration is parsed from the command line and `DM_*` variables, then
 `DM` loads the plugins: `src/plugins/priority.json` first, one at a time in
 its order, then the rest in parallel. Once every load settled, the server
-checks the authorization composition, learns the directory's attribute types,
-reports unknown options and runs `afterLoad`. `DM.ready` resolves then; the
-CLI opens the port after it. An embedding host may register plugins after
+checks the authorization composition, learns the directory's attribute types
+when an authorization plugin is loaded, reports unknown options and runs
+`afterLoad`. `DM.ready` resolves then, and rejects if a plugin failed to load;
+the CLI opens the port after it. An embedding host may register plugins after
 `ready`, and each registration is checked against the composition too.
+`warnUnauthenticatedRoutes` stays silent when no authentication plugin is
+loaded; the enforcement check says once whether that is an open server or a
+configuration to refuse.
 
 [Plugin load order](adr/0001-plugin-load-order.md),
 [server views](adr/0008-withconfig-views.md).

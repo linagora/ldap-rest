@@ -10,11 +10,11 @@ round trip.
 
 ## Decision
 
-`SearchCache` caches non-paginated, base-scope searches — single-entry
-lookups by DN — keyed by base, scope, filter, attributes, options and values
-mode, in an LRU bounded by `--ldap-cache-max`. It is **off by default**
-(`--ldap-cache-ttl=0`): no deployment has run with it on, and turning it on
-for everyone would be a silent behaviour change.
+`SearchCache` caches non-paged, base-scope searches — single-entry lookups by
+DN, with whatever filter — keyed by base, scope, filter, attributes, options
+and values mode, in an LRU bounded by `--ldap-cache-max`. It is **off by
+default** (`--ldap-cache-ttl=0`): no deployment has run with it on, and
+turning it on for everyone would be a silent behaviour change.
 
 `ldapActions` drops, around every write it makes through this process:
 
@@ -36,8 +36,9 @@ Writes made elsewhere — another replica, an LSC synchronisation, a hand-run
 
 - Enable the cache only when this service is the only writer, or when serving
   an entry up to `--ldap-cache-ttl` seconds old is acceptable.
-- A read of a subtree, a paged search or a filter is never cached; the cache
-  does not accelerate listings.
+- A subtree or one-level read, or a paged search, is never cached; the cache
+  does not accelerate listings. A base-scope read with a filter is cached,
+  keyed by that filter.
 - The cache does not lift a miss: a read of an absent DN throws and caches
   nothing.
 - The invalidation rules follow the overlays this project documents

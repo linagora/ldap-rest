@@ -15,29 +15,38 @@ picks one per branch:
 
 - **`core/ldap/trash`** moves the entry, by an atomic `modifyDN`, to a trash
   branch under `--trash-base`, overwriting an earlier entry with the same RDN
-  there, and adds the deletion date and the original DN as metadata. The
-  native delete is cancelled. `--trash-watched-bases` selects the branches;
-  an empty list watches every branch.
+  there; with `--trash-add-metadata`, it then replaces `description` with the
+  deletion date and the original DN, a failure there being logged and not
+  fatal. The native delete is cancelled. `--trash-watched-bases` selects the
+  branches; an empty list watches every branch.
 - **`core/twake/tombstone`** keeps the entry in place: one modify sets the
-  deleted attribute, the deletion date, the reason and the lock, and removes
-  the attributes the deployment names. The identifier is reserved until an
-  operator erases the tombstone, once the deletion is old enough or
-  immediately when forced. Erasing removes the entry and its group
-  memberships and announces nothing.
+  deleted attribute and the lock, the deletion date and the reason when their
+  attributes are configured, and removes the attributes the deployment names.
+  The identifier is reserved until an operator erases the tombstone, once the
+  deletion is old enough or immediately when forced. Erasing removes the entry
+  and its group memberships and announces nothing.
 
-Both run at the end of the `ldapdeleterequest` chain, after every
-authorization plugin has judged the delete, so a refused delete changes
-nothing. The tombstone is written by the server, not as the caller: the
-caller's delete right is what was judged.
+The tombstone moves itself last in the `ldapdeleterequest` and
+`ldapaddrequest` chains (`hookBus.toLast`), so every plugin that may refuse
+has judged. The trash does not: it runs in load order, after the authorization
+judges but possibly before another plugin that can refuse a delete
+(`organizations`, `enterpriseRules`, `james`). A plugin that refuses a delete
+and loads after the trash refuses one that has already been moved. The
+tombstone is written by the server, not as the caller: the caller's delete
+right is what was judged.
 
-SCIM treats a tombstone as gone: reads answer 404, lists omit it, and a create
-with the same identity erases the tombstone and creates a new entry. A delete
-of an existing tombstone writes nothing and fires `twakedeletionreplay`, so
-lifecycle events can replay a lost deletion.
+SCIM treats a tombstone as gone: its reads carry a not-deleted filter, so
+reads answer 404 and lists omit it; a create with the same identity erases
+the tombstone and creates a new entry. A non-SCIM delete of an existing
+tombstone writes nothing and fires `twakedeletionreplay`, so lifecycle events
+can replay a lost deletion. A SCIM DELETE never gets there: its existence
+check hides the tombstone and answers 404.
 
-The server refuses to start when a `--trash-watched-bases` entry covers or
-sits under a `--twake-tombstone-dn` pattern: the trash would move the entry
-before the tombstone saw the delete, and no tombstone would be written.
+The server refuses to start when the tombstone is loaded beside the trash and
+any watched branch overlaps a `--twake-tombstone-dn` pattern: the trash would
+move the entry before the tombstone saw the delete, and no tombstone would be
+written. An empty `--trash-watched-bases` watches every branch, so it overlaps
+any pattern and refuses too.
 
 ## Consequences
 
@@ -46,6 +55,8 @@ before the tombstone saw the delete, and no tombstone would be written.
   branch.
 - Trash and tombstone cannot watch the same branch; the startup check names
   the overlap.
+- A deployment that loads the trash must load it before the plugins that can
+  refuse a delete, or accept that a refusal can come after the entry moved.
 - A tombstone cannot be restored: clearing its deleted attribute by hand is
   not a supported operation.
 - Trash moves the entry, so its DN changes and references to it are not

@@ -14,9 +14,12 @@ the same plugin registry. A second `DM` would be a second server.
 
 `DM.withConfig(config)` returns a view of the server built with
 `Object.create(Object.getPrototypeOf(this))` and `Object.assign(…, this,
-{ config })`. Own properties — the app, hooks, LDAP actions, plugin registry,
-operation sequence — are shared by reference; only `config` differs. The
-loader constructs a plugin with overrides on such a view.
+{ config })`. The own properties that hold objects — the app, the hooks, the
+LDAP actions, the plugin registry, the authenticators — are shared by
+reference. The configuration is `{ ...this.config, ...overrides }`, a shallow
+copy: overridden top-level keys are the plugin's alone, nested objects and
+arrays are still shared with the server. The loader constructs a plugin with
+overrides on such a view.
 
 The copy is built on the prototype rather than by spreading `{...this}`,
 which copies own properties and leaves the methods behind: a plugin calling
@@ -26,10 +29,16 @@ overrides.
 ## Consequences
 
 - A plugin loaded with overrides cannot change the server's configuration for
-  anyone else; mutating `this.config` affects its view alone.
-- State added to the server after the view was created is still shared if it
-  lives in an own property; a new field holding mutable state has to be an
-  object, not a primitive, for the views to see its changes.
+  anyone else; mutating `this.config` affects its view alone, at the top
+  level.
+- Primitive fields are copied by value, not shared. Two of them are known
+  limitations, not fixed here: `operationSequence` gives each view its own
+  counter (two views can hand out the same operation number), and `_composed`
+  is frozen at its value when the view was created, so a plugin registered
+  through a view after `ready` skips the composition check.
+- An own property added to the server after the view was created is not
+  visible to that view. State that must be shared has to live in an object
+  that already exists when the view is made.
 - A plugin that closes over `this.server` keeps the view for its lifetime,
   which is the point: its options stay its own.
 - Tests may call `withConfig` to exercise option-dependent behaviour without
