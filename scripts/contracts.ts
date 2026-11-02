@@ -7,10 +7,16 @@
  * Usage: npx tsx scripts/contracts.ts --base origin/master [--breaking]
  */
 import { execFileSync } from 'child_process';
-import { realpathSync } from 'fs';
+import { readFileSync, realpathSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import {
+  API_ENTRIES,
+  API_REPORT_DIR,
+  diffApiReports,
+  reportPath,
+} from './api-snapshot';
 import { OpenAPIGenerator } from './generate-openapi';
 import {
   buildOptionsSnapshot,
@@ -24,6 +30,34 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const OPTIONS_SNAPSHOT = 'docs/usage/options.snapshot.json';
 export const OPENAPI_SNAPSHOT = 'openapi.json';
+
+function baseApiEntries(base: string): string[] {
+  try {
+    const listed = execFileSync(
+      'git',
+      ['ls-tree', '--name-only', `${base}:etc/api`],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }
+    );
+    return listed
+      .split('\n')
+      .filter(line => line.endsWith('.api.md'))
+      .map(line => line.replace(/\.api\.md$/, ''));
+  } catch {
+    return [];
+  }
+}
+
+function readApiReport(entry: string): string | null {
+  try {
+    return readFileSync(reportPath(entry), 'utf8');
+  } catch {
+    return null;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Schema = Record<string, any>;
@@ -883,6 +917,52 @@ async function main(): Promise<void> {
       )
     );
   }
+
+  let introducedReports = false;
+  // The base's reports as well: dropping an entry from the snapshot list is a
+  // removed sub-path, and only a report in the base can show it
+  for (const entry of new Set([
+    ...Object.keys(API_ENTRIES),
+    ...baseApiEntries(base),
+  ])) {
+    const baseReport = gitShow(base, path.relative(root, reportPath(entry)));
+    if (baseReport === null) {
+      introducedReports = true;
+      continue;
+    }
+    const current = readApiReport(entry);
+    if (current === null) {
+      if (!(entry in API_ENTRIES)) {
+        differences.push({ kind: 'removed', what: `${entry} entry` });
+        continue;
+      }
+      console.error(
+        `${path.relative(root, reportPath(entry))} is missing: run ` +
+          '`npm run snapshot:api` and commit it.'
+      );
+      process.exitCode = 1;
+      continue;
+    }
+    const changes = diffApiReports(baseReport, current);
+    for (const declaration of changes.removed)
+      differences.push({
+        kind: 'removed',
+        what: `${entry} declaration ${declaration}`,
+      });
+    for (const declaration of changes.added)
+      console.log(`+ added ${entry} declaration ${declaration}`);
+    // A changed declaration may add an optional member or narrow a union: the
+    // report diff says which, until the gate decides it
+    for (const declaration of changes.changed)
+      console.log(
+        `~ changed ${entry} declaration ${declaration}: review the report diff`
+      );
+  }
+  if (introducedReports)
+    console.log(
+      `No ${path.relative(root, API_REPORT_DIR)}/ reports in ${base}: ` +
+        'introducing the plugin API snapshot.'
+    );
 
   const nonAdditiveChanges = nonAdditive(differences);
   for (const difference of differences) {

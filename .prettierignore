@@ -5,6 +5,7 @@ helm/
 package.json
 openapi.json
 docs/usage/options.snapshot.json
+etc/api/
 
 # Dependencies
 node_modules/
