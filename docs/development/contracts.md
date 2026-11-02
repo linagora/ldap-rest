@@ -31,15 +31,19 @@ contract shows up as a diff instead of a surprise after the release:
 - `openapi.json` is the REST API document the published reference is built
   from. Regenerate it with `npm run generate:openapi`; `npm run check:openapi`
   fails when it is stale.
-- `etc/api/*.api.md` are the API Extractor reports of the five entry points
-  #595 covers first — `ldap-rest`, `./plugin`, `./hooks`, `./ldapactions` and
-  `./expressformatedresponses` — one file per sub-path. Regenerate them with
-  `npm run snapshot:api`; `npm run check:api`, part of `npm run check`, fails
-  when one is stale. A report lists what the entry exports and the shapes of
-  the types those exports reference, including the types the entry does not
-  export itself, so a change to `RouteDefinition` or `OptionSet` shows up even
-  though a plugin cannot name them. The 66 `./plugin-*` entries come with the
-  modularization, see [the plan](modularization-plan.md).
+- `etc/api/*.api.md` are the API Extractor reports, one file per sub-path:
+  the five main entry points — `ldap-rest`, `./plugin`, `./hooks`,
+  `./ldapactions` and `./expressformatedresponses` — and every `./plugin-*`
+  entry. A new plugin gets its report from `package.json`, without another
+  list to update. Regenerate them with `npm run snapshot:api`;
+  `npm run check:api`, part of `npm run check`, fails when one is stale. A
+  report lists what the entry exports and the shapes of the types those
+  exports reference, including the types the entry does not export itself, so
+  a change to `RouteDefinition` or `OptionSet` shows up even though a plugin
+  cannot name them. A declaration a plugin report shares verbatim with a
+  core report is dropped from the plugin report: the core report already
+  gates it, and repeating it would rewrite every plugin report on a core
+  change.
 
 The snapshot records what the parser reads. A narrowed `choices` list, a
 raised `min` or a lowered `max` is checked when a plugin reads its options,
@@ -69,9 +73,9 @@ the exported one, or a member of an exported namespace. Renaming a type only
 reachable through a signature is not a break: nobody can write its name, and
 the declarations that use it are reported as changed. A changed declaration is
 printed for review and does not fail the job yet: telling an added optional
-member from a narrowed union needs more than a line diff, and comes with the
-`./plugin-*` reports. Renaming an option is a deprecation, not a removal, as
-long as the old CLI name and environment variable stay in its `aliases` and
+member from a narrowed union needs more than a line diff. Renaming an
+option is a deprecation, not a removal, as long as the old CLI name and
+environment variable stay in its `aliases` and
 `envAliases`. Adding a union variant, a field or an optional parameter is
 additive, and so is a request union with an alternative that still accepts
 everything the base did — in a response the client reads every alternative,
