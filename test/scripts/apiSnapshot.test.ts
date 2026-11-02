@@ -124,6 +124,22 @@ describe('API reports', () => {
     expect(changes.removed).to.deep.equal(['unescapeDnValue']);
   });
 
+  it('names a namespace by itself, not after the function before it', () => {
+    const changes = diffApiReports(
+      report(
+        '// @public\nfunction unescapeDnValue(value: string): string;',
+        'declare namespace utils {\n    export {\n        escapeDnValue,\n        unescapeDnValue\n    }\n}\nexport { utils }'
+      ),
+      report(
+        '// @public\nfunction unescapeDnValue(value: string): string;',
+        'declare namespace utils {\n    export {\n        escapeDnValue\n    }\n}\nexport { utils }'
+      )
+    );
+
+    expect(changes.changed).to.deep.equal(['utils']);
+    expect(changes.removed).to.deep.equal([]);
+  });
+
   it('keeps overloads of one name apart', () => {
     const changes = diffApiReports(
       report(
