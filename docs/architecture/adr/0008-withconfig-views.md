@@ -23,10 +23,11 @@ overrides on such a view.
 
 A primitive field would be copied by value into every view, so state the views
 must share lives in an object: the operation counter (`_operations`, read
-through the `operationSequence` accessor) and the composition flag
-(`_compositionState`), as the dispatcher's own state does (`_authState`). A
-view created while the plugins load therefore sees the composition once the
-server has checked it.
+through the `operationSequence` accessor), the composition flag
+(`_compositionState`) and the mounted error middleware (`_errorState`), as
+the dispatcher's own state does (`_authState`). A view created while the
+plugins load therefore sees the composition once the server has checked it,
+and finds the error middleware after the routes it registers.
 
 The copy is built on the prototype rather than by spreading `{...this}`,
 which copies own properties and leaves the methods behind: a plugin calling
@@ -39,10 +40,11 @@ overrides.
   anyone else; mutating `this.config` affects its view alone, at the top
   level.
 - Primitive fields are copied by value, not shared: what must be shared is
-  held in an object, as the operation counter and the composition flag are.
-  A plugin registered after `ready` through a view created while loading is
-  therefore checked against the composition like any other (before [#625] and
-  [#626], the counter and the flag were primitives, and neither held).
+  held in an object, as the operation counter, the composition flag and the
+  error middleware are. A plugin registered after `ready` through a view
+  created while loading is therefore checked against the composition like any
+  other, and its failing routes answer through the server's JSON handler
+  ([#625], [#626], [#627]).
 - An own property added to the server after the view was created is not
   visible to that view. State that must be shared has to live in an object
   that already exists when the view is made.
@@ -56,3 +58,4 @@ See `src/bin/index.ts` (`withConfig`, `importPlugin`) and
 
 [#625]: https://github.com/linagora/ldap-rest/issues/625
 [#626]: https://github.com/linagora/ldap-rest/issues/626
+[#627]: https://github.com/linagora/ldap-rest/pull/627
