@@ -167,7 +167,7 @@ interface ChangeContext {
     source?: string;
 }
 
-// @public (undocumented)
+// @public
 type ChangesToNotify = Record<string, [
 AttributeValue | null,
 AttributeValue | null

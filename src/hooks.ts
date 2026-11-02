@@ -11,9 +11,9 @@ import type {
   AttributeValue,
   LdapList,
 } from './lib/ldapActions';
-import type { ChangesToNotify } from './plugins/ldap/onChange';
+import type { ChangesToNotify } from './lib/changes';
 import type { ChangeContext } from './lib/changeContext';
-import type { BulkResponse, ScimGroup, ScimUser } from './plugins/scim/types';
+import type { BulkResponse, ScimGroup, ScimUser } from './lib/scim/types';
 import * as utils from './lib/utils';
 
 export type MaybePromise<T> = Promise<T> | T;
