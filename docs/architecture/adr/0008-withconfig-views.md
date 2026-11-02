@@ -32,10 +32,10 @@ overrides.
   anyone else; mutating `this.config` affects its view alone, at the top
   level.
 - Primitive fields are copied by value, not shared. Two of them are known
-  limitations, not fixed here: `operationSequence` gives each view its own
-  counter (two views can hand out the same operation number), and `_composed`
-  is frozen at its value when the view was created, so a plugin registered
-  through a view after `ready` skips the composition check.
+  limitations, tracked in [#625] and [#626]: `operationSequence` gives each
+  view its own counter (two views can hand out the same operation number), and
+  `_composed` is frozen at its value when the view was created, so a plugin
+  registered through a view after `ready` skips the composition check.
 - An own property added to the server after the view was created is not
   visible to that view. State that must be shared has to live in an object
   that already exists when the view is made.
@@ -46,3 +46,6 @@ overrides.
 
 See `src/bin/index.ts` (`withConfig`, `importPlugin`) and
 [plugin options](../../plugin-development/options.md).
+
+[#625]: https://github.com/linagora/ldap-rest/issues/625
+[#626]: https://github.com/linagora/ldap-rest/issues/626
