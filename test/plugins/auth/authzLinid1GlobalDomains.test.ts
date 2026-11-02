@@ -146,7 +146,7 @@ describe('AuthzLinid1: the global organization links any domain', () => {
     await removeTree(top);
     for (const uid of ['god.top', 'god.global', 'god.local'])
       await dm.ldap.delete(user(uid)).catch(() => undefined);
-    await dm.stop();
+    dm.stop();
   });
 
   it('lets an administrator of the global organization create one linked to any domain', async () => {

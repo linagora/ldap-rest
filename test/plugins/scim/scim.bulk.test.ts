@@ -31,7 +31,7 @@ describe('SCIM Bulk (integration)', function () {
     process.env.DM_SCIM_GROUP_BASE = groupBase;
     server = new DM();
     plugin = new Scim(server);
-    await plugin.api(server.app);
+    plugin.api(server.app);
     await server.ready;
   });
 

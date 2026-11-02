@@ -41,7 +41,7 @@ describe('SCIM cross-tenant isolation (integration)', function () {
     process.env.DM_GROUP_SCHEMA = '';
     server = new DM();
     plugin = new Scim(server);
-    await plugin.api(server.app);
+    plugin.api(server.app);
     await server.ready;
 
     // Create an in-base user + an OUT-of-base "foreign" entry that must not
@@ -165,7 +165,7 @@ describe('SCIM ServiceProviderConfig honesty (integration)', function () {
     process.env.DM_SCIM_GROUP_BASE = `ou=groups,${baseDn}`;
     server = new DM();
     plugin = new Scim(server);
-    await plugin.api(server.app);
+    plugin.api(server.app);
     await server.ready;
   });
 

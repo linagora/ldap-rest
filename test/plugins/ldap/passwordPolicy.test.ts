@@ -19,14 +19,14 @@ describe('PasswordPolicy Plugin', () => {
 
   afterEach(async () => {
     if (dm) {
-      await dm.stop();
+      dm.stop();
     }
   });
 
   describe('API Endpoints', () => {
     it('should expose GET /password-policy endpoint', async () => {
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -40,7 +40,7 @@ describe('PasswordPolicy Plugin', () => {
 
     it('should return 404 for non-existent user password status', async () => {
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -52,7 +52,7 @@ describe('PasswordPolicy Plugin', () => {
 
     it('should expose GET /password-policy/expiring-soon endpoint', async () => {
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -67,7 +67,7 @@ describe('PasswordPolicy Plugin', () => {
 
     it('should accept days parameter for expiring-soon', async () => {
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -80,7 +80,7 @@ describe('PasswordPolicy Plugin', () => {
 
     it('should refuse a days parameter that is not a number', async () => {
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const response = await supertest(dm.app).get(
         '/api/v1/password-policy/expiring-soon?days=soon'
@@ -93,7 +93,7 @@ describe('PasswordPolicy Plugin', () => {
 
     it('should refuse a days parameter below one', async () => {
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const response = await supertest(dm.app).get(
         '/api/v1/password-policy/expiring-soon?days=0'
@@ -106,7 +106,7 @@ describe('PasswordPolicy Plugin', () => {
 
     it('should expose GET /password-policy/locked-accounts endpoint', async () => {
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -123,7 +123,7 @@ describe('PasswordPolicy Plugin', () => {
     it('should expose POST /password/validate when ppolicy_validate_complexity is true', async () => {
       dm.config.ppolicy_validate_complexity = true;
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -140,7 +140,7 @@ describe('PasswordPolicy Plugin', () => {
     it('should answer 400 to a body that is not JSON', async () => {
       dm.config.ppolicy_validate_complexity = true;
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const response = await supertest(dm.app)
         .post('/api/v1/password/validate')
@@ -154,7 +154,7 @@ describe('PasswordPolicy Plugin', () => {
     it('should refuse a password that is not text', async () => {
       dm.config.ppolicy_validate_complexity = true;
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const response = await supertest(dm.app)
         .post('/api/v1/password/validate')
@@ -170,7 +170,7 @@ describe('PasswordPolicy Plugin', () => {
       dm.config.ppolicy_validate_complexity = true;
       dm.config.ppolicy_min_length = 12;
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -188,7 +188,7 @@ describe('PasswordPolicy Plugin', () => {
       dm.config.ppolicy_validate_complexity = true;
       dm.config.ppolicy_require_uppercase = true;
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -208,7 +208,7 @@ describe('PasswordPolicy Plugin', () => {
       dm.config.ppolicy_validate_complexity = true;
       dm.config.ppolicy_require_lowercase = true;
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -228,7 +228,7 @@ describe('PasswordPolicy Plugin', () => {
       dm.config.ppolicy_validate_complexity = true;
       dm.config.ppolicy_require_digit = true;
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -246,7 +246,7 @@ describe('PasswordPolicy Plugin', () => {
       dm.config.ppolicy_validate_complexity = true;
       dm.config.ppolicy_require_special = true;
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -270,7 +270,7 @@ describe('PasswordPolicy Plugin', () => {
       dm.config.ppolicy_require_digit = true;
       dm.config.ppolicy_require_special = true;
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -287,7 +287,7 @@ describe('PasswordPolicy Plugin', () => {
     it('should return 400 when password is missing', async () => {
       dm.config.ppolicy_validate_complexity = true;
       const plugin = new PasswordPolicy(dm);
-      dm.registerPlugin('passwordPolicy', plugin);
+      await dm.registerPlugin('passwordPolicy', plugin);
 
       const request = supertest(dm.app);
       const response = await request
@@ -401,7 +401,7 @@ describe('PasswordPolicy Plugin: policy management', () => {
     for (const cn of ['default', 'aged', 'software', 'checked', 'huge'])
       await dm.ldap.delete(`cn=${cn},${policyBase}`).catch(() => undefined);
     await dm.ldap.delete(policyBase).catch(() => undefined);
-    await dm.stop();
+    dm.stop();
   });
 
   it('creates a policy with typed values', async () => {

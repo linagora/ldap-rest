@@ -61,7 +61,7 @@ describe('AuthzLinid1 Plugin', () => {
     dm = new DM();
     await dm.ready;
     authz = new AuthzLinid1(dm);
-    dm.registerPlugin('authzLinid1', authz);
+    await dm.registerPlugin('authzLinid1', authz);
   });
 
   afterEach(async () => {
@@ -412,7 +412,7 @@ describe('AuthzLinid1 Plugin', () => {
 
       // Load organization plugin
       const orgPlugin = new LdapOrganization(dm);
-      dm.registerPlugin('ldapOrganizations', orgPlugin);
+      await dm.registerPlugin('ldapOrganizations', orgPlugin);
 
       // Create admin user
       const adminEntry = {

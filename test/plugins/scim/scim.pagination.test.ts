@@ -47,7 +47,7 @@ describe('SCIM pagination (integration)', function () {
 
     server = new DM();
     plugin = new Scim(server);
-    await plugin.api(server.app);
+    plugin.api(server.app);
     await server.ready;
 
     try {
@@ -163,7 +163,7 @@ describe('SCIM pagination (integration)', function () {
       }`;
       missingServer = new DM();
       missingPlugin = new Scim(missingServer);
-      await missingPlugin.api(missingServer.app);
+      missingPlugin.api(missingServer.app);
       await missingServer.ready;
     });
 
@@ -195,7 +195,7 @@ describe('SCIM pagination (integration)', function () {
       process.env.DM_SCIM_MAX_SCANNED = '4';
       boundedServer = new DM();
       boundedPlugin = new Scim(boundedServer);
-      await boundedPlugin.api(boundedServer.app);
+      boundedPlugin.api(boundedServer.app);
       await boundedServer.ready;
     });
 

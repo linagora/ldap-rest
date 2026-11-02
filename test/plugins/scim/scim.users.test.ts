@@ -40,7 +40,7 @@ describe('SCIM Users (integration)', function () {
     process.env.DM_SCIM_USER_LOCK_VALUE = 'disabled';
     server = new DM();
     plugin = new Scim(server);
-    await plugin.api(server.app);
+    plugin.api(server.app);
     await server.ready;
   });
 
@@ -295,7 +295,7 @@ describe('SCIM Users (integration)', function () {
       process.env.DM_SCIM_BASE_URL = 'https://scim.example.test';
       pinnedServer = new DM();
       pinnedPlugin = new Scim(pinnedServer);
-      await pinnedPlugin.api(pinnedServer.app);
+      pinnedPlugin.api(pinnedServer.app);
       await pinnedServer.ready;
     });
 
@@ -799,7 +799,7 @@ describe('SCIM Users (integration)', function () {
       process.env.DM_SCIM_USER_LOCK_VALUE = 'TRUE';
       badServer = new DM();
       badPlugin = new Scim(badServer);
-      await badPlugin.api(badServer.app);
+      badPlugin.api(badServer.app);
       await badServer.ready;
     });
 

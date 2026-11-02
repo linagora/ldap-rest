@@ -27,7 +27,7 @@ describe('ConfigApi Plugin', () => {
 
   it('should expose configuration endpoint', async () => {
     const configApi = new ConfigApi(dm);
-    dm.registerPlugin('configApi', configApi);
+    await dm.registerPlugin('configApi', configApi);
 
     const request = supertest(dm.app);
     const response = await request
@@ -50,7 +50,7 @@ describe('ConfigApi Plugin', () => {
       )
     ) as { version: string };
     const configApi = new ConfigApi(dm);
-    dm.registerPlugin('configApi', configApi);
+    await dm.registerPlugin('configApi', configApi);
     const response = await supertest(dm.app)
       .get('/api/v1/config')
       .set('Accept', 'application/json');
@@ -86,10 +86,10 @@ describe('ConfigApi Plugin', () => {
     ];
 
     const flatGeneric = new LdapFlatGeneric(dm);
-    dm.registerPlugin('ldapFlatGeneric', flatGeneric);
+    await dm.registerPlugin('ldapFlatGeneric', flatGeneric);
 
     const configApi = new ConfigApi(dm);
-    dm.registerPlugin('configApi', configApi);
+    await dm.registerPlugin('configApi', configApi);
 
     const request = supertest(dm.app);
     const response = await request
@@ -130,10 +130,10 @@ describe('ConfigApi Plugin', () => {
     }
 
     const groups = new LdapGroups(dm);
-    dm.registerPlugin('ldapGroups', groups);
+    await dm.registerPlugin('ldapGroups', groups);
 
     const configApi = new ConfigApi(dm);
-    dm.registerPlugin('configApi', configApi);
+    await dm.registerPlugin('configApi', configApi);
 
     const request = supertest(dm.app);
     const response = await request
@@ -160,10 +160,10 @@ describe('ConfigApi Plugin', () => {
     }
 
     const organizations = new LdapOrganization(dm);
-    dm.registerPlugin('ldapOrganizations', organizations);
+    await dm.registerPlugin('ldapOrganizations', organizations);
 
     const configApi = new ConfigApi(dm);
-    dm.registerPlugin('configApi', configApi);
+    await dm.registerPlugin('configApi', configApi);
 
     const request = supertest(dm.app);
     const response = await request
@@ -213,7 +213,7 @@ describe('ConfigApi Plugin', () => {
 
     // Load static plugin
     const staticPlugin = new Static(dm);
-    dm.registerPlugin('static', staticPlugin);
+    await dm.registerPlugin('static', staticPlugin);
 
     // Configure ldapFlatGeneric with a test schema
     dm.config.ldap_flat_schema = [
@@ -221,10 +221,10 @@ describe('ConfigApi Plugin', () => {
     ];
 
     const flatGeneric = new LdapFlatGeneric(dm);
-    dm.registerPlugin('ldapFlatGeneric', flatGeneric);
+    await dm.registerPlugin('ldapFlatGeneric', flatGeneric);
 
     const configApi = new ConfigApi(dm);
-    dm.registerPlugin('configApi', configApi);
+    await dm.registerPlugin('configApi', configApi);
 
     const request = supertest(dm.app);
     const response = await request

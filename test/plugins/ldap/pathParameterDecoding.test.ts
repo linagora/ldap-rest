@@ -58,7 +58,7 @@ describe('Route parameters decoded once', function () {
       await server?.ldap.delete(dn).catch(() => undefined);
     if (previousGroupSchema === undefined) delete process.env.DM_GROUP_SCHEMA;
     else process.env.DM_GROUP_SCHEMA = previousGroupSchema;
-    await server?.stop();
+    server?.stop();
   });
 
   it('reads a name holding % as its escaping spells it', async () => {
@@ -131,7 +131,7 @@ describe('Route parameters decoded once: an organization DN', function () {
 
   after(async () => {
     await server?.ldap.delete(dn()).catch(() => undefined);
-    await server?.stop();
+    server?.stop();
   });
 
   it('reads a DN holding % as its escaping spells it', async () => {
@@ -168,7 +168,7 @@ describe('Route parameters decoded once: a raw entry DN', function () {
 
   after(async () => {
     await server?.ldap.delete(dn()).catch(() => undefined);
-    await server?.stop();
+    server?.stop();
   });
 
   it('reads an entry DN holding % as its escaping spells it', async () => {
@@ -224,7 +224,7 @@ describe('Route parameters decoded once: an account lifecycle id', function () {
     if (previousFlatSchema === undefined)
       delete process.env.DM_LDAP_FLAT_SCHEMA;
     else process.env.DM_LDAP_FLAT_SCHEMA = previousFlatSchema;
-    await server?.stop();
+    server?.stop();
   });
 
   it('changes the state of an id holding % as its escaping spells it', async () => {

@@ -160,6 +160,13 @@ export default [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      // The whole type-checked set reports ~2,500 issues in tests, mostly
+      // `no-unsafe-*` on supertest's `any` and `require-await` on Mocha
+      // callbacks. The promise rules catch real bugs and are enabled; the
+      // rest is a separate cleanup.
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
       ...prettierConfig.rules,
       'prettier/prettier': 'error',
       '@typescript-eslint/no-unused-vars': [
