@@ -93,6 +93,37 @@ describe('API reports', () => {
     expect(changes.changed).to.deep.equal([]);
   });
 
+  it('does not call the rename of an unexported type a removal', () => {
+    const changes = diffApiReports(
+      report(
+        '// @public\ninterface RouteDefinition { path: string; }',
+        '// @public\nexport function defineRoute(route: RouteDefinition): void;'
+      ),
+      report(
+        '// @public\ninterface RouteSpec { path: string; }',
+        '// @public\nexport function defineRoute(route: RouteSpec): void;'
+      )
+    );
+
+    expect(changes.removed).to.deep.equal([]);
+    expect(changes.added).to.deep.equal(['RouteSpec']);
+    expect(changes.changed).to.deep.equal(['RouteDefinition', 'defineRoute']);
+  });
+
+  it('keeps the removal of a namespace member nameable', () => {
+    const changes = diffApiReports(
+      report(
+        '// @public\nfunction escapeDnValue(value: string): string;',
+        '// @public\nfunction unescapeDnValue(value: string): string;\n\ndeclare namespace utils {\n    export {\n        escapeDnValue,\n        unescapeDnValue\n    }\n}\nexport { utils }'
+      ),
+      report(
+        '// @public\nfunction escapeDnValue(value: string): string;\n\ndeclare namespace utils {\n    export {\n        escapeDnValue\n    }\n}\nexport { utils }'
+      )
+    );
+
+    expect(changes.removed).to.deep.equal(['unescapeDnValue']);
+  });
+
   it('keeps overloads of one name apart', () => {
     const changes = diffApiReports(
       report(

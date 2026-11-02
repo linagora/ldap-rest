@@ -64,7 +64,10 @@ that becomes required, a response that may now be null, changed security
 requirements, a removed union variant, a value an alternative of the type
 closes with an enum or a `const` where the type used to accept any, an
 untyped request value that becomes a union, an `allOf` that adds a
-constraint, or a removed declaration in `etc/api/`. A changed declaration is
+constraint, or a removed declaration in `etc/api/` that a plugin can name —
+the exported one, or a member of an exported namespace. Renaming a type only
+reachable through a signature is not a break: nobody can write its name, and
+the declarations that use it are reported as changed. A changed declaration is
 printed for review and does not fail the job yet: telling an added optional
 member from a narrowed union needs more than a line diff, and comes with the
 `./plugin-*` reports. Renaming an option is a deprecation, not a removal, as

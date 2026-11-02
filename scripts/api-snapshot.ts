@@ -12,6 +12,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -152,18 +153,57 @@ function declarationsIn(report: string): Map<string, string> {
   return found;
 }
 
+/** The declaration line of a block, release tag and blank lines aside */
+function declarationLine(block: string): string {
+  return (
+    block
+      .split('\n')
+      .find(line => line.trim() && !line.startsWith('//'))
+      ?.trim() ?? ''
+  );
+}
+
+/**
+ * The names a plugin can write: the exported declarations, the names the
+ * report re-exports, and the members of an exported namespace. A type only
+ * reachable through a signature is not one of them.
+ */
+function nameableIn(report: string): Set<string> {
+  const names = new Set<string>();
+  for (const [, exported] of report.matchAll(/^export \{ ([^}]+) \}$/gm))
+    for (const name of exported.split(',')) names.add(name.trim());
+  for (const [, members] of report.matchAll(
+    /declare namespace [A-Za-z0-9_$]+ \{\s*export \{([^}]*)\}/g
+  ))
+    for (const name of members.split(',')) names.add(name.trim());
+  return names;
+}
+
 export function diffApiReports(
   base: string,
   current: string
 ): ApiReportChanges {
   const before = declarationsIn(base);
   const after = declarationsIn(current);
+  const nameable = nameableIn(base);
+  const removed: string[] = [];
+  const changed: string[] = [];
+  for (const [name, block] of before) {
+    if (!after.has(name)) {
+      // A rename of a type nobody can name breaks nothing: the declarations
+      // that use it show up as changed
+      const exported =
+        declarationLine(block).startsWith('export') ||
+        nameable.has(name.replace(/ #\d+$/, ''));
+      (exported ? removed : changed).push(name);
+      continue;
+    }
+    if (after.get(name) !== block) changed.push(name);
+  }
   return {
-    removed: [...before.keys()].filter(name => !after.has(name)),
+    removed,
     added: [...after.keys()].filter(name => !before.has(name)),
-    changed: [...before.keys()].filter(
-      name => after.has(name) && after.get(name) !== before.get(name)
-    ),
+    changed,
   };
 }
 
@@ -223,6 +263,17 @@ async function main(): Promise<void> {
     const outdated = Object.keys(API_ENTRIES).filter(name =>
       stale(name, folder)
     );
+    const produced = new Set(
+      Object.keys(API_ENTRIES).map(name => `${name}.api.md`)
+    );
+    for (const file of readdirSync(API_REPORT_DIR))
+      if (file.endsWith('.api.md') && !produced.has(file)) {
+        console.error(
+          `${path.relative(root, reportPath(file.replace(/\.api\.md$/, '')))} ` +
+            'has no entry: remove it, or list its entry in API_ENTRIES.'
+        );
+        outdated.push(file);
+      }
     if (outdated.length === 0)
       console.log('every API report in etc/api/ is up to date');
     else process.exitCode = 1;
