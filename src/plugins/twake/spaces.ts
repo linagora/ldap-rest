@@ -17,6 +17,7 @@ import type { Hooks } from '../../hooks';
 import type { ChangeContext } from '../../lib/changeContext';
 import { BadRequestError } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
+import { providedService } from '../../lib/services';
 import {
   TombstoneService,
   type TombstoneApi,
@@ -331,8 +332,9 @@ export default class TwakeSpaces extends DmPlugin {
     return groups;
   }
 
-  private get tombstone(): TombstoneApi | null {
-    return this.service(TombstoneService);
+  private get tombstone(): TombstoneApi | undefined {
+    // The tombstone is optional: its absence only means no delete is kept
+    return providedService(this.server.services, TombstoneService);
   }
 
   hooks: Hooks = {
