@@ -22,6 +22,7 @@
       "types": "./dist/src/bin/index.d.ts"
     },
     "./hooks": {
+      "import": "./dist/hooks.js",
       "types": "./dist/src/hooks.d.ts"
     },
     "./plugin": {
