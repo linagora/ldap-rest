@@ -101,7 +101,7 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
     wireHooks(server, authz);
 
     scim = new Scim(server);
-    await scim.api(server.app);
+    scim.api(server.app);
     wireHooks(server, scim);
 
     server.loadedPlugins['authzDynamic'] = authz;

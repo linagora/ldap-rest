@@ -121,7 +121,7 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
     wireHooks(server, authz);
 
     const scim = new Scim(server);
-    await scim.api(server.app);
+    scim.api(server.app);
     wireHooks(server, scim);
 
     server.loadedPlugins['headerAuth'] = auth;

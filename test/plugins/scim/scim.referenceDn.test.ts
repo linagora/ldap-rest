@@ -53,7 +53,7 @@ describe('SCIM mapped reference DNs', function () {
     setEnv('DM_SCIM_GROUP_BASE', `ou=groups,${baseDn}`);
     setEnv('DM_SCIM_USER_MAPPING', mapping);
     server = new DM();
-    await new Scim(server).api(server.app);
+    new Scim(server).api(server.app);
     await server.ready;
   });
 

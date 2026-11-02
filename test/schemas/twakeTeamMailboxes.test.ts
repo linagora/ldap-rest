@@ -85,7 +85,7 @@ describe('Twake team mailbox schema', () => {
     await dm.ldap.delete(`cn=${name},${branch}`).catch(() => undefined);
     await dm.ldap.delete(alice).catch(() => undefined);
     await dm.ldap.delete(org).catch(() => undefined);
-    await dm.stop();
+    dm.stop();
   });
 
   const body = (

@@ -37,7 +37,7 @@ describe('SCIM Groups (integration)', function () {
     process.env.DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE = 'description';
     server = new DM();
     plugin = new Scim(server);
-    await plugin.api(server.app);
+    plugin.api(server.app);
     await server.ready;
 
     try {

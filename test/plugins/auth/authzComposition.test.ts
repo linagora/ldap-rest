@@ -423,7 +423,7 @@ describe('Authorization plugins loaded together', function () {
         return server.logger;
       }) as unknown as typeof server.logger.warn;
       await server.registerPlugin('authzDynamic', new AuthzDynamic(server));
-      assertAuthzComposition(server);
+      await assertAuthzComposition(server);
       expect(
         warned.some(m =>
           m.startsWith('--authz-for names oidcc, and no loaded plugin reads it')

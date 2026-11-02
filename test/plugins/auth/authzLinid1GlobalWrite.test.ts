@@ -162,7 +162,7 @@ describe('AuthzLinid1: global write branches', () => {
     await dm.ldap.delete(orgDn).catch(() => undefined);
     await dm.ldap.delete(globalDn()).catch(() => undefined);
     await dm.ldap.delete(localDn()).catch(() => undefined);
-    await dm.stop();
+    dm.stop();
   });
 
   it('lets the administrator of the top organization add, change and delete', async () => {

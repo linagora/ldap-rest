@@ -274,7 +274,7 @@ describe('Request id', () => {
         )
       );
       expect(seen).to.equal(undefined);
-      const kept = await runWithLogContext({ requestId: 'A' }, () =>
+      const kept = runWithLogContext({ requestId: 'A' }, () =>
         outsideRequest(() => currentLogContext()?.requestId)
       );
       expect(kept, 'as the server, still the request').to.equal('A');
