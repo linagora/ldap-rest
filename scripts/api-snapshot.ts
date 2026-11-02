@@ -145,8 +145,14 @@ function declarationsIn(report: string): Map<string, string> {
     current = [];
   };
   for (const line of lines.slice(start, end === -1 ? undefined : end)) {
-    // A release tag or a re-export line opens the next declaration
-    if (line.startsWith('// @') || line.startsWith('export {')) flush();
+    // A release tag, a re-export line or a namespace without one of its own
+    // opens the next declaration
+    if (
+      line.startsWith('// @') ||
+      line.startsWith('export {') ||
+      line.startsWith('declare namespace ')
+    )
+      flush();
     current.push(line);
   }
   flush();
