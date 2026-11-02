@@ -17,7 +17,7 @@ import { currentOperation } from '../../lib/operation';
 import { Hooks } from '../../hooks';
 import type { ChangesToNotify } from '../ldap/onChange';
 import { wantJson } from '../../lib/expressFormatedResponses';
-import { type Schema, roleAttribute } from '../../config/schema';
+import { roleAttribute } from '../../config/schema';
 import { domainBranches, mailDomains } from '../../lib/mailDomains';
 import {
   escapeLdapFilter,
@@ -1034,14 +1034,9 @@ export default class James extends TwakePlugin {
    * without either.
    */
   private domainLinkAttributes(): string[] {
-    const organizations = this.server.loadedPlugins['ldapOrganizations'] as
-      { schema?: Schema } | undefined;
-    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
-      { instances?: { schema?: Schema }[] } | undefined;
-    const names = [
-      organizations?.schema,
-      ...(flat?.instances || []).map(instance => instance.schema),
-    ].map(schema => roleAttribute(schema, 'domainLink'));
+    const names = this.server.entities
+      .all()
+      .map(entity => roleAttribute(entity.schema, 'domainLink'));
     names.push(this.config.enterprise_domain_link_attribute);
     const out: string[] = [];
     for (const name of names)

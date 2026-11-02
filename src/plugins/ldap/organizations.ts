@@ -191,6 +191,15 @@ export default class LdapOrganizations extends DmPlugin {
           )
         );
     }
+
+    this.server.entities.register({
+      name: 'organization',
+      pluralName: 'organizations',
+      base: this.settings.ldap_top_organization,
+      mainAttribute: 'ou',
+      kind: 'organizations',
+      source: this,
+    });
   }
 
   /**

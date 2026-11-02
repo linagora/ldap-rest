@@ -114,9 +114,22 @@ export default class LdapAccountLifecycle extends DmPlugin {
    * @param app Express application
    */
   api(app: Express): void {
-    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
-      { instances?: FlatEntity[] } | undefined;
-    if (!flat?.instances?.length) {
+    const entities: FlatEntity[] = this.server.entities
+      .ofKind('flat')
+      .flatMap(entity => {
+        const flat = entity.flat;
+        if (!flat) return [];
+        return [
+          {
+            pluralName: entity.pluralName,
+            singularName: entity.name,
+            schema: entity.schema,
+            modifyEntry: (id, changes, req) =>
+              flat.modifyEntry(id, changes, req),
+          },
+        ];
+      });
+    if (entities.length === 0) {
       this.logger.warn(
         'accountLifecycle: no flat entity is loaded, no endpoint registered'
       );
@@ -124,7 +137,7 @@ export default class LdapAccountLifecycle extends DmPlugin {
     }
 
     const prefix = `${this.config.api_prefix}/v1/ldap`;
-    for (const entity of flat.instances) {
+    for (const entity of entities) {
       const statusAttr = roleAttribute(entity.schema, 'accountStatus');
       const states = statusAttr
         ? entity.schema?.attributes[statusAttr]?.states

@@ -86,13 +86,13 @@ describe('Schema guards on every route', function () {
       config: {},
       logger: console,
       hooks: {},
-      loadedPlugins: {
-        users: {
-          schema: {
+      entities: {
+        schemas: () => [
+          {
             strict: false,
             attributes: { userPassword: { type: 'string', neverReturn: true } },
           },
-        },
+        ],
       },
     } as unknown as DM);
 

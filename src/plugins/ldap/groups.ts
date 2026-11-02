@@ -245,6 +245,23 @@ export default class LdapGroups extends DmPlugin {
           this.logger.error(`Failed to load group schema from ${file}: ${err}`)
         );
     }
+    this.declareEntity();
+  }
+
+  /**
+   * Declare the group branch to the entity registry. `TwakeGroups` overrides
+   * this method: its groups are served by its own API, not as the `groups`
+   * entity.
+   */
+  protected declareEntity(): void {
+    this.server.entities.register({
+      name: 'group',
+      pluralName: 'groups',
+      base: this.base as string,
+      mainAttribute: this.cn,
+      kind: 'groups',
+      source: this,
+    });
   }
 
   /**

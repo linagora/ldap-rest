@@ -427,42 +427,15 @@ export default class LdapEnterpriseRules extends DmPlugin {
    */
   private bindings(): EntityBinding[] {
     const out: EntityBinding[] = [];
-
-    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
-      | {
-          instances?: { base: string; schema?: Schema; singularName: string }[];
-        }
-      | undefined;
-    for (const instance of flat?.instances || []) {
-      if (instance.schema)
-        out.push({
-          base: instance.base,
-          subtree: false,
-          schema: instance.schema,
-          label: instance.singularName,
-        });
+    for (const entity of this.server.entities.all()) {
+      if (!entity.schema || !entity.base) continue;
+      out.push({
+        base: entity.base,
+        subtree: entity.kind !== 'flat',
+        schema: entity.schema,
+        label: entity.name,
+      });
     }
-
-    const groups = this.server.loadedPlugins['ldapGroups'] as
-      { base?: string; schema?: Schema } | undefined;
-    if (groups?.base && groups.schema)
-      out.push({
-        base: groups.base,
-        subtree: true,
-        schema: groups.schema,
-        label: 'group',
-      });
-
-    const organizations = this.server.loadedPlugins['ldapOrganizations'] as
-      { schema?: Schema } | undefined;
-    if (organizations?.schema && this.topOrganization)
-      out.push({
-        base: this.topOrganization,
-        subtree: true,
-        schema: organizations.schema,
-        label: 'organization',
-      });
-
     return out;
   }
 

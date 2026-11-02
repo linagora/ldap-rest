@@ -45,6 +45,11 @@ import {
 import { registerAttributeTypes } from '../lib/utils';
 import { BadRequestError, errorChain } from '../lib/errors';
 import { type ServiceMap, type ServiceToken } from '../lib/services';
+import {
+  createEntityRegistry,
+  type EntityRegistry,
+  EntityRegistryService,
+} from '../lib/entities';
 import HookBus, { recordHookOwner, type HookFn } from '../lib/hookBus';
 import { runForRequest, runWithLogContext } from '../lib/requestContext';
 import { requestId } from '../lib/changeContext';
@@ -183,6 +188,12 @@ export class DM {
   readonly services: ServiceMap = new Map();
   /** The plugin that provided each service, for the duplicate warning. */
   private readonly serviceOwners = new Map<ServiceToken<unknown>, string>();
+  /**
+   * The entity types the loaded plugins serve. The server owns it, so a
+   * plugin declares its entities as it loads and a consumer reads them
+   * without knowing which plugin holds which.
+   */
+  readonly entities: EntityRegistry = createEntityRegistry();
   ldap: ldapActions;
   /**
    * The next operation number, shared by the `withConfig` views. An accessor
@@ -281,6 +292,7 @@ export class DM {
   private readonly authzHooks = new WeakSet<object>();
 
   constructor() {
+    this.services.set(EntityRegistryService, this.entities);
     const parser = new ConfigParser(configArgs);
     this.config = parser.parse();
     this.unknownCliOptions = parser.unknownOptions;

@@ -26,7 +26,7 @@ import {
 import type { BranchPermissions } from '../../config/args';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { UnauthorizedError } from '../../lib/errors';
-import { roleAttribute, type Schema } from '../../config/schema';
+import { roleAttribute } from '../../config/schema';
 
 /** The part of an authorization plugin this endpoint needs. */
 interface AuthzLike extends DmPlugin {
@@ -299,42 +299,12 @@ export default class AuthzScope extends DmPlugin {
           name => name.toLowerCase() === linkAttr
         ));
 
-    const out: EntityInfo[] = [];
-    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
-      | {
-          instances?: {
-            base: string;
-            pluralName: string;
-            schema?: { attributes?: object };
-          }[];
-        }
-      | undefined;
-    for (const instance of flat?.instances || [])
-      out.push({
-        name: instance.pluralName,
-        base: instance.base,
-        linkable: linkable(instance.schema),
-      });
-
-    const groups = this.server.loadedPlugins['ldapGroups'] as
-      { base?: string; schema?: { attributes?: object } } | undefined;
-    if (groups?.base)
-      out.push({
-        name: 'groups',
-        base: groups.base,
-        linkable: linkable(groups.schema),
-      });
-
-    if (
-      this.server.loadedPlugins['ldapOrganizations'] &&
-      this.config.ldap_top_organization
-    )
-      out.push({
-        name: 'organizations',
-        base: this.config.ldap_top_organization,
-        linkable: false,
-      });
-    return out;
+    return this.server.entities.all().map(entity => ({
+      name: entity.pluralName,
+      base: entity.base,
+      linkable:
+        entity.kind === 'organizations' ? false : linkable(entity.schema),
+    }));
   }
 
   /**
@@ -526,8 +496,7 @@ export default class AuthzScope extends DmPlugin {
   ): Promise<{ name?: string; path?: string }> {
     // The role first, as the enterprise rules read it: a deployment naming
     // the path attribute only through the schema got raw DNs in the sidebar.
-    const organizations = this.server.loadedPlugins['ldapOrganizations'] as
-      { schema?: Schema } | undefined;
+    const organizations = this.server.entities.ofKind('organizations')[0];
     const pathAttr =
       roleAttribute(organizations?.schema, 'organizationPath') ||
       this.config.ldap_organization_path_attribute;

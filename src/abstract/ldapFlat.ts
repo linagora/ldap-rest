@@ -421,6 +421,16 @@ export default abstract class LdapFlat extends DmPlugin {
         );
       }
     }
+
+    server.entities.register({
+      name: this.singularName,
+      pluralName: this.pluralName,
+      base: this.base,
+      mainAttribute: this.mainAttribute,
+      kind: 'flat',
+      source: this,
+      flat: this,
+    });
   }
 
   /**

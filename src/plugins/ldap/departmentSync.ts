@@ -12,7 +12,7 @@ import type { SearchResult } from 'ldapts';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
-import { roleAttribute, type Schema } from '../../config/schema';
+import { roleAttribute } from '../../config/schema';
 import {
   getParentDn,
   escapeLdapFilter,
@@ -61,8 +61,7 @@ export default class LdapDepartmentSync extends DmPlugin {
    * @returns the attribute name
    */
   private organizationPathAttribute(): string {
-    const organizations = this.server.loadedPlugins['ldapOrganizations'] as
-      { schema?: Schema } | undefined;
+    const organizations = this.server.entities.ofKind('organizations')[0];
     return (
       roleAttribute(organizations?.schema, 'organizationPath') || this.pathAttr
     );
@@ -76,13 +75,10 @@ export default class LdapDepartmentSync extends DmPlugin {
    * @returns distinct pairs, the ones declared by roles first
    */
   private linkedAttributes(): LinkedAttributes[] {
-    const schemas: (Schema | undefined)[] = [];
-    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
-      { instances?: { schema?: Schema }[] } | undefined;
-    for (const instance of flat?.instances || []) schemas.push(instance.schema);
-    const groups = this.server.loadedPlugins['ldapGroups'] as
-      { schema?: Schema } | undefined;
-    schemas.push(groups?.schema);
+    const schemas = this.server.entities
+      .all()
+      .filter(entity => entity.kind !== 'organizations')
+      .map(entity => entity.schema);
 
     const pairs: LinkedAttributes[] = [];
     for (const schema of schemas) {

@@ -284,6 +284,12 @@ export default class TwakeGroups extends LdapGroups {
     };
   }
 
+  /** Twake groups are served by this plugin's own API, not as `groups`. */
+  protected declareEntity(): void {
+    // Intentionally empty: the inherited declaration would name the wrong
+    // branch and collection.
+  }
+
   /**
    * Declare the group attributes under their configured names, whatever case
    * the schema spells them in, or add them when it does not: the schema does
