@@ -704,4 +704,19 @@ describe('Twake spaces plugin routes', function () {
       (await api.get(`${route()}?user=nobody`).expect(404)).body.code
     ).to.equal('USER_NOT_FOUND');
   });
+
+  it('refuses to start without the Twake groups service', async () => {
+    const server = new DM();
+    Object.assign(server.config, {
+      twake_group_base: `ou=groups,ou={org},${ORGS}`,
+      twake_group_user_base: `ou=users,ou={org},${ORGS}`,
+      twake_space_base: `ou=spaces,ou={org},${ORGS}`,
+    });
+    await server.ready;
+    const refused = await new TwakeSpaces(server).assertComposition().then(
+      () => undefined,
+      (err: Error) => err
+    );
+    expect(refused?.message).to.match(/core\/twake\/groups/);
+  });
 });
