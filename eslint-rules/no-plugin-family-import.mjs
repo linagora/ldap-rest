@@ -7,13 +7,27 @@
  */
 import path from 'node:path';
 
+const named = node => {
+  if (node?.type === 'Identifier') return node.name;
+  if (node?.type === 'Literal') return node.value;
+  if (node?.type === 'TemplateLiteral' && node.expressions.length === 0)
+    return node.quasis[0]?.value.cooked;
+  return undefined;
+};
+
 const familyOf = file => {
   const normalized = file.split(path.sep).join('/');
   const directory =
-    /(?:^|\/)src\/plugins\/(auth|ldap|scim|twake|storage)\//.exec(normalized);
+    /(?:^|\/)src\/plugins\/(auth|ldap|scim|twake|storage)(?:\/|$)/.exec(
+      normalized
+    );
   if (directory) return directory[1];
   // The storage plugin is a top-level file, not a directory.
-  if (/(?:^|\/)src\/plugins\/storage(?:\.options)?(?:\.ts)?$/.test(normalized))
+  if (
+    /(?:^|\/)src\/plugins\/storage(?:\.options)?(?:\.(?:ts|js))?$/.test(
+      normalized
+    )
+  )
     return 'storage';
   if (/(?:^|\/)src\/plugins\//.test(normalized)) return 'misc';
   return undefined;
@@ -55,8 +69,8 @@ export default {
         if (node.source) check(node, node.source.value);
       },
       ExportAllDeclaration: node => check(node, node.source.value),
-      ImportExpression: node => check(node, node.source.value),
-      TSImportType: node => check(node, node.source?.value),
+      ImportExpression: node => check(node, named(node.source)),
+      TSImportType: node => check(node, named(node.source)),
     };
   },
 };
