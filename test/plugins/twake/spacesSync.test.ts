@@ -4,6 +4,7 @@ import supertest from 'supertest';
 import { DM } from '../../../src/bin';
 import { TrashService } from '../../../src/lib/services/trash';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
+import TrashPlugin from '../../../src/plugins/ldap/trash';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
 import { waitFor } from '../../helpers/waitFor';
@@ -374,26 +375,20 @@ describe('Twake spaces: user roles', function () {
         `ou=spaces,${orgDn}`,
         `${users};ou=spaces,${orgDn}`,
       ]) {
-        dm.services.set(TrashService, {
-          trashBase: '',
-          watchedBases: watched
-            .split(';')
-            .map(base => base.trim())
-            .filter(Boolean),
-        });
+        dm.config.trash_watched_bases = watched;
+        dm.services.set(TrashService, new TrashPlugin(dm));
         const refused = await plugin.assertComposition().then(
           () => undefined,
           (err: Error) => err
         );
         expect(refused?.message, watched).to.match(/core\/ldap\/trash/);
       }
-      dm.services.set(TrashService, {
-        trashBase: '',
-        watchedBases: [users],
-      });
+      dm.config.trash_watched_bases = users;
+      dm.services.set(TrashService, new TrashPlugin(dm));
       await plugin.assertComposition();
     } finally {
       dm.services.delete(TrashService);
+      delete dm.config.trash_watched_bases;
     }
   });
 
