@@ -1,14 +1,18 @@
 name: Test Node.js Module
 
-# A change reaches `master` through a pull request, and a pull request is
-# already tested: listening to every push as well ran the whole matrix twice
-# for each one. The push trigger is kept for the default branch, so what
-# lands there is tested as it lands.
+# A change reaches `master` or `v3.0` through a pull request, and a pull
+# request is already tested: listening to every push as well ran the whole
+# matrix twice for each one. The push trigger is kept for those branches, so
+# what lands there is tested as it lands.
 on:
   push:
     branches:
       - master
+      - v3.0
   pull_request:
+    branches:
+      - master
+      - v3.0
     types: [opened, synchronize, reopened]
 
 permissions:

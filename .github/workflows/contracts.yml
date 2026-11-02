@@ -7,6 +7,9 @@ name: Published contracts
 # See docs/development/contracts.md.
 on:
   pull_request:
+    branches:
+      - master
+      - v3.0
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
