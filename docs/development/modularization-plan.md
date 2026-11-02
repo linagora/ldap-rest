@@ -147,9 +147,10 @@ compatible.
 ## Branch strategy
 
 Phase 0 lands on `master`: it is non-breaking, and #603 fixes test bugs that
-matter to the default branch too. Merge `master` into `v3.0` before phase 1,
-so the 3.0 work starts from a green, guarded base. Phases 1 to 3 land on
-`v3.0`.
+matter to the default branch too. Rebase `v3.0` onto `master` before phase 1,
+so the 3.0 work starts from a green, guarded base, and again before each phase:
+`v3.0` only carries the work of the current phase, so its history stays a line
+on top of `master`. Phases 1 to 3 land on `v3.0`.
 
 ## Order
 
