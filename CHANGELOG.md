@@ -10,7 +10,9 @@
 - Plugins can reach the trash, the password policies, the loaded
   authenticators, the shared broker, the keyed store and the Twake groups
   through `TrashService`, `PasswordPolicyService`, `AuthenticatorsService`,
-  `RabbitMqService`, `StorageService` and `TwakeGroupsService`
+  `RabbitMqService`, `StorageService` and `TwakeGroupsService`, reach the
+  Twake tombstone and the SCIM lock through `TombstoneService` and
+  `ScimService`, and the rename cascade through `ReferenceRewriterService`
   ([details](docs/plugin-development/services.md#services-the-server-provides)).
 - Plugins can ask `PluginInfoService` whether a plugin is loaded, and which
   ones serve configuration, operational attributes, generated attributes or

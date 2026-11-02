@@ -30,6 +30,8 @@ import {
   unescapeDnValue,
 } from '../../lib/utils';
 import { RabbitMqService } from '../../lib/services/rabbitmq';
+import { providedService } from '../../lib/services';
+import { ScimService } from '../../lib/services/scim';
 import { DEFAULT_LOCK_ATTRIBUTE, DEFAULT_LOCK_VALUE } from '../scim/mapping';
 
 import {
@@ -324,12 +326,12 @@ export default class TwakeLifecycleEvents extends DmPlugin {
    * value, `disabled` and `enabled` never follow a SCIM `active` change.
    */
   afterLoad(): void {
-    const scim = this.server.loadedPlugins.scim?.config;
+    // SCIM is optional here: its absence only skips a consistency warning
+    const scim = providedService(this.server.services, ScimService);
     if (!scim) return;
-    const attribute =
-      scim.scim_user_lock_attribute?.trim() || DEFAULT_LOCK_ATTRIBUTE;
+    const attribute = scim.userLockAttribute?.trim() || DEFAULT_LOCK_ATTRIBUTE;
     // SCIM refused to start on a non-default attribute without its value
-    const value = scim.scim_user_lock_value?.trim() || DEFAULT_LOCK_VALUE;
+    const value = scim.userLockValue?.trim() || DEFAULT_LOCK_VALUE;
     const { lock, lockValue } = this.attrs;
     if (
       attribute.toLowerCase() !== lock.toLowerCase() ||

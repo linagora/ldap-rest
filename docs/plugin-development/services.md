@@ -135,6 +135,10 @@ A plugin family provides the others:
 - `StorageService`: the one keyed store and its backend.
 - `TwakeGroupsService`: the groups of a Twake space, their branches and the
   pages the space routes read.
+- `TombstoneService`: whether the Twake tombstone keeps a DN from a plain
+  delete.
+- `ScimService`: the lock attribute and value SCIM writes.
+- `ReferenceRewriterService`: the references a rename must rewrite.
 
 A consumer that only needs to know whether the feature is loaded calls
 `this.service(token)` and skips its work when the answer is `null`.

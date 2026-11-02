@@ -18,6 +18,7 @@ import {
 } from '../../../src/plugins/twake/lifecycleAttributes';
 import { waitFor } from '../../helpers/waitFor';
 import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
+import { ScimService } from '../../../src/lib/services/scim';
 
 const BASE = `ou=users,${process.env.DM_LDAP_BASE}`;
 const GROUPS = `ou=groups,${process.env.DM_LDAP_BASE}`;
@@ -894,23 +895,19 @@ describe('Twake lifecycle events plugin', function () {
         warned.push(m);
         return plugin.logger;
       }) as typeof warn;
-      const scim = dm.loadedPlugins.scim;
+      const scim = dm.services.get(ScimService);
       try {
-        for (const config of [
-          { scim_user_lock_attribute: 'pwdAccountLockedTime' },
-          {
-            scim_user_lock_attribute: 'nsAccountLock',
-            scim_user_lock_value: 'TRUE',
-          },
+        for (const lock of [
+          { userLockAttribute: 'pwdAccountLockedTime', userLockValue: '' },
+          { userLockAttribute: 'nsAccountLock', userLockValue: 'TRUE' },
         ]) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          dm.loadedPlugins.scim = { config } as any;
+          dm.services.set(ScimService, lock);
           plugin.afterLoad();
         }
       } finally {
         plugin.logger.warn = warn;
-        if (scim) dm.loadedPlugins.scim = scim;
-        else delete dm.loadedPlugins.scim;
+        if (scim) dm.services.set(ScimService, scim);
+        else dm.services.delete(ScimService);
       }
       expect(warned).to.have.length(1);
       expect(warned[0]).to.match(/SCIM locks an account with nsAccountLock/);
