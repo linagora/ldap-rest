@@ -524,7 +524,7 @@ export default class Scim extends DmPlugin {
       options,
       schemaDir: this.scimSchemaDir,
       scimPrefix: this.scimPrefix,
-      loadedPlugins: server.loadedPlugins,
+      authenticators: server.authenticatorsInfo,
     });
   }
 

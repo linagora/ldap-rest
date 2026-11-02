@@ -3,6 +3,7 @@ import nock from 'nock';
 
 import type { Schema } from '../../../src/config/schema';
 import type { SearchResult } from '../../../src/lib/ldapActions';
+import { TrashService } from '../../../src/lib/services/trash';
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
@@ -514,8 +515,8 @@ describe('James Plugin - mail domains in the trash', () => {
     );
     // Without a list, the trash watches every branch
     warned.length = 0;
-    const listed = dm.config.trash_watched_bases;
-    dm.config.trash_watched_bases = '';
+    const listed = dm.services.get(TrashService);
+    dm.services.set(TrashService, { trashBase: '', watchedBases: [] });
     james.logger.warn = ((message: string) => {
       warned.push(String(message));
       return james.logger;
@@ -524,7 +525,8 @@ describe('James Plugin - mail domains in the trash', () => {
       james.afterLoad();
     } finally {
       james.logger.warn = warn;
-      dm.config.trash_watched_bases = listed;
+      if (listed) dm.services.set(TrashService, listed);
+      else dm.services.delete(TrashService);
     }
     expect(warned.join('\n')).to.match(/every branch/);
   });

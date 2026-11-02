@@ -26,6 +26,7 @@ import {
 import { changeContext } from '../../lib/changeContext';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
+import { TrashService } from '../../lib/services/trash';
 import { escapeLdapFilter, isDnInBranch, normalizeDn } from '../../lib/utils';
 import { scimOptionsOf } from '../scim/scim.options';
 
@@ -273,12 +274,10 @@ export default class TwakeTombstone extends DmPlugin {
    * would move the tombstone instead of removing it.
    */
   assertComposition(): void {
-    if (!this.server.loadedPlugins.trash) return;
-    // Read as core/ldap/trash reads it, none meaning every branch
-    const watched = String(this.config.trash_watched_bases || '')
-      .split(';')
-      .map(base => base.trim())
-      .filter(Boolean);
+    const trash = this.service(TrashService);
+    if (!trash) return;
+    // None meaning every branch
+    const watched = trash.watchedBases;
     const clash = this.patterns.filter(p => {
       const branch = p.source.replace(/\$$/, '');
       return (

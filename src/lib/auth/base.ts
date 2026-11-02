@@ -3,6 +3,7 @@ import type { Express, Request, Response } from 'express';
 import DmPlugin from '../../abstract/plugin';
 import type { Config } from '../../config/args';
 import { serverError } from '../../lib/expressFormatedResponses';
+import type { AuthenticatorsInfo } from '../services/authenticators';
 
 /**
  * A request as the authentication plugins leave it.
@@ -128,19 +129,20 @@ export function identityFor(
  * provider's claims are not, and saying "cannot verify" is the honest
  * answer rather than silence.
  *
- * @param loadedPlugins the server's plugin registry
+ * @param authenticators the loaded authentication plugins
  * @returns the identities that can be named, and the plugins that cannot say
  */
-export function identityCoverage(loadedPlugins: Record<string, DmPlugin>): {
+export function identityCoverage(authenticators: readonly AuthBase[]): {
   known: Set<string>;
   unverifiable: string[];
 } {
   const known = new Set<string>();
   const unverifiable: string[] = [];
-  for (const plugin of Object.values(loadedPlugins)) {
-    if (!plugin.roles?.includes('auth')) continue;
+  for (const plugin of authenticators) {
     const names = (
-      plugin as DmPlugin & { knownIdentities?: () => string[] | undefined }
+      plugin as unknown as {
+        knownIdentities?: () => string[] | undefined;
+      }
     ).knownIdentities?.();
     if (!names) unverifiable.push(plugin.name);
     else for (const name of names) known.add(name);
@@ -152,13 +154,13 @@ export function identityCoverage(loadedPlugins: Record<string, DmPlugin>): {
  * Say, once at startup, when configured rules name nobody.
  *
  * @param keys the identities the rules are written for
- * @param loadedPlugins the server's plugin registry
+ * @param authenticators the loaded authentication plugins
  * @param who the plugin asking
  * @param logger where to say it
  */
 export function warnUnmatchedRuleKeys(
   keys: string[],
-  loadedPlugins: Record<string, DmPlugin>,
+  authenticators: AuthenticatorsInfo,
   who: string,
   logger: {
     warn: (message: string) => unknown;
@@ -166,7 +168,7 @@ export function warnUnmatchedRuleKeys(
   }
 ): void {
   if (keys.length === 0) return;
-  const { known, unverifiable } = identityCoverage(loadedPlugins);
+  const { known, unverifiable } = authenticators.coverage();
   const matched = keys.filter(key => known.has(key));
   if (matched.length > 0) return;
   if (known.size === 0 && unverifiable.length === 0) return;

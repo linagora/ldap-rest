@@ -155,7 +155,7 @@ export default class AuthzPerBranch extends AuthzBase {
   afterLoad(): void {
     warnUnmatchedRuleKeys(
       Object.keys(this.authConfig?.users ?? {}),
-      this.server.loadedPlugins,
+      this.server.authenticatorsInfo,
       this.name,
       this.logger
     );

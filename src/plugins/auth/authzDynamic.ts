@@ -382,14 +382,14 @@ export default class AuthzDynamic extends AuthBase {
     // the longest matching prefix, so an unscoped plugin and a scoped one
     // never see the same request, nor do `/api` and `/api/admin`. Reading
     // either as sharing said here what the composition check contradicts.
-    const sharing = Object.values(this.server.loadedPlugins)
+    const sharing = this.server.authenticatorsInfo
+      .all()
       .filter(
         plugin =>
           plugin !== this &&
-          plugin.roles?.includes('auth') &&
           runTogether(this, {
             name: plugin.name,
-            pathPrefixes: (plugin as AuthBase).pathPrefixes || [],
+            pathPrefixes: plugin.pathPrefixes || [],
           })
       )
       .map(plugin => plugin.name);

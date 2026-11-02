@@ -100,6 +100,19 @@ interface AuthConfig {
     };
 }
 
+// @public (undocumented)
+export interface AuthenticatorsInfo {
+    all(): readonly AuthBase[];
+    coverage(): {
+        known: Set<string>;
+        unverifiable: string[];
+    };
+    has(name: string): boolean;
+}
+
+// @public (undocumented)
+export const AuthenticatorsService: ServiceToken<AuthenticatorsInfo>;
+
 // @public
 type AuthorizedHook = 'ldapaddrequest' | 'ldapmodifyrequest' | 'ldapdeleterequest' | 'ldaprenamerequest';
 
@@ -760,6 +773,7 @@ class DM {
     // (undocumented)
     app: express.Express;
     authenticators: AuthBase[];
+    readonly authenticatorsInfo: AuthenticatorsInfo;
     get composed(): boolean;
     // (undocumented)
     config: Config;
@@ -1280,6 +1294,14 @@ interface OptionSpec<T> {
 // @public (undocumented)
 type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
 
+// @public (undocumented)
+export interface PasswordPolicyApi {
+    policyBase(): string;
+}
+
+// @public (undocumented)
+export const PasswordPolicyService: ServiceToken<PasswordPolicyApi>;
+
 // @public
 interface Refusal {
     attribute?: string;
@@ -1617,6 +1639,15 @@ interface SyntaxDefinition {
 export class TooManyRequestsError extends HttpError {
     constructor(message?: string);
 }
+
+// @public (undocumented)
+export interface TrashApi {
+    readonly trashBase: string;
+    readonly watchedBases: readonly string[];
+}
+
+// @public (undocumented)
+export const TrashService: ServiceToken<TrashApi>;
 
 // @public (undocumented)
 export class UnauthorizedError extends HttpError {

@@ -18,6 +18,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { Hooks } from '../../hooks';
 import type { SearchResult } from '../../lib/ldapActions';
 import { BadRequestError } from '../../lib/errors';
+import { TrashService } from '../../lib/services/trash';
 import { isDnInBranch, normalizeDn, parseDn } from '../../lib/utils';
 
 import { trashOptions } from './ldap.options';
@@ -27,9 +28,10 @@ class TrashPlugin extends DmPlugin {
 
   name = 'trash';
   roles: Role[] = ['consistency'] as const;
+  provides = [TrashService.with(this)];
 
-  private watchedBases: string[] = [];
-  private trashBase: string = '';
+  readonly watchedBases: string[] = [];
+  readonly trashBase: string = '';
   private addMetadata: boolean = true;
   private autoCreateTrash: boolean = true;
   private trashInitialized: boolean = false;

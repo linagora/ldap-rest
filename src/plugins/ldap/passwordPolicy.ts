@@ -32,6 +32,7 @@ import {
 } from '../../lib/utils';
 import { jsonBody } from '../../lib/expressFormatedResponses';
 import { extractLdapCode } from '../../lib/ldapCodes';
+import { PasswordPolicyService } from '../../lib/services/passwordPolicy';
 
 // ppolicy operational attributes to read
 const PPOLICY_ATTRS = [
@@ -511,6 +512,7 @@ export default class PasswordPolicy extends DmPlugin {
 
   name = 'ldapPasswordPolicy';
   roles: Role[] = ['api', 'configurable'];
+  provides = [PasswordPolicyService.with(this)];
 
   // By normalized DN; null for a DN that holds no policy
   private policyCache = new Map<

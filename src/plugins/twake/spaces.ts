@@ -17,6 +17,7 @@ import type { Hooks } from '../../hooks';
 import type { ChangeContext } from '../../lib/changeContext';
 import { BadRequestError } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
+import { TrashService } from '../../lib/services/trash';
 import type {
   AttributesList,
   AttributeValue,
@@ -453,7 +454,8 @@ export default class TwakeSpaces extends DmPlugin {
       throw new Error(
         `${this.name}: the directory schema defines no ${this.domainAttribute}; load a schema that does, or set --twake-instance-organization-domain-attribute`
       );
-    if (!this.follows || !this.server.loadedPlugins.trash) return;
+    const trash = this.service(TrashService);
+    if (!this.follows || !trash) return;
     const type = (rdn: string): string => rdn.split('=')[0].toLowerCase();
     // A watched base above a branch, or in one, holds its entries
     const holds = (pattern: string) => {
@@ -471,10 +473,7 @@ export default class TwakeSpaces extends DmPlugin {
     const branches = [this.groupSettings.twake_group_base, this.spaceBase].map(
       holds
     );
-    const watched = String(this.config.trash_watched_bases || '')
-      .split(';')
-      .map(base => base.trim())
-      .filter(Boolean);
+    const watched = trash.watchedBases;
     if (
       watched.length === 0 ||
       watched.some(base => branches.some(held => held(base)))

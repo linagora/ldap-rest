@@ -9,6 +9,7 @@ import type {
   AttributesList,
   SearchResult,
 } from '../../../src/lib/ldapActions';
+import { TrashService } from '../../../src/lib/services/trash';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import Scim from '../../../src/plugins/scim/scim';
@@ -684,16 +685,18 @@ describe('Twake tombstone plugin', function () {
   describe('with core/ldap/trash', () => {
     const composed = (watched: string): TwakeTombstone => {
       dm.config.trash_watched_bases = watched;
+      dm.services.set(TrashService, {
+        trashBase: '',
+        watchedBases: watched
+          .split(';')
+          .map(base => base.trim())
+          .filter(Boolean),
+      });
       return new TwakeTombstone(dm);
     };
 
-    beforeEach(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dm.loadedPlugins['trash'] = { name: 'trash' } as any;
-    });
-
     afterEach(() => {
-      delete dm.loadedPlugins['trash'];
+      dm.services.delete(TrashService);
       delete dm.config.trash_watched_bases;
     });
 

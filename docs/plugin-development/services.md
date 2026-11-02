@@ -116,3 +116,17 @@ for a plugin driving the entity.
 
 `TwakeGroups` is the one exception: it extends `LdapGroups` but serves its own
 API, so it overrides the declaration and does not register a `groups` entity.
+
+## Services the server provides
+
+The server itself provides `AuthenticatorsService`
+(`server.authenticatorsInfo`): the loaded authentication plugins, whether one
+is loaded, and the identities they can publish.
+
+A plugin family provides the others:
+
+- `TrashService`: the trash branch and the branches it watches.
+- `PasswordPolicyService`: the branch holding the password policies.
+
+A consumer that only needs to know whether the feature is loaded calls
+`this.service(token)` and skips its work when the answer is `null`.
