@@ -26,6 +26,7 @@ import {
 import { changeContext } from '../../lib/changeContext';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
+import { TombstoneService } from '../../lib/services/tombstone';
 import { TrashService } from '../../lib/services/trash';
 import { escapeLdapFilter, isDnInBranch, normalizeDn } from '../../lib/utils';
 import { scimOptionsOf } from '../scim/scim.options';
@@ -60,6 +61,7 @@ export default class TwakeTombstone extends DmPlugin {
 
   name = 'twakeTombstone';
   roles: Role[] = ['consistency', 'api'] as const;
+  provides = [TombstoneService.with(this)];
 
   private readonly attrs: LifecycleAttributes;
   private readonly patterns: RegExp[];

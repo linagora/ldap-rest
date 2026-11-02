@@ -18,6 +18,7 @@ import type ldapActions from '../../lib/ldapActions';
 import type { DmRequest } from '../../lib/auth/base';
 import { setChangeSource } from '../../lib/changeContext';
 import { jsonBodyParser } from '../../lib/rawBody';
+import { ScimService } from '../../lib/services/scim';
 import { staticPlugins } from '../../lib/staticFiles';
 import {
   type BulkRequest,
@@ -460,6 +461,7 @@ export default class Scim extends DmPlugin {
 
   name = 'scim';
   roles: Role[] = ['api', 'configurable'] as const;
+  provides = [ScimService.with(this)];
 
   ldap: ldapActions;
   private readonly scimPrefix: string;
@@ -526,6 +528,14 @@ export default class Scim extends DmPlugin {
       scimPrefix: this.scimPrefix,
       authenticators: server.authenticatorsInfo,
     });
+  }
+
+  get userLockAttribute(): string {
+    return this.settings.scim_user_lock_attribute;
+  }
+
+  get userLockValue(): string {
+    return this.settings.scim_user_lock_value;
   }
 
   private scimJson(

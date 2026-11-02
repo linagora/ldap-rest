@@ -17,6 +17,10 @@ import type { Hooks } from '../../hooks';
 import type { ChangeContext } from '../../lib/changeContext';
 import { BadRequestError } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
+import {
+  TombstoneService,
+  type TombstoneApi,
+} from '../../lib/services/tombstone';
 import { TrashService } from '../../lib/services/trash';
 import type {
   AttributesList,
@@ -38,7 +42,6 @@ import {
   type TwakeGroupsApi,
 } from '../../lib/services/twakeGroups';
 
-import type TwakeTombstone from './tombstone';
 import {
   bodyOf,
   branchPattern,
@@ -328,9 +331,8 @@ export default class TwakeSpaces extends DmPlugin {
     return groups;
   }
 
-  private get tombstone(): TwakeTombstone | undefined {
-    return this.server.loadedPlugins.twakeTombstone as unknown as
-      TwakeTombstone | undefined;
+  private get tombstone(): TombstoneApi | null {
+    return this.service(TombstoneService);
   }
 
   hooks: Hooks = {
