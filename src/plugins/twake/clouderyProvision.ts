@@ -34,7 +34,7 @@ import { isChildOf } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 import { BaseResolver } from '../scim/baseResolver';
 import { scimOptionsOf } from '../scim/scim.options';
-import type { ScimUser } from '../scim/types';
+import type { ScimUser } from '../../lib/scim/types';
 
 import { clouderyOptions, clouderyOptionsOf } from './cloudery.options';
 import { cozyOptionsOf } from './cozy.options';

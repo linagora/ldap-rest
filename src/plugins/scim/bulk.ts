@@ -14,10 +14,6 @@ import type winston from 'winston';
 
 import type { DmRequest } from '../../lib/auth/base';
 import type HookBus from '../../lib/hookBus';
-
-import type { ScimUsers } from './users';
-import type { ScimOptions } from './scim.options';
-import type { ScimGroups } from './groups';
 import {
   type BulkRequest,
   type BulkResponse,
@@ -27,7 +23,11 @@ import {
   type ScimGroup,
   type PatchRequest,
   SCHEMA_BULK_RESPONSE,
-} from './types';
+} from '../../lib/scim/types';
+
+import type { ScimUsers } from './users';
+import type { ScimOptions } from './scim.options';
+import type { ScimGroups } from './groups';
 import {
   kindOf,
   scimErrorFromException,

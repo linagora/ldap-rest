@@ -25,6 +25,11 @@ import type {
   ModifyRequest,
 } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
+import {
+  type ResourceMapping,
+  type PatchOperation,
+  type PatchRequest,
+} from '../../lib/scim/types';
 
 import {
   ScimError,
@@ -33,11 +38,6 @@ import {
   scimNoTarget,
   scimInvalidValue,
 } from './errors';
-import {
-  type ResourceMapping,
-  type PatchOperation,
-  type PatchRequest,
-} from './types';
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,

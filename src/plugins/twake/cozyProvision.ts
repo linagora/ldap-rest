@@ -23,7 +23,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
 import type RabbitMq from '../rabbitmq';
-import type { ScimUser } from '../scim/types';
+import type { ScimUser } from '../../lib/scim/types';
 
 import { cozyOptions, cozyOptionsOf } from './cozy.options';
 

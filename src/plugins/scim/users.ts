@@ -20,16 +20,16 @@ import {
   isChildOf,
   validateDnValue,
 } from '../../lib/utils';
-
-import { BaseResolver } from './baseResolver';
-import type { ScimOptions } from './scim.options';
 import {
   type ResourceMapping,
   type ScimUser,
   type ListResponse,
   type PatchRequest,
   SCHEMA_LIST_RESPONSE,
-} from './types';
+} from '../../lib/scim/types';
+
+import { BaseResolver } from './baseResolver';
+import type { ScimOptions } from './scim.options';
 import {
   DEFAULT_USER_MAPPING,
   loadMappingFile,

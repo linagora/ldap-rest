@@ -19,6 +19,12 @@ import type { DmRequest } from '../../lib/auth/base';
 import { setChangeSource } from '../../lib/changeContext';
 import { jsonBodyParser } from '../../lib/rawBody';
 import { staticPlugins } from '../../lib/staticFiles';
+import {
+  type BulkRequest,
+  type PatchRequest,
+  type ScimGroup,
+  type ScimUser,
+} from '../../lib/scim/types';
 
 import { scimOptions, type ScimOptions } from './scim.options';
 import { BaseResolver } from './baseResolver';
@@ -32,12 +38,6 @@ import {
   writeScimErrorFromException,
   SCIM_CONTENT_TYPE,
 } from './errors';
-import {
-  type BulkRequest,
-  type PatchRequest,
-  type ScimGroup,
-  type ScimUser,
-} from './types';
 import {
   type ProjectionQuery,
   assertProjection,

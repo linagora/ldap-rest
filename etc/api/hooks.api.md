@@ -56,7 +56,21 @@ interface BranchPermissions {
 }
 
 // @public (undocumented)
-interface BulkOperationResponse {
+export interface BulkOperationRequest {
+    // (undocumented)
+    bulkId?: string;
+    // (undocumented)
+    data?: unknown;
+    // (undocumented)
+    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+    // (undocumented)
+    path: string;
+    // (undocumented)
+    version?: string;
+}
+
+// @public (undocumented)
+export interface BulkOperationResponse {
     // (undocumented)
     bulkId?: string;
     // (undocumented)
@@ -71,7 +85,17 @@ interface BulkOperationResponse {
 }
 
 // @public (undocumented)
-interface BulkResponse {
+export interface BulkRequest {
+    // (undocumented)
+    failOnErrors?: number;
+    // (undocumented)
+    Operations: BulkOperationRequest[];
+    // (undocumented)
+    schemas: string[];
+}
+
+// @public (undocumented)
+export interface BulkResponse {
     // (undocumented)
     Operations: BulkOperationResponse[];
     // (undocumented)
@@ -91,8 +115,8 @@ interface ChangeContext {
     source?: string;
 }
 
-// @public (undocumented)
-type ChangesToNotify = Record<string, [
+// @public
+export type ChangesToNotify = Record<string, [
 AttributeValue | null,
 AttributeValue | null
 ]>;
@@ -832,10 +856,47 @@ function knownAttributeName(type: string): string | undefined;
 type LdapList = Record<string, AttributesList>;
 
 // @public (undocumented)
+export interface ListResponse<T> {
+    // (undocumented)
+    itemsPerPage: number;
+    // (undocumented)
+    Resources: T[];
+    // (undocumented)
+    schemas: [typeof SCHEMA_LIST_RESPONSE];
+    // (undocumented)
+    startIndex: number;
+    // (undocumented)
+    totalResults: number;
+}
+
+// @public
+export interface MappingEntry {
+    // (undocumented)
+    converter?: 'boolean' | 'number' | 'string';
+    // (undocumented)
+    ldap?: string;
+    // (undocumented)
+    ldapPrimary?: string;
+    // (undocumented)
+    ldapSecondary?: string;
+    // (undocumented)
+    multi?: 'single' | 'array';
+    // (undocumented)
+    operational?: boolean;
+    // (undocumented)
+    readOnly?: boolean;
+    // (undocumented)
+    scim: string;
+    // (undocumented)
+    sub?: Record<string, string>;
+    subDn?: string[];
+}
+
+// @public (undocumented)
 export type MaybePromise<T> = Promise<T> | T;
 
 // @public (undocumented)
-interface Meta {
+export interface Meta {
     // (undocumented)
     created?: string;
     // (undocumented)
@@ -862,7 +923,7 @@ interface ModifyRequest {
 function movedToTrash(trashBase: string | undefined, oldDn: string, newDn: string): boolean;
 
 // @public (undocumented)
-interface MultiValued<T extends string = string> {
+export interface MultiValued<T extends string = string> {
     // (undocumented)
     $ref?: string;
     // (undocumented)
@@ -905,6 +966,24 @@ function parseDirectoryDate(raw: AttributeValue): Date | null;
 // @public
 function parseDn(dn: string): string[];
 
+// @public (undocumented)
+export interface PatchOperation {
+    // (undocumented)
+    op: 'add' | 'remove' | 'replace' | 'Add' | 'Remove' | 'Replace';
+    // (undocumented)
+    path?: string;
+    // (undocumented)
+    value?: unknown;
+}
+
+// @public (undocumented)
+export interface PatchRequest {
+    // (undocumented)
+    Operations: PatchOperation[];
+    // (undocumented)
+    schemas: string[];
+}
+
 // @public
 function rdnTypes(dn: string): string[];
 
@@ -920,17 +999,96 @@ function registerAttributeTypes(types: Iterable<{
     names: string[];
 }>): void;
 
+// @public (undocumented)
+export interface ResourceMapping {
+    // (undocumented)
+    entries: MappingEntry[];
+    // (undocumented)
+    resourceType: 'User' | 'Group';
+    // (undocumented)
+    schemas: string[];
+}
+
+// @public (undocumented)
+export interface ResourceTypeDefinition {
+    // (undocumented)
+    description?: string;
+    // (undocumented)
+    endpoint: string;
+    // (undocumented)
+    id: string;
+    // (undocumented)
+    meta?: {
+        resourceType: 'ResourceType';
+        location?: string;
+    };
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    schema: string;
+    // (undocumented)
+    schemaExtensions?: Array<{
+        schema: string;
+        required: boolean;
+    }>;
+    // (undocumented)
+    schemas: [typeof SCHEMA_RESOURCE_TYPE];
+}
+
 // @public
 const runAsHookOwner: <T>(hook: HookFn, fn: () => T) => T;
 
 // @public (undocumented)
-const SCHEMA_BULK_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:BulkResponse";
+export const SCHEMA_BULK_REQUEST = "urn:ietf:params:scim:api:messages:2.0:BulkRequest";
 
 // @public (undocumented)
-const SCHEMA_ERROR = "urn:ietf:params:scim:api:messages:2.0:Error";
+export const SCHEMA_BULK_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:BulkResponse";
 
 // @public (undocumented)
-interface ScimAddress {
+export const SCHEMA_ERROR = "urn:ietf:params:scim:api:messages:2.0:Error";
+
+// @public (undocumented)
+export const SCHEMA_GROUP = "urn:ietf:params:scim:schemas:core:2.0:Group";
+
+// @public (undocumented)
+export const SCHEMA_LIST_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
+
+// @public (undocumented)
+export const SCHEMA_PATCH_OP = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
+
+// @public (undocumented)
+export const SCHEMA_RESOURCE_TYPE = "urn:ietf:params:scim:schemas:core:2.0:ResourceType";
+
+// @public (undocumented)
+export const SCHEMA_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Schema";
+
+// @public (undocumented)
+export const SCHEMA_SERVICE_PROVIDER_CONFIG = "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig";
+
+// @public
+export const SCHEMA_USER = "urn:ietf:params:scim:schemas:core:2.0:User";
+
+// @public (undocumented)
+export interface SchemaDefinition {
+    // (undocumented)
+    attributes: unknown[];
+    // (undocumented)
+    description?: string;
+    // (undocumented)
+    id: string;
+    // (undocumented)
+    meta?: {
+        resourceType: 'Schema';
+        location?: string;
+    };
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    schemas: [typeof SCHEMA_SCHEMA];
+}
+
+// @public (undocumented)
+export interface ScimAddress {
     // (undocumented)
     country?: string;
     // (undocumented)
@@ -950,7 +1108,7 @@ interface ScimAddress {
 }
 
 // @public (undocumented)
-interface ScimErrorResponse {
+export interface ScimErrorResponse {
     // (undocumented)
     detail?: string;
     // (undocumented)
@@ -962,10 +1120,10 @@ interface ScimErrorResponse {
 }
 
 // @public (undocumented)
-type ScimErrorType = 'invalidFilter' | 'tooMany' | 'uniqueness' | 'mutability' | 'invalidSyntax' | 'invalidPath' | 'noTarget' | 'invalidValue' | 'invalidVers' | 'sensitive';
+export type ScimErrorType = 'invalidFilter' | 'tooMany' | 'uniqueness' | 'mutability' | 'invalidSyntax' | 'invalidPath' | 'noTarget' | 'invalidValue' | 'invalidVers' | 'sensitive';
 
 // @public (undocumented)
-interface ScimGroup {
+export interface ScimGroup {
     // (undocumented)
     [ext: string]: unknown;
     // (undocumented)
@@ -983,7 +1141,7 @@ interface ScimGroup {
 }
 
 // @public (undocumented)
-interface ScimName {
+export interface ScimName {
     // (undocumented)
     familyName?: string;
     // (undocumented)
@@ -999,7 +1157,10 @@ interface ScimName {
 }
 
 // @public (undocumented)
-interface ScimUser {
+export type ScimResource = ScimUser | ScimGroup;
+
+// @public (undocumented)
+export interface ScimUser {
     // (undocumented)
     [ext: string]: unknown;
     // (undocumented)
@@ -1052,6 +1213,55 @@ interface ScimUser {
     userType?: string;
     // (undocumented)
     x509Certificates?: MultiValued[];
+}
+
+// @public (undocumented)
+export interface ServiceProviderConfig {
+    // (undocumented)
+    authenticationSchemes: Array<{
+        name: string;
+        description: string;
+        specUri?: string;
+        documentationUri?: string;
+        type: string;
+        primary?: boolean;
+    }>;
+    // (undocumented)
+    bulk: {
+        supported: boolean;
+        maxOperations: number;
+        maxPayloadSize: number;
+    };
+    // (undocumented)
+    changePassword: {
+        supported: boolean;
+    };
+    // (undocumented)
+    documentationUri?: string;
+    // (undocumented)
+    etag: {
+        supported: boolean;
+    };
+    // (undocumented)
+    filter: {
+        supported: boolean;
+        maxResults: number;
+    };
+    // (undocumented)
+    meta?: {
+        resourceType: 'ServiceProviderConfig';
+        location?: string;
+    };
+    // (undocumented)
+    patch: {
+        supported: boolean;
+    };
+    // (undocumented)
+    schemas: [typeof SCHEMA_SERVICE_PROVIDER_CONFIG];
+    // (undocumented)
+    sort: {
+        supported: boolean;
+    };
 }
 
 // @public

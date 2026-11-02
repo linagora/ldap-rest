@@ -98,6 +98,7 @@ pkg.exports = {
     types: './dist/src/bin/index.d.ts',
   },
   './hooks': {
+    import: './dist/hooks.js',
     types: './dist/src/hooks.d.ts',
   },
   './plugin': {
@@ -154,6 +155,7 @@ export default async () => {
     {
       input: [
         'src/bin/index.ts',
+        'src/hooks.ts',
         ...p.map(file => `${PLUGINS_SRC_DIR}/${file}`),
         ...a.map(file => `src/abstract/${file}`),
       ],

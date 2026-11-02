@@ -17,14 +17,13 @@ import { messageOf } from '../../lib/expressFormatedResponses';
 // it too. Imported and re-exported, so this module stays the one SCIM reads
 // it from.
 import { extractLdapCode, isSchemaRefusal } from '../../lib/ldapCodes';
-
-export { extractLdapCode };
-
 import {
   type ScimErrorResponse,
   type ScimErrorType,
   SCHEMA_ERROR,
-} from './types';
+} from '../../lib/scim/types';
+
+export { extractLdapCode };
 
 export const SCIM_CONTENT_TYPE = 'application/scim+json';
 

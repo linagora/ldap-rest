@@ -3,7 +3,7 @@ import { expect } from 'chai';
 
 import { DM } from '../../../src/bin';
 import CozyProvision from '../../../src/plugins/twake/cozyProvision';
-import type { ScimUser } from '../../../src/plugins/scim/types';
+import type { ScimUser } from '../../../src/lib/scim/types';
 
 interface PublishCall {
   exchange: string;

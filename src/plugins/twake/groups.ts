@@ -49,7 +49,7 @@ import {
   mergeMapping,
 } from '../scim/mapping';
 import { scimOptionsOf } from '../scim/scim.options';
-import type { ScimGroup } from '../scim/types';
+import type { ScimGroup } from '../../lib/scim/types';
 import { outsideRequest } from '../../lib/requestContext';
 
 import {

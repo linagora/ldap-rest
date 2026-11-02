@@ -15,7 +15,7 @@ import { ConflictError } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
 import { currentOperation } from '../../lib/operation';
 import { Hooks } from '../../hooks';
-import type { ChangesToNotify } from '../ldap/onChange';
+import type { ChangesToNotify } from '../../lib/changes';
 import { wantJson } from '../../lib/expressFormatedResponses';
 import { roleAttribute } from '../../config/schema';
 import { domainBranches, mailDomains } from '../../lib/mailDomains';

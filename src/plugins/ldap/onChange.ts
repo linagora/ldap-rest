@@ -13,12 +13,11 @@ import type { Hooks } from '../../hooks';
 import type { AttributeValue, SearchResult } from '../../lib/ldapActions';
 import type { Config } from '../../bin';
 import type { ChangeContext } from '../../lib/changeContext';
+import type { ChangesToNotify } from '../../lib/changes';
 import { currentOperation } from '../../lib/operation';
 
-export type ChangesToNotify = Record<
-  string,
-  [AttributeValue | null, AttributeValue | null]
->;
+/** @deprecated import from `ldap-rest/hooks`; removed in 4.0.0 */
+export type { ChangesToNotify } from '../../lib/changes';
 
 const normalize = (value: AttributeValue | undefined): string[] =>
   (value === undefined ? [] : Array.isArray(value) ? value : [value])

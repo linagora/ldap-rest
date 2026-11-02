@@ -20,13 +20,13 @@
  * Unknown SCIM attribute paths cause a ScimError(invalidFilter, 400).
  */
 import { escapeLdapFilter } from '../../lib/utils';
+import type { ResourceMapping } from '../../lib/scim/types';
 
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
   scimPathToLdapAttribute,
 } from './mapping';
-import type { ResourceMapping } from './types';
 import { scimInvalidFilter } from './errors';
 
 type TokenKind =
