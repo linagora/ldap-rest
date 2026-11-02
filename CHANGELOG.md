@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- The published image upgrades the Alpine packages of its base image when it is
+  built, so security fixes published after the base image was built reach it
+  ([details](docs/usage/operations.md#health-and-readiness)).
 - A plugin loaded with per-instance overrides no longer counts operations on
   its own, skips the authorization composition check, or places its routes
   after the error handler, where a failure answered as HTML and went unlogged
