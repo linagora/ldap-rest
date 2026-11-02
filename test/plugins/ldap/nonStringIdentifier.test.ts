@@ -42,7 +42,7 @@ describe('A creation body naming the entry', function () {
     request = supertest(server.app);
   });
 
-  after(async () => {
+  after(() => {
     if (previousGroupSchema === undefined) delete process.env.DM_GROUP_SCHEMA;
     else process.env.DM_GROUP_SCHEMA = previousGroupSchema;
     server?.stop();

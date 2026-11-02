@@ -17,7 +17,7 @@ describe('PasswordPolicy Plugin', () => {
     await dm.ready;
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     if (dm) {
       dm.stop();
     }
