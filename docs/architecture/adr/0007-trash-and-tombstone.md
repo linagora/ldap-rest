@@ -15,10 +15,10 @@ picks one per branch:
 
 - **`core/ldap/trash`** moves the entry, by an atomic `modifyDN`, to a trash
   branch under `--trash-base`, overwriting an earlier entry with the same RDN
-  there; with `--trash-add-metadata`, it then replaces `description` with the
-  deletion date and the original DN, a failure there being logged and not
-  fatal. The native delete is cancelled. `--trash-watched-bases` selects the
-  branches; an empty list watches every branch.
+  there; unless `--trash-add-metadata=false`, it then replaces `description`
+  with the deletion date and the original DN, a failure there being logged
+  and not fatal. The native delete is cancelled. `--trash-watched-bases`
+  selects the branches; an empty list watches every branch.
 - **`core/twake/tombstone`** keeps the entry in place: one modify sets the
   deleted attribute and the lock, the deletion date and the reason when their
   attributes are configured, and removes the attributes the deployment names.

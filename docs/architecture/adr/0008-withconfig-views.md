@@ -21,6 +21,13 @@ copy: overridden top-level keys are the plugin's alone, nested objects and
 arrays are still shared with the server. The loader constructs a plugin with
 overrides on such a view.
 
+A primitive field would be copied by value into every view, so state the views
+must share lives in an object: the operation counter (`_operations`, read
+through the `operationSequence` accessor) and the composition flag
+(`_compositionState`), as the dispatcher's own state does (`_authState`). A
+view created while the plugins load therefore sees the composition once the
+server has checked it.
+
 The copy is built on the prototype rather than by spreading `{...this}`,
 which copies own properties and leaves the methods behind: a plugin calling
 `this.server.anything()` would throw, and only when configured with
@@ -31,11 +38,11 @@ overrides.
 - A plugin loaded with overrides cannot change the server's configuration for
   anyone else; mutating `this.config` affects its view alone, at the top
   level.
-- Primitive fields are copied by value, not shared. Two of them are known
-  limitations, tracked in [#625] and [#626]: `operationSequence` gives each
-  view its own counter (two views can hand out the same operation number), and
-  `_composed` is frozen at its value when the view was created, so a plugin
-  registered through a view after `ready` skips the composition check.
+- Primitive fields are copied by value, not shared: what must be shared is
+  held in an object, as the operation counter and the composition flag are.
+  A plugin registered after `ready` through a view created while loading is
+  therefore checked against the composition like any other (before [#625] and
+  [#626], the counter and the flag were primitives, and neither held).
 - An own property added to the server after the view was created is not
   visible to that view. State that must be shared has to live in an object
   that already exists when the view is made.

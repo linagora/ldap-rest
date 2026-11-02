@@ -32,7 +32,8 @@ const base = path.resolve(root, '..');
 
 // "used to" is also the instrumental sense ("the attribute used to resolve
 // the DN"). It narrates history when it follows a subject, not a comma, a
-// bracket, a modal or an instrument.
+// bracket, a modal or an instrument. The rule errs towards silence: a
+// history phrase after an instrument noun, `never` or `not` goes unchecked.
 const INSTRUMENTS = new Set(
   (
     'attribute attributes field fields option options param params parameter ' +
@@ -109,10 +110,14 @@ for (const file of sources(root)) {
     }
   };
 
+  // `getChildren` rather than `forEachChild`: the parser's children include
+  // the tokens, so a comment before a closing bracket or after a comma is
+  // some token's trivia. Node-only walking misses those, and with them a
+  // comment that sits nowhere else.
   const visit = node => {
     add(ts.getLeadingCommentRanges(text, node.getFullStart()));
     add(ts.getTrailingCommentRanges(text, node.getEnd()));
-    ts.forEachChild(node, visit);
+    for (const child of node.getChildren(source)) visit(child);
   };
   visit(source);
   add(ts.getLeadingCommentRanges(text, source.endOfFileToken.getFullStart()));
