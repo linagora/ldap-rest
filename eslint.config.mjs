@@ -22,11 +22,7 @@ export default [
 
   // TypeScript config (except browser)
   {
-    files: [
-      'src/**/*.{ts,tsx}',
-      'packages/core/src/**/*.ts',
-      'packages/storage/src/**/*.ts',
-    ],
+    files: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
     ignores: ['src/browser/**'],
     languageOptions: {
       parser: tsparser,
@@ -163,11 +159,7 @@ export default [
   // Reported as a warning: the rule treats assertions that other rules need
   // as unnecessary, so failing the build on it blocks correct changes.
   {
-    files: [
-      'src/**/*.{ts,tsx}',
-      'packages/core/src/**/*.ts',
-      'packages/storage/src/**/*.ts',
-    ],
+    files: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
     rules: {
       '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
     },
@@ -257,11 +249,7 @@ export default [
   // A later block for the same files replaces this rule's options rather
   // than adding to them: the SCIM block below repeats the fetch selector.
   {
-    files: [
-      'src/**/*.ts',
-      'packages/core/src/**/*.ts',
-      'packages/storage/src/**/*.ts',
-    ],
+    files: ['src/**/*.ts', 'packages/*/src/**/*.ts'],
     ignores: [
       'src/browser/**',
       'packages/core/src/lib/ldap/operations.ts',
@@ -330,11 +318,7 @@ export default [
   // One validator enforces the entity schemas, see
   // docs/client-development/schemas/README.md#what-a-value-must-look-like
   {
-    files: [
-      'src/**/*.ts',
-      'packages/core/src/**/*.ts',
-      'packages/storage/src/**/*.ts',
-    ],
+    files: ['src/**/*.ts', 'packages/*/src/**/*.ts'],
     ignores: [
       'src/lib/entitySchema/**',
       'packages/core/src/config/schema.ts',
@@ -371,11 +355,7 @@ export default [
   // docs/usage/operations.md#metrics: a call to another service is timed
   // under its caller, which `DmPlugin.fetch` and the instance providers do
   {
-    files: [
-      'src/**/*.ts',
-      'packages/core/src/**/*.ts',
-      'packages/storage/src/**/*.ts',
-    ],
+    files: ['src/**/*.ts', 'packages/*/src/**/*.ts'],
     ignores: [
       'src/browser/**',
       'src/abstract/plugin.ts',

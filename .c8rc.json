@@ -1,6 +1,6 @@
 {
   "all": true,
-  "src": ["src", "packages/core/src", "packages/storage/src"],
+  "src": ["src", "packages"],
   "extension": [".ts"],
   "reporter": ["text-summary", "html", "lcov"],
   "report-dir": "coverage",
@@ -13,6 +13,7 @@
     "packages/core/src/hooks.ts",
     "packages/core/src/config/schema.ts",
     "packages/core/src/**/types.ts",
+    "packages/*/dist/**",
     "test/**",
     "dist/**"
   ],
