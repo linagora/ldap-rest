@@ -25,6 +25,9 @@ Settled<F extends (...args: never[]) => infer R ? R : never>
 // @public
 type Args<K extends keyof Hooks> = NonNullable<Hooks[K]> extends (...args: infer A) => unknown ? A : never;
 
+// @public (undocumented)
+type ArrayKind = 'identifiers' | 'dns' | 'phrases';
+
 // @public
 export function assertedRdnValue(dn: string, attribute: string, base?: string): string | null;
 
@@ -769,13 +772,30 @@ export interface Config {
 }
 
 // @public (undocumented)
+type ConfigEntry = [
+string,
+string,
+// env value
+string | string[] | boolean | number | Record<string, any>,
+('string' | 'number' | 'boolean' | 'array' | 'json' | null | undefined)?,
+(string | null | undefined)?,
+ArrayKind?,
+boolean?,
+(string[] | null | undefined)?,
+(string[] | null | undefined)?
+];
+
+// @public (undocumented)
+type ConfigTemplate = ConfigEntry[];
+
+// @public (undocumented)
 export class ConflictError extends HttpError {
     constructor(message?: string, refusal?: Refusal);
 }
 
 // @public
 export class DM {
-    constructor();
+    constructor(options?: ConfigTemplate);
     afterLoad(): void;
     // (undocumented)
     app: express.Express;
@@ -784,6 +804,7 @@ export class DM {
     get composed(): boolean;
     // (undocumented)
     config: Config;
+    readonly configTemplate: ConfigTemplate;
     dispatchAuth(req: Request_2, res: Response_2, next: () => void): void;
     readonly entities: EntityRegistry;
     exitOnCrash(): void;
@@ -803,6 +824,7 @@ export class DM {
     // (undocumented)
     get operationSequence(): number;
     set operationSequence(value: number);
+    readonly optionKeys: ReadonlySet<string>;
     readonly pluginInfo: PluginInfo;
     // (undocumented)
     ready: Promise<void>;

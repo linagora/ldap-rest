@@ -9,7 +9,7 @@ import {
   SNAPSHOT_PATH,
   serializeOptionsSnapshot,
 } from '../../scripts/options-snapshot';
-import configArgs from '../../src/config/args';
+import configArgs from '../../src/bin/options';
 import type { ConfigEntry } from '../../src/lib/parseConfig';
 
 const config: ConfigEntry[] = [

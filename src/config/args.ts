@@ -1,6 +1,7 @@
 /**
- * command-line options, corresponding environment variables, default values and types
- * Contains also the typescript declaration of config
+ * Core command-line options, their environment variables, defaults and types,
+ * and the TypeScript declaration of config. `src/bin/options.ts` appends the
+ * plugin families' options.
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import { fileURLToPath } from 'url';
@@ -8,54 +9,6 @@ import { dirname, join } from 'path';
 
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
-import { bclOptions } from '../plugins/bcl.options';
-import { rabbitmqOptions } from '../plugins/rabbitmq.options';
-import { metricsOptions } from '../plugins/metrics.options';
-import { storageOptions } from '../plugins/storage.options';
-import { staticOptions } from '../plugins/static.options';
-import { scimOptions } from '../lib/scim/options';
-import {
-  crowdsecOptions,
-  dynamicOptions,
-  fakeOptions,
-  hmacOptions,
-  linid1Options,
-  llngOptions,
-  openidconnectOptions,
-  perBranchOptions,
-  perRouteOptions,
-  rateLimitOptions,
-  tokenOptions,
-  totpOptions,
-  trustedProxyOptions,
-} from '../plugins/auth/auth.options';
-import {
-  bulkImportOptions,
-  enterpriseRulesOptions,
-  externalUsersOptions,
-  flatGenericOptions,
-  groupsOptions,
-  organizationOptions,
-  passwordPolicyOptions,
-  rawOptions,
-  trashOptions,
-} from '../plugins/ldap/ldap.options';
-import { appAccountsOptions } from '../plugins/twake/appAccounts.options';
-import { calendarOptions } from '../plugins/twake/calendar.options';
-import { clouderyOptions } from '../plugins/twake/cloudery.options';
-import { cozyOptions } from '../plugins/twake/cozy.options';
-import { driveOptions } from '../plugins/twake/drive.options';
-import { jamesOptions } from '../plugins/twake/james.options';
-import { migrationProxyOptions } from '../plugins/twake/migrationProxy.options';
-import { twakeGroupsOptions } from '../plugins/twake/twakeGroups.options';
-import { twakeInstancesOptions } from '../plugins/twake/twakeInstances.options';
-import { twakeLifecycleOptions } from '../plugins/twake/twakeLifecycle.options';
-import { twakeSpacesOptions } from '../plugins/twake/twakeSpaces.options';
-import { twakeTombstoneOptions } from '../plugins/twake/twakeTombstone.options';
-
-import { toConfigEntries } from './options';
-
-export { STATIC_CSP, STATIC_FRAME_OPTIONS } from '../plugins/static.options';
 
 export interface BranchPermissions {
   read?: boolean;
@@ -600,73 +553,10 @@ const configArgs: ConfigTemplate = [
     'identifiers',
   ],
 
-  // Plugins options
+  // Access control: the core reads these, whether or not an auth plugin is
+  // loaded (see lib/auth/base.ts and lib/authz/).
 
-  // LDAP organizations
-  ...toConfigEntries(organizationOptions),
-
-  // LDAP enterprise rules plugin
-  ...toConfigEntries(enterpriseRulesOptions),
-
-  // Metrics, keyed storage and Back-Channel Logout plugins
-  ...toConfigEntries(metricsOptions),
-  ...toConfigEntries(storageOptions),
-  ...toConfigEntries(bclOptions),
-
-  // LDAP groups and external users plugins
-  ...toConfigEntries(groupsOptions),
-  ...toConfigEntries(externalUsersOptions),
-
-  // static
-  ...toConfigEntries(staticOptions),
-
-  // LDAP flat, raw and bulk import plugins
-  ...toConfigEntries(flatGenericOptions),
-  ...toConfigEntries(rawOptions),
-  ...toConfigEntries(bulkImportOptions),
-
-  // James plugin
-  ['--ldap-concurrency', 'DM_LDAP_CONCURRENCY', 10, 'number'],
-  ...toConfigEntries(jamesOptions),
-
-  // Twake Mail migration proxy plugin
-  ...toConfigEntries(migrationProxyOptions),
-
-  // Drive (Cozy) plugin
-  ...toConfigEntries(driveOptions),
-
-  // Twake Calendar plugin
-  ...toConfigEntries(calendarOptions),
-
-  // Cozy provisioning plugin (twake/cozyProvision)
-  ...toConfigEntries(cozyOptions),
-
-  // clouderyProvision plugin
-  ...toConfigEntries(clouderyOptions),
-
-  // Account lifecycle, groups, spaces and tombstone options
-  ...toConfigEntries(twakeLifecycleOptions),
-  ...toConfigEntries(twakeGroupsOptions),
-  ...toConfigEntries(twakeSpacesOptions),
-  ...toConfigEntries(twakeTombstoneOptions),
-
-  // twake/instances plugin
-  ...toConfigEntries(twakeInstancesOptions),
-
-  ...toConfigEntries(rabbitmqOptions),
-
-  // Applicative Accounts plugin
-  ...toConfigEntries(appAccountsOptions),
-
-  // Trash plugin
-  ...toConfigEntries(trashOptions),
-
-  /* Access control plugins */
-
-  // Lemonldap options
-  ...toConfigEntries(llngOptions),
-
-  // Common to every authentication plugin: restrict it to path prefixes
+  // Common to every authentication plugin: the path prefixes it guards
   [
     '--auth-path-prefix',
     'DM_AUTH_PATH_PREFIX',
@@ -675,17 +565,6 @@ const configArgs: ConfigTemplate = [
     '--auth-path-prefixes',
   ],
 
-  // Auth token, fake, TOTP and HMAC plugins
-  ...toConfigEntries(tokenOptions),
-  ...toConfigEntries(fakeOptions),
-  ...toConfigEntries(totpOptions),
-  ...toConfigEntries(hmacOptions),
-
-  // Auth authzPerRoute plugin
-  ...toConfigEntries(perRouteOptions),
-
-  // Common to every authorization plugin
-  //
   // What an *authenticated* caller whose identity the plugin cannot resolve
   // means. `deny` refuses the operation; `allow` lets it through with a
   // warning, which is what every plugin did until it turned out to be an
@@ -711,10 +590,6 @@ const configArgs: ConfigTemplate = [
   // an AND: the first refusal wins. The server refuses to start on that
   // unless this says the AND is meant.
   ['--authz-combine', 'DM_AUTHZ_COMBINE', false, 'boolean'],
-  // The branch-level plugin `authzScope` describes a caller with, when more
-  // than one of them judges that caller. Empty: the first one loaded, and
-  // the answer lists the others under `sources`.
-  ['--authz-scope-source', 'DM_AUTHZ_SCOPE_SOURCE', ''],
 
   // Auth authzPerBranch plugin
   [
@@ -725,37 +600,9 @@ const configArgs: ConfigTemplate = [
   ],
   ['--authz-transit-branch', 'DM_AUTHZ_TRANSIT_BRANCH', ''],
   ['--authz-transit-origin-attribute', 'DM_AUTHZ_TRANSIT_ORIGIN_ATTRIBUTE', ''],
-  ...toConfigEntries(perBranchOptions),
 
-  // Auth authzDynamic plugin
-  //
-  // Who may reach the directory through this plugin without presenting one
-  // of its tokens. Empty — the default — means nobody: a request is checked
-  // against the ACLs of the token it carries, whatever else authenticated
-  // it. Values are identities as another authenticator publishes them in
-  // `req.user`, plus two words:
-  //
-  //  - `any-authenticated`: anything another plugin authenticated, which is
-  //    what the plugin did until 0.9.0, by accident rather than by decision;
-  //  - `trusted-proxy`: a request `core/auth/trustedProxy` vouched for.
-  ...toConfigEntries(dynamicOptions),
-
-  // Auth authzLinid1 plugin
-  ...toConfigEntries(linid1Options),
-
-  // Auth OpenID Connect plugin
-  ...toConfigEntries(openidconnectOptions),
-
-  // Rate limiting, CrowdSec and trusted proxy plugins
-  ...toConfigEntries(rateLimitOptions),
-  ...toConfigEntries(crowdsecOptions),
-  ...toConfigEntries(trustedProxyOptions),
-
-  // Password Policy plugin
-  ...toConfigEntries(passwordPolicyOptions),
-
-  // SCIM plugin
-  ...toConfigEntries(scimOptions),
+  // LDAP operation concurrency, read by lib/ldap/state.ts
+  ['--ldap-concurrency', 'DM_LDAP_CONCURRENCY', 10, 'number'],
 ];
 
 export default configArgs;

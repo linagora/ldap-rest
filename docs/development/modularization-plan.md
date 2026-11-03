@@ -6,38 +6,28 @@ not a contract; update it as the work lands.
 
 ## Open issues
 
-| Issue  | Subject                                                                             | Role                          | Size   |
-| ------ | ----------------------------------------------------------------------------------- | ----------------------------- | ------ |
-| [#397] | Split the repository into `@ldap-rest/*` modules                                    | Final step                    | Major  |
-| [#593] | Finish the plugin service migration: entity registry, call sites, family boundaries | Prerequisite of #397          | Large  |
-| [#594] | Finish the `ldapActions` split: operation pipeline and façade                       | Prerequisite of #397          | Medium |
-| [#595] | Snapshot the plugin API types and gate changes                                      | Safety net, start before #397 | Medium |
-| [#549] | Architecture pages, decision records, comment check                                 | Independent, start early      | Medium |
-| [#603] | Enable the type-checked ESLint rules the test block leaves out                      | Independent, quick win        | Small  |
+| Issue  | Subject                                             | Role           | Size   |
+| ------ | --------------------------------------------------- | -------------- | ------ |
+| [#397] | Split the repository into `@ldap-rest/*` modules    | Final step     | Major  |
+| [#549] | Architecture pages, decision records, comment check | Part 2 remains | Medium |
 
-[#397] is still in the `2.0.0` milestone, which is released. Retarget it to a
-2.x epic or to 3.0.0 once the compatibility decision below is made. [#593] and
-[#594] are labelled `Minor`/`backlog` but are the real prerequisites of
-[#397]; promote them to the same milestone.
+[#397] targets `3.0.0`, where the former sub-paths are removed after the
+internal split. [#593], [#594], [#595] and [#603] are done.
 
 ## What blocks #397 today
 
-The core still imports plugin code:
+The core declares the options it reads. What remains is runtime coupling and
+packaging:
 
-- `src/config/args.ts` imports the option sets of every plugin family.
-- `src/bin/index.ts` imports `src/plugins/priority.json`.
-- `src/hooks.ts` imports `ChangesToNotify` from
-  `src/plugins/ldap/onChange.ts` and the SCIM types from
-  `src/plugins/scim/types.ts`.
-- `src/abstract/ldapFlat.ts` reads `server.loadedPlugins` and uses
-  `requirePlugin`.
-- `src/lib/ldapActions.ts` is 1,375 lines; `src/lib/ldap/operations.ts` does
-  not exist.
-- The single package generates 66 `./plugin-*` exports from
+- `DM`'s default constructor argument still imports `src/bin/options.ts`, and
+  through it every plugin family. The template is already injectable; phase 2
+  drops the default and has the umbrella pass it, when `options.ts` moves out
+  of the core package.
+- The single package generates 88 `./plugin-*` exports from
   `rollup.config.mjs`, with no npm workspaces.
 
-Between plugin families the coupling is smaller: only the Twake plugins import
-`ldap`/`scim` (15 imports), plus `TwakeGroups extends LdapGroups`.
+Between plugin families the only coupling left is
+`TwakeGroups extends LdapGroups`.
 
 ## Target architecture
 
@@ -111,9 +101,10 @@ the public types have a baseline.
 2. [#594]: extract the operation pipeline into `src/lib/ldap/operations.ts`,
    bring `ldapActions.ts` under 400 lines, add the file-size test, move the
    ESLint exemption, add the type test on `ldap-rest/ldapactions`.
-3. Options refactor (needs its own issue): split `src/config/args.ts` into core
-   options and per-family option sets; let the parser/`DM` accept an
-   `OptionSet`; move `priority.json` into the core or make it a parameter.
+3. Options refactor (**done**): `src/config/args.ts` holds the core options
+   only; `src/bin/options.ts` composes the family option sets; `DM` accepts the
+   template as a constructor parameter; `priority.json` moved to
+   `src/config/priority.json`.
 
 Outcome: `src/hooks.ts` imports no plugin, the core reads no `loadedPlugins`,
 families do not import each other, and `ldapActions` is a stable façade.
@@ -123,7 +114,10 @@ families do not import each other, and `ldapActions` is a stable façade.
 1. Set up npm workspaces, `packages/`, a shared `tsconfig` and per-package
    builds.
 2. Extract `@ldap-rest/core` first, with the `ldap-rest` umbrella depending on
-   it and re-exporting the existing entry points.
+   it and re-exporting the existing entry points. Export `ConfigTemplate` and
+   `ConfigEntry` from the umbrella: `DM`'s constructor already names them in
+   the published reports, but no entry point exports them yet, so an external
+   caller cannot pass a template.
 3. Extract the families in dependency order: storage → auth → ldap → scim →
    twake → misc.
 4. Extract `browser` and `schemas`.
@@ -172,8 +166,8 @@ phase 1.
 
 1. **Granularity**: packages per family (recommended) or one package per plugin
    from the start?
-2. **Versioning**: a non-breaking internal split in 2.x with the umbrella
-   (recommended), or 3.0.0 with the former sub-paths removed?
+2. **Versioning** (**decided**): 3.0.0 with the former sub-paths removed, on
+   the `v3.0` branch.
 3. **`TwakeGroups extends LdapGroups`**: documented exception, or move the
    shared base into `core`?
 4. **`Config` type**: type-only aggregate in `core` (recommended to start), or
@@ -183,12 +177,12 @@ phase 1.
 
 ## First actions
 
-1. Retarget [#397] and add the package map and the dependency rule to it.
-2. Open sub-issues for [#593] and [#594]; both are too large for one pull
-   request.
-3. Start [#603] and [#549] part 1 in parallel.
-4. Spike [#595] on the five main entry points.
-5. Then [#593]/[#594], then the package extraction.
+Phases 0 and 1 are done. The next steps are:
+
+1. Set up the npm workspaces and extract `@ldap-rest/core`, moving
+   `src/bin/options.ts` to the umbrella.
+2. Extract the families in dependency order, then `browser` and `schemas`.
+3. Finish [#549] part 2 in phase 3.
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397
 [#549]: https://github.com/linagora/ldap-rest/issues/549

@@ -4,7 +4,7 @@ import type { Request } from 'express';
 
 import LdapActions, { type AttributesList } from '../../src/lib/ldapActions';
 import { parseConfig } from '../../src/lib/parseConfig';
-import configTemplate from '../../src/config/args';
+import configTemplate from '../../src/bin/options';
 import { DM } from '../../src/bin';
 import type { ChangeContext } from '../../src/lib/changeContext';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';

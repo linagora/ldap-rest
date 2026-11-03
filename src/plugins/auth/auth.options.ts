@@ -10,6 +10,17 @@ import {
   type OptionsOf,
 } from '../../config/options';
 
+export const authzOptions = defineOptions({
+  // The branch-level plugin `authzScope` describes a caller with, when more
+  // than one of them judges that caller. Empty: the first one loaded, and
+  // the answer lists the others under `sources`.
+  authz_scope_source: opt.string({
+    env: 'DM_AUTHZ_SCOPE_SOURCE',
+    default: '',
+  }),
+});
+export type AuthzOptions = OptionsOf<typeof authzOptions>;
+
 export const tokenOptions = defineOptions({
   auth_token: opt.array({
     env: 'DM_AUTH_TOKENS',
@@ -97,6 +108,15 @@ export const perBranchOptions = defineOptions({
 export type PerBranchOptions = OptionsOf<typeof perBranchOptions>;
 
 export const dynamicOptions = defineOptions({
+  // Who may reach the directory through this plugin without presenting one
+  // of its tokens. Empty — the default — means nobody: a request is checked
+  // against the ACLs of the token it carries, whatever else authenticated
+  // it. Values are identities as another authenticator publishes them in
+  // `req.user`, plus two words:
+  //
+  //  - `any-authenticated`: anything another plugin authenticated, which is
+  //    what the plugin did until 0.9.0, by accident rather than by decision;
+  //  - `trusted-proxy`: a request `core/auth/trustedProxy` vouched for.
   authz_dynamic_bypass: opt.array({
     env: 'DM_AUTHZ_DYNAMIC_BYPASS',
     default: [],

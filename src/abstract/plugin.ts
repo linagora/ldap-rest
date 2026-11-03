@@ -18,11 +18,6 @@ import { timedOutbound } from '../lib/metrics';
 import type { EntityDeclaration } from '../lib/entities';
 import { neverReturnAttributes, withoutAttributes } from '../config/schema';
 import { readOptions, type OptionsOf, type OptionSet } from '../config/options';
-import configArgs from '../config/args';
-
-const parsedOptionKeys = new Set(
-  configArgs.map(entry => entry[0].replace(/^--?/, '').replace(/-/g, '_'))
-);
 
 export {
   asyncHandler,
@@ -228,7 +223,7 @@ export default abstract class DmPlugin {
         `${this.constructor.name}: options() takes the definitions the ` +
           'plugin declares'
       );
-    return readOptions(declared, this.config, parsedOptionKeys, message =>
+    return readOptions(declared, this.config, this.server.optionKeys, message =>
       this.logger.warn(message)
     ) as OptionsOf<T>;
   }

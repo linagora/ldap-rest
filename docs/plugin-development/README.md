@@ -285,7 +285,7 @@ A core plugin declares its options next to its code, in a
 `<plugin>.options.ts` file, and reads them through `this.options()` with their
 types, defaults and checks. See [plugin options](options.md).
 
-A plugin outside the repository cannot add to `src/config/args.ts` yet. It keeps
+A plugin outside the repository cannot add to `src/bin/options.ts` yet. It keeps
 reading `this.config.<name>`: LDAP-Rest accepts and stores unknown
 `--option-name value` pairs under `option_name`, with `--option-name` and
 `DM_OPTION_NAME` overriding in that order. See
@@ -334,7 +334,7 @@ npx ldap-rest
 
 ### Plugin Loading Order
 
-Some plugins must load before others (e.g., authentication plugins). Edit `src/plugins/priority.json`:
+Some plugins must load before others (e.g., authentication plugins). Edit `src/config/priority.json`:
 
 ```json
 [

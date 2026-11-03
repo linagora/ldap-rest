@@ -5,15 +5,20 @@
 ```ts
 
 // @public (undocumented)
-type ArrayKind = 'identifiers' | 'dns' | 'phrases';
-
-// @public (undocumented)
 interface ArrayOption extends OptionSpec<string[]> {
     readonly kind?: ArrayKind;
     readonly plural?: string;
     // (undocumented)
     readonly type: 'array';
 }
+
+// @public (undocumented)
+export type AuthzOptions = OptionsOf<typeof authzOptions>;
+
+// @public (undocumented)
+export const authzOptions: {
+    authz_scope_source: StringOption;
+};
 
 // @public (undocumented)
 interface BooleanOption extends OptionSpec<boolean> {

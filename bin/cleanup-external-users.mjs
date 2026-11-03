@@ -13,7 +13,7 @@
  */
 
 import { parseConfig } from '../dist/lib/parseConfig.js';
-import configArgs from '../dist/config/args.js';
+import configArgs from '../dist/bin/options.js';
 import ldapActions from '../dist/lib/ldapActions.js';
 import { buildLogger } from '../dist/logger/winston.js';
 

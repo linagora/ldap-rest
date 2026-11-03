@@ -580,7 +580,7 @@ graph TB
 ## Plugin Priority System
 
 LDAP-Rest uses a priority system defined in
-[`src/plugins/priority.json`](../../src/plugins/priority.json), which is the
+[`src/config/priority.json`](../../src/config/priority.json), which is the
 list itself — copying it here is how this section came to name two plugins
 the file does not and to omit four it does.
 
@@ -690,4 +690,4 @@ LDAP-Rest validates dependencies at startup:
 
 - [Plugin Development Guide](DEVELOPER_GUIDE.md)
 - [Hook System Documentation](../src/hooks/README.md)
-- [Plugin Priority Configuration](../src/plugins/priority.json)
+- [Plugin Priority Configuration](../../src/config/priority.json)

@@ -19,7 +19,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
-import pluginPriority from '../../../src/plugins/priority.json';
+import pluginPriority from '../../../src/config/priority.json';
 
 const PROBE = '../../test/fixtures/plugins/xffProbe.js';
 const TRUSTED_PROXY = '../../dist/plugins/auth/trustedProxy.js';
