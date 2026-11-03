@@ -70,9 +70,15 @@ Rules:
   `@ldap-rest/twake-appaccounts` owns `sync-app-accounts`. npm installs the
   `bin` of a dependency, so installing `ldap-rest` keeps every command.
 - A script that needs a `DM` uses `@ldap-rest/core` and its own option set, not
-  the umbrella: a plugin package cannot depend on `ldap-rest` without a
-  cycle. The umbrella keeps only the main `ldap-rest` command, the option
-  composition and the `DM` subclass that supplies the plugin tree.
+  the umbrella or another plugin package: a plugin package cannot depend on
+  `ldap-rest` without a cycle. `ldapActions`, the parser and the services are
+  core, so using them loads no plugin.
+- Being a dependency of `ldap-rest` only installs a plugin package; it does not
+  load the plugin. `DM` loads only the `--plugin` entries and the priority
+  list, so `cleanup-external-users` in `ldap-externalusers` never loads the
+  LDAP plugins (and there is no aggregate `@ldap-rest/ldap` package).
+- The umbrella keeps only the main `ldap-rest` command, the option composition
+  and the `DM` subclass that supplies the plugin tree.
 - The core parser accepts an injected `OptionSet`; the umbrella composes the
   option sets of every plugin. `Config` may stay a type-only aggregate in
   `core`, but runtime option imports leave the core.
