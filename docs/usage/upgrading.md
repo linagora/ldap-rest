@@ -4,6 +4,31 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## To 3.0.0
+
+### Plugins are separate packages
+
+**Who is affected:** every deployment that installs `ldap-rest` and loads a
+plugin beyond the core.
+
+`ldap-rest` 3.0 depends on `@ldap-rest/core` only. Each plugin is its own
+package, and the deployment installs the ones it loads:
+
+```sh
+npm install @ldap-rest/ldap-externalusers @ldap-rest/twake-james
+```
+
+Keep the existing `--plugin core/…` entries: the loader maps them to the
+installed packages. The server refuses to start when a named plugin's package
+is missing; a plugin in the priority list whose package is not installed is
+skipped.
+
+The commands that belong to an optional plugin are installed with it:
+`cleanup-external-users` with `@ldap-rest/ldap-externalusers`, `sync-james`
+with `@ldap-rest/twake-james`, and `sync-app-accounts` with
+`@ldap-rest/twake-appaccounts`. `ldap-rest` alone still provides the
+`ldap-rest` command.
+
 ## From 1.3.0
 
 ### A plugin with its own `service` member
