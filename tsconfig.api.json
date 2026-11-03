@@ -6,7 +6,12 @@
     "outDir": "./temp/api/declarations",
     "paths": {
       "@ldap-rest/core": ["./packages/core/dist/index.d.ts"],
-      "@ldap-rest/core/*": ["./packages/core/dist/*"]
+      "@ldap-rest/core/*": ["./packages/core/dist/*"],
+      "@ldap-rest/storage": ["./packages/storage/dist/storage.d.ts"],
+      "@ldap-rest/storage/*": ["./packages/storage/dist/storage/*.d.ts"],
+      "@ldap-rest/storage/options": [
+        "./packages/storage/dist/storage.options.d.ts"
+      ]
     }
   },
   "include": ["src/**/*", "packages/core/src/types/**/*.d.ts"],

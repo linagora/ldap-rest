@@ -3,12 +3,25 @@
   "compilerOptions": {
     "paths": {
       "@ldap-rest/core": ["./packages/core/src/index.ts"],
-      "@ldap-rest/core/*": ["./packages/core/src/*"]
+      "@ldap-rest/core/*": ["./packages/core/src/*"],
+      "@ldap-rest/storage": ["./packages/storage/src/storage.ts"],
+      "@ldap-rest/storage/*": [
+        "./packages/storage/src/storage/*",
+        "./packages/storage/src/*"
+      ],
+      "@ldap-rest/storage/options": [
+        "./packages/storage/src/storage.options.ts"
+      ]
     },
     "outDir": "./dist",
     "rootDir": "./",
     "types": ["node", "mocha"]
   },
-  "include": ["src/**/*", "packages/core/src/types/**/*.d.ts", "test/**/*"],
+  "include": [
+    "src/**/*",
+    "packages/core/src/types/**/*.d.ts",
+    "packages/storage/src/**/*",
+    "test/**/*"
+  ],
   "exclude": ["node_modules", "dist", "packages/*/dist"]
 }

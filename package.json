@@ -813,10 +813,11 @@
     "build:docker": "./.dev.mk builddocker",
     "build:dockerfile": "./.dev.mk Dockerfile",
     "build:pages": "tsx scripts/build-pages.ts",
-    "build:prod": "npm run clean && npm run build:core && NODE_ENV=production rollup -c && npm run build:browser && node scripts/moveBrowserLibs.mjs && npm run build:dockerfile",
+    "build:prod": "npm run clean && npm run build:core && npm run build:storage && NODE_ENV=production rollup -c && npm run build:browser && node scripts/moveBrowserLibs.mjs && npm run build:dockerfile",
+    "build:storage": "rimraf packages/storage/dist && cd packages/storage && rollup -c",
     "build:watch": "rollup -c --watch",
     "check": "npm run check:ts && npm run lint && npm run format:check && npm run check:hooks && npm run check:comments && npm run check:no-client-values && npm run check:api && npm run check:openapi && npm run check:options",
-    "check:api": "npm run build:core && tsx scripts/api-snapshot.ts --check",
+    "check:api": "npm run build:core && npm run build:storage && tsx scripts/api-snapshot.ts --check",
     "check:comments": "sh scripts/check-comments.sh",
     "check:hooks": "tsx scripts/hooks-doc.ts",
     "check:no-client-values": "sh scripts/check-no-client-values.sh",
@@ -836,7 +837,7 @@
     "generate:openapi": "tsx scripts/generate-openapi.ts",
     "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\" \"packages/core/src/**/*.ts\" \"test/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" \"packages/core/src/**/*.ts\" \"test/**/*.ts\" --fix",
-    "snapshot:api": "npm run build:core && tsx scripts/api-snapshot.ts",
+    "snapshot:api": "npm run build:core && npm run build:storage && tsx scripts/api-snapshot.ts",
     "snapshot:options": "tsx scripts/options-snapshot.ts",
     "start:dev": "./.dev.mk start",
     "test": "npm run check:ts && mocha",
@@ -852,6 +853,7 @@
   },
   "dependencies": {
     "@ldap-rest/core": "3.0.0",
+    "@ldap-rest/storage": "3.0.0",
     "@sinclair/typebox": "^0.34.52",
     "body-parser": "^2.2.0",
     "csv-parse": "^7.0.2",
@@ -912,7 +914,8 @@
     "re2": "^1.22.1"
   },
   "bundledDependencies": [
-    "@ldap-rest/core"
+    "@ldap-rest/core",
+    "@ldap-rest/storage"
   ],
   "engines": {
     "node": ">=22"
