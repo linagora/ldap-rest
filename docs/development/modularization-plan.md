@@ -171,7 +171,10 @@ compatible.
 2. [#549], part 2: the modularization decision record, a shrinking comment
    baseline, and the `require_code_owner_review` ruleset.
 3. Publish the scoped packages and document the deprecation policy for the
-   former sub-paths.
+   former sub-paths. With the first published plugin package, add the
+   `3.0.0` upgrade note and the CHANGELOG breaking entry: a deployment must
+   add the plugin packages it loads to its `package.json`, and optional
+   commands move with their plugin package.
 4. Close [#397].
 
 ## Branch strategy

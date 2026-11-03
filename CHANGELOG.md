@@ -19,15 +19,6 @@
   authorization
   ([details](docs/plugin-development/services.md#services-the-server-provides)).
 
-### Breaking Changes
-
-- The plugins are separate packages: `ldap-rest` depends on
-  `@ldap-rest/core` only, and each deployment installs the plugins it loads.
-  The `--plugin` names are unchanged, but a named plugin whose package is
-  absent refuses to start, and the commands of optional plugins move with
-  their package
-  ([upgrading](docs/usage/upgrading.md#to-300)).
-
 ### Changed
 
 - The SCIM types, the `SCHEMA_*` constants and `ChangesToNotify` are exported
