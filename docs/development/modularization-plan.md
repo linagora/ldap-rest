@@ -157,7 +157,10 @@ families do not import each other, and `ldapActions` is a stable façade.
    umbrella's default template keeps the core options only. `src/options.full.ts`
    keeps the complete set for the build scripts and the tests.
 4. Extract one package per plugin, grouped for the order: storage → auth →
-   ldap → scim → twake → misc.
+   ldap → scim → twake → misc. (**started**) The storage plugin, its options
+   and its backends live in `packages/storage` (`@ldap-rest/storage`); the
+   umbrella keeps the `./plugin-storage*` shims and bundles the package until
+   phase 3 publishes it.
 5. Extract `browser` and `schemas`.
 6. After each step: `npm run test:dev`, `npm run check`,
    `npm run check:openapi`, `npm run check:options`, and the `contracts` job.
