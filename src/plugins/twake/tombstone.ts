@@ -14,22 +14,31 @@
  */
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
-
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { Hooks } from '@ldap-rest/core/hooks';
 import {
   BadRequestError,
   ConflictError,
   NotFoundError,
-} from '../../lib/errors';
-import { changeContext } from '../../lib/changeContext';
-import type { AttributesList, SearchResult } from '../../lib/ldapActions';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { TombstoneService } from '../../lib/services/tombstone';
-import { TrashService } from '../../lib/services/trash';
-import { escapeLdapFilter, isDnInBranch, normalizeDn } from '../../lib/utils';
-import { scimOptionsOf } from '../../lib/scim/options';
+} from '@ldap-rest/core/lib/errors';
+import { changeContext } from '@ldap-rest/core/lib/changeContext';
+import type {
+  AttributesList,
+  SearchResult,
+} from '@ldap-rest/core/lib/ldapActions';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
+import { TombstoneService } from '@ldap-rest/core/lib/services/tombstone';
+import { TrashService } from '@ldap-rest/core/lib/services/trash';
+import {
+  escapeLdapFilter,
+  isDnInBranch,
+  normalizeDn,
+} from '@ldap-rest/core/lib/utils';
+import { scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
 
 import {
   first,

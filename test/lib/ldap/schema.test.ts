@@ -1,11 +1,10 @@
 import { expect } from 'chai';
 import type { SearchOptions, SearchResult } from 'ldapts';
-
-import type { AttributesList } from '../../../src/lib/ldapActions';
+import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 import DirectorySchema, {
   type DirectorySearch,
   type SchemaLogger,
-} from '../../../src/lib/ldap/schema';
+} from '@ldap-rest/core/lib/ldap/schema';
 
 const SCHEMA_ENTRY = {
   objectClasses: [

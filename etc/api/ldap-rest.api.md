@@ -15,6 +15,13 @@ import type { Response as Response_2 } from 'express';
 import type { SearchOptions } from 'ldapts';
 import type { SearchResult } from 'ldapts';
 import { Server } from 'http';
+import type { Static } from '@sinclair/typebox';
+import { TBoolean } from '@sinclair/typebox';
+import { TInteger } from '@sinclair/typebox';
+import { TObject } from '@sinclair/typebox';
+import { TOptional } from '@sinclair/typebox';
+import type { TSchema } from '@sinclair/typebox';
+import { TString } from '@sinclair/typebox';
 import type winston from 'winston';
 
 // @public
@@ -26,10 +33,24 @@ Settled<F extends (...args: never[]) => infer R ? R : never>
 type Args<K extends keyof Hooks> = NonNullable<Hooks[K]> extends (...args: infer A) => unknown ? A : never;
 
 // @public (undocumented)
-type ArrayKind = 'identifiers' | 'dns' | 'phrases';
+export type ArrayKind = 'identifiers' | 'dns' | 'phrases';
+
+// @public (undocumented)
+export interface ArrayOption extends OptionSpec<string[]> {
+    readonly kind?: ArrayKind;
+    readonly plural?: string;
+    // (undocumented)
+    readonly type: 'array';
+}
+
+// @public
+export function assertClientMaySet(schema: Schema | undefined, names: string[], mainAttribute?: string): void;
 
 // @public
 export function assertedRdnValue(dn: string, attribute: string, base?: string): string | null;
+
+// @public
+export function assertModifyRequest(body: object): asserts body is ModifyRequest;
 
 // @public
 export function assertRfc4514Escapes(dn: string, what: string): void;
@@ -38,7 +59,7 @@ export function assertRfc4514Escapes(dn: string, what: string): void;
 export const asyncHandler: (fn: (req: Request_2, res: Response_2, next: NextFunction) => Promise<void>) => RequestHandler;
 
 // @public (undocumented)
-type AttributesList = Record<string, AttributeValue>;
+export type AttributesList = Record<string, AttributeValue>;
 
 // @public
 interface AttributeTypeDefinition {
@@ -71,7 +92,7 @@ interface AttributeTypeDefinition {
 }
 
 // @public (undocumented)
-type AttributeValue = Buffer | Buffer[] | string[] | string;
+export type AttributeValue = Buffer | Buffer[] | string[] | string;
 
 // @public (undocumented)
 abstract class AuthBase extends DmPlugin {
@@ -90,7 +111,7 @@ abstract class AuthBase extends DmPlugin {
 }
 
 // @public (undocumented)
-interface AuthConfig {
+export interface AuthConfig {
     // (undocumented)
     default?: BranchPermissions;
     // (undocumented)
@@ -108,7 +129,7 @@ interface AuthConfig {
 }
 
 // @public (undocumented)
-interface AuthenticatorsInfo {
+export interface AuthenticatorsInfo {
     all(): readonly AuthBase[];
     coverage(): {
         known: Set<string>;
@@ -116,6 +137,9 @@ interface AuthenticatorsInfo {
     };
     has(name: string): boolean;
 }
+
+// @public (undocumented)
+export const AuthenticatorsService: ServiceToken<AuthenticatorsInfo>;
 
 // @public
 type AuthorizedHook = 'ldapaddrequest' | 'ldapmodifyrequest' | 'ldapdeleterequest' | 'ldaprenamerequest';
@@ -126,10 +150,16 @@ export class AuthzRefusedError extends ForbiddenError {
     readonly authzRefusal: true;
 }
 
+// @public (undocumented)
+export const badGateway: (res: Response_2, message?: string) => void;
+
 // @public
 export class BadGatewayError extends HttpError {
     constructor(message?: string);
 }
+
+// @public (undocumented)
+export const badRequest: (res: Response_2, message?: string) => void;
 
 // @public
 export class BadRequestError extends HttpError {
@@ -137,7 +167,13 @@ export class BadRequestError extends HttpError {
 }
 
 // @public (undocumented)
-interface BranchPermissions {
+export interface BooleanOption extends OptionSpec<boolean> {
+    // (undocumented)
+    readonly type: 'boolean';
+}
+
+// @public (undocumented)
+export interface BranchPermissions {
     // (undocumented)
     delete?: boolean;
     // (undocumented)
@@ -147,7 +183,21 @@ interface BranchPermissions {
 }
 
 // @public (undocumented)
-interface BulkOperationResponse {
+export interface BulkOperationRequest {
+    // (undocumented)
+    bulkId?: string;
+    // (undocumented)
+    data?: unknown;
+    // (undocumented)
+    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+    // (undocumented)
+    path: string;
+    // (undocumented)
+    version?: string;
+}
+
+// @public (undocumented)
+export interface BulkOperationResponse {
     // (undocumented)
     bulkId?: string;
     // (undocumented)
@@ -162,7 +212,17 @@ interface BulkOperationResponse {
 }
 
 // @public (undocumented)
-interface BulkResponse {
+export interface BulkRequest {
+    // (undocumented)
+    failOnErrors?: number;
+    // (undocumented)
+    Operations: BulkOperationRequest[];
+    // (undocumented)
+    schemas: string[];
+}
+
+// @public (undocumented)
+export interface BulkResponse {
     // (undocumented)
     Operations: BulkOperationResponse[];
     // (undocumented)
@@ -173,7 +233,7 @@ interface BulkResponse {
 export function canonicalDn(dn: string): string;
 
 // @public (undocumented)
-type ChainedHook<T> = (arg: T) => MaybePromise<T>;
+export type ChainedHook<T> = (arg: T) => MaybePromise<T>;
 
 // @public
 type ChainedName = {
@@ -194,10 +254,16 @@ interface ChangeContext {
 }
 
 // @public
-type ChangesToNotify = Record<string, [
+export type ChangesToNotify = Record<string, [
 AttributeValue | null,
 AttributeValue | null
 ]>;
+
+// @public
+export function checkDnValues(field: string, attr: SchemaAttribute, value: AttributeValue, entryExists: (dn: string) => Promise<boolean>): Promise<void>;
+
+// @public
+export const clientMessageOf: (err: unknown) => string;
 
 // @public
 export interface Config {
@@ -772,7 +838,7 @@ export interface Config {
 }
 
 // @public (undocumented)
-type ConfigEntry = [
+export type ConfigEntry = [
 string,
 string,
 // env value
@@ -786,7 +852,20 @@ boolean?,
 ];
 
 // @public (undocumented)
-type ConfigTemplate = ConfigEntry[];
+export class ConfigParser {
+    constructor(config: ConfigTemplate);
+    get deprecationWarnings(): string[];
+    // (undocumented)
+    parse(argv?: string[]): Config;
+    // (undocumented)
+    get unknownOptions(): string[];
+}
+
+// @public (undocumented)
+export type ConfigTemplate = ConfigEntry[];
+
+// @public (undocumented)
+export const conflict: (res: Response_2, message?: string) => void;
 
 // @public (undocumented)
 export class ConflictError extends HttpError {
@@ -794,8 +873,28 @@ export class ConflictError extends HttpError {
 }
 
 // @public
-export class DM {
+export const CORE_ROLES: readonly ["identifier", "displayName", "primaryEmail", "emailAliases", "emailQuota", "organizationLink", "organizationPath", "members", "owners", "accountStatus", "password", "passwordReset", "accountExpiry", "domainLink", "domainName"];
+
+// @public (undocumented)
+export const created: (res: Response_2, data?: object) => void;
+
+// @public
+export const DEFAULT_MAX_LENGTH = 4096;
+
+// @public
+export function defineOptions<T extends OptionSet>(options: T): T;
+
+// @public
+export const defineRoute: <P extends TSchema | undefined = undefined, Q extends TSchema | undefined = undefined, B extends TSchema | undefined = undefined>(app: Express_2, route: RouteDefinition<P, Q, B>) => void;
+
+// @public (undocumented)
+export class DM extends DM_2 {
     constructor(options?: ConfigTemplate);
+}
+
+// @public
+class DM_2 {
+    constructor(options?: ConfigTemplate, pluginRoot?: string, resolveBase?: string);
     afterLoad(): void;
     // (undocumented)
     app: express.Express;
@@ -846,12 +945,12 @@ export class DM {
     get stopping(): boolean;
     get unhandledRejections(): number;
     warnUnauthenticatedRoutes(): string[];
-    withConfig(config: Config): DM;
+    withConfig(config: Config): DM_2;
 }
 
 // @public (undocumented)
 abstract class DmPlugin {
-    constructor(server: DM);
+    constructor(server: DM_2);
     afterLoad?(): void;
     // (undocumented)
     api?(app: Express_2): MaybePromise<void>;
@@ -885,7 +984,7 @@ abstract class DmPlugin {
     protected requirePlugin<T extends DmPlugin>(name: string): T | null;
     // (undocumented)
     roles?: Role[] | undefined;
-    server: DM;
+    server: DM_2;
     protected service<T>(token: ServiceToken<T>): T | null;
 }
 
@@ -897,7 +996,7 @@ type DmRequest = Request_2 & {
 };
 
 // @public
-interface EntityDeclaration {
+export interface EntityDeclaration {
     // (undocumented)
     base: string;
     flat?: FlatEntityApi;
@@ -913,7 +1012,7 @@ interface EntityDeclaration {
 }
 
 // @public
-interface EntityDescriptor {
+export interface EntityDescriptor {
     readonly base: string;
     readonly flat?: FlatEntityApi;
     // (undocumented)
@@ -925,10 +1024,10 @@ interface EntityDescriptor {
 }
 
 // @public
-type EntityKind = 'flat' | 'groups' | 'organizations';
+export type EntityKind = 'flat' | 'groups' | 'organizations';
 
 // @public
-interface EntityRegistry {
+export interface EntityRegistry {
     // (undocumented)
     all(): readonly EntityDescriptor[];
     // (undocumented)
@@ -939,10 +1038,21 @@ interface EntityRegistry {
 }
 
 // @public
-interface EntitySource {
+export const EntityRegistryService: ServiceToken<EntityRegistry>;
+
+// @public
+export interface EntitySource {
     // (undocumented)
     readonly schema?: Schema;
 }
+
+// @public
+export const errorResponse: (err: unknown, debug?: boolean) => {
+    status: number;
+    body: {
+        error: string;
+    } & Partial<Refusal>;
+};
 
 // @public
 export function escapeDnValue(value: string): string;
@@ -957,10 +1067,15 @@ export function escapeRegex(str: string): string;
 export function fillPattern(pattern: string, placeholder: string, value: string): string;
 
 // @public
-interface FlatEntityApi {
+export interface FlatEntityApi {
     // (undocumented)
     modifyEntry(id: string, changes: ModifyRequest, req: Request_2): Promise<boolean>;
 }
+
+// @public (undocumented)
+export const FlatEntryParams: TObject<    {
+id: TString;
+}>;
 
 // @public
 interface FlatHookBus {
@@ -968,10 +1083,44 @@ interface FlatHookBus {
     notify(suffix: string, ...args: unknown[]): void;
 }
 
+// @public
+export type FlatHookPrefix = `ldap${string}`;
+
+// @public
+export const FlatListQuery: TObject<    {
+match: TOptional<TString>;
+attribute: TOptional<TString>;
+attributes: TOptional<TString>;
+limit: TOptional<TInteger>;
+}>;
+
+// @public (undocumented)
+export const FlatMoveBody: TObject<    {
+targetOrgDn: TString;
+}>;
+
+// @public (undocumented)
+export const FlatMoveResponse: TObject<    {
+success: TBoolean;
+departmentPath: TString;
+departmentLink: TString;
+}>;
+
+// @public (undocumented)
+export const FlatRenameBody: TObject<    {
+newId: TString;
+}>;
+
+// @public (undocumented)
+export const forbidden: (res: Response_2, message?: string) => void;
+
 // @public (undocumented)
 export class ForbiddenError extends HttpError {
     constructor(message?: string);
 }
+
+// @public (undocumented)
+export const gatewayTimeout: (res: Response_2, message?: string) => void;
 
 // @public (undocumented)
 export class GatewayTimeoutError extends HttpError {
@@ -979,13 +1128,13 @@ export class GatewayTimeoutError extends HttpError {
 }
 
 // @public
-interface GeneratedAttributeFiller {
+export interface GeneratedAttributeFiller {
     // (undocumented)
     fillsGeneratedAttribute?: (name: string, attr: SchemaAttribute, schema: Schema) => boolean;
 }
 
 // @public
-interface GeneratedFrom {
+export interface GeneratedFrom {
     attribute: string;
     extract?: string;
     lowercase?: boolean;
@@ -995,6 +1144,9 @@ interface GeneratedFrom {
 
 // @public
 export function getCompiledRegex(pattern: string, flags?: string): RegExp;
+
+// @public (undocumented)
+export const getLogger: () => winston.Logger | undefined;
 
 // @public
 export function getParentDn(dn: string): string;
@@ -1006,7 +1158,10 @@ export function getRdn(dn: string): string;
 export function hasOnlyRfc4514Escapes(dn: string): boolean;
 
 // @public
-type HealthStatus = 'ok' | 'degraded';
+export function hasRole(attr: SchemaAttribute | undefined, role: SchemaRole): boolean;
+
+// @public
+export type HealthStatus = 'ok' | 'degraded';
 
 // @public (undocumented)
 class HookBus implements FlatHookBus {
@@ -1039,7 +1194,7 @@ export const hookOwner: (fn: HookFn) => {
 } | undefined;
 
 // @public
-interface Hooks {
+export interface Hooks {
     // (undocumented)
     afterAuth?: ChainedHook<[Request_2, Response_2]>;
     beforeAuth?: ChainedHook<[Request_2, Response_2]>;
@@ -1156,6 +1311,12 @@ export class HttpError extends Error {
 }
 
 // @public
+type Input<T> = T extends TSchema ? Static<T> : unknown;
+
+// @public
+export function invalidValueMessage(name: string, attr: SchemaAttribute | undefined): string;
+
+// @public
 export function isChildOf(dn: string, parentDn: string): boolean;
 
 // @public
@@ -1170,12 +1331,21 @@ export function isDnSyntax(dn: string): boolean;
 // @public
 export function isDummyMemberDn(member: unknown, dummy: string | undefined): boolean;
 
+// @public (undocumented)
+export const jsonBody: (req: Request_2, res: Response_2, ...requiredFields: string[]) => object | false;
+
+// @public (undocumented)
+export interface JsonOption<T> extends OptionSpec<T> {
+    // (undocumented)
+    readonly type: 'json';
+}
+
 // @public
 export function knownAttributeName(type: string): string | undefined;
 
 // @public (undocumented)
 class ldapActions {
-    constructor(server: DM);
+    constructor(server: DM_2);
     // (undocumented)
     add(dn: string, entry: AttributesList, req?: Request_2): Promise<boolean>;
     authorize<H extends AuthorizedHook>(hook: H, args: Parameters<NonNullable<Hooks[H]>>[0]): Promise<void>;
@@ -1200,7 +1370,7 @@ class ldapActions {
     // (undocumented)
     opNumber(): number;
     // (undocumented)
-    parent: DM;
+    parent: DM_2;
     ping(timeoutMs: number): Promise<void>;
     poolStats(): {
         busy: number;
@@ -1222,7 +1392,19 @@ class ldapActions {
 }
 
 // @public (undocumented)
-type LdapList = Record<string, AttributesList>;
+export interface LdapFlatConfig {
+    base: string;
+    defaultAttributes?: AttributesList;
+    hookPrefix: string;
+    mainAttribute: string;
+    objectClass: string[];
+    pluralName: string;
+    schemaPath?: string;
+    singularName: string;
+}
+
+// @public (undocumented)
+export type LdapList = Record<string, AttributesList>;
 
 // @public
 interface LdapSchema {
@@ -1237,7 +1419,58 @@ interface LdapSchema {
 }
 
 // @public
-type LocalizedText = string | Record<string, string>;
+export interface ListEntriesOptions {
+    attributes?: string[];
+    filter?: string;
+    limit?: number;
+    req?: Request_2;
+}
+
+// @public (undocumented)
+export interface ListResponse<T> {
+    // (undocumented)
+    itemsPerPage: number;
+    // (undocumented)
+    Resources: T[];
+    // (undocumented)
+    schemas: [typeof SCHEMA_LIST_RESPONSE];
+    // (undocumented)
+    startIndex: number;
+    // (undocumented)
+    totalResults: number;
+}
+
+// @public
+export type LocalizedText = string | Record<string, string>;
+
+// @public
+export function localizedText(text: LocalizedText | undefined, language?: string): string | undefined;
+
+// @public
+export interface MappingEntry {
+    // (undocumented)
+    converter?: 'boolean' | 'number' | 'string';
+    // (undocumented)
+    ldap?: string;
+    // (undocumented)
+    ldapPrimary?: string;
+    // (undocumented)
+    ldapSecondary?: string;
+    // (undocumented)
+    multi?: 'single' | 'array';
+    // (undocumented)
+    operational?: boolean;
+    // (undocumented)
+    readOnly?: boolean;
+    // (undocumented)
+    scim: string;
+    // (undocumented)
+    sub?: Record<string, string>;
+    subDn?: string[];
+}
+
+// @public
+export function matchesPattern(attr: SchemaAttribute, value: AttributeValue): boolean;
 
 // @public
 interface MatchingRuleDefinition {
@@ -1251,11 +1484,17 @@ interface MatchingRuleDefinition {
     syntax?: string;
 }
 
-// @public (undocumented)
-type MaybePromise<T> = Promise<T> | T;
+// @public
+export function maxLengthOf(attr: SchemaAttribute | undefined): number;
 
 // @public (undocumented)
-interface Meta {
+export type MaybePromise<T> = Promise<T> | T;
+
+// @public
+export const messageOf: (err: unknown) => string;
+
+// @public (undocumented)
+export interface Meta {
     // (undocumented)
     created?: string;
     // (undocumented)
@@ -1268,15 +1507,25 @@ interface Meta {
     version?: string;
 }
 
+// @public
+export function missingRequiredAttribute(schema: Schema | undefined, entry: Record<string, unknown>, fillers: readonly GeneratedAttributeFiller[]): string | undefined;
+
+// @public
+export function modifiedAttributeNames(body: {
+    add?: object;
+    replace?: object;
+    delete?: string[] | object;
+}): string[];
+
 // @public (undocumented)
-interface ModifyOptions {
+export interface ModifyOptions {
     context?: ChangeContext;
     declaredClasses?: string[];
     permissive?: boolean;
 }
 
 // @public (undocumented)
-interface ModifyRequest {
+export interface ModifyRequest {
     // (undocumented)
     add?: AttributesList;
     // (undocumented)
@@ -1288,8 +1537,11 @@ interface ModifyRequest {
 // @public
 export function movedToTrash(trashBase: string | undefined, oldDn: string, newDn: string): boolean;
 
+// @public
+export const multiStatus: (res: Response_2, data: object) => void;
+
 // @public (undocumented)
-interface MultiValued<T extends string = string> {
+export interface MultiValued<T extends string = string> {
     // (undocumented)
     $ref?: string;
     // (undocumented)
@@ -1306,7 +1558,16 @@ interface MultiValued<T extends string = string> {
 export function namesByDn(id: string, attribute: string): boolean;
 
 // @public
+export function neverReturnAttributes(schemas: Iterable<Schema | undefined>): Set<string>;
+
+// @public (undocumented)
+export const noContent: (res: Response_2) => void;
+
+// @public
 export function normalizeDn(dn: string): string;
+
+// @public (undocumented)
+export const notFound: (res: Response_2, message?: string) => void;
 
 // @public (undocumented)
 export class NotFoundError extends HttpError {
@@ -1315,6 +1576,16 @@ export class NotFoundError extends HttpError {
 
 // @public
 type NotifiedName = Exclude<keyof Hooks, ChainedName>;
+
+// @public (undocumented)
+export interface NumberOption extends OptionSpec<number> {
+    // (undocumented)
+    readonly max?: number;
+    // (undocumented)
+    readonly min?: number;
+    // (undocumented)
+    readonly type: 'number';
+}
 
 // @public
 interface ObjectClassDefinition {
@@ -1337,10 +1608,10 @@ interface ObjectClassDefinition {
 }
 
 // @public (undocumented)
-type OidcLogoutToken = OidcSessionClaims;
+export type OidcLogoutToken = OidcSessionClaims;
 
 // @public
-interface OidcSessionClaims {
+export interface OidcSessionClaims {
     // (undocumented)
     iss: string;
     // (undocumented)
@@ -1352,15 +1623,28 @@ interface OidcSessionClaims {
 }
 
 // @public (undocumented)
-type OptionSet = Record<string, OptionSpec<unknown>>;
+export const ok: (res: Response_2, data?: object) => void;
+
+// @public (undocumented)
+export const opt: {
+    string: (options?: Omit<StringOption, "type">) => StringOption;
+    number: (options?: Omit<NumberOption, "type">) => NumberOption;
+    boolean: (options?: Omit<BooleanOption, "type">) => BooleanOption;
+    array: (options?: Omit<ArrayOption, "type">) => ArrayOption;
+    stringOrFalse: (options?: Omit<StringOrFalseOption, "type" | "allowFalse">) => StringOrFalseOption;
+    json: <T = Record<string, unknown>>(options?: Omit<JsonOption<T>, "type">) => JsonOption<T>;
+};
+
+// @public (undocumented)
+export type OptionSet = Record<string, OptionSpec<unknown>>;
 
 // @public
-type OptionsOf<T extends OptionSet> = {
+export type OptionsOf<T extends OptionSet> = {
     [K in keyof T]: T[K] extends OptionSpec<infer V> ? V : never;
 };
 
 // @public (undocumented)
-interface OptionSpec<T> {
+export interface OptionSpec<T> {
     readonly aliases?: readonly string[];
     readonly default?: T;
     readonly emptyIsValue?: boolean;
@@ -1372,10 +1656,29 @@ interface OptionSpec<T> {
 }
 
 // @public (undocumented)
-type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
+export type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
 
 // @public
 export function organizationLink(value: AttributeValue | undefined): string | undefined;
+
+// @public
+export interface Page {
+    // (undocumented)
+    desc: boolean;
+    // (undocumented)
+    limit: number;
+    // (undocumented)
+    offset: number;
+    // (undocumented)
+    page: number;
+    // (undocumented)
+    search?: string;
+    // (undocumented)
+    sortBy?: string;
+}
+
+// @public (undocumented)
+export function parseConfig(config: ConfigEntry[], argv?: string[]): Config;
 
 // @public
 export function parseDirectoryDate(raw: AttributeValue): Date | null;
@@ -1384,13 +1687,79 @@ export function parseDirectoryDate(raw: AttributeValue): Date | null;
 export function parseDn(dn: string): string[];
 
 // @public (undocumented)
-interface PluginInfo {
+export function parseNumber(value: string): number;
+
+// @public (undocumented)
+export interface PasswordPolicyApi {
+    policyBase(): string;
+}
+
+// @public (undocumented)
+export const PasswordPolicyService: ServiceToken<PasswordPolicyApi>;
+
+// @public (undocumented)
+export interface PatchOperation {
+    // (undocumented)
+    op: 'add' | 'remove' | 'replace' | 'Add' | 'Remove' | 'Replace';
+    // (undocumented)
+    path?: string;
+    // (undocumented)
+    value?: unknown;
+}
+
+// @public (undocumented)
+export interface PatchRequest {
+    // (undocumented)
+    Operations: PatchOperation[];
+    // (undocumented)
+    schemas: string[];
+}
+
+// @public (undocumented)
+export interface PluginInfo {
     authzPlugins(): readonly DmPlugin[];
     configurable(): readonly DmPlugin[];
     generatedAttributeFillers(): readonly (DmPlugin & GeneratedAttributeFiller)[];
     has(name: string): boolean;
     operationalAttributeFollowers(): readonly DmPlugin[];
 }
+
+// @public (undocumented)
+export const PluginInfoService: ServiceToken<PluginInfo>;
+
+// @public
+export interface PublishOptions {
+    // (undocumented)
+    correlationId?: string;
+    // (undocumented)
+    expiration?: string;
+    // (undocumented)
+    headers?: Record<string, unknown>;
+    // (undocumented)
+    maxAttempts?: number;
+    // (undocumented)
+    messageId?: string;
+}
+
+// @public
+export type RabbitMessage = Record<string, unknown>;
+
+// @public
+export type RabbitMessageHandler = (message: RabbitMessage) => Promise<void>;
+
+// @public (undocumented)
+export interface RabbitMqApi {
+    getRawClient(): Promise<object | null>;
+    // (undocumented)
+    publish(exchange: string, routingKey: string, message: RabbitMessage, options?: PublishOptions): Promise<void>;
+    // (undocumented)
+    subscribe(exchange: string, routingKey: string, queue: string, handler: RabbitMessageHandler, options?: SubscribeOptions): Promise<void>;
+    // (undocumented)
+    unsubscribe(queue: string): Promise<void>;
+}
+
+// @public (undocumented)
+export const RabbitMqService: ServiceToken<RabbitMqApi>;
 
 // @public
 export function rdnTypes(dn: string): string[];
@@ -1399,7 +1768,25 @@ export function rdnTypes(dn: string): string[];
 export function rdnValue(dn: string): string;
 
 // @public
+export function readOptions<T extends OptionSet>(options: T, config: Config | Record<string, unknown>, parsedKeys?: ReadonlySet<string>, warn?: (message: string) => void): OptionsOf<T>;
+
+// @public
 export const recordHookOwner: (fn: HookFn, plugin: string, hook: string) => void;
+
+// @public (undocumented)
+export interface ReferenceRewriterApi {
+    findReferences(dn: string): Promise<unknown[]>;
+    rewriteReferences(references: unknown[], oldDn: string, newDn: string, req?: Request_2): Promise<{
+        updated: number;
+        failed: {
+            attribute: string;
+            count: number;
+        }[];
+    }>;
+}
+
+// @public (undocumented)
+export const ReferenceRewriterService: ServiceToken<ReferenceRewriterApi>;
 
 // @public
 interface Refusal {
@@ -1416,7 +1803,13 @@ export function registerAttributeTypes(types: Iterable<{
 }>): void;
 
 // @public
-interface RequestBoundLdap {
+type RegisteredRoute = Omit<RouteDefinition<TSchema, TSchema, TSchema>, 'handler' | 'middleware'>;
+
+// @public
+export const registeredRoutes: (app: Express_2) => readonly RegisteredRoute[];
+
+// @public
+export interface RequestBoundLdap {
     // (undocumented)
     add(dn: string, entry: AttributesList): Promise<boolean>;
     // (undocumented)
@@ -1430,13 +1823,103 @@ interface RequestBoundLdap {
 }
 
 // @public (undocumented)
-type Role = 'auth' | 'authz' | 'protect' | 'api' | 'logging' | 'demo' | 'consistency' | 'configurable';
+export interface ResourceMapping {
+    // (undocumented)
+    entries: MappingEntry[];
+    // (undocumented)
+    resourceType: 'User' | 'Group';
+    // (undocumented)
+    schemas: string[];
+}
+
+// @public (undocumented)
+export interface ResourceTypeDefinition {
+    // (undocumented)
+    description?: string;
+    // (undocumented)
+    endpoint: string;
+    // (undocumented)
+    id: string;
+    // (undocumented)
+    meta?: {
+        resourceType: 'ResourceType';
+        location?: string;
+    };
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    schema: string;
+    // (undocumented)
+    schemaExtensions?: Array<{
+        schema: string;
+        required: boolean;
+    }>;
+    // (undocumented)
+    schemas: [typeof SCHEMA_RESOURCE_TYPE];
+}
+
+// @public (undocumented)
+export type Role = 'auth' | 'authz' | 'protect' | 'api' | 'logging' | 'demo' | 'consistency' | 'configurable';
+
+// @public
+export function roleAttribute(schema: Schema | undefined, role: SchemaRole): string | undefined;
+
+// @public
+export function roleAttributes(schema: Schema | undefined, role: SchemaRole): string[];
+
+// @public
+interface RouteDefinition<P extends TSchema | undefined = undefined, Q extends TSchema | undefined = undefined, B extends TSchema | undefined = undefined> {
+    body?: B;
+    // (undocumented)
+    description?: string;
+    // (undocumented)
+    handler: (input: RouteInput<P, Q, B>) => void | Promise<void>;
+    json?: boolean;
+    // (undocumented)
+    method: RouteMethod;
+    middleware?: RequestHandler | RequestHandler[];
+    params?: P;
+    // (undocumented)
+    path: string;
+    query?: Q;
+    responses?: Partial<Record<number, TSchema | RouteResponse>>;
+    // (undocumented)
+    summary?: string;
+    // (undocumented)
+    tags?: string[];
+}
+
+// @public
+interface RouteInput<P extends TSchema | undefined, Q extends TSchema | undefined, B extends TSchema | undefined> {
+    // (undocumented)
+    body: Input<B>;
+    next: NextFunction;
+    // (undocumented)
+    params: Input<P>;
+    // (undocumented)
+    query: Input<Q>;
+    // (undocumented)
+    req: Request_2;
+    // (undocumented)
+    res: Response_2;
+}
+
+// @public (undocumented)
+type RouteMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+
+// @public
+interface RouteResponse {
+    // (undocumented)
+    description?: string;
+    // (undocumented)
+    schema: TSchema;
+}
 
 // @public
 export const runAsHookOwner: <T>(hook: HookFn, fn: () => T) => T;
 
 // @public (undocumented)
-interface Schema {
+export interface Schema {
     // (undocumented)
     attributes: {
         [key: string]: SchemaAttribute;
@@ -1451,13 +1934,37 @@ interface Schema {
 }
 
 // @public (undocumented)
-const SCHEMA_BULK_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:BulkResponse";
+export const SCHEMA_BULK_REQUEST = "urn:ietf:params:scim:api:messages:2.0:BulkRequest";
 
 // @public (undocumented)
-const SCHEMA_ERROR = "urn:ietf:params:scim:api:messages:2.0:Error";
+export const SCHEMA_BULK_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:BulkResponse";
 
 // @public (undocumented)
-interface SchemaAttribute {
+export const SCHEMA_ERROR = "urn:ietf:params:scim:api:messages:2.0:Error";
+
+// @public (undocumented)
+export const SCHEMA_GROUP = "urn:ietf:params:scim:schemas:core:2.0:Group";
+
+// @public (undocumented)
+export const SCHEMA_LIST_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
+
+// @public (undocumented)
+export const SCHEMA_PATCH_OP = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
+
+// @public (undocumented)
+export const SCHEMA_RESOURCE_TYPE = "urn:ietf:params:scim:schemas:core:2.0:ResourceType";
+
+// @public (undocumented)
+export const SCHEMA_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Schema";
+
+// @public (undocumented)
+export const SCHEMA_SERVICE_PROVIDER_CONFIG = "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig";
+
+// @public
+export const SCHEMA_USER = "urn:ietf:params:scim:schemas:core:2.0:User";
+
+// @public (undocumented)
+export interface SchemaAttribute {
     allowSubdomains?: boolean;
     // (undocumented)
     branch?: string[];
@@ -1499,7 +2006,29 @@ interface SchemaAttribute {
 }
 
 // @public
-type SchemaAttributeType = 'string' | 'number' | 'integer' | 'boolean' | 'date' | 'array' | 'pointer';
+export function schemaAttribute(schema: Schema | undefined, name: string): [string, SchemaAttribute] | undefined;
+
+// @public
+export type SchemaAttributeType = 'string' | 'number' | 'integer' | 'boolean' | 'date' | 'array' | 'pointer';
+
+// @public (undocumented)
+export interface SchemaDefinition {
+    // (undocumented)
+    attributes: unknown[];
+    // (undocumented)
+    description?: string;
+    // (undocumented)
+    id: string;
+    // (undocumented)
+    meta?: {
+        resourceType: 'Schema';
+        location?: string;
+    };
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    schemas: [typeof SCHEMA_SCHEMA];
+}
 
 // @public
 class SchemaIndex {
@@ -1521,10 +2050,10 @@ class SchemaIndex {
 }
 
 // @public
-type SchemaRole = string;
+export type SchemaRole = string;
 
 // @public (undocumented)
-interface ScimAddress {
+export interface ScimAddress {
     // (undocumented)
     country?: string;
     // (undocumented)
@@ -1544,7 +2073,13 @@ interface ScimAddress {
 }
 
 // @public (undocumented)
-interface ScimErrorResponse {
+export interface ScimApi {
+    readonly userLockAttribute: string;
+    readonly userLockValue: string;
+}
+
+// @public (undocumented)
+export interface ScimErrorResponse {
     // (undocumented)
     detail?: string;
     // (undocumented)
@@ -1556,10 +2091,10 @@ interface ScimErrorResponse {
 }
 
 // @public (undocumented)
-type ScimErrorType = 'invalidFilter' | 'tooMany' | 'uniqueness' | 'mutability' | 'invalidSyntax' | 'invalidPath' | 'noTarget' | 'invalidValue' | 'invalidVers' | 'sensitive';
+export type ScimErrorType = 'invalidFilter' | 'tooMany' | 'uniqueness' | 'mutability' | 'invalidSyntax' | 'invalidPath' | 'noTarget' | 'invalidValue' | 'invalidVers' | 'sensitive';
 
 // @public (undocumented)
-interface ScimGroup {
+export interface ScimGroup {
     // (undocumented)
     [ext: string]: unknown;
     // (undocumented)
@@ -1577,7 +2112,7 @@ interface ScimGroup {
 }
 
 // @public (undocumented)
-interface ScimName {
+export interface ScimName {
     // (undocumented)
     familyName?: string;
     // (undocumented)
@@ -1593,7 +2128,13 @@ interface ScimName {
 }
 
 // @public (undocumented)
-interface ScimUser {
+export type ScimResource = ScimUser | ScimGroup;
+
+// @public (undocumented)
+export const ScimService: ServiceToken<ScimApi>;
+
+// @public (undocumented)
+export interface ScimUser {
     // (undocumented)
     [ext: string]: unknown;
     // (undocumented)
@@ -1648,26 +2189,94 @@ interface ScimUser {
     x509Certificates?: MultiValued[];
 }
 
+export { SearchOptions }
+
+export { SearchResult }
+
+// @public (undocumented)
+export const serverError: (res: Response_2, err: unknown) => void;
+
+// @public
+export const serverErrorBody: (err: unknown, debug?: boolean) => {
+    error: string;
+    message: string;
+};
+
 // @public
 type ServiceMap = Map<ServiceToken<unknown>, unknown>;
 
 // @public
-interface ServiceProvider<T> {
+export interface ServiceProvider<T> {
     // (undocumented)
     readonly service: T;
     // (undocumented)
     readonly token: ServiceToken<T>;
 }
 
+// @public (undocumented)
+export interface ServiceProviderConfig {
+    // (undocumented)
+    authenticationSchemes: Array<{
+        name: string;
+        description: string;
+        specUri?: string;
+        documentationUri?: string;
+        type: string;
+        primary?: boolean;
+    }>;
+    // (undocumented)
+    bulk: {
+        supported: boolean;
+        maxOperations: number;
+        maxPayloadSize: number;
+    };
+    // (undocumented)
+    changePassword: {
+        supported: boolean;
+    };
+    // (undocumented)
+    documentationUri?: string;
+    // (undocumented)
+    etag: {
+        supported: boolean;
+    };
+    // (undocumented)
+    filter: {
+        supported: boolean;
+        maxResults: number;
+    };
+    // (undocumented)
+    meta?: {
+        resourceType: 'ServiceProviderConfig';
+        location?: string;
+    };
+    // (undocumented)
+    patch: {
+        supported: boolean;
+    };
+    // (undocumented)
+    schemas: [typeof SCHEMA_SERVICE_PROVIDER_CONFIG];
+    // (undocumented)
+    sort: {
+        supported: boolean;
+    };
+}
+
 // @public
-interface ServiceToken<T> {
+export interface ServiceToken<T> {
     readonly [serviceType]?: T;
     readonly name: string;
     with(provider: T): ServiceProvider<T>;
 }
 
 // @public
+export const serviceToken: <T>(name: string) => ServiceToken<T>;
+
+// @public
 const serviceType: unique symbol;
+
+// @public (undocumented)
+export const serviceUnavailable: (res: Response_2, message?: string) => void;
 
 // @public (undocumented)
 export class ServiceUnavailableError extends HttpError {
@@ -1675,7 +2284,81 @@ export class ServiceUnavailableError extends HttpError {
 }
 
 // @public
+export const setDebug: (debug: boolean) => void;
+
+// @public
+export const setLogger: (logger: winston.Logger | undefined) => void;
+
+// @public
 type Settled<T> = T extends Promise<infer P> ? P : T;
+
+// @public (undocumented)
+export function splitValue(value: string, kind: ArrayKind | undefined, form: 'singular' | 'plural'): string[];
+
+// @public (undocumented)
+export interface StorageApi {
+    // (undocumented)
+    readonly store: Store;
+}
+
+// @public (undocumented)
+export const StorageService: ServiceToken<StorageApi>;
+
+// @public (undocumented)
+abstract class Store {
+    constructor(logger: winston.Logger);
+    close(): Promise<void>;
+    protected closed: boolean;
+    // (undocumented)
+    protected static decodeRecord(value: unknown): StoredRecord | null;
+    delete(namespace: string, key: string): Promise<void>;
+    protected abstract drop(key: string): Promise<void>;
+    protected static encodeRecord(key: string, record: StoredRecord): string;
+    get(namespace: string, key: string): Promise<string | null>;
+    health(): Promise<HealthStatus>;
+    protected abstract load(key: string): Promise<StoredRecord | null>;
+    // (undocumented)
+    protected logger: winston.Logger;
+    abstract name: string;
+    open(): Promise<void>;
+    protected static readable(scoped: string): string;
+    protected abstract save(key: string, record: StoredRecord): Promise<void>;
+    protected static scoped(namespace: string, key: string): string;
+    set(namespace: string, key: string, value: string, deadline: number): Promise<void>;
+    startSweeping(seconds: number): void;
+    // (undocumented)
+    stopSweeping(): void;
+    abstract sweep(): Promise<number>;
+}
+
+// @public
+interface StoredRecord {
+    // (undocumented)
+    deadline: number;
+    // (undocumented)
+    value: string;
+}
+
+// @public (undocumented)
+export interface StringOption extends OptionSpec<string> {
+    readonly choices?: readonly string[];
+    // (undocumented)
+    readonly type: 'string';
+}
+
+// @public (undocumented)
+export interface StringOrFalseOption extends OptionSpec<string | false> {
+    // (undocumented)
+    readonly allowFalse: true;
+    // (undocumented)
+    readonly type: 'string';
+}
+
+// @public
+export interface SubscribeOptions {
+    // (undocumented)
+    queueArguments?: Record<string, unknown>;
+}
 
 // @public
 export function substringSearchFilter(match: string, attribute: string): string;
@@ -1689,6 +2372,35 @@ interface SyntaxDefinition {
     oid: string;
 }
 
+// @public
+export function toConfigEntries(options: OptionSet): ConfigEntry[];
+
+// @public
+export function toDirectoryChanges(schema: Schema | undefined, changes: ModifyRequest): void;
+
+// @public
+export function toDirectoryEntry(schema: Schema | undefined, entry: AttributesList): void;
+
+// @public
+export function toDirectoryValue(schema: Schema | undefined, field: string, value: AttributeValue): AttributeValue;
+
+// @public (undocumented)
+export interface TombstoneApi {
+    keeps(dn: string): boolean;
+}
+
+// @public (undocumented)
+export const TombstoneService: ServiceToken<TombstoneApi>;
+
+// @public
+export function tooLongMessage(name: string, maxLength: number): string;
+
+// @public
+export function tooLongValue(attr: SchemaAttribute, value: AttributeValue): AttributeValue | undefined;
+
+// @public (undocumented)
+export const tooManyRequests: (res: Response_2, message?: string) => void;
+
 // @public (undocumented)
 export class TooManyRequestsError extends HttpError {
     constructor(message?: string);
@@ -1696,6 +2408,116 @@ export class TooManyRequestsError extends HttpError {
 
 // @public (undocumented)
 export const transformSchemas: (schemas: string | Buffer, config: Config) => string;
+
+// @public (undocumented)
+export interface TrashApi {
+    readonly trashBase: string;
+    readonly watchedBases: readonly string[];
+}
+
+// @public (undocumented)
+export const TrashService: ServiceToken<TrashApi>;
+
+// @public (undocumented)
+export const tryMethod: (res: Response_2, method: Function, ...args: unknown[]) => Promise<void>;
+
+// @public (undocumented)
+export const tryMethodData: (res: Response_2, method: Function, ...args: unknown[]) => Promise<void>;
+
+// @public
+export interface TwakeConnection {
+    // (undocumented)
+    concurrency: number;
+    concurrencyOption: string;
+    // (undocumented)
+    token: string;
+    tokenOption: string;
+    // (undocumented)
+    url: string;
+    urlOption: string;
+}
+
+// @public (undocumented)
+export interface TwakeGroupsApi {
+    // (undocumented)
+    checkOrganization(org: string, req?: Request_2): Promise<void>;
+    // (undocumented)
+    readonly cn: string;
+    // (undocumented)
+    groupBaseOf(org: string): string;
+    // (undocumented)
+    groupOf(org: string, entry: AttributesList): Record<string, unknown>;
+    // (undocumented)
+    groups(org: string, filter: string, attributes?: string[], req?: Request_2): Promise<AttributesList[]>;
+    // (undocumented)
+    readonly maxPage: number;
+    // (undocumented)
+    memberPage(p: Page, org: string, names: string[], extra?: (username: string) => Record<string, unknown>, req?: Request_2): Promise<{
+        members: Record<string, unknown>[];
+        pagination: Record<string, number | boolean>;
+    }>;
+    // (undocumented)
+    organizationOf(dn: string): string | undefined;
+    // (undocumented)
+    organizationRoute(context: string, handler: (req: Request_2, res: Response_2, org: string) => Promise<void>, plugin?: string): (req: Request_2, res: Response_2) => Promise<void>;
+    // (undocumented)
+    page(req: Request_2, sortable: string[]): Page;
+    // (undocumented)
+    sorted<T extends Record<string, unknown>>(items: T[], sortBy: string | undefined, desc: boolean): T[];
+    // (undocumented)
+    tombstonesOf(org: string): Promise<string[]>;
+    // (undocumented)
+    readonly userAttribute: string;
+    // (undocumented)
+    userBaseOf(org: string): string;
+    // (undocumented)
+    users(org: string, usernames: string[], attributes: string[], req?: Request_2): Promise<AttributesList[]>;
+}
+
+// @public (undocumented)
+export const TwakeGroupsService: ServiceToken<TwakeGroupsApi>;
+
+// @public
+export abstract class TwakePlugin extends DmPlugin {
+    constructor(server: DM_2, connection: TwakeConnection);
+    protected attributeToString(value: unknown): string | null;
+    protected callWebAdminApi(hookname: string, url: string, method: string, dn: string, body: string | null, fields: object, retryOn?: readonly number[]): Promise<boolean>;
+    protected createHeaders(contentType?: string): {
+        Authorization?: string;
+        'Content-Type'?: string;
+    };
+    // (undocumented)
+    protected displayNameAttr: string;
+    protected extractDomainFromDn(dn: string): string;
+    protected extractMailDomain(email: string): string | null;
+    protected findReadableUser(username: string, req: Request_2, attributes: string[]): Promise<AttributesList | null>;
+    protected getAliases(value: string | string[] | Buffer | Buffer[] | undefined): string[];
+    protected ldapGetAttributes(dn: string, attributes?: string[]): Promise<AttributesList | null>;
+    // (undocumented)
+    protected mailAttr: string;
+    // (undocumented)
+    abstract name: string;
+    protected normalizeAlias(alias: string): string;
+    // (undocumented)
+    protected requestLimit: ReturnType<typeof pLimit>;
+    // (undocumented)
+    protected retryAttempts: number;
+    // (undocumented)
+    protected retryDelay: number;
+    // (undocumented)
+    abstract roles: Role[];
+    protected shouldIgnoreError(statusCode: number, hookname: string): boolean;
+    protected shouldRetry(statusCode: number, retryOn: readonly number[], attempt: number): boolean;
+    protected waitBeforeRetry(attempt: number): Promise<void>;
+    protected webadminHealth(): Promise<HealthStatus>;
+    // (undocumented)
+    protected webadminToken: string;
+    // (undocumented)
+    protected webadminUrl: string;
+}
+
+// @public (undocumented)
+export const unauthorized: (res: Response_2, message?: string) => void;
 
 // @public (undocumented)
 export class UnauthorizedError extends HttpError {
@@ -1706,22 +2528,81 @@ export class UnauthorizedError extends HttpError {
 export function unescapeDnValue(value: string): string;
 
 // @public
-interface UniqueConstraint {
+export interface UniqueConstraint {
     attributes?: string[];
     branches?: string[];
     filter?: string;
     sentinel?: string;
 }
 
+// @public
+export function unknownEnvironmentOptions(entries: ConfigTemplate, env?: Record<string, string | undefined>, extra?: OptionSet[]): string[];
+
+// @public (undocumented)
+export const uriTooLong: (res: Response_2, message?: string) => void;
+
 // @public (undocumented)
 export class UriTooLongError extends HttpError {
     constructor(message?: string);
 }
 
+declare namespace utils {
+    export {
+        getCompiledRegex,
+        escapeRegex,
+        escapeLdapFilter,
+        substringSearchFilter,
+        fillPattern,
+        escapeDnValue,
+        unescapeDnValue,
+        validateDnValue,
+        parseDn,
+        isDnSyntax,
+        hasOnlyRfc4514Escapes,
+        assertRfc4514Escapes,
+        getParentDn,
+        getRdn,
+        rdnValue,
+        assertedRdnValue,
+        namesByDn,
+        isChildOf,
+        isDirectChildOf,
+        registerAttributeTypes,
+        knownAttributeName,
+        rdnTypes,
+        normalizeDn,
+        canonicalDn,
+        isDummyMemberDn,
+        organizationLink,
+        isDnInBranch,
+        movedToTrash,
+        parseDirectoryDate,
+        hookOwner,
+        recordHookOwner,
+        runAsHookOwner,
+        transformSchemas,
+        asyncHandler
+    }
+}
+export { utils }
+
 // @public
 export function validateDnValue(value: string, fieldName: string): void;
 
 // @public (undocumented)
-type VoidHook<T extends unknown[]> = (...args: T) => MaybePromise<void>;
+export type VoidHook<T extends unknown[]> = (...args: T) => MaybePromise<void>;
+
+// @public (undocumented)
+export const wantJson: (req: Request_2, res: Response_2) => boolean;
+
+// @public
+export function withoutAttributes<T extends object>(entry: T, hidden: Set<string>): T;
+
+// @public
+export const WriteResponse: TObject<    {
+success: TBoolean;
+}>;
+
+// (No @packageDocumentation comment for this package)
 
 ```

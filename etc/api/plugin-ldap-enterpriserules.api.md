@@ -54,18 +54,6 @@ export function mailInDomains(mail: string, domains: string[], allowSubdomains?:
 // @public
 export function parseByteSize(raw: AttributeValue): number;
 
-// @public (undocumented)
-interface ReferenceRewriterApi {
-    findReferences(dn: string): Promise<unknown[]>;
-    rewriteReferences(references: unknown[], oldDn: string, newDn: string, req?: Request_2): Promise<{
-        updated: number;
-        failed: {
-            attribute: string;
-            count: number;
-        }[];
-    }>;
-}
-
 // @public
 export interface ReferenceRewriteReport {
     failed: {
@@ -77,12 +65,5 @@ export interface ReferenceRewriteReport {
 
 // @public
 export function startOfUtcDay(now?: Date): number;
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
 
 ```

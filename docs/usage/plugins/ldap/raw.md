@@ -154,7 +154,7 @@ The filter is parsed before the search runs, so a malformed one comes back as a 
 }
 ```
 
-Inheritance is **not** flattened: a client resolving the attributes of an entry must walk the `sup` chains. `SchemaView` (browser) and `SchemaIndex` (`src/lib/ldapSchema.ts`, server) do it for you.
+Inheritance is **not** flattened: a client resolving the attributes of an entry must walk the `sup` chains. `SchemaView` (browser) and `SchemaIndex` (`packages/core/src/lib/ldapSchema.ts`, server) do it for you.
 
 ## Hidden attributes
 

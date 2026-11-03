@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import { Client, Attribute } from 'ldapts';
+import { ServiceUnavailableError } from '@ldap-rest/core/lib/errors';
 
 import LdapRaw from '../../../src/plugins/ldap/raw';
 import { DM } from '../../../src/bin';
-import { ServiceUnavailableError } from '../../../src/lib/errors';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('LDAP Raw Plugin', function () {

@@ -7,17 +7,19 @@
  */
 import { Entry } from 'ldapts';
 import type { Request } from 'express';
-
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { Hooks } from '../../hooks';
-import type { AttributeValue, SearchResult } from '../../lib/ldapActions';
-import type { Config } from '../../bin';
-import type { ChangeContext } from '../../lib/changeContext';
-import type { ChangesToNotify } from '../../lib/changes';
-import { currentOperation } from '../../lib/operation';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import type {
+  AttributeValue,
+  SearchResult,
+} from '@ldap-rest/core/lib/ldapActions';
+import type { Config } from '@ldap-rest/core';
+import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
+import type { ChangesToNotify } from '@ldap-rest/core/lib/changes';
+import { currentOperation } from '@ldap-rest/core/lib/operation';
 
 /** @deprecated import from `ldap-rest/hooks`; removed in 4.0.0 */
-export type { ChangesToNotify } from '../../lib/changes';
+export type { ChangesToNotify } from '@ldap-rest/core/lib/changes';
 
 const normalize = (value: AttributeValue | undefined): string[] =>
   (value === undefined ? [] : Array.isArray(value) ? value : [value])

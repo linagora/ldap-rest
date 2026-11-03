@@ -2,13 +2,13 @@
  * Cozy provisioning options, shared by `cozyProvision` and
  * `clouderyProvision`. See `docs/plugin-development/options.md`.
  */
-import type { Config } from '../../config/args';
+import type { Config } from '@ldap-rest/core/config/args';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../../config/options';
+} from '@ldap-rest/core/config/options';
 
 export const cozyOptions = defineOptions({
   cozy_admin_url: opt.string({ env: 'DM_COZY_ADMIN_URL', default: '' }),

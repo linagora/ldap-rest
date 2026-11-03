@@ -17,9 +17,9 @@
  */
 import { createHash } from 'node:crypto';
 
-import Store, { type StoredRecord } from '../../lib/storage/store';
-import type { DM } from '../../bin';
-import type { SearchResult } from '../../lib/ldapActions';
+import Store, { type StoredRecord } from '@ldap-rest/core/lib/storage/store';
+import type { DM } from '@ldap-rest/core';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 
 const errorText = (err: unknown): string =>
   err instanceof Error ? err.message : JSON.stringify(err);

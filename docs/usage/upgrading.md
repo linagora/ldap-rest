@@ -72,7 +72,7 @@ repository that calls `launchHooks` / `launchHooksChained`, or subscribes
 to a `*done` hook with its arguments packed in one tuple.
 
 Hooks are raised through `this.hookBus`, and every hook is declared in
-`src/hooks.ts`: a plugin raising or subscribing to a hook the server does
+`packages/core/src/hooks.ts`: a plugin raising or subscribing to a hook the server does
 not declare no longer compiles. A notified hook — `ldapadddone`,
 `ldapaddafter`, `ldapmodifydone`, `ldaprenamedone`, `ldapgroupadddone`,
 `ldapgroupmodifydone`, `ldapgrouprenamedone`, `ldapexternaluseradded` — now

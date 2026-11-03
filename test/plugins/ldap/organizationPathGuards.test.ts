@@ -15,10 +15,10 @@
  * every organization of theirs unwritable on an upgrade.
  */
 import { expect } from 'chai';
+import { rdnValue } from '@ldap-rest/core/lib/utils';
 
 import { DM } from '../../../src/bin';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import { rdnValue } from '../../../src/lib/utils';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

@@ -140,7 +140,7 @@ lists what the Express stack carries that `defineRoute` did not declare.
 
 ## The migration guard
 
-`npm run lint` refuses `app.<verb>(` under `src/plugins` and `src/abstract`,
+`npm run lint` refuses `app.<verb>(` under `src/plugins` and `packages/core/src/abstract`,
 through `eslint-rules/no-raw-route.mjs`. `eslint-rules/route-allowlist.json`
 names the files a raw route is tolerated in; it is empty, so every route in
 the tree is declared. `test/scripts/routeAllowlist.test.ts` keeps the list

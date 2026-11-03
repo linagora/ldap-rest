@@ -42,26 +42,25 @@
  * @group Plugins
  */
 import type { Request } from 'express';
-
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { Hooks } from '@ldap-rest/core/hooks';
 import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
+} from '@ldap-rest/core/lib/ldapActions';
 import type {
   Schema,
   SchemaAttribute,
   UniqueConstraint,
-} from '../../config/schema';
+} from '@ldap-rest/core/config/schema';
 import {
   hasRole,
   invalidValueMessage,
   roleAttribute,
-} from '../../config/schema';
+} from '@ldap-rest/core/config/schema';
 import {
   escapeLdapFilter,
   getParentDn,
@@ -71,11 +70,11 @@ import {
   movedToTrash,
   normalizeDn,
   rdnValue,
-} from '../../lib/utils';
-import type { ChangeContext } from '../../lib/changeContext';
-import { BadRequestError, ConflictError } from '../../lib/errors';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { ReferenceRewriterService } from '../../lib/services/referenceRewriter';
+} from '@ldap-rest/core/lib/utils';
+import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
+import { BadRequestError, ConflictError } from '@ldap-rest/core/lib/errors';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
+import { ReferenceRewriterService } from '@ldap-rest/core/lib/services/referenceRewriter';
 
 /** One entity the rules apply to: its branch and the schema describing it. */
 interface EntityBinding {

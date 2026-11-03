@@ -1,6 +1,9 @@
 import { expect } from 'chai';
+import {
+  ConfigParser,
+  type ConfigEntry,
+} from '@ldap-rest/core/lib/parseConfig';
 
-import { ConfigParser, type ConfigEntry } from '../../src/lib/parseConfig';
 import configArgs from '../../src/bin/options';
 
 describe('ConfigParser', () => {

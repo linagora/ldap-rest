@@ -6,8 +6,10 @@
 
 import { Type } from '@sinclair/typebox';
 import type { Express } from 'express';
-
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
 
 /**
  * The answer of the hello-world endpoint.

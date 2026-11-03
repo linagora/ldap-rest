@@ -5,14 +5,14 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
-
-import { DM } from '../../../src/bin';
-import { errorResponse } from '../../../src/lib/expressFormatedResponses';
+import { errorResponse } from '@ldap-rest/core/lib/expressFormatedResponses';
 import {
   AUTHZ_REFUSED,
   AuthzRefusedError,
   GatewayTimeoutError,
-} from '../../../src/lib/errors';
+} from '@ldap-rest/core/lib/errors';
+
+import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';

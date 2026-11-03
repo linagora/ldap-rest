@@ -11,7 +11,10 @@ import {
 
 const root = path.join(__dirname, '..', '..');
 const source = () =>
-  fs.readFileSync(path.join(root, 'src', 'hooks.ts'), 'utf8');
+  fs.readFileSync(
+    path.join(root, 'packages', 'core', 'src', 'hooks.ts'),
+    'utf8'
+  );
 const doc = () =>
   fs.readFileSync(
     path.join(root, 'docs', 'plugin-development', 'hooks.md'),
@@ -69,7 +72,7 @@ describe('the hooks document', () => {
       'export interface Hooks {\n  kept?: () => void;\n}\n',
       [
         '# Hooks',
-        '<!-- hooks: generated from src/hooks.ts, do not edit by hand -->',
+        '<!-- hooks: generated from packages/core/src/hooks.ts, do not edit by hand -->',
         '- **kept**: described here',
         '- **gone**: described here too',
         '<!-- /hooks -->',

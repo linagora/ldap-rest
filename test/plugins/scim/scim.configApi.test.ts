@@ -9,9 +9,9 @@ import { join } from 'path';
 
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { Config } from '@ldap-rest/core/config/args';
 
 import { DM } from '../../../src/bin';
-import type { Config } from '../../../src/config/args';
 import Scim from '../../../src/plugins/scim/scim';
 import Static from '../../../src/plugins/static';
 

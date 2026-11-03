@@ -11,19 +11,19 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
-
-import { DM } from '../../../src/bin';
-import DmPlugin from '../../../src/abstract/plugin';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
 import {
   assertClientMaySet,
   modifiedAttributeNames,
   schemaAttribute,
   type Schema,
-} from '../../../src/config/schema';
+} from '@ldap-rest/core/config/schema';
+
+import { DM } from '../../../src/bin';
+import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import LdapOrganizations from '../../../src/plugins/ldap/organizations';
+import LdapGroups from '../../../src/plugins/ldap/groups';
+import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

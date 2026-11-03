@@ -14,23 +14,28 @@
  */
 import { Type } from '@sinclair/typebox';
 import type { Express, Response } from 'express';
-
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import { identityFor, type DmRequest } from '../../lib/auth/base';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import { identityFor, type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import {
   authzFor,
   EVERYONE,
   overlap,
   servesRequest,
-} from '../../lib/authz/composition';
-import type { BranchPermissions } from '../../config/args';
-import type { AttributesList, SearchResult } from '../../lib/ldapActions';
-import { UnauthorizedError } from '../../lib/errors';
+} from '@ldap-rest/core/lib/authz/composition';
+import type { BranchPermissions } from '@ldap-rest/core/config/args';
+import type {
+  AttributesList,
+  SearchResult,
+} from '@ldap-rest/core/lib/ldapActions';
+import { UnauthorizedError } from '@ldap-rest/core/lib/errors';
 import {
   PasswordPolicyService,
   type PasswordPolicyApi,
-} from '../../lib/services/passwordPolicy';
-import { roleAttribute } from '../../config/schema';
+} from '@ldap-rest/core/lib/services/passwordPolicy';
+import { roleAttribute } from '@ldap-rest/core/config/schema';
 
 /** The part of an authorization plugin this endpoint needs. */
 interface AuthzLike extends DmPlugin {

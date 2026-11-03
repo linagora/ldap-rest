@@ -9,11 +9,11 @@
  */
 import { expect } from 'chai';
 import type { SearchResult } from 'ldapts';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import { isAuthzRefusal } from '@ldap-rest/core/lib/errors';
+import { mostSpecificBranchRule } from '@ldap-rest/core/lib/authz/base';
 
 import { DM } from '../../../src/bin';
-import type { DmRequest } from '../../../src/lib/auth/base';
-import { isAuthzRefusal } from '../../../src/lib/errors';
-import { mostSpecificBranchRule } from '../../../src/lib/authz/base';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 

@@ -580,7 +580,7 @@ graph TB
 ## Plugin Priority System
 
 LDAP-Rest uses a priority system defined in
-[`src/config/priority.json`](../../src/config/priority.json), which is the
+[`packages/core/src/config/priority.json`](../../packages/core/src/config/priority.json), which is the
 list itself — copying it here is how this section came to name two plugins
 the file does not and to omit four it does.
 
@@ -653,7 +653,7 @@ export default class MyPlugin extends DmPlugin {
 
 ### Providing Hooks
 
-A hook is declared in `src/hooks.ts` before anything raises it, and raised
+A hook is declared in `packages/core/src/hooks.ts` before anything raises it, and raised
 through the bus of the kind it is, see [hooks](hooks.md#the-bus):
 
 ```typescript
@@ -689,5 +689,5 @@ LDAP-Rest validates dependencies at startup:
 ## See Also
 
 - [Plugin Development Guide](DEVELOPER_GUIDE.md)
-- [Hook System Documentation](../src/hooks/README.md)
-- [Plugin Priority Configuration](../../src/config/priority.json)
+- [Hook System Documentation](../../packages/core/src/hooks.ts)
+- [Plugin Priority Configuration](../../packages/core/src/config/priority.json)

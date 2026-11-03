@@ -11,16 +11,17 @@ const lines = (file: string): number =>
 
 describe('LDAP operation file sizes', () => {
   it('keeps the façade under 400 lines', () => {
-    expect(lines('src/lib/ldapActions.ts')).to.be.at.most(400);
+    expect(lines('packages/core/src/lib/ldapActions.ts')).to.be.at.most(400);
   });
 
   it('keeps every pipeline file at 600 lines or less', () => {
-    const directory = path.join(root, 'src', 'lib', 'ldap');
+    const directory = path.join(root, 'packages', 'core', 'src', 'lib', 'ldap');
     for (const name of readdirSync(directory)) {
       if (!name.endsWith('.ts')) continue;
-      expect(lines(path.join('src', 'lib', 'ldap', name)), name).to.be.at.most(
-        600
-      );
+      expect(
+        lines(path.join('packages', 'core', 'src', 'lib', 'ldap', name)),
+        name
+      ).to.be.at.most(600);
     }
   });
 });

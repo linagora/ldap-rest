@@ -18,14 +18,6 @@ import { TString } from '@sinclair/typebox';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 export type Space = {
     id: string;
     name: string;
@@ -70,13 +62,6 @@ spaceId: TString;
 
 // @public (undocumented)
 export type SpaceRole = (typeof SPACE_ROLES)[number];
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
 
 // @public (undocumented)
 class TwakeSpaces extends DmPlugin {

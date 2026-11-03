@@ -3,8 +3,12 @@
   "compilerOptions": {
     "emitDeclarationOnly": true,
     "declarationDir": "./temp/api/declarations",
-    "outDir": "./temp/api/declarations"
+    "outDir": "./temp/api/declarations",
+    "paths": {
+      "@ldap-rest/core": ["./packages/core/dist/index.d.ts"],
+      "@ldap-rest/core/*": ["./packages/core/dist/*"]
+    }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "packages/core/src/types/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

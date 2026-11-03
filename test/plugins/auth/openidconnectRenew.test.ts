@@ -6,8 +6,8 @@
 import { expect } from 'chai';
 import type { Response } from 'express';
 import nock from 'nock';
+import type { DM } from '@ldap-rest/core';
 
-import type { DM } from '../../../src/bin';
 import {
   build,
   clearsSession,

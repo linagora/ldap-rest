@@ -5,30 +5,29 @@
  * SCIM Users resource handler — direct access via ldapActions.
  */
 import type winston from 'winston';
-
-import type ldapActions from '../../lib/ldapActions';
+import type ldapActions from '@ldap-rest/core/lib/ldapActions';
 import type {
   AttributesList,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import type { DmRequest } from '../../lib/auth/base';
-import type HookBus from '../../lib/hookBus';
+} from '@ldap-rest/core/lib/ldapActions';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type HookBus from '@ldap-rest/core/lib/hookBus';
 import {
   escapeDnValue,
   escapeLdapFilter,
   isChildOf,
   validateDnValue,
-} from '../../lib/utils';
+} from '@ldap-rest/core/lib/utils';
 import {
   type ResourceMapping,
   type ScimUser,
   type ListResponse,
   type PatchRequest,
   SCHEMA_LIST_RESPONSE,
-} from '../../lib/scim/types';
-import { BaseResolver } from '../../lib/scim/baseResolver';
-import type { ScimOptions } from '../../lib/scim/options';
+} from '@ldap-rest/core/lib/scim/types';
+import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
+import type { ScimOptions } from '@ldap-rest/core/lib/scim/options';
 import {
   DEFAULT_USER_MAPPING,
   loadMappingFile,
@@ -39,7 +38,7 @@ import {
   resolveLockConfig,
   isLocked,
   type MappingContext,
-} from '../../lib/scim/mapping';
+} from '@ldap-rest/core/lib/scim/mapping';
 import {
   extractLdapCode,
   kindOf,
@@ -47,7 +46,7 @@ import {
   scimInvalidValue,
   scimNotFound,
   scimUniqueness,
-} from '../../lib/scim/errors';
+} from '@ldap-rest/core/lib/scim/errors';
 
 import { scimFilterToLdap } from './filter';
 import { pagedSearch } from './list';

@@ -1,27 +1,26 @@
 import type { SearchResult } from 'ldapts';
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
-
 import DmPlugin, {
   defineRoute,
   type EntityDeclaration,
   type Role,
-} from '../../abstract/plugin';
-import { DM } from '../../bin';
-import { Hooks } from '../../hooks';
+} from '@ldap-rest/core/abstract/plugin';
+import { DM } from '@ldap-rest/core';
+import { Hooks } from '@ldap-rest/core/hooks';
 import {
   AttributesList,
   AttributeValue,
   assertModifyRequest,
   ModifyRequest,
-} from '../../lib/ldapActions';
+} from '@ldap-rest/core/lib/ldapActions';
 import {
   tryMethodData,
   tryMethod,
   jsonBody,
   wantJson,
   WriteResponse,
-} from '../../lib/expressFormatedResponses';
+} from '@ldap-rest/core/lib/expressFormatedResponses';
 import {
   assertRfc4514Escapes,
   escapeDnValue,
@@ -34,26 +33,26 @@ import {
   rdnValue,
   substringSearchFilter,
   validateDnValue,
-} from '../../lib/utils';
+} from '@ldap-rest/core/lib/utils';
 import {
   BadRequestError,
   NotFoundError,
   ConflictError,
   HttpError,
   isAuthzRefusal,
-} from '../../lib/errors';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { loadSchemaFileAsync } from '../../lib/schemaFile';
-import { staticSchemaUrl } from '../../lib/staticFiles';
-import type { Schema } from '../../config/schema';
+} from '@ldap-rest/core/lib/errors';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
+import { loadSchemaFileAsync } from '@ldap-rest/core/lib/schemaFile';
+import { staticSchemaUrl } from '@ldap-rest/core/lib/staticFiles';
+import type { Schema } from '@ldap-rest/core/config/schema';
 import {
   assertClientMaySet,
   modifiedAttributeNames,
-} from '../../config/schema';
+} from '@ldap-rest/core/config/schema';
 import {
   applyFixedDefaults,
   EntityValidator,
-} from '../../lib/entitySchema/validator';
+} from '@ldap-rest/core/lib/entitySchema/validator';
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by

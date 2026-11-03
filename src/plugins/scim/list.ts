@@ -20,8 +20,12 @@ import type {
   AttributesList,
   RequestBoundLdap,
   SearchResult,
-} from '../../lib/ldapActions';
-import { ScimError, scimTooMany, extractLdapCode } from '../../lib/scim/errors';
+} from '@ldap-rest/core/lib/ldapActions';
+import {
+  ScimError,
+  scimTooMany,
+  extractLdapCode,
+} from '@ldap-rest/core/lib/scim/errors';
 
 export interface PagedSearch {
   /** The directory bound to the request, so authorization always applies. */

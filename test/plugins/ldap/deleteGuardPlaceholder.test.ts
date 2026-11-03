@@ -5,11 +5,11 @@
  * spelling and the two were compared as text.
  */
 import { expect } from 'chai';
+import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
-import type { AttributesList } from '../../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Enterprise rules: the placeholder is not a member', function () {

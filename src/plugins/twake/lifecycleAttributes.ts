@@ -5,15 +5,18 @@
  * deletion), read from the `--twake-lifecycle-*` options: the ones
  * `core/twake/lifecycleEvents` reads, and `core/twake/tombstone` writes.
  */
-import type { Config } from '../../bin';
-import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
-import { parseDirectoryDate } from '../../lib/utils';
+import type { Config } from '@ldap-rest/core';
+import type {
+  AttributesList,
+  AttributeValue,
+} from '@ldap-rest/core/lib/ldapActions';
+import { parseDirectoryDate } from '@ldap-rest/core/lib/utils';
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   holdsValue,
   resolveLockConfig,
-} from '../../lib/scim/mapping';
-import { scimOptionsOf } from '../../lib/scim/options';
+} from '@ldap-rest/core/lib/scim/mapping';
+import { scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
 
 import { twakeLifecycleOptionsOf } from './twakeLifecycle.options';
 

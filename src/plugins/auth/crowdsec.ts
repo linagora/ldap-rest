@@ -14,8 +14,7 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Express, Request, Response, NextFunction } from 'express';
-
-import DmPlugin, { Role } from '../../abstract/plugin';
+import DmPlugin, { Role } from '@ldap-rest/core/abstract/plugin';
 
 import { crowdsecOptions } from './auth.options';
 

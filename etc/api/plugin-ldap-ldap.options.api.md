@@ -5,20 +5,6 @@
 ```ts
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
-interface BooleanOption extends OptionSpec<boolean> {
-    // (undocumented)
-    readonly type: 'boolean';
-}
-
-// @public (undocumented)
 export type BulkImportOptions = OptionsOf<typeof bulkImportOptions>;
 
 // @public (undocumented)
@@ -73,22 +59,6 @@ export const groupsOptions: {
 export function groupsOptionsOf(config: Config): GroupsOptions;
 
 // @public (undocumented)
-interface JsonOption<T> extends OptionSpec<T> {
-    // (undocumented)
-    readonly type: 'json';
-}
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
 export type OrganizationOptions = OptionsOf<typeof organizationOptions>;
 
 // @public (undocumented)
@@ -133,13 +103,6 @@ export const rawOptions: {
     ldap_raw_max_results: NumberOption;
     ldap_raw_schema_cache_ttl: NumberOption;
 };
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
 
 // @public (undocumented)
 export type TrashOptions = OptionsOf<typeof trashOptions>;

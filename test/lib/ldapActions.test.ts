@@ -1,15 +1,17 @@
 import { expect } from 'chai';
 import { Client, SearchResult } from 'ldapts';
 import type { Request } from 'express';
+import LdapActions, {
+  type AttributesList,
+} from '@ldap-rest/core/lib/ldapActions';
+import { parseConfig } from '@ldap-rest/core/lib/parseConfig';
+import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
+import { NotFoundError } from '@ldap-rest/core/lib/errors';
+import type { ChainedHook } from '@ldap-rest/core/hooks';
 
-import LdapActions, { type AttributesList } from '../../src/lib/ldapActions';
-import { parseConfig } from '../../src/lib/parseConfig';
 import configTemplate from '../../src/bin/options';
 import { DM } from '../../src/bin';
-import type { ChangeContext } from '../../src/lib/changeContext';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
-import { NotFoundError } from '../../src/lib/errors';
-import type { ChainedHook } from '../../src/hooks';
 
 let ldapActions: LdapActions;
 

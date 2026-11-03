@@ -1,17 +1,17 @@
 import { expect } from 'chai';
-
-import configArgs from '../../src/bin/options';
 import {
   defineOptions,
   opt,
   readOptions,
   toConfigEntries,
-} from '../../src/config/options';
-import { ConfigParser } from '../../src/lib/parseConfig';
-import DmPlugin from '../../src/abstract/plugin';
-import { TwakePlugin } from '../../src/abstract/twakePlugin';
+} from '@ldap-rest/core/config/options';
+import { ConfigParser } from '@ldap-rest/core/lib/parseConfig';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import { TwakePlugin } from '@ldap-rest/core/abstract/twakePlugin';
+import { scimOptions, scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
+
 import { DM } from '../../src/bin';
-import { scimOptions, scimOptionsOf } from '../../src/lib/scim/options';
+import configArgs from '../../src/bin/options';
 import {
   perBranchOptions,
   crowdsecOptionsOf,

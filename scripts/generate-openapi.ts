@@ -167,7 +167,7 @@ export class OpenAPIGenerator {
   public async analyze(
     dirs: string[] = [
       path.join(this.rootDir, 'src', 'plugins'),
-      path.join(this.rootDir, 'src', 'abstract'),
+      path.join(this.rootDir, 'packages', 'core', 'src', 'abstract'),
     ]
   ): Promise<void> {
     for (const dir of dirs) this.analyzeDirectory(dir);
@@ -302,7 +302,7 @@ export class OpenAPIGenerator {
     return calls;
   }
 
-  /** Whether an expression names the `defineRoute` of `src/lib/route.ts`. */
+  /** Whether an expression names the `defineRoute` of `packages/core/src/lib/route.ts`. */
   private isDefineRoute(expr: ts.Expression): boolean {
     let symbol = this.checker.getSymbolAtLocation(expr);
     for (let depth = 0; symbol?.flags && depth < 8; depth++) {
@@ -313,7 +313,7 @@ export class OpenAPIGenerator {
     const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
     return (
       declaration?.getSourceFile().fileName ===
-      path.join(this.rootDir, 'src', 'lib', 'route.ts')
+      path.join(this.rootDir, 'packages', 'core', 'src', 'lib', 'route.ts')
     );
   }
 

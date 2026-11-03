@@ -1,7 +1,6 @@
 import { expect } from 'chai';
-
-import type { DM } from '../../src/bin';
-import { declaredMailDomains } from '../../src/lib/mailDomains';
+import type { DM } from '@ldap-rest/core';
+import { declaredMailDomains } from '@ldap-rest/core/lib/mailDomains';
 
 describe('declaredMailDomains', () => {
   it('reads every page, whatever case the directory answers the attribute in', async () => {

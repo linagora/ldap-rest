@@ -1,6 +1,5 @@
 import { expect } from 'chai';
-
-import { ScimError } from '../../../src/lib/scim/errors';
+import { ScimError } from '@ldap-rest/core/lib/scim/errors';
 import {
   DEFAULT_USER_MAPPING,
   DEFAULT_GROUP_MAPPING,
@@ -15,7 +14,7 @@ import {
   setLockConfigWarn,
   withExternalId,
   type MappingContext,
-} from '../../../src/lib/scim/mapping';
+} from '@ldap-rest/core/lib/scim/mapping';
 
 const userCtx: MappingContext = {
   idAttribute: 'rdn',

@@ -12,9 +12,9 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
+import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../src/bin';
-import type { AttributesList } from '../../src/lib/ldapActions';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../src/plugins/ldap/organizations';

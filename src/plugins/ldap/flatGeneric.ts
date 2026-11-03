@@ -6,17 +6,16 @@
  * Automatically creates sub-plugins based on schema metadata
  */
 import type { Express } from 'express';
-
 import DmPlugin, {
   type EntityDeclaration,
   type Role,
-} from '../../abstract/plugin';
-import LdapFlat from '../../abstract/ldapFlat';
-import type { DM } from '../../bin';
-import { loadSchemaFile } from '../../lib/schemaFile';
-import { staticSchemaUrl } from '../../lib/staticFiles';
-import type { LocalizedText, Schema } from '../../config/schema';
-import type { AttributesList } from '../../lib/ldapActions';
+} from '@ldap-rest/core/abstract/plugin';
+import LdapFlat from '@ldap-rest/core/abstract/ldapFlat';
+import type { DM } from '@ldap-rest/core';
+import { loadSchemaFile } from '@ldap-rest/core/lib/schemaFile';
+import { staticSchemaUrl } from '@ldap-rest/core/lib/staticFiles';
+import type { LocalizedText, Schema } from '@ldap-rest/core/config/schema';
+import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 
 import { flatGenericOptions } from './ldap.options';
 

@@ -763,7 +763,7 @@ type ConfigTemplate = ConfigEntry[];
 
 // @public
 class DM {
-    constructor(options?: ConfigTemplate);
+    constructor(options?: ConfigTemplate, pluginRoot?: string, resolveBase?: string);
     afterLoad(): void;
     // (undocumented)
     app: express.Express;

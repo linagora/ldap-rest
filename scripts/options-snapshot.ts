@@ -11,7 +11,7 @@ import { readFileSync, realpathSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import type { ConfigEntry } from '../src/lib/parseConfig';
+import type { ConfigEntry } from '@ldap-rest/core/lib/parseConfig';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 

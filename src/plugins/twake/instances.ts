@@ -10,11 +10,13 @@
  */
 import { Type } from '@sinclair/typebox';
 import type { Express, Request } from 'express';
-
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
-import { BadRequestError, NotFoundError } from '../../lib/errors';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import { BadRequestError, NotFoundError } from '@ldap-rest/core/lib/errors';
 import {
   ClouderyProvider,
   CozyStackProvider,
@@ -22,9 +24,12 @@ import {
   instanceSlug,
   type InstanceRequest,
   matrixId,
-} from '../../lib/instanceProviders';
-import type { AttributesList, SearchResult } from '../../lib/ldapActions';
-import { extractLdapCode } from '../../lib/ldapCodes';
+} from '@ldap-rest/core/lib/instanceProviders';
+import type {
+  AttributesList,
+  SearchResult,
+} from '@ldap-rest/core/lib/ldapActions';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
 import {
   canonicalDn,
   escapeLdapFilter,
@@ -34,8 +39,8 @@ import {
   rdnTypes,
   rdnValue,
   unescapeDnValue,
-} from '../../lib/utils';
-import { RabbitMqService } from '../../lib/services/rabbitmq';
+} from '@ldap-rest/core/lib/utils';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
 import {
   isTombstone,
@@ -963,6 +968,6 @@ export default class TwakeInstances extends DmPlugin {
       this.config.ldap_base,
       req
     )) as SearchResult;
-    return res.searchEntries.find(e => this.match(e.dn as string));
+    return res.searchEntries.find(e => this.match(e.dn));
   }
 }

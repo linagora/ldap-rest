@@ -1,5 +1,5 @@
 #!/bin/sh
-# Refuse new rationale comments in src/.
+# Refuse new rationale comments in the core and the umbrella sources.
 #
 # A comment explains what is not obvious in the code beside it. Why a design
 # is what it is belongs in docs/architecture/adr/, once; the comment points
@@ -22,13 +22,13 @@ new=$(mktemp)
 stale=$(mktemp)
 trap 'rm -f "$current" "$texts" "$new" "$stale"' EXIT
 
-node - "$root/src" <<'NODE' > "$current"
+node - "$root/src" "$root/packages/core/src" <<'NODE' > "$current"
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 
-const root = process.argv[2];
-const base = path.resolve(root, '..');
+const roots = process.argv.slice(2);
+const base = path.resolve(roots[0], '..');
 
 // "used to" is also the instrumental sense ("the attribute used to resolve
 // the DN"). It narrates history when it follows a subject, not a comma, a
@@ -73,7 +73,8 @@ function* sources(dir) {
   }
 }
 
-for (const file of sources(root)) {
+for (const root of roots)
+  for (const file of sources(root)) {
   const text = fs.readFileSync(file, 'utf8');
   // The parser, not a bare scanner: a scanner without the parser's rescan
   // calls gets out of step at a template substitution or a regex and stops
@@ -121,7 +122,7 @@ for (const file of sources(root)) {
   };
   visit(source);
   add(ts.getLeadingCommentRanges(text, source.endOfFileToken.getFullStart()));
-}
+  }
 NODE
 
 cut -f2- "$current" | LC_ALL=C sort > "$texts"
@@ -142,7 +143,7 @@ LC_ALL=C comm -13 "$baseline" "$texts" > "$new"
 LC_ALL=C comm -23 "$baseline" "$texts" > "$stale"
 
 if [ -s "$new" ]; then
-  echo "check-comments: new rationale comments in src/:" >&2
+  echo "check-comments: new rationale comments in src/ or packages/core/src/:" >&2
   awk -F '\t' 'NR == FNR { new[$0] = 1; next } $2 in new {
     printf "  %s\n      %s\n", $1, $2
   }' "$new" "$current" >&2
@@ -157,7 +158,7 @@ fi
 
 if [ -s "$stale" ]; then
   cat >&2 <<'EOF'
-check-comments: the baseline lists comments src/ no longer has. Let it shrink:
+check-comments: the baseline lists comments the sources no longer have. Let it shrink:
 sh scripts/check-comments.sh --update
 EOF
   exit 1

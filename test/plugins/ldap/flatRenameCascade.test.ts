@@ -17,6 +17,11 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type {
+  AttributesList,
+  SearchOptions,
+  SearchResult,
+} from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
@@ -26,11 +31,6 @@ import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import ExternalUsersInGroups from '../../../src/plugins/ldap/externalUsersInGroups';
 import DepartmentSync from '../../../src/plugins/ldap/departmentSync';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
-import type {
-  AttributesList,
-  SearchOptions,
-  SearchResult,
-} from '../../../src/lib/ldapActions';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

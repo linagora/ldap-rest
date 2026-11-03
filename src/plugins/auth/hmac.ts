@@ -20,11 +20,10 @@
 import { createHmac, createHash, timingSafeEqual } from 'crypto';
 
 import type { Response } from 'express';
-
-import { unauthorized } from '../../lib/expressFormatedResponses';
-import { rawBodyOf } from '../../lib/rawBody';
-import AuthBase, { type DmRequest } from '../../lib/auth/base';
-import type { Role } from '../../abstract/plugin';
+import { unauthorized } from '@ldap-rest/core/lib/expressFormatedResponses';
+import { rawBodyOf } from '@ldap-rest/core/lib/rawBody';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
 
 import { hmacOptions } from './auth.options';
 

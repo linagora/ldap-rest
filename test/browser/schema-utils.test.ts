@@ -1,10 +1,10 @@
 import { expect } from 'chai';
-
 import {
   hasRole as serverHasRole,
   localizedText as serverText,
   type SchemaAttribute,
-} from '../../src/config/schema';
+} from '@ldap-rest/core/config/schema';
+
 import {
   hasRole,
   localizedText as browserText,

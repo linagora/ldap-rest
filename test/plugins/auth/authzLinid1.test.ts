@@ -1,14 +1,14 @@
 import { expect } from 'chai';
 import type { Response } from 'express';
 import supertest from 'supertest';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
+import { AmbiguousIdentityError } from '@ldap-rest/core/lib/errors';
 
 import { DM } from '../../../src/bin';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import LdapOrganization from '../../../src/plugins/ldap/organizations';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Role } from '../../../src/abstract/plugin';
 import { skipIfMissingEnvVars } from '../../helpers/env';
-import { AmbiguousIdentityError } from '../../../src/lib/errors';
 
 // Simple auth plugin for testing that sets user from X-Test-User header
 class TestAuthPlugin extends AuthBase {

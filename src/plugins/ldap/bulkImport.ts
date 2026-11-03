@@ -8,20 +8,28 @@ import type { Express, Request, Response } from 'express';
 import type { SearchResult } from 'ldapts';
 import multer from 'multer';
 import { parse as csvParse } from 'csv-parse/sync';
-
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
-import { badRequest, serverError } from '../../lib/expressFormatedResponses';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type {
+  AttributesList,
+  AttributeValue,
+} from '@ldap-rest/core/lib/ldapActions';
+import {
+  badRequest,
+  serverError,
+} from '@ldap-rest/core/lib/expressFormatedResponses';
 import {
   AUTHZ_REFUSED,
   HttpError,
   errorBody,
   isAuthzRefusal,
   type Refusal,
-} from '../../lib/errors';
-import { loadSchemaFile } from '../../lib/schemaFile';
-import { escapeDnValue, validateDnValue } from '../../lib/utils';
+} from '@ldap-rest/core/lib/errors';
+import { loadSchemaFile } from '@ldap-rest/core/lib/schemaFile';
+import { escapeDnValue, validateDnValue } from '@ldap-rest/core/lib/utils';
 
 interface BulkImportSchema {
   base?: string;

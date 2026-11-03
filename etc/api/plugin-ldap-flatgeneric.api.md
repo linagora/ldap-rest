@@ -15,20 +15,6 @@ import type { SearchResult } from 'ldapts';
 import { Server } from 'http';
 import type winston from 'winston';
 
-// @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
-interface BooleanOption extends OptionSpec<boolean> {
-    // (undocumented)
-    readonly type: 'boolean';
-}
-
 // @public
 class EntityValidator {
     constructor(schema: Schema | undefined, deps: EntityValidatorDeps);
@@ -120,18 +106,6 @@ abstract class LdapFlat extends DmPlugin {
 }
 
 // @public (undocumented)
-interface LdapFlatConfig {
-    base: string;
-    defaultAttributes?: AttributesList;
-    hookPrefix: string;
-    mainAttribute: string;
-    objectClass: string[];
-    pluralName: string;
-    schemaPath?: string;
-    singularName: string;
-}
-
-// @public (undocumented)
 class LdapFlatGeneric extends DmPlugin {
     constructor(server: DM);
     api(app: Express_2): void;
@@ -174,13 +148,5 @@ export const ldapPluginCollections: {
     modules: string[];
     collection: string;
 }[];
-
-// @public
-interface ListEntriesOptions {
-    attributes?: string[];
-    filter?: string;
-    limit?: number;
-    req?: Request_2;
-}
 
 ```

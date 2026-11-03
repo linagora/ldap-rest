@@ -16,15 +16,15 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Response } from 'express';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
 
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import Scim from '../../../src/plugins/scim/scim';
 import { DM } from '../../../src/bin';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Role } from '../../../src/abstract/plugin';
-import type { Hooks } from '../../../src/hooks';
-import type { ChangeContext } from '../../../src/lib/changeContext';
 import { waitFor } from '../../helpers/waitFor';
 
 /** Minimal auth plugin: identifies the caller from the `x-scim-user` header. */

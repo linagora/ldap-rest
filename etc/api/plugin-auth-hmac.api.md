@@ -16,14 +16,6 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 class AuthHmac extends AuthBase {
     constructor(...args: ConstructorParameters<typeof AuthBase>);
     // (undocumented)
@@ -43,15 +35,5 @@ class AuthHmac extends AuthBase {
     roles: Role[];
 }
 export default AuthHmac;
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
 
 ```

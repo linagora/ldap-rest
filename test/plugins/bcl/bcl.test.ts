@@ -14,11 +14,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { expect } from 'chai';
+import type { OidcSessionClaims } from '@ldap-rest/core/hooks';
 
 import { DM } from '../../../src/bin';
 import Bcl from '../../../src/plugins/bcl';
 import Storage from '../../../src/plugins/storage';
-import type { OidcSessionClaims } from '../../../src/hooks';
 
 describe('Back-Channel Logout, over the shared store', function () {
   let server: DM;

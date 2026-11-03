@@ -8,14 +8,13 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 import { expect } from 'chai';
-
-import type { Schema } from '../../src/config/schema';
+import type { Schema } from '@ldap-rest/core/config/schema';
 import {
   DEFAULT_MAX_LENGTH,
   matchesPattern,
   maxLengthOf,
-} from '../../src/config/schema';
-import { EntityValidator } from '../../src/lib/entitySchema/validator';
+} from '@ldap-rest/core/config/schema';
+import { EntityValidator } from '@ldap-rest/core/lib/entitySchema/validator';
 
 const schemaDir = join(__dirname, '../../static/schemas');
 

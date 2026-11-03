@@ -1,6 +1,5 @@
 import { expect } from 'chai';
-
-import { type Schema, schemaAttribute } from '../../src/config/schema';
+import { type Schema, schemaAttribute } from '@ldap-rest/core/config/schema';
 
 describe('schemaAttribute', () => {
   const schema = {

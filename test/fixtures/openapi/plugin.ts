@@ -5,9 +5,8 @@
  */
 import { Type } from '@sinclair/typebox';
 import type { Express } from 'express';
-
-import DmPlugin, { type Role } from '../../../src/abstract/plugin';
-import { defineRoute as declare } from '../../../src/lib/route';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import { defineRoute as declare } from '@ldap-rest/core/lib/route';
 
 export const ItemParams = Type.Object({
   id: Type.String({ minLength: 1, description: 'The item identifier' }),

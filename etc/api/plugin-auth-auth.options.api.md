@@ -5,26 +5,12 @@
 ```ts
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 export type AuthzOptions = OptionsOf<typeof authzOptions>;
 
 // @public (undocumented)
 export const authzOptions: {
     authz_scope_source: StringOption;
 };
-
-// @public (undocumented)
-interface BooleanOption extends OptionSpec<boolean> {
-    // (undocumented)
-    readonly type: 'boolean';
-}
 
 // @public (undocumented)
 export type CrowdsecOptions = OptionsOf<typeof crowdsecOptions>;
@@ -77,12 +63,6 @@ export const hmacOptions: {
 export function hmacOptionsOf(config: Config): HmacOptions;
 
 // @public (undocumented)
-interface JsonOption<T> extends OptionSpec<T> {
-    // (undocumented)
-    readonly type: 'json';
-}
-
-// @public (undocumented)
 export type Linid1Options = OptionsOf<typeof linid1Options>;
 
 // @public (undocumented)
@@ -101,16 +81,6 @@ export const llngOptions: {
     llng_ini: StringOption;
     llng_username_header: StringOption;
 };
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
 
 // @public (undocumented)
 export type OpenidconnectOptions = OptionsOf<typeof openidconnectOptions>;
@@ -156,13 +126,6 @@ export const rateLimitOptions: {
 
 // @public (undocumented)
 export function rateLimitOptionsOf(config: Config): RateLimitOptions;
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
 
 // @public (undocumented)
 export type TokenOptions = OptionsOf<typeof tokenOptions>;

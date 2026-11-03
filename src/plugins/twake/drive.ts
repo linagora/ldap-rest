@@ -7,11 +7,11 @@
  * @see https://docs.cozy.io/en/cozy-stack/admin/
  */
 
-import TwakePlugin from '../../abstract/twakePlugin';
-import { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { AttributeValue } from '../../lib/ldapActions';
-import { Hooks } from '../../hooks';
+import TwakePlugin from '@ldap-rest/core/abstract/twakePlugin';
+import { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { AttributeValue } from '@ldap-rest/core/lib/ldapActions';
+import { Hooks } from '@ldap-rest/core/hooks';
 
 import { driveOptions, driveOptionsOf } from './drive.options';
 
@@ -371,7 +371,7 @@ export default class Drive extends TwakePlugin {
    * Fallback logic: displayName → cn → givenName+sn
    */
   private getDisplayNameFromAttributes(
-    attributes: import('../../lib/ldapActions').AttributesList
+    attributes: import('@ldap-rest/core/lib/ldapActions').AttributesList
   ): string | null {
     // 1. Try displayName first
     const displayName = this.attributeToString(

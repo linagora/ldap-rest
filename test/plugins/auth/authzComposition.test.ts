@@ -16,18 +16,18 @@ import type { Express, Response } from 'express';
 import type winston from 'winston';
 import { expect } from 'chai';
 import supertest from 'supertest';
-
-import DmPlugin, { type Role } from '../../../src/abstract/plugin';
-import type { Hooks } from '../../../src/hooks';
-import { DM, type Config } from '../../../src/bin';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import { assertAuthzComposition } from '../../../src/lib/authz/composition';
-import { AuthzRefusedError } from '../../../src/lib/errors';
-import { asyncHandler } from '../../../src/lib/utils';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import { assertAuthzComposition } from '@ldap-rest/core/lib/authz/composition';
+import { AuthzRefusedError } from '@ldap-rest/core/lib/errors';
+import { asyncHandler } from '@ldap-rest/core/lib/utils';
 import {
   getLogger,
   setLogger,
-} from '../../../src/lib/expressFormatedResponses';
+} from '@ldap-rest/core/lib/expressFormatedResponses';
+
+import { DM, type Config } from '../../../src/bin';
 import AuthToken from '../../../src/plugins/auth/token';
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';

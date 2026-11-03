@@ -19,11 +19,14 @@
  */
 import { Buffer } from 'buffer';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import { Hooks } from '../../hooks';
-import { RabbitMqService, type RabbitMqApi } from '../../lib/services/rabbitmq';
-import type { ScimUser } from '../../lib/scim/types';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import { Hooks } from '@ldap-rest/core/hooks';
+import {
+  RabbitMqService,
+  type RabbitMqApi,
+} from '@ldap-rest/core/lib/services/rabbitmq';
+import type { ScimUser } from '@ldap-rest/core/lib/scim/types';
 
 import { cozyOptions, cozyOptionsOf } from './cozy.options';
 

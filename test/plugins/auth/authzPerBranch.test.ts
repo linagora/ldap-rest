@@ -1,13 +1,13 @@
 import { expect } from 'chai';
 import type { Response } from 'express';
 import supertest from 'supertest';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
+import type { ModifyRequest } from '@ldap-rest/core/lib/ldapActions';
 
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { DM } from '../../../src/bin';
 import LdapOrganization from '../../../src/plugins/ldap/organizations';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Role } from '../../../src/abstract/plugin';
-import type { ModifyRequest } from '../../../src/lib/ldapActions';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

@@ -65,7 +65,7 @@ API, which a minor or a patch release does not break:
   `ServiceProvider`, `asyncHandler`, the DN and filter escaping helpers and
   the error classes —, the `DM` type of `ldap-rest` and the
   `Hooks` of `ldap-rest/hooks`, whose arguments are those typed in
-  `src/hooks.ts` ([hooks](plugin-development/hooks.md)), and the directory
+  `packages/core/src/hooks.ts` ([hooks](plugin-development/hooks.md)), and the directory
   operations of [the development guide](plugin-development/README.md):
   `ldap.search`, `add`, `modify`, `rename`, `delete`, `ldap.forRequest`,
   `ldap.system`, `ldap.authorize`, `ldap.readableBy`,

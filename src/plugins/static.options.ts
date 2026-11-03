@@ -2,13 +2,13 @@
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-import type { Config } from '../config/args';
+import type { Config } from '@ldap-rest/core/config/args';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../config/options';
+} from '@ldap-rest/core/config/options';
 
 /** The headers `core/static` sends unless told otherwise: no framing by another site */
 export const STATIC_CSP = "frame-ancestors 'self'";

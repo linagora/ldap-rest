@@ -13,15 +13,6 @@ import type { Response as Response_2 } from 'express';
 export function extractLdapCode(err: unknown): number | undefined;
 
 // @public
-class HttpError extends Error {
-    constructor(message: string, statusCode?: number, refusal?: Refusal | undefined);
-    // (undocumented)
-    refusal?: Refusal | undefined;
-    // (undocumented)
-    statusCode: number;
-}
-
-// @public
 export const kindOf: (v: unknown) => string;
 
 // @public (undocumented)

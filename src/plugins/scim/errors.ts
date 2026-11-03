@@ -5,4 +5,4 @@
  * Re-export of the SCIM errors, moved to `lib/scim/errors` so shared code
  * can use them without importing a plugin.
  */
-export * from '../../lib/scim/errors';
+export * from '@ldap-rest/core/lib/scim/errors';

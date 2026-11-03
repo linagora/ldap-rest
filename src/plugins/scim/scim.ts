@@ -11,29 +11,34 @@ import { dirname, join } from 'path';
 
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, RequestHandler } from 'express';
-
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type ldapActions from '../../lib/ldapActions';
-import type { DmRequest } from '../../lib/auth/base';
-import { setChangeSource } from '../../lib/changeContext';
-import { jsonBodyParser } from '../../lib/rawBody';
-import { ScimService } from '../../lib/services/scim';
-import { staticPlugins } from '../../lib/staticFiles';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type ldapActions from '@ldap-rest/core/lib/ldapActions';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import { setChangeSource } from '@ldap-rest/core/lib/changeContext';
+import { jsonBodyParser } from '@ldap-rest/core/lib/rawBody';
+import { ScimService } from '@ldap-rest/core/lib/services/scim';
+import { staticPlugins } from '@ldap-rest/core/lib/staticFiles';
 import {
   type BulkRequest,
   type PatchRequest,
   type ScimGroup,
   type ScimUser,
-} from '../../lib/scim/types';
-import { scimOptions, type ScimOptions } from '../../lib/scim/options';
-import { BaseResolver } from '../../lib/scim/baseResolver';
+} from '@ldap-rest/core/lib/scim/types';
+import {
+  scimOptions,
+  type ScimOptions,
+} from '@ldap-rest/core/lib/scim/options';
+import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
 import {
   scimAsyncHandler,
   writeScimError,
   writeScimErrorFromException,
   SCIM_CONTENT_TYPE,
-} from '../../lib/scim/errors';
+} from '@ldap-rest/core/lib/scim/errors';
 
 import { ScimUsers } from './users';
 import { ScimGroups } from './groups';

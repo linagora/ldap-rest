@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import type { Schema } from '@ldap-rest/core/config/schema';
 
 import {
   auditEntry,
@@ -8,7 +9,6 @@ import {
   schemaConfig,
   type Finding,
 } from '../../scripts/audit-directory';
-import type { Schema } from '../../src/config/schema';
 
 /** Capture what the report writes, so its wording can be asserted. */
 function capture(run: () => boolean): { clean: boolean; output: string } {

@@ -6,11 +6,13 @@
  * Grants permissions to users referenced in organization's twakeLocalAdminLink
  * @group Plugins
  */
-import type { DM } from '../../bin';
-import type { SearchResult } from '../../lib/ldapActions';
-import type { BranchPermissions } from '../../config/args';
-import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base';
-import { escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+import type { DM } from '@ldap-rest/core';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
+import type { BranchPermissions } from '@ldap-rest/core/config/args';
+import AuthzBase, {
+  mostSpecificBranchRule,
+} from '@ldap-rest/core/lib/authz/base';
+import { escapeLdapFilter, isDnInBranch } from '@ldap-rest/core/lib/utils';
 
 interface CachedPermissions {
   branches: Map<string, BranchPermissions>;

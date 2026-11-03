@@ -5,8 +5,11 @@
  * way of splitting a run of escapes.
  */
 import { expect } from 'chai';
-
-import { assertedRdnValue, namesByDn, rdnValue } from '../../src/lib/utils';
+import {
+  assertedRdnValue,
+  namesByDn,
+  rdnValue,
+} from '@ldap-rest/core/lib/utils';
 
 const B = String.fromCharCode(92);
 const base = 'ou=users,dc=example,dc=com';

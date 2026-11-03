@@ -16,16 +16,6 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
 class Storage_2 extends DmPlugin {
     constructor(server: DM);
     // (undocumented)
@@ -52,18 +42,5 @@ class Storage_2 extends DmPlugin {
     store: Store;
 }
 export default Storage_2;
-
-// @public (undocumented)
-interface StorageApi {
-    // (undocumented)
-    readonly store: Store;
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
 
 ```

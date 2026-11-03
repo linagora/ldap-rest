@@ -1,11 +1,11 @@
 /** Metrics plugin options, see `docs/plugin-development/options.md`. */
-import type { Config } from '../config/args';
+import type { Config } from '@ldap-rest/core/config/args';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../config/options';
+} from '@ldap-rest/core/config/options';
 
 export const metricsOptions = defineOptions({
   metrics_port: opt.number({ env: 'DM_METRICS_PORT', default: 9464 }),

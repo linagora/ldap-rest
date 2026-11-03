@@ -2,12 +2,12 @@ import { expect } from 'chai';
 import type { Response } from 'express';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
 
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { DM } from '../../../src/bin';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Role } from '../../../src/abstract/plugin';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

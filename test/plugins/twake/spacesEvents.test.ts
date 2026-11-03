@@ -1,15 +1,15 @@
 import { expect } from 'chai';
 import type { Request } from 'express';
 import supertest from 'supertest';
+import { TrashService } from '@ldap-rest/core/lib/services/trash';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
 import { DM } from '../../../src/bin';
-import { TrashService } from '../../../src/lib/services/trash';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TrashPlugin from '../../../src/plugins/ldap/trash';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
 import { waitFor } from '../../helpers/waitFor';
-import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
 
 const ORGS = `ou=tse-orgs,${process.env.DM_LDAP_BASE}`;
 const orgDn = `ou=acme,${ORGS}`;

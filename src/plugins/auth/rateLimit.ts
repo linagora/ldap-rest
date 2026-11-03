@@ -13,8 +13,7 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Express, Request, Response, NextFunction } from 'express';
-
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 
 import { rateLimitOptions } from './auth.options';
 

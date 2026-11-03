@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 /**
- * Check `docs/plugin-development/hooks.md` against `src/hooks.ts`: every
+ * Check `docs/plugin-development/hooks.md` against
+ * `packages/core/src/hooks.ts`: every
  * hook the interface names is documented, and the document names nothing
  * else.
  *
@@ -15,11 +16,11 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const HOOKS = path.join(root, 'src', 'hooks.ts');
+const HOOKS = path.join(root, 'packages', 'core', 'src', 'hooks.ts');
 const DOC = path.join(root, 'docs', 'plugin-development', 'hooks.md');
 
 const BEGIN =
-  '<!-- hooks: generated from src/hooks.ts, do not edit by hand -->';
+  '<!-- hooks: generated from packages/core/src/hooks.ts, do not edit by hand -->';
 const END = '<!-- /hooks -->';
 
 /**
@@ -29,7 +30,7 @@ const END = '<!-- /hooks -->';
  * share a line with another or with a nested type the text would mistake
  * for it.
  *
- * @param source `src/hooks.ts`
+ * @param source `packages/core/src/hooks.ts`
  * @returns their names
  */
 export function declaredHooks(source: string): string[] {
@@ -38,7 +39,8 @@ export function declaredHooks(source: string): string[] {
     (statement): statement is ts.InterfaceDeclaration =>
       ts.isInterfaceDeclaration(statement) && statement.name.text === 'Hooks'
   );
-  if (!declaration) throw new Error('src/hooks.ts declares no Hooks interface');
+  if (!declaration)
+    throw new Error('packages/core/src/hooks.ts declares no Hooks interface');
   const names: string[] = [];
   for (const member of declaration.members) {
     if (member.name && ts.isIdentifier(member.name))
@@ -88,7 +90,7 @@ export function block(doc: string): {
 /**
  * What differs between the hooks declared and the ones the document lists.
  *
- * @param source `src/hooks.ts`
+ * @param source `packages/core/src/hooks.ts`
  * @param doc the document
  * @returns the missing and the unknown names, each sorted
  */
@@ -109,7 +111,7 @@ export function differences(
 /**
  * The document with the entries of hooks it no longer declares dropped.
  *
- * @param source `src/hooks.ts`
+ * @param source `packages/core/src/hooks.ts`
  * @param doc the document
  * @returns the document, every other entry kept where it was
  */
@@ -135,7 +137,9 @@ function main(): void {
   if (missing.length > 0)
     console.error(`Not documented: ${missing.join(', ')}`);
   if (unknown.length > 0)
-    console.error(`Not declared in src/hooks.ts: ${unknown.join(', ')}`);
+    console.error(
+      `Not declared in packages/core/src/hooks.ts: ${unknown.join(', ')}`
+    );
   process.exitCode = 1;
 }
 

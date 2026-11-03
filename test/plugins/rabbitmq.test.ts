@@ -1,14 +1,14 @@
 import { expect } from 'chai';
 import Transport from 'winston-transport';
-
-import { DM } from '../../src/bin';
-import RabbitMq from '../../src/plugins/rabbitmq';
 import {
   currentLogContext,
   runWithLogContext,
-} from '../../src/lib/requestContext';
-import { providedService } from '../../src/lib/services';
-import { RabbitMqService } from '../../src/lib/services/rabbitmq';
+} from '@ldap-rest/core/lib/requestContext';
+import { providedService } from '@ldap-rest/core/lib/services';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+
+import RabbitMq from '../../src/plugins/rabbitmq';
+import { DM } from '../../src/bin';
 
 interface PublishCall {
   exchange: string;

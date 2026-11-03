@@ -7,29 +7,6 @@
 // @public
 export function applyPatchToResource<T extends Record<string, unknown>>(resource: T, patch: PatchRequest): T;
 
-// @public
-interface MappingEntry {
-    // (undocumented)
-    converter?: 'boolean' | 'number' | 'string';
-    // (undocumented)
-    ldap?: string;
-    // (undocumented)
-    ldapPrimary?: string;
-    // (undocumented)
-    ldapSecondary?: string;
-    // (undocumented)
-    multi?: 'single' | 'array';
-    // (undocumented)
-    operational?: boolean;
-    // (undocumented)
-    readOnly?: boolean;
-    // (undocumented)
-    scim: string;
-    // (undocumented)
-    sub?: Record<string, string>;
-    subDn?: string[];
-}
-
 // @public (undocumented)
 export interface PatchContext {
     current: AttributesList;
@@ -44,35 +21,7 @@ export interface PatchContext {
 }
 
 // @public (undocumented)
-interface PatchOperation {
-    // (undocumented)
-    op: 'add' | 'remove' | 'replace' | 'Add' | 'Remove' | 'Replace';
-    // (undocumented)
-    path?: string;
-    // (undocumented)
-    value?: unknown;
-}
-
-// @public (undocumented)
-interface PatchRequest {
-    // (undocumented)
-    Operations: PatchOperation[];
-    // (undocumented)
-    schemas: string[];
-}
-
-// @public (undocumented)
 export function patchToModifyRequest(patch: PatchRequest, ctx: PatchContext): Promise<ModifyRequest>;
-
-// @public (undocumented)
-interface ResourceMapping {
-    // (undocumented)
-    entries: MappingEntry[];
-    // (undocumented)
-    resourceType: 'User' | 'Group';
-    // (undocumented)
-    schemas: string[];
-}
 
 // @public
 export function writePatch(dn: string, attempt: () => Promise<void>): Promise<void>;

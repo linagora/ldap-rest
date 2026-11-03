@@ -8,17 +8,23 @@ import { randomInt } from 'crypto';
 
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
-
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { SearchResult } from '../../lib/ldapActions';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import {
   AUTHZ_REFUSED,
   HttpError,
   errorBody,
   isAuthzRefusal,
-} from '../../lib/errors';
-import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+} from '@ldap-rest/core/lib/errors';
+import {
+  escapeDnValue,
+  escapeLdapFilter,
+  isDnInBranch,
+} from '@ldap-rest/core/lib/utils';
 
 import {
   appAccountsOptions,

@@ -10,26 +10,27 @@ roadmap; this page describes the code as it is.
 
 ## Module map
 
-| Path                   | Role                                                                                                                                                                                                                   |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/bin/index.ts`     | `DM`: the Express app, plugin loading, the authentication dispatcher, `ready` and `stop`, `withConfig`                                                                                                                 |
-| `src/bin/options.ts`   | The complete option set: the core options plus every plugin family's declarations; the one composition root the umbrella keeps                                                                                         |
-| `src/config/`          | Core command-line and environment options (`args.ts`), option specs (`options.ts`), plugin load order (`priority.json`), the entity-schema model (`schema.ts`; the directory's own schema is `src/lib/ldap/schema.ts`) |
-| `src/abstract/`        | `DmPlugin` base class; `LdapFlat`, the entity CRUD built on it; `TwakePlugin`                                                                                                                                          |
-| `src/hooks.ts`         | The hook type map: one entry per hook, with its arguments and its answer                                                                                                                                               |
-| `src/lib/`             | Core services: `ldapActions` and `lib/ldap/` (pool, search cache, schema), `lib/auth/`, `lib/authz/`, `lib/services/`, `lib/storage/`, `hookBus`, `requestContext`, errors, routes                                     |
-| `src/plugins/auth/`    | Authentication plugins, authorization plugins, and the guards that sit before them                                                                                                                                     |
-| `src/plugins/ldap/`    | Directory plugins: groups, organizations, entities, change detection, trash, password policy                                                                                                                           |
-| `src/plugins/scim/`    | The SCIM 2.0 API                                                                                                                                                                                                       |
-| `src/plugins/storage/` | Storage backends (`file`, `ldap`, `postgres`, `valkey`), each a `Store`                                                                                                                                                |
-| `src/plugins/twake/`   | Twake integrations: mail, calendar, spaces, drives, tombstones, lifecycle events                                                                                                                                       |
-| `src/plugins/*.ts`     | Standalone plugins: `storage` (`core/storage`, over the backends above), `static`, `weblogs`, `configApi`, `metrics`, `bcl`, and `rabbitmq` (a shared broker connection, not a store)                                  |
-| `src/plugins/demo/`    | Example plugins                                                                                                                                                                                                        |
-| `src/browser/`         | Browser libraries shipped with the package                                                                                                                                                                             |
-| `src/logger/`          | Log formatting and levels                                                                                                                                                                                              |
-| `src/types/`           | Shared TypeScript declarations                                                                                                                                                                                         |
+| Path                             | Role                                                                                                                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/core/src/bin/index.ts` | `DM`: the Express app, plugin loading, the authentication dispatcher, `ready` and `stop`, `withConfig`                                                                                                                               |
+| `src/bin/index.ts`               | The umbrella `DM`: the core server with the full option set and the plugin tree beside it                                                                                                                                            |
+| `src/options.ts`                 | The complete option set: the core options plus every plugin family's declarations; the one composition root the umbrella keeps                                                                                                       |
+| `packages/core/src/config/`      | Core command-line and environment options (`args.ts`), option specs (`options.ts`), plugin load order (`priority.json`), the entity-schema model (`schema.ts`; the directory's own schema is `packages/core/src/lib/ldap/schema.ts`) |
+| `packages/core/src/abstract/`    | `DmPlugin` base class; `LdapFlat`, the entity CRUD built on it; `TwakePlugin`                                                                                                                                                        |
+| `packages/core/src/hooks.ts`     | The hook type map: one entry per hook, with its arguments and its answer                                                                                                                                                             |
+| `packages/core/src/lib/`         | Core services: `ldapActions` and `lib/ldap/` (pool, search cache, schema), `lib/auth/`, `lib/authz/`, `lib/services/`, `lib/storage/`, `hookBus`, `requestContext`, errors, routes                                                   |
+| `src/plugins/auth/`              | Authentication plugins, authorization plugins, and the guards that sit before them                                                                                                                                                   |
+| `src/plugins/ldap/`              | Directory plugins: groups, organizations, entities, change detection, trash, password policy                                                                                                                                         |
+| `src/plugins/scim/`              | The SCIM 2.0 API                                                                                                                                                                                                                     |
+| `src/plugins/storage/`           | Storage backends (`file`, `ldap`, `postgres`, `valkey`), each a `Store`                                                                                                                                                              |
+| `src/plugins/twake/`             | Twake integrations: mail, calendar, spaces, drives, tombstones, lifecycle events                                                                                                                                                     |
+| `src/plugins/*.ts`               | Standalone plugins: `storage` (`core/storage`, over the backends above), `static`, `weblogs`, `configApi`, `metrics`, `bcl`, and `rabbitmq` (a shared broker connection, not a store)                                                |
+| `src/plugins/demo/`              | Example plugins                                                                                                                                                                                                                      |
+| `src/browser/`                   | Browser libraries shipped with the package                                                                                                                                                                                           |
+| `packages/core/src/logger/`      | Log formatting and levels                                                                                                                                                                                                            |
+| `packages/core/src/types/`       | Shared TypeScript declarations                                                                                                                                                                                                       |
 
-The plugin families depend on `src/lib/` and on each other as documented in
+The plugin families depend on `packages/core/src/lib/` and on each other as documented in
 [dependencies](../plugin-development/dependencies.md). The dependency rules
 that the modularization will enforce are in the
 [plan](../development/modularization-plan.md#target-architecture).
@@ -143,7 +144,7 @@ sequenceDiagram
 ## Startup
 
 The configuration is parsed from the command line and `DM_*` variables, then
-`DM` loads the plugins: `src/config/priority.json` first, one at a time in
+`DM` loads the plugins: `packages/core/src/config/priority.json` first, one at a time in
 its order, then the rest in parallel. Once every load settled, the server
 checks the authorization composition, learns the directory's attribute types
 when an authorization plugin is loaded, reports unknown options and runs

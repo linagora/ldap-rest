@@ -14,7 +14,8 @@ See [abstract class](../abstract/plugin.ts) for more
 - A plugin is a class with optional **api** methods and/or **hooks** property.
 - It should also have a uniq property "**name**" _(which can be overridden, example: `npx ldap-rest --plugin core/hello:myhello`)_.
 - It should use the `this.config.api_prefix` else it can't be loaded more than one time.
-- It may inherit from [plugin abstract class](../abstract/plugin.ts).
+- It may inherit from [plugin abstract class](../abstract/plugin.ts), which
+  lives in `@ldap-rest/core` and is re-exported by `ldap-rest/plugin`.
 - Its constructor receives one argument _(the server)_ which exposes
   - hooks: an object `{ [K in keyof Hooks]?: Function[] }` where plugin
     can find functions to launch if it exposes hooks
@@ -29,10 +30,14 @@ See [abstract class](../abstract/plugin.ts) for more
 
 #### Simple
 
+`DmPlugin` and `Hooks` live in `@ldap-rest/core`; import them through
+`ldap-rest/plugin` and `ldap-rest/hooks`, the sub-paths a plugin package can
+reach.
+
 ```typescript
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin from '../abstract/plugin';
+import DmPlugin from 'ldap-rest/plugin';
 
 export default class HelloWorld extends DmPlugin {
   name = 'hello';
@@ -52,7 +57,7 @@ Note that exposed hooks has to be documented into [HOOKS](../../HOOKS.md)
 ```typescript
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin from '../abstract/plugin';
+import DmPlugin from 'ldap-rest/plugin';
 
 export default class HelloWorld extends DmPlugin {
   name = 'hello';
@@ -79,9 +84,9 @@ consumes hooks named 'hello' and want functions that return strings and receive 
 ```typescript
 import type { Express, Request, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
-import type { Hooks } from '../hooks.ts'; // also exported by this module, see package.json
+import type { Hooks } from 'ldap-rest/hooks';
 
-import DmPlugin from '../abstract/plugin';
+import DmPlugin from 'ldap-rest/plugin';
 
 export default class HelloWorld extends DmPlugin {
   name = 'hello';

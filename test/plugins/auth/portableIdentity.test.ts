@@ -14,16 +14,16 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Express, Request, Response } from 'express';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
 
 import { DM } from '../../../src/bin';
-import DmPlugin, { type Role } from '../../../src/abstract/plugin';
 import AuthToken from '../../../src/plugins/auth/token';
 import AuthTotp from '../../../src/plugins/auth/totp';
 import AuthHmac from '../../../src/plugins/auth/hmac';
 import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
 import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
-import type { DmRequest } from '../../../src/lib/auth/base';
-import { BaseResolver } from '../../../src/lib/scim/baseResolver';
 
 /** Reports what the authenticators left on the request */
 class Probe extends DmPlugin {

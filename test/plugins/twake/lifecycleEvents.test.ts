@@ -5,6 +5,8 @@ import path from 'node:path';
 import { expect } from 'chai';
 import type { Request } from 'express';
 import supertest from 'supertest';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+import { ScimService } from '@ldap-rest/core/lib/services/scim';
 
 import { DM } from '../../../src/bin';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
@@ -17,8 +19,6 @@ import {
   parseDeletedAt,
 } from '../../../src/plugins/twake/lifecycleAttributes';
 import { waitFor } from '../../helpers/waitFor';
-import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
-import { ScimService } from '../../../src/lib/services/scim';
 
 const BASE = `ou=users,${process.env.DM_LDAP_BASE}`;
 const GROUPS = `ou=groups,${process.env.DM_LDAP_BASE}`;

@@ -96,6 +96,14 @@ describe('My Feature', () => {
 });
 ```
 
+### Core modules
+
+`test/setup.ts` imports the umbrella options, so the core has its shipped
+schema directory and server version before any test runs. Import core modules
+statically: the runner loads TypeScript through `tsx/cjs`, and a dynamic
+`import()` of a core module goes through the ESM loader instead, which yields a
+second instance with the core's own defaults.
+
 ### Test with Direct LDAP Access
 
 ```typescript

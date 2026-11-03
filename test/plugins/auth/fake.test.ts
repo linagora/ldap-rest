@@ -1,11 +1,11 @@
 import type { Express, Response } from 'express';
 import request from 'supertest';
 import { expect } from 'chai';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 
 import { DM } from '../../../src/bin';
 import AuthFake from '../../../src/plugins/auth/fake';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
-import type { DmRequest } from '../../../src/lib/auth/base';
 
 describe('AuthFake', () => {
   let savedUser: string | undefined;

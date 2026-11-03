@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-/** `start` and the three directories above it */
-const SEARCH_DEPTH = 4;
+/** `start` and the four directories above it */
+const SEARCH_DEPTH = 5;
 
 /**
  * The version of this package, read from the `package.json` that ships with
@@ -42,4 +42,12 @@ export function readVersion(
 }
 
 /** The server's version, as its package declares it */
-export const SERVER_VERSION: string | undefined = readVersion();
+export let SERVER_VERSION: string | undefined = readVersion();
+
+/**
+ * Set the version the umbrella declares. The core's own package.json is not
+ * the server's once both are installed.
+ */
+export function setServerVersion(version: string | undefined): void {
+  SERVER_VERSION = version;
+}

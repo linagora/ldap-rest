@@ -6,8 +6,7 @@
  * docs/client-development/schemas/README.md#extending-a-schema
  */
 import fs from 'fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { dirname, isAbsolute, relative, resolve } from 'path';
 
 import type { Config } from '../bin';
 
@@ -15,13 +14,16 @@ import type { ConfigTemplate } from './parseConfig';
 import { transformSchemas } from './utils';
 
 /** Directory of the schemas shipped with LDAP-Rest, whatever --schemas-path says */
-export const shippedSchemasPath = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  'static',
-  'schemas'
-);
+export let shippedSchemasPath = '';
+
+/**
+ * Point `ldap-rest:` `extends` at the host's shipped schemas. The core cannot
+ * know where its umbrella keeps them once both are installed under
+ * `node_modules`.
+ */
+export function setShippedSchemasPath(path: string): void {
+  shippedSchemasPath = path;
+}
 
 /** Prefix of an `extends` naming a shipped schema, as `ldap-rest:twake/users.json` */
 export const SHIPPED_SCHEMA_PREFIX = 'ldap-rest:';
@@ -80,6 +82,10 @@ export function mergeSchema(base: unknown, patch: unknown): unknown {
 export function resolveSchemaBase(file: string, base: string): string {
   if (!base.startsWith(SHIPPED_SCHEMA_PREFIX))
     return resolve(dirname(file), base);
+  if (!shippedSchemasPath)
+    throw new Error(
+      `${file}: "${base}" names a shipped schema but no schema directory is configured`
+    );
   const path = resolve(
     shippedSchemasPath,
     base.slice(SHIPPED_SCHEMA_PREFIX.length)

@@ -1,9 +1,8 @@
 import type { Express, Request, Response } from 'express';
-
-import DmPlugin, { type Role } from '../abstract/plugin';
-import { DmRequest } from '../lib/auth/base';
-import { requestId } from '../lib/changeContext';
-import { runWithLogContext } from '../lib/requestContext';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import { requestId } from '@ldap-rest/core/lib/changeContext';
+import { runWithLogContext } from '@ldap-rest/core/lib/requestContext';
 
 // Extend Express Request so any plugin can enrich the access log line.
 // A handler sets `req.logDetails = { … }` (usually the parameters it received)

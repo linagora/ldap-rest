@@ -2,13 +2,13 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import { SearchResult } from 'ldapts';
 import type { Response } from 'express';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
+import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
+import type { Hooks } from '@ldap-rest/core/hooks';
 
-import { DM } from '../../../src/bin';
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Role } from '../../../src/abstract/plugin';
-import type { ChangeContext } from '../../../src/lib/changeContext';
-import type { Hooks } from '../../../src/hooks';
+import { DM } from '../../../src/bin';
 import { waitFor } from '../../helpers/waitFor';
 
 const { DM_LDAP_GROUP_BASE } = process.env;

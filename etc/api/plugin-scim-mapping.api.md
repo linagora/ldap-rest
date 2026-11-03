@@ -60,29 +60,6 @@ export interface MappingContext {
 }
 
 // @public
-interface MappingEntry {
-    // (undocumented)
-    converter?: 'boolean' | 'number' | 'string';
-    // (undocumented)
-    ldap?: string;
-    // (undocumented)
-    ldapPrimary?: string;
-    // (undocumented)
-    ldapSecondary?: string;
-    // (undocumented)
-    multi?: 'single' | 'array';
-    // (undocumented)
-    operational?: boolean;
-    // (undocumented)
-    readOnly?: boolean;
-    // (undocumented)
-    scim: string;
-    // (undocumented)
-    sub?: Record<string, string>;
-    subDn?: string[];
-}
-
-// @public
 export function mergeMapping(base: ResourceMapping, override?: ResourceMapping): ResourceMapping;
 
 // @public
@@ -102,16 +79,6 @@ export function resolveLockConfig(attribute: string, value: string, options?: {
 
 // @public
 export function resolveScimId(entry: AttributesList, ctx: MappingContext): string | undefined;
-
-// @public (undocumented)
-interface ResourceMapping {
-    // (undocumented)
-    entries: MappingEntry[];
-    // (undocumented)
-    resourceType: 'User' | 'Group';
-    // (undocumented)
-    schemas: string[];
-}
 
 // @public
 export function scimGroupToLdap(group: ScimGroup, mapping: ResourceMapping, objectClass: string[]): {

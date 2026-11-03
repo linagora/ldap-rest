@@ -16,10 +16,9 @@
 import { AsyncResource } from 'node:async_hooks';
 
 import type winston from 'winston';
-
-import Store, { type StoredRecord } from '../../lib/storage/store';
-import type { HealthStatus } from '../../lib/health';
-import { outsideAnyRequest } from '../../lib/requestContext';
+import Store, { type StoredRecord } from '@ldap-rest/core/lib/storage/store';
+import type { HealthStatus } from '@ldap-rest/core/lib/health';
+import { outsideAnyRequest } from '@ldap-rest/core/lib/requestContext';
 
 type IoValkey = typeof import('iovalkey');
 type Client = InstanceType<IoValkey['Valkey']>;

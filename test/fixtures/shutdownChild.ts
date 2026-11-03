@@ -6,7 +6,7 @@
 import {
   registerProcessShutdown,
   shutdownTimeout,
-} from '../../src/lib/shutdown';
+} from '@ldap-rest/core/lib/shutdown';
 
 const mode = process.argv[2] ?? 'closes';
 const say = (what: string): void => {

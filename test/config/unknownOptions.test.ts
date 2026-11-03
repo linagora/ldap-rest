@@ -1,13 +1,16 @@
 import { expect } from 'chai';
-
-import { ConfigParser, type ConfigEntry } from '../../src/lib/parseConfig';
-import configArgs from '../../src/bin/options';
+import {
+  ConfigParser,
+  type ConfigEntry,
+} from '@ldap-rest/core/lib/parseConfig';
 import {
   defineOptions,
   opt,
   readOptions,
   unknownEnvironmentOptions,
-} from '../../src/config/options';
+} from '@ldap-rest/core/config/options';
+
+import configArgs from '../../src/bin/options';
 import { DM } from '../../src/bin';
 
 describe('unknown options', () => {

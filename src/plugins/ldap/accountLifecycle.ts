@@ -30,12 +30,17 @@ import { randomBytes } from 'crypto';
 
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
-
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { Schema } from '../../config/schema';
-import { roleAttribute } from '../../config/schema';
-import type { AttributesList, ModifyRequest } from '../../lib/ldapActions';
-import { BadRequestError, NotFoundError } from '../../lib/errors';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import type { Schema } from '@ldap-rest/core/config/schema';
+import { roleAttribute } from '@ldap-rest/core/config/schema';
+import type {
+  AttributesList,
+  ModifyRequest,
+} from '@ldap-rest/core/lib/ldapActions';
+import { BadRequestError, NotFoundError } from '@ldap-rest/core/lib/errors';
 
 export const StatusBody = Type.Object({ state: Type.String() });
 

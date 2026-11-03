@@ -16,14 +16,6 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 class BaseResolver {
     constructor(config: Config, options?: ScimOptions);
     // (undocumented)
@@ -34,12 +26,6 @@ class BaseResolver {
     userBase(req?: DmRequest | {
         user?: string;
     }): string;
-}
-
-// @public (undocumented)
-interface BooleanOption extends OptionSpec<boolean> {
-    // (undocumented)
-    readonly type: 'boolean';
 }
 
 // @public (undocumented)
@@ -73,84 +59,6 @@ interface ListQuery {
     // (undocumented)
     startIndex?: number;
 }
-
-// @public (undocumented)
-interface ListResponse<T> {
-    // (undocumented)
-    itemsPerPage: number;
-    // (undocumented)
-    Resources: T[];
-    // (undocumented)
-    schemas: [typeof SCHEMA_LIST_RESPONSE];
-    // (undocumented)
-    startIndex: number;
-    // (undocumented)
-    totalResults: number;
-}
-
-// @public
-interface MappingEntry {
-    // (undocumented)
-    converter?: 'boolean' | 'number' | 'string';
-    // (undocumented)
-    ldap?: string;
-    // (undocumented)
-    ldapPrimary?: string;
-    // (undocumented)
-    ldapSecondary?: string;
-    // (undocumented)
-    multi?: 'single' | 'array';
-    // (undocumented)
-    operational?: boolean;
-    // (undocumented)
-    readOnly?: boolean;
-    // (undocumented)
-    scim: string;
-    // (undocumented)
-    sub?: Record<string, string>;
-    subDn?: string[];
-}
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
-interface PatchOperation {
-    // (undocumented)
-    op: 'add' | 'remove' | 'replace' | 'Add' | 'Remove' | 'Replace';
-    // (undocumented)
-    path?: string;
-    // (undocumented)
-    value?: unknown;
-}
-
-// @public (undocumented)
-interface PatchRequest {
-    // (undocumented)
-    Operations: PatchOperation[];
-    // (undocumented)
-    schemas: string[];
-}
-
-// @public (undocumented)
-interface ResourceMapping {
-    // (undocumented)
-    entries: MappingEntry[];
-    // (undocumented)
-    resourceType: 'User' | 'Group';
-    // (undocumented)
-    schemas: string[];
-}
-
-// @public (undocumented)
-const SCHEMA_LIST_RESPONSE = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
 
 // @public (undocumented)
 export class ScimGroups {
@@ -254,13 +162,6 @@ interface ScimUsersOptions {
     logger: winston.Logger;
     // (undocumented)
     options: ScimOptions;
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
 }
 
 ```

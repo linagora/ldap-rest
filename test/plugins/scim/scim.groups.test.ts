@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { Hooks } from '@ldap-rest/core/hooks';
 
-import type { Hooks } from '../../../src/hooks';
 import Scim from '../../../src/plugins/scim/scim';
 import { DM } from '../../../src/bin';
 

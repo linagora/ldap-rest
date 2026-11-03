@@ -2,13 +2,13 @@
  * Authentication and authorization plugin options, see
  * `docs/plugin-development/options.md`.
  */
-import type { AuthConfig, Config } from '../../config/args';
+import type { AuthConfig, Config } from '@ldap-rest/core/config/args';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../../config/options';
+} from '@ldap-rest/core/config/options';
 
 export const authzOptions = defineOptions({
   // The branch-level plugin `authzScope` describes a caller with, when more

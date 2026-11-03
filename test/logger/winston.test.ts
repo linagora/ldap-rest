@@ -4,10 +4,12 @@ import path from 'path';
 
 import { expect } from 'chai';
 import winston from 'winston';
-
-import { buildLogger } from '../../src/logger/winston';
-import { runAsPlugin, runWithLogContext } from '../../src/lib/requestContext';
-import type { Config } from '../../src/bin';
+import { buildLogger } from '@ldap-rest/core/logger/winston';
+import {
+  runAsPlugin,
+  runWithLogContext,
+} from '@ldap-rest/core/lib/requestContext';
+import type { Config } from '@ldap-rest/core';
 
 const config = (over: Partial<Config>): Config =>
   ({

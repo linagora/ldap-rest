@@ -3,7 +3,7 @@
  * @module test/helpers/waitFor
  */
 
-import type { DM } from '../../src/bin';
+import type { DM } from '@ldap-rest/core';
 
 /**
  * Poll a condition until it holds.

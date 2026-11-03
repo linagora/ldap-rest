@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import type { Request } from 'express';
 import supertest from 'supertest';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
 import { DM } from '../../../src/bin';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
@@ -8,7 +9,6 @@ import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
 import TwakeTombstone from '../../../src/plugins/twake/tombstone';
 import { waitFor } from '../../helpers/waitFor';
-import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
 
 const ORGS = `ou=tsl-orgs,${process.env.DM_LDAP_BASE}`;
 const orgDn = `ou=acme,${ORGS}`;

@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-
 import {
   parseAttributeType,
   parseObjectClass,
@@ -7,7 +6,7 @@ import {
   parseMatchingRule,
   parseSchema,
   SchemaIndex,
-} from '../../src/lib/ldapSchema';
+} from '@ldap-rest/core/lib/ldapSchema';
 
 describe('LDAP schema parser', () => {
   describe('parseAttributeType', () => {

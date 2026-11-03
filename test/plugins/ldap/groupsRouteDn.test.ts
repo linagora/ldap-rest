@@ -9,10 +9,10 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import { isDnSyntax } from '@ldap-rest/core/lib/utils';
 
 import { DM } from '../../../src/bin';
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import { isDnSyntax } from '../../../src/lib/utils';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Group routes and the DN they are given', function () {

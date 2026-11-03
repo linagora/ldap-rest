@@ -5,13 +5,17 @@
  * Creates on-the-fly missing group users into a branch
  * This permits to add external users into mailing lists
  */
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import { Hooks } from '../../hooks';
-import { HttpError } from '../../lib/errors';
-import ldapActions, { AttributesList } from '../../lib/ldapActions';
-import { declaredMailDomains } from '../../lib/mailDomains';
-import { normalizeDn, parseDn, unescapeDnValue } from '../../lib/utils';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import { Hooks } from '@ldap-rest/core/hooks';
+import { HttpError } from '@ldap-rest/core/lib/errors';
+import ldapActions, { AttributesList } from '@ldap-rest/core/lib/ldapActions';
+import { declaredMailDomains } from '@ldap-rest/core/lib/mailDomains';
+import {
+  normalizeDn,
+  parseDn,
+  unescapeDnValue,
+} from '@ldap-rest/core/lib/utils';
 
 /**
  * The domain of an address, as the managed domains are compared: after its

@@ -6,14 +6,14 @@
  * class of vulnerability is back.
  */
 import { expect } from 'chai';
+import { DEFAULT_USER_MAPPING } from '@ldap-rest/core/lib/scim/mapping';
+import { ScimError } from '@ldap-rest/core/lib/scim/errors';
 
 import {
   patchToModifyRequest,
   applyPatchToResource,
 } from '../../../src/plugins/scim/patch';
 import { scimFilterToLdap } from '../../../src/plugins/scim/filter';
-import { DEFAULT_USER_MAPPING } from '../../../src/lib/scim/mapping';
-import { ScimError } from '../../../src/lib/scim/errors';
 
 describe('SCIM security hardening', () => {
   describe('prototype pollution via PATCH paths', () => {

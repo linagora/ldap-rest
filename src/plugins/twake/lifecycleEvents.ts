@@ -13,29 +13,29 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
-import type { ChangeContext } from '../../lib/changeContext';
-import { extractLdapCode } from '../../lib/ldapCodes';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
 import type {
   AttributesList,
   AttributeValue,
   SearchResult,
-} from '../../lib/ldapActions';
+} from '@ldap-rest/core/lib/ldapActions';
 import {
   isDummyMemberDn,
   normalizeDn,
   parseDn,
   unescapeDnValue,
-} from '../../lib/utils';
-import { RabbitMqService } from '../../lib/services/rabbitmq';
-import { providedService } from '../../lib/services';
-import { ScimService } from '../../lib/services/scim';
+} from '@ldap-rest/core/lib/utils';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+import { providedService } from '@ldap-rest/core/lib/services';
+import { ScimService } from '@ldap-rest/core/lib/services/scim';
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
-} from '../../lib/scim/mapping';
+} from '@ldap-rest/core/lib/scim/mapping';
 
 import {
   first,

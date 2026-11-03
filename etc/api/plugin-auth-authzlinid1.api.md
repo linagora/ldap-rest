@@ -15,14 +15,6 @@ import type { SearchResult } from 'ldapts';
 import { Server } from 'http';
 import type winston from 'winston';
 
-// @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
 // @public
 abstract class AuthzBase extends DmPlugin {
     constructor(server: DM);
@@ -92,13 +84,6 @@ interface CachedPermissions {
     branches: Map<string, BranchPermissions>;
     // (undocumented)
     timestamp: number;
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
 }
 
 ```

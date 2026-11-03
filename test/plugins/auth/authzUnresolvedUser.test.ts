@@ -16,10 +16,10 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Response } from 'express';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
 
 import { DM } from '../../../src/bin';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Role } from '../../../src/abstract/plugin';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';

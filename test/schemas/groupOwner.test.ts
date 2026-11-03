@@ -2,8 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { expect } from 'chai';
-
-import type { Schema } from '../../src/config/schema';
+import type { Schema } from '@ldap-rest/core/config/schema';
 
 const base = 'dc=example,dc=com';
 

@@ -14,14 +14,14 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type {
+  AttributesList,
+  SearchResult,
+} from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
-import type {
-  AttributesList,
-  SearchResult,
-} from '../../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Flat entity rename', function () {

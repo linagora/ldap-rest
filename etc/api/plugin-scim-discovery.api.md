@@ -16,20 +16,6 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
-interface BooleanOption extends OptionSpec<boolean> {
-    // (undocumented)
-    readonly type: 'boolean';
-}
-
-// @public (undocumented)
 export interface DiscoveryOptions {
     // (undocumented)
     authenticators: AuthenticatorsInfo;
@@ -41,70 +27,6 @@ export interface DiscoveryOptions {
     schemaDir: string;
     // (undocumented)
     scimPrefix: string;
-}
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
-interface ResourceTypeDefinition {
-    // (undocumented)
-    description?: string;
-    // (undocumented)
-    endpoint: string;
-    // (undocumented)
-    id: string;
-    // (undocumented)
-    meta?: {
-        resourceType: 'ResourceType';
-        location?: string;
-    };
-    // (undocumented)
-    name: string;
-    // (undocumented)
-    schema: string;
-    // (undocumented)
-    schemaExtensions?: Array<{
-        schema: string;
-        required: boolean;
-    }>;
-    // (undocumented)
-    schemas: [typeof SCHEMA_RESOURCE_TYPE];
-}
-
-// @public (undocumented)
-const SCHEMA_RESOURCE_TYPE = "urn:ietf:params:scim:schemas:core:2.0:ResourceType";
-
-// @public (undocumented)
-const SCHEMA_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Schema";
-
-// @public (undocumented)
-const SCHEMA_SERVICE_PROVIDER_CONFIG = "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig";
-
-// @public (undocumented)
-interface SchemaDefinition {
-    // (undocumented)
-    attributes: unknown[];
-    // (undocumented)
-    description?: string;
-    // (undocumented)
-    id: string;
-    // (undocumented)
-    meta?: {
-        resourceType: 'Schema';
-        location?: string;
-    };
-    // (undocumented)
-    name: string;
-    // (undocumented)
-    schemas: [typeof SCHEMA_SCHEMA];
 }
 
 // @public (undocumented)
@@ -153,61 +75,5 @@ const scimOptions: {
     scim_etag: BooleanOption;
     scim_base_url: StringOption;
 };
-
-// @public (undocumented)
-interface ServiceProviderConfig {
-    // (undocumented)
-    authenticationSchemes: Array<{
-        name: string;
-        description: string;
-        specUri?: string;
-        documentationUri?: string;
-        type: string;
-        primary?: boolean;
-    }>;
-    // (undocumented)
-    bulk: {
-        supported: boolean;
-        maxOperations: number;
-        maxPayloadSize: number;
-    };
-    // (undocumented)
-    changePassword: {
-        supported: boolean;
-    };
-    // (undocumented)
-    documentationUri?: string;
-    // (undocumented)
-    etag: {
-        supported: boolean;
-    };
-    // (undocumented)
-    filter: {
-        supported: boolean;
-        maxResults: number;
-    };
-    // (undocumented)
-    meta?: {
-        resourceType: 'ServiceProviderConfig';
-        location?: string;
-    };
-    // (undocumented)
-    patch: {
-        supported: boolean;
-    };
-    // (undocumented)
-    schemas: [typeof SCHEMA_SERVICE_PROVIDER_CONFIG];
-    // (undocumented)
-    sort: {
-        supported: boolean;
-    };
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
 
 ```

@@ -11,10 +11,9 @@ import {
 
 import type { Express } from 'express';
 import { Gauge, Registry, collectDefaultMetrics } from 'prom-client';
-
-import DmPlugin from '../abstract/plugin';
-import type { DM } from '../bin';
-import { registry } from '../lib/metrics';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import { registry } from '@ldap-rest/core/lib/metrics';
 
 import { metricsOptions } from './metrics.options';
 

@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-
 import {
   AuthzRefusedError,
   ForbiddenError,
@@ -7,7 +6,7 @@ import {
   errorChain,
   isAuthzRefusal,
   statusCodeOf,
-} from '../../src/lib/errors';
+} from '@ldap-rest/core/lib/errors';
 
 const wrapping = (err: unknown): Error =>
   new Error(`wrapped: ${String(err)}`, { cause: err });

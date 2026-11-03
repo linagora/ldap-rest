@@ -7,9 +7,8 @@
  * This plugin enables authentication and authorization using Lemonldap::NG.
  */
 import type { Express, Response } from 'express';
-
-import AuthBase, { DmRequest } from '../../lib/auth/base';
-import type { Role } from '../../abstract/plugin';
+import AuthBase, { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
 
 import { llngOptions } from './auth.options';
 

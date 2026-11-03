@@ -1,13 +1,14 @@
 import { expect } from 'chai';
 import nock from 'nock';
 import type { Express } from 'express';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
 
 // Taken from `Hooks`: chai's supertest brings a second copy of express's types
 type AuthTuple = Parameters<NonNullable<Hooks['beforeAuth']>>[0];
-import type { Hooks } from '../../../src/hooks';
+
 import { DM } from '../../../src/bin';
 import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
-import DmPlugin from '../../../src/abstract/plugin';
 
 // Simple test plugin to verify auth flow
 class TestProtectedResource extends DmPlugin {

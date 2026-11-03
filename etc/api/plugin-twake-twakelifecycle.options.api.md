@@ -5,13 +5,6 @@
 ```ts
 
 // @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
-
-// @public (undocumented)
 export type TwakeLifecycleOptions = OptionsOf<typeof twakeLifecycleOptions>;
 
 // @public (undocumented)

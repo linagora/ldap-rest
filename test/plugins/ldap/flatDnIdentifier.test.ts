@@ -7,10 +7,10 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
+import { normalizeDn } from '@ldap-rest/core/lib/utils';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import { normalizeDn } from '../../../src/lib/utils';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 const B = String.fromCharCode(92);

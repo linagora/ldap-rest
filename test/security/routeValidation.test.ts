@@ -8,9 +8,13 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import {
+  registeredRoutes,
+  type RegisteredRoute,
+} from '@ldap-rest/core/lib/route';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
 import { DM } from '../../src/bin';
-import { registeredRoutes, type RegisteredRoute } from '../../src/lib/route';
 import LdapAccountLifecycle from '../../src/plugins/ldap/accountLifecycle';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
@@ -23,7 +27,6 @@ import AppAccountsApi from '../../src/plugins/twake/appAccountsApi';
 import TwakeInstances from '../../src/plugins/twake/instances';
 import TwakeTombstone from '../../src/plugins/twake/tombstone';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS_WITH_ORG } from '../helpers/env';
-import { RabbitMqService } from '../../src/lib/services/rabbitmq';
 
 /** A JSON schema, as the registry keeps it */
 interface Schema {

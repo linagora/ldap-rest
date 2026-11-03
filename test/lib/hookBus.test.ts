@@ -1,11 +1,13 @@
 import { expect } from 'chai';
 import type { SearchOptions } from 'ldapts';
 import type winston from 'winston';
-
-import HookBus, { recordHookOwner } from '../../src/lib/hookBus';
-import { AuthzRefusedError } from '../../src/lib/errors';
-import type { Hooks } from '../../src/hooks';
-import { getLogger, setLogger } from '../../src/lib/expressFormatedResponses';
+import HookBus, { recordHookOwner } from '@ldap-rest/core/lib/hookBus';
+import { AuthzRefusedError } from '@ldap-rest/core/lib/errors';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import {
+  getLogger,
+  setLogger,
+} from '@ldap-rest/core/lib/expressFormatedResponses';
 
 /**
  * What the bus promises each kind of hook: a notification reports and

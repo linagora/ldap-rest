@@ -1,8 +1,18 @@
 import { randomUUID } from 'crypto';
 
+import { type Role } from '@ldap-rest/core/abstract/plugin';
+import { DM } from '@ldap-rest/core';
+import type { OidcLogoutToken, OidcSessionClaims } from '@ldap-rest/core/hooks';
+import AuthBase, { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import {
+  serverError,
+  unauthorized,
+} from '@ldap-rest/core/lib/expressFormatedResponses';
 import type { Express, RequestHandler, Response } from 'express';
 import oidc from 'express-openid-connect';
 import type { ConfigParams } from 'express-openid-connect';
+
+import { openidconnectOptions } from './auth.options';
 
 // Taken off the default export, not imported by name. The package is
 // CommonJS, and Node detects the named exports an ESM file may import by
@@ -13,14 +23,6 @@ import type { ConfigParams } from 'express-openid-connect';
 // deployment uses: `Named export 'requiresAuth' not found`. `core/auth/llng`
 // is built the same way, for the same reason.
 const { auth, requiresAuth } = oidc;
-
-import AuthBase, { DmRequest } from '../../lib/auth/base';
-import { type Role } from '../../abstract/plugin';
-import { serverError, unauthorized } from '../../lib/expressFormatedResponses';
-import { DM } from '../../bin';
-import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
-
-import { openidconnectOptions } from './auth.options';
 
 /**
  * The routes this plugin answers itself: `/logout` in `authMethod`, the others

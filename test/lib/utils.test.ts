@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-
 import {
   escapeDnValue,
   unescapeDnValue,
@@ -16,8 +15,8 @@ import {
   isDirectChildOf,
   organizationLink,
   parseDirectoryDate,
-} from '../../src/lib/utils';
-import { BadRequestError } from '../../src/lib/errors';
+} from '@ldap-rest/core/lib/utils';
+import { BadRequestError } from '@ldap-rest/core/lib/errors';
 
 describe('LDAP Utils', () => {
   describe('escapeDnValue', () => {

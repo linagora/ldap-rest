@@ -1,10 +1,10 @@
 import nock from 'nock';
 import { expect } from 'chai';
+import type { ScimUser } from '@ldap-rest/core/lib/scim/types';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
 import { DM } from '../../../src/bin';
 import ClouderyProvision from '../../../src/plugins/twake/clouderyProvision';
-import type { ScimUser } from '../../../src/lib/scim/types';
-import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
 
 const CLOUDERY = 'http://cloudery.test';
 const B2B_BRANCH = 'ou=b2b,dc=twake,dc=local';

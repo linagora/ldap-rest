@@ -26,7 +26,7 @@ notification mode:
   of the answer. Every subscriber runs; the first failure is raised once they
   all returned.
 
-Every hook is declared in `src/hooks.ts` with its arguments and its answer. A
+Every hook is declared in `packages/core/src/hooks.ts` with its arguments and its answer. A
 plugin subscribing to an undeclared hook does not compile, and `npm run
 check:hooks` keeps the documentation in step. Notified hooks take their
 arguments one by one; chained hooks take one value, a tuple when there are
@@ -51,4 +51,4 @@ other hooks run in plugin load order.
   subscribers returned. Keying state by the operation number is what tells
   two writes of one DN apart.
 
-See [hooks](../../plugin-development/hooks.md) and `src/lib/hookBus.ts`.
+See [hooks](../../plugin-development/hooks.md) and `packages/core/src/lib/hookBus.ts`.

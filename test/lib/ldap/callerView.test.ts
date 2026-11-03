@@ -1,9 +1,8 @@
 import { expect } from 'chai';
 import type { Request } from 'express';
 import type { SearchOptions, SearchResult } from 'ldapts';
-
-import CallerView from '../../../src/lib/ldap/callerView';
-import { ForbiddenError } from '../../../src/lib/errors';
+import CallerView from '@ldap-rest/core/lib/ldap/callerView';
+import { ForbiddenError } from '@ldap-rest/core/lib/errors';
 
 const req = { user: 'alice' } as unknown as Request;
 

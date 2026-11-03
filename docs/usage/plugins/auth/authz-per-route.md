@@ -14,7 +14,7 @@ AND **before** any API route plugin (so its Express middleware is registered bef
 the routes it protects).
 
 When loaded via the CLI plugin loader, plugins not listed in
-`src/config/priority.json` are loaded in parallel — this can race with API route
+`packages/core/src/config/priority.json` are loaded in parallel — this can race with API route
 registration and result in an authorization bypass. To guarantee correct ordering,
 `core/auth/authzPerRoute` is included in the priority list and loads sequentially
 after the other auth plugins. If you build a custom loader, ensure equivalent

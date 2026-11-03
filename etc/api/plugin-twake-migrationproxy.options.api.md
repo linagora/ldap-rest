@@ -5,14 +5,6 @@
 ```ts
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 export type MigrationProxyOptions = OptionsOf<typeof migrationProxyOptions>;
 
 // @public (undocumented)
@@ -27,16 +19,6 @@ export const migrationProxyOptions: {
 
 // @public
 export function migrationProxyOptionsOf(config: Config): MigrationProxyOptions;
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
 
 // @public (undocumented)
 interface StringOption extends OptionSpec<string> {

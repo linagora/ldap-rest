@@ -23,12 +23,12 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { Hooks } from '@ldap-rest/core/hooks';
 
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import Scim from '../../../src/plugins/scim/scim';
 import { DM } from '../../../src/bin';
 import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
-import type { Hooks } from '../../../src/hooks';
 
 function wireHooks(server: DM, plugin: { hooks?: Hooks }): void {
   if (!plugin.hooks) return;

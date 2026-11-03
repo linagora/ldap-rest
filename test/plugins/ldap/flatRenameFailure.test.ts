@@ -21,18 +21,18 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
-
-import { DM } from '../../../src/bin';
-import DmPlugin, { type Role } from '../../../src/abstract/plugin';
-import type { Hooks } from '../../../src/hooks';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
-import { ConflictError } from '../../../src/lib/errors';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import { ConflictError } from '@ldap-rest/core/lib/errors';
 import type {
   AttributesList,
   SearchResult,
-} from '../../../src/lib/ldapActions';
-import { normalizeDn } from '../../../src/lib/utils';
+} from '@ldap-rest/core/lib/ldapActions';
+import { normalizeDn } from '@ldap-rest/core/lib/utils';
+
+import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
+import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import { DM } from '../../../src/bin';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 /**

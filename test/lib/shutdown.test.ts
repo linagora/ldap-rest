@@ -6,9 +6,9 @@ import path from 'node:path';
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Express, Request, Response } from 'express';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
 
 import { DM } from '../../src/bin';
-import DmPlugin from '../../src/abstract/plugin';
 
 /** A request on a keep-alive connection, answered when the server answers */
 const get = (

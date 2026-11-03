@@ -17,11 +17,11 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
+import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
+import type { Hooks } from '@ldap-rest/core/hooks';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import type { AttributesList } from '../../../src/lib/ldapActions';
-import type { Hooks } from '../../../src/hooks';
 import {
   hasExternalLdap,
   skipIfMissingEnvVars,

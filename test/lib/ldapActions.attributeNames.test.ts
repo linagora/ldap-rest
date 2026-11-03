@@ -8,9 +8,12 @@
  * organization its administrator may not write.
  */
 import { expect } from 'chai';
+import type {
+  AttributesList,
+  SearchResult,
+} from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../src/bin';
-import type { AttributesList, SearchResult } from '../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 
 describe('Attribute names of a write', function () {

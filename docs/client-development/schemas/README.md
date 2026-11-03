@@ -416,7 +416,7 @@ strict schema refuses it.
 
 Every entity route applies these rules; `test/lib/entitySchema.contract.test.ts`
 asserts them on a flat entity, a group and an organization alike. In the
-server they are enforced by `EntityValidator` (`src/lib/entitySchema/validator.ts`)
+server they are enforced by `EntityValidator` (`packages/core/src/lib/entitySchema/validator.ts`)
 alone: ESLint refuses the import of the schema helpers anywhere else.
 
 #### `required` (Optional, default: `false`)
