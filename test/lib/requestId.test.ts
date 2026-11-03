@@ -15,9 +15,9 @@ import {
   outsideRequest,
   runWithLogContext,
 } from '@ldap-rest/core/lib/requestContext';
+import ValkeyStore from '@ldap-rest/storage/valkey';
+import PostgresStore from '@ldap-rest/storage/postgres';
 
-import ValkeyStore from '../../src/plugins/storage/valkey';
-import PostgresStore from '../../src/plugins/storage/postgres';
 import WebLogs from '../../src/plugins/weblogs';
 import { DM } from '../helpers/dm';
 

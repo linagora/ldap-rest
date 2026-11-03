@@ -1,6 +1,6 @@
 {
   "all": true,
-  "src": ["src", "packages/core/src"],
+  "src": ["src", "packages/core/src", "packages/storage/src"],
   "extension": [".ts"],
   "reporter": ["text-summary", "html", "lcov"],
   "report-dir": "coverage",

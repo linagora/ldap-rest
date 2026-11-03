@@ -1,0 +1,69 @@
+{
+  "name": "@ldap-rest/storage",
+  "version": "3.0.0",
+  "description": "LDAP-Rest keyed storage plugin and its backends",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/storage"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/storage.ts",
+      "types": "./dist/storage.d.ts",
+      "import": "./dist/storage.js"
+    },
+    "./options": {
+      "development": "./src/storage.options.ts",
+      "types": "./dist/storage.options.d.ts",
+      "import": "./dist/storage.options.js"
+    },
+    "./file": {
+      "development": "./src/storage/file.ts",
+      "types": "./dist/storage/file.d.ts",
+      "import": "./dist/storage/file.js"
+    },
+    "./ldap": {
+      "development": "./src/storage/ldap.ts",
+      "types": "./dist/storage/ldap.d.ts",
+      "import": "./dist/storage/ldap.js"
+    },
+    "./postgres": {
+      "development": "./src/storage/postgres.ts",
+      "types": "./dist/storage/postgres.d.ts",
+      "import": "./dist/storage/postgres.js"
+    },
+    "./valkey": {
+      "development": "./src/storage/valkey.ts",
+      "types": "./dist/storage/valkey.d.ts",
+      "import": "./dist/storage/valkey.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "iovalkey": "^0.4.0",
+    "pg": "^8.23.0",
+    "winston": "^3.17.0"
+  },
+  "peerDependenciesMeta": {
+    "iovalkey": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
+  }
+}

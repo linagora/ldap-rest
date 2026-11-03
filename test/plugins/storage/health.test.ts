@@ -5,13 +5,13 @@ import { join } from 'node:path';
 import { expect } from 'chai';
 import type winston from 'winston';
 import type Store from '@ldap-rest/core/lib/storage/store';
+import FileStore from '@ldap-rest/storage/file';
+import PostgresStore from '@ldap-rest/storage/postgres';
+import ValkeyStore from '@ldap-rest/storage/valkey';
+import LdapStore from '@ldap-rest/storage/ldap';
 
-import { DM } from '../../helpers/dm';
 import Storage from '../../../src/plugins/storage';
-import FileStore from '../../../src/plugins/storage/file';
-import PostgresStore from '../../../src/plugins/storage/postgres';
-import ValkeyStore from '../../../src/plugins/storage/valkey';
-import LdapStore from '../../../src/plugins/storage/ldap';
+import { DM } from '../../helpers/dm';
 
 const logger = {
   debug: () => undefined,

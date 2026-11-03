@@ -1,5 +1,5 @@
 #!/bin/sh
-# Refuse new rationale comments in the core and the umbrella sources.
+# Refuse new rationale comments in the umbrella and the package sources.
 #
 # A comment explains what is not obvious in the code beside it. Why a design
 # is what it is belongs in docs/architecture/adr/, once; the comment points
@@ -22,7 +22,7 @@ new=$(mktemp)
 stale=$(mktemp)
 trap 'rm -f "$current" "$texts" "$new" "$stale"' EXIT
 
-node - "$root/src" "$root/packages/core/src" <<'NODE' > "$current"
+node - "$root/src" "$root"/packages/*/src <<'NODE' > "$current"
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
@@ -143,7 +143,7 @@ LC_ALL=C comm -13 "$baseline" "$texts" > "$new"
 LC_ALL=C comm -23 "$baseline" "$texts" > "$stale"
 
 if [ -s "$new" ]; then
-  echo "check-comments: new rationale comments in src/ or packages/core/src/:" >&2
+  echo "check-comments: new rationale comments in src/ or a package source:" >&2
   awk -F '\t' 'NR == FNR { new[$0] = 1; next } $2 in new {
     printf "  %s\n      %s\n", $1, $2
   }' "$new" "$current" >&2
@@ -164,4 +164,4 @@ EOF
   exit 1
 fi
 
-echo "check-comments: no new rationale comments in src/"
+echo "check-comments: no new rationale comments in the sources"
