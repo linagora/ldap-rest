@@ -6,7 +6,7 @@
  * docs/client-development/schemas/README.md#extending-a-schema
  */
 import fs from 'fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'path';
+import { dirname, isAbsolute, relative, resolve } from 'path';
 
 import type { Config } from '../bin';
 
