@@ -3,8 +3,9 @@
 #
 # The core knows roles and schemas. A suffix, a mail domain, a national phone
 # format, a nomenclature value or a quota default belongs to a schema or to a
-# command-line option — never to `src/` or `packages/core/src/`. A default that happens to be one
-# customer's number is a leak just as much as a constant named after them.
+# command-line option — never to `src/` or a `packages/*/src/` tree. A default
+# that happens to be one customer's number is a leak just as much as a
+# constant named after them.
 #
 # The list of forbidden values is the one thing this repository cannot carry:
 # writing a deployment's name here in order to forbid it would publish it just

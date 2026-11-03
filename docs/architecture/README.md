@@ -174,9 +174,10 @@ configuration to refuse.
 ## Checking the comments
 
 `npm run check:comments` (`scripts/check-comments.sh`) refuses new comments in
-`src/` that cite an issue number, narrate history ("used to", "since 1.2") or
-otherwise carry rationale. The rationale belongs in a decision record; the
-comment points at it. The accepted set is `scripts/comment-baseline.txt`, and
+`src/` and in every package's `src/` that cite an issue number, narrate history
+("used to", "since 1.2") or otherwise carry rationale. The rationale belongs
+in a decision record; the comment points at it. The accepted set is
+`scripts/comment-baseline.txt`, and
 it may only shrink: removing a comment is fine, adding one fails the check.
 `sh scripts/check-comments.sh --update` rewrites the baseline from the current
 tree when a change removes one.

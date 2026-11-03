@@ -1,5 +1,5 @@
 #!/bin/sh
-# Refuse new rationale comments in the core and the umbrella sources.
+# Refuse new rationale comments in the umbrella and the package sources.
 #
 # A comment explains what is not obvious in the code beside it. Why a design
 # is what it is belongs in docs/architecture/adr/, once; the comment points
@@ -164,4 +164,4 @@ EOF
   exit 1
 fi
 
-echo "check-comments: no new rationale comments in src/"
+echo "check-comments: no new rationale comments in the sources"
