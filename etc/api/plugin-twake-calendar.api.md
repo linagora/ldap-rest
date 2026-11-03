@@ -42,6 +42,8 @@ class Calendar extends TwakePlugin {
         calendar_lastname_attribute: StringOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
     syncRegisteredUser(event: string, dn: string, lookupEmail?: string): Promise<void>;
 }

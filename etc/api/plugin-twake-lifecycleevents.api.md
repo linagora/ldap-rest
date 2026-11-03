@@ -89,6 +89,8 @@ class TwakeLifecycleEvents extends DmPlugin {
         twake_lifecycle_member_attribute: StringOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
 }
 export default TwakeLifecycleEvents;

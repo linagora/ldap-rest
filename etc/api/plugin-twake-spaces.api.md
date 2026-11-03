@@ -87,6 +87,8 @@ class TwakeSpaces extends DmPlugin {
         twake_space_exchange: StringOption;
         twake_space_sync_queue: StringOption;
     };
+    // (undocumented)
+    static optionDependencies: string[];
     organizationOf(dn: string): string | undefined;
     // (undocumented)
     readonly roleAttributes: Record<SpaceRole, string>;

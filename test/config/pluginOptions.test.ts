@@ -11,10 +11,18 @@ import {
   pluginOptionEntries,
   resolvePluginModule,
 } from '@ldap-rest/core/config/pluginOptions';
+import { defineOptions, opt } from '@ldap-rest/core/config/options';
 import { expect } from 'chai';
 
 import { composeOptions } from '../../src/options';
 import Sample from '../fixtures/pluginOptionSample';
+
+const Dependent = class {
+  static optionDefinitions = defineOptions({
+    dependent_port: opt.number({ default: 8080 }),
+  });
+  static optionDependencies = ['core/pluginOptionSample'];
+};
 
 const fixtures = path.join(__dirname, '..', 'fixtures');
 
@@ -116,9 +124,26 @@ describe('plugin option entries', () => {
     expect(entries).to.have.length(1);
   });
 
+  it('reads the declarations of what a plugin depends on', async () => {
+    const entries = await pluginOptionEntries(
+      ['core/pluginDependencySample'],
+      { pluginRoot: fixtures, resolveBase: fixtures },
+      async specifier =>
+        specifier.endsWith('pluginOptionSample.js')
+          ? { default: Sample }
+          : { default: Dependent }
+    );
+    expect(entries.map(entry => entry[0])).to.deep.equal([
+      '--dependent-port',
+      '--sample-timeout',
+    ]);
+  });
+
   it('leaves the core template alone when nothing is named', async () => {
     const coreOnly = await composeOptions([]);
-    expect(coreOnly.map(entry => entry[0])).to.include('--plugin');
-    expect(coreOnly.map(entry => entry[0])).to.not.include('--metrics-port');
+    const names = coreOnly.map(entry => entry[0]);
+    expect(names).to.include('--plugin');
+    expect(names).to.include('--ldap-organization-link-attribute');
+    expect(names).to.not.include('--metrics-port');
   });
 });

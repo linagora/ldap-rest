@@ -138,6 +138,8 @@ class TwakeInstances extends DmPlugin {
         twake_instance_organization_fqdn_attribute: StringOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     protected readonly patterns: RegExp[];
     // (undocumented)
     protected readonly provider: InstanceProvider;

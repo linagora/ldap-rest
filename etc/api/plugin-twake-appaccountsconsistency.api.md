@@ -35,6 +35,8 @@ class AppAccountsConsistency extends DmPlugin {
         ldap_operational_attribute: ArrayOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
 }
 export default AppAccountsConsistency;

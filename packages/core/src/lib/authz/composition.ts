@@ -268,6 +268,17 @@ export function assertAuthzComposition(
     !authenticators.some(plugin => plugin.name === candidate.name)
   )
     authenticators.push(candidate);
+  // Without the link attribute, an attached entry is judged as if it were in
+  // its DN's branch: fail closed rather than open.
+  if (
+    server.config.authz_filter_attached_entries &&
+    !server.config.ldap_organization_link_attribute
+  )
+    throw new Error(
+      'authz_filter_attached_entries needs ldap_organization_link_attribute: ' +
+        'without it, an entry attached to another organization is judged in ' +
+        'the branch of its DN'
+    );
   const names = authenticators.map(plugin => plugin.name);
   const concerns = (plugin: DmPlugin): boolean =>
     !candidate || plugin === candidate;

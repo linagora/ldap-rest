@@ -46,6 +46,8 @@ class ClouderyProvision extends DmPlugin {
         cloudery_workflow_max_attempts: NumberOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
 }
 export default ClouderyProvision;

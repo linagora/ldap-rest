@@ -132,6 +132,8 @@ export default class AppAccountsApi extends DmPlugin {
 
   name = 'appAccountsApi';
   roles: Role[] = ['api', 'configurable'] as const;
+  static optionDependencies = ['core/twake/appAccountsConsistency'];
+
   dependencies = {
     appAccountsConsistency: 'core/twake/appAccountsConsistency',
   };

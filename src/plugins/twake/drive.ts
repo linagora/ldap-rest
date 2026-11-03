@@ -21,6 +21,8 @@ export default class Drive extends TwakePlugin {
   name = 'drive';
   roles: Role[] = ['consistency'] as const;
 
+  static optionDependencies = ['core/ldap/onChange'];
+
   dependencies = {
     onLdapChange: 'core/ldap/onChange',
   };

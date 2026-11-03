@@ -34,6 +34,8 @@ export default class Bcl extends DmPlugin {
   static optionDefinitions = bclOptions;
 
   name = 'bcl';
+  static optionDependencies = ['core/storage'];
+
   dependencies = { storage: 'core/storage' };
   private storage?: StorageApi;
   /** How long a tombstone is kept, in milliseconds. */

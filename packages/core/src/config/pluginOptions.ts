@@ -15,7 +15,11 @@ import { toConfigEntries, type OptionSet } from './options';
 
 /** A plugin class, or the module that exports it */
 interface PluginModule {
-  default?: { optionDefinitions?: OptionSet };
+  default?: {
+    optionDefinitions?: OptionSet;
+    /** Modules whose options this plugin reads, besides its own */
+    optionDependencies?: readonly string[];
+  };
   optionDefinitions?: OptionSet;
 }
 
@@ -97,8 +101,9 @@ export async function pluginOptionEntries(
   const seenModules = new Set<string>();
   const seenOptions = new Set<string>();
   const config: ConfigEntry[] = [];
-  for (const entry of entries) {
-    const module = entryModule(entry);
+  const queue = [...entries];
+  while (queue.length > 0) {
+    const module = entryModule(queue.shift() as string);
     if (seenModules.has(module)) continue;
     seenModules.add(module);
     // The loader resolves an absolute path as `DM.loadPlugin` does; a package
@@ -106,12 +111,15 @@ export async function pluginOptionEntries(
     const imported = await load(resolvePluginModule(module, roots));
     const definitions =
       imported.default?.optionDefinitions ?? imported.optionDefinitions;
-    if (!definitions) continue;
-    for (const option of toConfigEntries(definitions))
-      if (!seenOptions.has(option[0])) {
-        seenOptions.add(option[0]);
-        config.push(option);
-      }
+    if (definitions)
+      for (const option of toConfigEntries(definitions))
+        if (!seenOptions.has(option[0])) {
+          seenOptions.add(option[0]);
+          config.push(option);
+        }
+    // A plugin reads the options of what it depends on before registering it,
+    // so phase 1 reads those declarations too.
+    queue.push(...(imported.default?.optionDependencies ?? []));
   }
   return config;
 }

@@ -108,6 +108,8 @@ export default class LdapAccountLifecycle extends DmPlugin {
   name = 'ldapAccountLifecycle';
   roles: Role[] = ['api'] as const;
 
+  static optionDependencies = ['core/ldap/flatGeneric'];
+
   dependencies = {
     ldapFlatGeneric: 'core/ldap/flatGeneric',
   };

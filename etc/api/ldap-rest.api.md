@@ -977,6 +977,7 @@ abstract class DmPlugin {
     abstract name: string;
     opNumber(): number;
     static optionDefinitions: OptionSet;
+    static optionDependencies: readonly string[];
     options<T extends OptionSet>(definitions: T): OptionsOf<T>;
     provides?: ServiceProvider<unknown>[];
     // (undocumented)

@@ -37,6 +37,8 @@ class ExternalUsersInGroups extends DmPlugin {
         external_branch_class: ArrayOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
 }
 export default ExternalUsersInGroups;

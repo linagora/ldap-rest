@@ -88,6 +88,8 @@ export default class ClouderyProvision extends DmPlugin {
   name = 'clouderyProvision';
   roles: Role[] = ['consistency'] as const;
 
+  static optionDependencies = ['core/rabbitmq'];
+
   dependencies = { rabbitmq: 'core/rabbitmq' };
 
   private readonly managerUrl: string;

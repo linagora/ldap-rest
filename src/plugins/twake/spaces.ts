@@ -239,6 +239,8 @@ export default class TwakeSpaces extends DmPlugin {
 
   name = 'twakeSpaces';
   roles: Role[] = ['api'];
+  static optionDependencies = ['core/rabbitmq'];
+
   dependencies: Record<string, string> = {
     twakeGroups: 'core/twake/groups',
     onLdapChange: 'core/ldap/onChange',

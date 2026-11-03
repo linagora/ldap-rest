@@ -136,6 +136,8 @@ class LdapFlatInstance extends LdapFlat {
     // (undocumented)
     name: string;
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
     // (undocumented)
     singularLabel?: LocalizedText;

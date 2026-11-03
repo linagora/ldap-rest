@@ -45,6 +45,8 @@ class Drive extends TwakePlugin {
         twake_drive_default_domain_template: StringOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
     syncUserToCozy(dn: string): Promise<boolean>;
     unblockInstance(dn: string): Promise<boolean>;

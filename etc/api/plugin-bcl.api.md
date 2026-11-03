@@ -35,6 +35,8 @@ class Bcl extends DmPlugin {
     static optionDefinitions: {
         bcl_retention: NumberOption;
     };
+    // (undocumented)
+    static optionDependencies: string[];
 }
 export default Bcl;
 

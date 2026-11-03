@@ -97,6 +97,12 @@ export type Role =
 export default abstract class DmPlugin {
   /** Options this plugin declares, see `docs/plugin-development/options.md` */
   static optionDefinitions: OptionSet = {};
+  /**
+   * Modules whose options this plugin reads, besides its own. The server reads
+   * their declarations in phase 1, before the instance `dependencies` makes it
+   * load them.
+   */
+  static optionDependencies: readonly string[] = [];
 
   /**
    * Properties inherited from parent (DM)

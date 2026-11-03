@@ -37,6 +37,8 @@ import {
 } from '@ldap-rest/core/lib/services/passwordPolicy';
 import { roleAttribute } from '@ldap-rest/core/config/schema';
 
+import { authzOptions } from './auth.options';
+
 /** The part of an authorization plugin this endpoint needs. */
 interface AuthzLike extends DmPlugin {
   resolveUser(uid: string): Promise<string | null>;
@@ -98,6 +100,7 @@ export const ScopeResponse = Type.Object({
 });
 
 export default class AuthzScope extends DmPlugin {
+  static optionDefinitions = authzOptions;
   name = 'authzScope';
   roles: Role[] = ['api'] as const;
 

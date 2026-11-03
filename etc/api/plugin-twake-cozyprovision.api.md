@@ -42,6 +42,8 @@ class CozyProvision extends DmPlugin {
         cozy_user_deleted_routing_key: StringOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
 }
 export default CozyProvision;

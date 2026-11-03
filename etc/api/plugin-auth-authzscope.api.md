@@ -30,6 +30,10 @@ class AuthzScope extends DmPlugin {
     // (undocumented)
     name: string;
     // (undocumented)
+    static optionDefinitions: {
+        authz_scope_source: StringOption;
+    };
+    // (undocumented)
     roles: Role[];
 }
 export default AuthzScope;

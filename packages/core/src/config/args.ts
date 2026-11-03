@@ -523,6 +523,50 @@ const configArgs: ConfigTemplate = [
   // embedder names this option.
   ['--schemas-path', 'DM_SCHEMAS_PATH', ''],
 
+  // Read by the core and by plugins other than the one that serves the
+  // option: a plugin the configuration does not name must not remove the
+  // value from the parser.
+  ['--ldap-top-organization', 'DM_LDAP_TOP_ORGANIZATION', ''],
+  [
+    '--ldap-organization-link-attribute',
+    'DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE',
+    'twakeDepartmentLink',
+  ],
+  [
+    '--ldap-organization-path-attribute',
+    'DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE',
+    'twakeDepartmentPath',
+  ],
+  ['--ldap-group-base', 'DM_LDAP_GROUP_BASE', ''],
+  [
+    '--group-class',
+    'DM_GROUP_CLASSES',
+    ['top', 'groupOfNames'],
+    'array',
+    '--group-classes',
+    'identifiers',
+  ],
+  ['--group-dummy-user', 'DM_GROUP_DUMMY_USER', 'cn=fakeuser'],
+  [
+    '--enterprise-domain-name-attribute',
+    'DM_ENTERPRISE_DOMAIN_NAME_ATTRIBUTE',
+    'associatedDomain',
+  ],
+  [
+    '--enterprise-domain-link-attribute',
+    'DM_ENTERPRISE_DOMAIN_LINK_ATTRIBUTE',
+    '',
+  ],
+  ['--ldap-flat-auto-repair', 'DM_LDAP_FLAT_AUTO_REPAIR', true, 'boolean'],
+  [
+    '--ldap-raw-schema-cache-ttl',
+    'DM_LDAP_RAW_SCHEMA_CACHE_TTL',
+    3600,
+    'number',
+  ],
+  ['--static-name', 'DM_STATIC_NAME', 'static'],
+  ['--trash-base', 'DM_TRASH_BASE', ''],
+
   // Special attributes
   ['--mail-attribute', 'DM_MAIL_ATTRIBUTE', 'mail'],
   ['--quota-attribute', 'DM_QUOTA_ATTRIBUTE', 'mailQuotaSize'],

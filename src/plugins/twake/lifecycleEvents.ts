@@ -281,6 +281,8 @@ export default class TwakeLifecycleEvents extends DmPlugin {
   name = 'twakeLifecycleEvents';
   roles: Role[] = ['consistency'] as const;
 
+  static optionDependencies = ['core/ldap/onChange', 'core/rabbitmq'];
+
   dependencies = {
     onLdapChange: 'core/ldap/onChange',
     rabbitmq: 'core/rabbitmq',

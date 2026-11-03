@@ -95,6 +95,8 @@ export default class TwakeInstances extends DmPlugin {
   name = 'twakeInstances';
   roles: Role[] = ['consistency', 'api'] as const;
 
+  static optionDependencies = ['core/rabbitmq'];
+
   dependencies = { rabbitmq: 'core/rabbitmq' };
 
   private readonly settings: TwakeInstancesOptions;
