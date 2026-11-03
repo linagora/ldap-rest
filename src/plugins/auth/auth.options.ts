@@ -10,60 +10,7 @@ import {
   type OptionsOf,
 } from '../../config/options';
 
-/**
- * Common to every authentication plugin: the path prefixes it guards.
- */
-export const authOptions = defineOptions({
-  auth_path_prefix: opt.array({
-    env: 'DM_AUTH_PATH_PREFIX',
-    default: [],
-    plural: 'auth-path-prefixes',
-  }),
-});
-export type AuthOptions = OptionsOf<typeof authOptions>;
-
-/**
- * Common to every authorization plugin.
- */
 export const authzOptions = defineOptions({
-  // What an *authenticated* caller whose identity the plugin cannot resolve
-  // means. `deny` refuses the operation; `allow` lets it through with a
-  // warning, which is what every plugin did until it turned out to be an
-  // open door: `authzLinid1` resolves `req.user` as a `uid` in the
-  // directory, so an authenticator publishing something else — an OIDC
-  // `sub`, an LLNG `whatToTrace` tracing a mail — made every check skip,
-  // across the whole tree. An anonymous request is not this case: it is
-  // skipped as before.
-  authz_unresolved_user: opt.string({
-    env: 'DM_AUTHZ_UNRESOLVED_USER',
-    default: 'deny',
-  }),
-  // Which of the two values an authenticator publishes the authorization
-  // plugins key on: `req.user`, this server's identifier for the caller, or
-  // `req.userName`, the caller under a name a person would use. The default
-  // keeps every existing rule meaning what it meant.
-  authz_identity: opt.string({
-    env: 'DM_AUTHZ_IDENTITY',
-    default: 'req.user',
-  }),
-  // Whose requests an authorization plugin judges: the instance names of the
-  // authentication plugins that vouched for them. Empty — the default —
-  // means every authenticated request, whatever authenticated it, which is
-  // what every plugin did before the option existed. Meant for a plugin's
-  // own overrides (`{"authz_for":["oidc"]}`), so a branch model written for
-  // administrators does not judge a machine token it cannot name.
-  authz_for: opt.array({
-    env: 'DM_AUTHZ_FOR',
-    default: [],
-    kind: 'identifiers',
-  }),
-  // Two plugins judging the LDAP operations of the same requests compose as
-  // an AND: the first refusal wins. The server refuses to start on that
-  // unless this says the AND is meant.
-  authz_combine: opt.boolean({
-    env: 'DM_AUTHZ_COMBINE',
-    default: false,
-  }),
   // The branch-level plugin `authzScope` describes a caller with, when more
   // than one of them judges that caller. Empty: the first one loaded, and
   // the answer lists the others under `sources`.
@@ -144,18 +91,6 @@ export const perRouteOptions = defineOptions({
 export type PerRouteOptions = OptionsOf<typeof perRouteOptions>;
 
 export const perBranchOptions = defineOptions({
-  authz_filter_attached_entries: opt.boolean({
-    env: 'DM_AUTHZ_FILTER_ATTACHED_ENTRIES',
-    default: false,
-  }),
-  authz_transit_branch: opt.string({
-    env: 'DM_AUTHZ_TRANSIT_BRANCH',
-    default: '',
-  }),
-  authz_transit_origin_attribute: opt.string({
-    env: 'DM_AUTHZ_TRANSIT_ORIGIN_ATTRIBUTE',
-    default: '',
-  }),
   authz_per_branch_config: opt.json<AuthConfig>({
     env: 'DM_AUTHZ_PER_BRANCH_CONFIG',
     default: { default: { read: true, write: false, delete: false } },
@@ -173,6 +108,15 @@ export const perBranchOptions = defineOptions({
 export type PerBranchOptions = OptionsOf<typeof perBranchOptions>;
 
 export const dynamicOptions = defineOptions({
+  // Who may reach the directory through this plugin without presenting one
+  // of its tokens. Empty — the default — means nobody: a request is checked
+  // against the ACLs of the token it carries, whatever else authenticated
+  // it. Values are identities as another authenticator publishes them in
+  // `req.user`, plus two words:
+  //
+  //  - `any-authenticated`: anything another plugin authenticated, which is
+  //    what the plugin did until 0.9.0, by accident rather than by decision;
+  //  - `trusted-proxy`: a request `core/auth/trustedProxy` vouched for.
   authz_dynamic_bypass: opt.array({
     env: 'DM_AUTHZ_DYNAMIC_BYPASS',
     default: [],

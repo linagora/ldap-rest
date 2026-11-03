@@ -23,7 +23,6 @@ export type JamesOptions = OptionsOf<typeof jamesOptions>;
 
 // @public (undocumented)
 export const jamesOptions: {
-    ldap_concurrency: NumberOption;
     james_webadmin_url: StringOption;
     james_webadmin_token: StringOption;
     james_signature_template: StringOption;

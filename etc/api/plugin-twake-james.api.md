@@ -78,7 +78,6 @@ class James extends TwakePlugin {
     _normalizeToArray(value: AttributeValue | null): string[];
     // (undocumented)
     static optionDefinitions: {
-        ldap_concurrency: NumberOption;
         james_webadmin_url: StringOption;
         james_webadmin_token: StringOption;
         james_signature_template: StringOption;

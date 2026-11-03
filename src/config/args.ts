@@ -552,6 +552,57 @@ const configArgs: ConfigTemplate = [
     '--user-classes',
     'identifiers',
   ],
+
+  // Access control: the core reads these, whether or not an auth plugin is
+  // loaded (see lib/auth/base.ts and lib/authz/).
+
+  // Common to every authentication plugin: the path prefixes it guards
+  [
+    '--auth-path-prefix',
+    'DM_AUTH_PATH_PREFIX',
+    [],
+    'array',
+    '--auth-path-prefixes',
+  ],
+
+  // What an *authenticated* caller whose identity the plugin cannot resolve
+  // means. `deny` refuses the operation; `allow` lets it through with a
+  // warning, which is what every plugin did until it turned out to be an
+  // open door: `authzLinid1` resolves `req.user` as a `uid` in the
+  // directory, so an authenticator publishing something else — an OIDC
+  // `sub`, an LLNG `whatToTrace` tracing a mail — made every check skip,
+  // across the whole tree. An anonymous request is not this case: it is
+  // skipped as before.
+  ['--authz-unresolved-user', 'DM_AUTHZ_UNRESOLVED_USER', 'deny'],
+  // Which of the two values an authenticator publishes the authorization
+  // plugins key on: `req.user`, this server's identifier for the caller, or
+  // `req.userName`, the caller under a name a person would use. The default
+  // keeps every existing rule meaning what it meant.
+  ['--authz-identity', 'DM_AUTHZ_IDENTITY', 'req.user'],
+  // Whose requests an authorization plugin judges: the instance names of the
+  // authentication plugins that vouched for them. Empty — the default —
+  // means every authenticated request, whatever authenticated it, which is
+  // what every plugin did before the option existed. Meant for a plugin's
+  // own overrides (`{"authz_for":["oidc"]}`), so a branch model written for
+  // administrators does not judge a machine token it cannot name.
+  ['--authz-for', 'DM_AUTHZ_FOR', [], 'array', null, 'identifiers'],
+  // Two plugins judging the LDAP operations of the same requests compose as
+  // an AND: the first refusal wins. The server refuses to start on that
+  // unless this says the AND is meant.
+  ['--authz-combine', 'DM_AUTHZ_COMBINE', false, 'boolean'],
+
+  // Auth authzPerBranch plugin
+  [
+    '--authz-filter-attached-entries',
+    'DM_AUTHZ_FILTER_ATTACHED_ENTRIES',
+    false,
+    'boolean',
+  ],
+  ['--authz-transit-branch', 'DM_AUTHZ_TRANSIT_BRANCH', ''],
+  ['--authz-transit-origin-attribute', 'DM_AUTHZ_TRANSIT_ORIGIN_ATTRIBUTE', ''],
+
+  // LDAP operation concurrency, read by lib/ldap/state.ts
+  ['--ldap-concurrency', 'DM_LDAP_CONCURRENCY', 10, 'number'],
 ];
 
 export default configArgs;

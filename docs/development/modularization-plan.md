@@ -16,11 +16,13 @@ internal split. [#593], [#594], [#595] and [#603] are done.
 
 ## What blocks #397 today
 
-The core no longer imports plugin code. One composition point remains:
+The core declares the options it reads. What remains is runtime coupling and
+packaging:
 
-- `src/bin/options.ts` appends every plugin family's option set to the core
-  options in `src/config/args.ts`. It moves to the umbrella package in phase 2,
-  which is why `DM` now takes the option template as a constructor parameter.
+- `DM`'s default constructor argument still imports `src/bin/options.ts`, and
+  through it every plugin family. The template is already injectable; phase 2
+  drops the default and has the umbrella pass it, when `options.ts` moves out
+  of the core package.
 - The single package generates 88 `./plugin-*` exports from
   `rollup.config.mjs`, with no npm workspaces.
 

@@ -17,7 +17,6 @@ import { rabbitmqOptions } from '../plugins/rabbitmq.options';
 import { staticOptions } from '../plugins/static.options';
 import { storageOptions } from '../plugins/storage.options';
 import {
-  authOptions,
   authzOptions,
   crowdsecOptions,
   dynamicOptions,
@@ -123,9 +122,6 @@ const configArgs: ConfigTemplate = [
   // Lemonldap options
   ...toConfigEntries(llngOptions),
 
-  // Common to every authentication plugin
-  ...toConfigEntries(authOptions),
-
   // Auth token, fake, TOTP and HMAC plugins
   ...toConfigEntries(tokenOptions),
   ...toConfigEntries(fakeOptions),
@@ -135,23 +131,13 @@ const configArgs: ConfigTemplate = [
   // Auth authzPerRoute plugin
   ...toConfigEntries(perRouteOptions),
 
-  // Common to every authorization plugin
+  // Auth authzScope plugin
   ...toConfigEntries(authzOptions),
 
   // Auth authzPerBranch plugin
   ...toConfigEntries(perBranchOptions),
 
   // Auth authzDynamic plugin
-  //
-  // Who may reach the directory through this plugin without presenting one
-  // of its tokens. Empty — the default — means nobody: a request is checked
-  // against the ACLs of the token it carries, whatever else authenticated
-  // it. Values are identities as another authenticator publishes them in
-  // `req.user`, plus two words:
-  //
-  //  - `any-authenticated`: anything another plugin authenticated, which is
-  //    what the plugin did until 0.9.0, by accident rather than by decision;
-  //  - `trusted-proxy`: a request `core/auth/trustedProxy` vouched for.
   ...toConfigEntries(dynamicOptions),
 
   // Auth authzLinid1 plugin
