@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import configArgs from '../../src/config/args';
+import configArgs from '../../src/bin/options';
 import {
   defineOptions,
   opt,

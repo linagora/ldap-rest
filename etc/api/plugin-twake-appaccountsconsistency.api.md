@@ -40,9 +40,6 @@ class AppAccountsConsistency extends DmPlugin {
 export default AppAccountsConsistency;
 
 // @public (undocumented)
-type ArrayKind = 'identifiers' | 'dns' | 'phrases';
-
-// @public (undocumented)
 interface ArrayOption extends OptionSpec<string[]> {
     readonly kind?: ArrayKind;
     readonly plural?: string;

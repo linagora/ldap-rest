@@ -2,7 +2,7 @@
  * Configuration options declared by the code that reads them.
  *
  * A plugin describes its options next to its implementation with
- * {@link defineOptions}; `src/config/args.ts` concatenates the declarations so
+ * {@link defineOptions}; `src/bin/options.ts` concatenates the declarations so
  * the parser sees the same entries it always did. {@link readOptions} gives a
  * plugin typed values, with the defaults applied and the value checked once.
  *
@@ -150,8 +150,8 @@ function emptyValue(type: OptionType): unknown {
 }
 
 /**
- * The parser entries a set of declarations amounts to. `args.ts` concatenates
- * them with the global options and the other plugins' declarations.
+ * The parser entries a set of declarations amounts to. `bin/options.ts`
+ * concatenates them with the global options and the other declarations.
  */
 export function toConfigEntries(options: OptionSet): ConfigEntry[] {
   return Object.entries(options).map(([key, spec]) => {
@@ -336,7 +336,7 @@ function reportWarning(
  * `DmPlugin.options()`.
  *
  * `parsedKeys` names the options the parser knew. An option declared outside
- * `src/config/args.ts` reaches the parser as an unknown `--name value` pair,
+ * the template it parsed reaches the parser as an unknown `--name value` pair,
  * so its aliases are read here, under the key the unknown name produces.
  */
 export function readOptions<T extends OptionSet>(

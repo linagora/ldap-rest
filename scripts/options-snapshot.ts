@@ -211,7 +211,7 @@ async function main(): Promise<void> {
   const check = process.argv.includes('--check');
   // Imported here rather than at module load so the tests and the contracts
   // comparison can import this module without pulling every plugin option in
-  const { default: configArgs } = (await import('../src/config/args')) as {
+  const { default: configArgs } = (await import('../src/bin/options')) as {
     default: ConfigEntry[];
   };
   const generated = serializeOptionsSnapshot(buildOptionsSnapshot(configArgs));

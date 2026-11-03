@@ -5,9 +5,6 @@
 ```ts
 
 // @public (undocumented)
-type ArrayKind = 'identifiers' | 'dns' | 'phrases';
-
-// @public (undocumented)
 interface ArrayOption extends OptionSpec<string[]> {
     readonly kind?: ArrayKind;
     readonly plural?: string;
@@ -26,6 +23,7 @@ export type JamesOptions = OptionsOf<typeof jamesOptions>;
 
 // @public (undocumented)
 export const jamesOptions: {
+    ldap_concurrency: NumberOption;
     james_webadmin_url: StringOption;
     james_webadmin_token: StringOption;
     james_signature_template: StringOption;

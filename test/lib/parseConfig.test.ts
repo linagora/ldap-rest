@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 
 import { ConfigParser, type ConfigEntry } from '../../src/lib/parseConfig';
-import configArgs from '../../src/config/args';
+import configArgs from '../../src/bin/options';
 
 describe('ConfigParser', () => {
   // test/setup.ts sets some DM_* variables for the whole run: give each test

@@ -27,6 +27,9 @@ Settled<F extends (...args: never[]) => infer R ? R : never>
 // @public
 type Args<K extends keyof Hooks> = NonNullable<Hooks[K]> extends (...args: infer A) => unknown ? A : never;
 
+// @public (undocumented)
+type ArrayKind = 'identifiers' | 'dns' | 'phrases';
+
 // @public
 export const asyncHandler: (fn: (req: Request_2, res: Response_2, next: NextFunction) => Promise<void>) => RequestHandler;
 
@@ -759,6 +762,23 @@ interface Config {
 }
 
 // @public (undocumented)
+type ConfigEntry = [
+string,
+string,
+// env value
+string | string[] | boolean | number | Record<string, any>,
+('string' | 'number' | 'boolean' | 'array' | 'json' | null | undefined)?,
+(string | null | undefined)?,
+ArrayKind?,
+boolean?,
+(string[] | null | undefined)?,
+(string[] | null | undefined)?
+];
+
+// @public (undocumented)
+type ConfigTemplate = ConfigEntry[];
+
+// @public (undocumented)
 export class ConflictError extends HttpError {
     constructor(message?: string, refusal?: Refusal);
 }
@@ -768,7 +788,7 @@ export const defineRoute: <P extends TSchema | undefined = undefined, Q extends 
 
 // @public
 class DM {
-    constructor();
+    constructor(options?: ConfigTemplate);
     afterLoad(): void;
     // (undocumented)
     app: express.Express;
@@ -777,6 +797,7 @@ class DM {
     get composed(): boolean;
     // (undocumented)
     config: Config;
+    readonly configTemplate: ConfigTemplate;
     dispatchAuth(req: Request_2, res: Response_2, next: () => void): void;
     readonly entities: EntityRegistry;
     exitOnCrash(): void;
@@ -796,6 +817,7 @@ class DM {
     // (undocumented)
     get operationSequence(): number;
     set operationSequence(value: number);
+    readonly optionKeys: ReadonlySet<string>;
     readonly pluginInfo: PluginInfo;
     // (undocumented)
     ready: Promise<void>;

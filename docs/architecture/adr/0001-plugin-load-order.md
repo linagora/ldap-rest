@@ -13,7 +13,7 @@ configuration.
 
 ## Decision
 
-`src/plugins/priority.json` lists the modules loaded first. That pass is
+`src/config/priority.json` lists the modules loaded first. That pass is
 sequential, in the file's order, and every instance of a priority module is
 loaded there, in configuration order — matching is on the module, not on the
 whole `--plugin` entry, so a named instance (`module:name:{…}`) keeps its

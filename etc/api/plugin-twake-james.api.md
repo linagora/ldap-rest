@@ -18,9 +18,6 @@ import { TString } from '@sinclair/typebox';
 import type winston from 'winston';
 
 // @public (undocumented)
-type ArrayKind = 'identifiers' | 'dns' | 'phrases';
-
-// @public (undocumented)
 interface ArrayOption extends OptionSpec<string[]> {
     readonly kind?: ArrayKind;
     readonly plural?: string;
@@ -81,6 +78,7 @@ class James extends TwakePlugin {
     _normalizeToArray(value: AttributeValue | null): string[];
     // (undocumented)
     static optionDefinitions: {
+        ldap_concurrency: NumberOption;
         james_webadmin_url: StringOption;
         james_webadmin_token: StringOption;
         james_signature_template: StringOption;

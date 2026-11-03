@@ -5,6 +5,7 @@ import { join } from 'path';
 import { expect } from 'chai';
 
 import type { Config } from '../../src/bin';
+import configArgs from '../../src/bin/options';
 import { type Schema, schemaAttribute } from '../../src/config/schema';
 import {
   configuredSchemaFiles,
@@ -365,11 +366,14 @@ describe('lib/schemaFile', () => {
   describe('configuredSchemaFiles', () => {
     it('lists the schema options, but those left at their default', () => {
       expect(
-        configuredSchemaFiles({
-          group_schema: join(shippedSchemasPath, 'twake', 'groups.json'),
-          organization_schema: '/etc/ldap-rest/schemas/organizations.json',
-          ldap_flat_schema: ['/etc/ldap-rest/schemas/users.json'],
-        } as Config)
+        configuredSchemaFiles(
+          {
+            group_schema: join(shippedSchemasPath, 'twake', 'groups.json'),
+            organization_schema: '/etc/ldap-rest/schemas/organizations.json',
+            ldap_flat_schema: ['/etc/ldap-rest/schemas/users.json'],
+          } as Config,
+          configArgs
+        )
       ).to.deep.equal([
         '/etc/ldap-rest/schemas/organizations.json',
         '/etc/ldap-rest/schemas/users.json',

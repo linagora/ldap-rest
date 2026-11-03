@@ -10,8 +10,8 @@ import { dirname, isAbsolute, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 import type { Config } from '../bin';
-import configArgs from '../config/args';
 
+import type { ConfigTemplate } from './parseConfig';
 import { transformSchemas } from './utils';
 
 /** Directory of the schemas shipped with LDAP-Rest, whatever --schemas-path says */
@@ -294,10 +294,13 @@ const schemaOptions: [keyof Config, string][] = [
  * @param config server configuration
  * @returns their paths, as configured
  */
-export function configuredSchemaFiles(config: Config): string[] {
+export function configuredSchemaFiles(
+  config: Config,
+  options: ConfigTemplate
+): string[] {
   const files: string[] = [];
   for (const [key, option] of schemaOptions) {
-    const defaults = [configArgs.find(entry => entry[0] === option)?.[2]]
+    const defaults = [options.find(entry => entry[0] === option)?.[2]]
       .flat()
       .filter((file): file is string => typeof file === 'string' && !!file)
       .map(file => resolve(file));

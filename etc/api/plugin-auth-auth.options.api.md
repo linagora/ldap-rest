@@ -5,15 +5,32 @@
 ```ts
 
 // @public (undocumented)
-type ArrayKind = 'identifiers' | 'dns' | 'phrases';
-
-// @public (undocumented)
 interface ArrayOption extends OptionSpec<string[]> {
     readonly kind?: ArrayKind;
     readonly plural?: string;
     // (undocumented)
     readonly type: 'array';
 }
+
+// @public (undocumented)
+export type AuthOptions = OptionsOf<typeof authOptions>;
+
+// @public
+export const authOptions: {
+    auth_path_prefix: ArrayOption;
+};
+
+// @public (undocumented)
+export type AuthzOptions = OptionsOf<typeof authzOptions>;
+
+// @public
+export const authzOptions: {
+    authz_unresolved_user: StringOption;
+    authz_identity: StringOption;
+    authz_for: ArrayOption;
+    authz_combine: BooleanOption;
+    authz_scope_source: StringOption;
+};
 
 // @public (undocumented)
 interface BooleanOption extends OptionSpec<boolean> {
@@ -124,6 +141,9 @@ export type PerBranchOptions = OptionsOf<typeof perBranchOptions>;
 
 // @public (undocumented)
 export const perBranchOptions: {
+    authz_filter_attached_entries: BooleanOption;
+    authz_transit_branch: StringOption;
+    authz_transit_origin_attribute: StringOption;
     authz_per_branch_config: JsonOption<AuthConfig>;
     authz_per_branch_cache_ttl: NumberOption;
     ldap_group_member_attribute: StringOption;

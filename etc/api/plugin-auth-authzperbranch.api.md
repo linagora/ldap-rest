@@ -69,6 +69,9 @@ class AuthzPerBranch extends AuthzBase {
     name: string;
     // (undocumented)
     static optionDefinitions: {
+        authz_filter_attached_entries: BooleanOption;
+        authz_transit_branch: StringOption;
+        authz_transit_origin_attribute: StringOption;
         authz_per_branch_config: JsonOption<AuthConfig>;
         authz_per_branch_cache_ttl: NumberOption;
         ldap_group_member_attribute: StringOption;
@@ -78,6 +81,12 @@ class AuthzPerBranch extends AuthzBase {
     protected shouldSkipAuthorization(req?: DmRequest): boolean;
 }
 export default AuthzPerBranch;
+
+// @public (undocumented)
+interface BooleanOption extends OptionSpec<boolean> {
+    // (undocumented)
+    readonly type: 'boolean';
+}
 
 // @public (undocumented)
 interface CachedGroups {

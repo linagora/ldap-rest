@@ -891,7 +891,7 @@ async function main(): Promise<void> {
       `No ${OPTIONS_SNAPSHOT} in ${base}: introducing the options snapshot.`
     );
   else {
-    const { default: configArgs } = (await import('../src/config/args')) as {
+    const { default: configArgs } = (await import('../src/bin/options')) as {
       default: Parameters<typeof buildOptionsSnapshot>[0];
     };
     differences.push(

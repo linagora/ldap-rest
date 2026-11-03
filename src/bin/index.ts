@@ -22,10 +22,10 @@ import bodyParser from 'body-parser';
 import type winston from 'winston';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
-import { ConfigParser } from '../lib/parseConfig';
+import { ConfigParser, type ConfigTemplate } from '../lib/parseConfig';
 import { unknownEnvironmentOptions } from '../config/options';
 import { keepRawBody } from '../lib/rawBody';
-import configArgs, { type Config } from '../config/args';
+import { type Config } from '../config/args';
 import type { Hooks } from '../hooks';
 import ldapActions from '../lib/ldapActions';
 import type DmPlugin from '../abstract/plugin';
@@ -71,7 +71,9 @@ import {
   unhandledRejections,
 } from '../lib/metrics';
 import { registerProcessShutdown, shutdownTimeout } from '../lib/shutdown';
-import pluginPriority from '../plugins/priority.json';
+import pluginPriority from '../config/priority.json';
+
+import configArgs from './options';
 
 export type { Config };
 
@@ -175,6 +177,10 @@ export {
 export class DM {
   app: express.Express;
   config: Config;
+  /** The option template this server parsed, injected by the umbrella. */
+  readonly configTemplate: ConfigTemplate;
+  /** `Config` keys the parser knew, for `DmPlugin.options` */
+  readonly optionKeys: ReadonlySet<string>;
   ready: Promise<void>;
   /** The listener, once `run()` opened it; shared by the `withConfig` views */
   get server(): import('http').Server | undefined {
@@ -339,14 +345,18 @@ export class DM {
    */
   private readonly authzHooks = new WeakSet<object>();
 
-  constructor() {
+  constructor(options: ConfigTemplate = configArgs) {
+    this.configTemplate = options;
+    this.optionKeys = new Set(
+      options.map(entry => entry[0].replace(/^--?/, '').replace(/-/g, '_'))
+    );
     this.services.set(EntityRegistryService, this.entities);
     this.serviceOwners.set(EntityRegistryService, 'core');
     this.services.set(AuthenticatorsService, this.authenticatorsInfo);
     this.serviceOwners.set(AuthenticatorsService, 'core');
     this.services.set(PluginInfoService, this.pluginInfo);
     this.serviceOwners.set(PluginInfoService, 'core');
-    const parser = new ConfigParser(configArgs);
+    const parser = new ConfigParser(options);
     this.config = parser.parse();
     this.unknownCliOptions = parser.unknownOptions;
     this.deprecationWarnings = parser.deprecationWarnings;
@@ -581,9 +591,11 @@ export class DM {
     );
     const unknown = [
       ...unknownCli.map(name => `option ${name}`),
-      ...unknownEnvironmentOptions(configArgs, process.env, definitions).map(
-        name => `environment variable ${name}`
-      ),
+      ...unknownEnvironmentOptions(
+        this.configTemplate,
+        process.env,
+        definitions
+      ).map(name => `environment variable ${name}`),
     ];
     if (unknown.length === 0) return;
     const message =

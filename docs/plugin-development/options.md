@@ -3,10 +3,10 @@
 A core plugin declares its configuration options next to its code, in a
 `<plugin>.options.ts` file. A family that shares imports and lifecycle keeps
 one set per plugin in a single `<family>.options.ts` file, named after the
-family. `src/config/args.ts` concatenates those declarations,
-so the parser, the command line and the environment variables see the same
-entries as before. The plugin then reads typed values instead of casting
-`this.config`.
+family. `src/bin/options.ts` concatenates those declarations on top of the
+core options in `src/config/args.ts`, so the parser, the command line and the
+environment variables see the same entries as before. The plugin then reads
+typed values instead of casting `this.config`.
 
 ## Declaring options
 
@@ -111,12 +111,12 @@ cannot describe the wrong view.
 
 ## Wiring it in
 
-Import the declaration in `src/config/args.ts` and spread it where the plugin's
-options used to be:
+Import the declaration in `src/bin/options.ts` and spread it where the
+plugin's options used to be:
 
 ```typescript
 import { exampleOptions } from '../plugins/example/example.options';
-import { toConfigEntries } from './options';
+import { toConfigEntries } from '../config/options';
 
 const configArgs: ConfigTemplate = [
   // ...
@@ -124,10 +124,11 @@ const configArgs: ConfigTemplate = [
 ];
 ```
 
-The `Config` interface keeps the hand-written fields until every plugin has
-moved. A migrated plugin no longer reads them: it uses `options()`.
+The `Config` interface in `src/config/args.ts` keeps the hand-written fields
+until every plugin has moved. A migrated plugin no longer reads them: it uses
+`options()`.
 
-Plugins outside the repository cannot add to `args.ts` yet, but they can
+Plugins outside the repository cannot add to `src/bin/options.ts` yet, but they can
 declare options the same way and name them in `optionDefinitions`: the startup
 report subtracts those keys and their aliases, and `options()` reads a declared
 `env` variable or a deprecated CLI alias the parser did not carry, warning at

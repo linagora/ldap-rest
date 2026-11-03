@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { expect } from 'chai';
 
 import { DM } from '../../../src/bin';
-import priority from '../../../src/plugins/priority.json';
+import priority from '../../../src/config/priority.json';
 import Storage from '../../../src/plugins/storage';
 
 describe('Keyed storage, one instance', function () {

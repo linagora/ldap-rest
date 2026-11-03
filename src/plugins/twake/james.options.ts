@@ -10,6 +10,10 @@ import {
 } from '../../config/options';
 
 export const jamesOptions = defineOptions({
+  ldap_concurrency: opt.number({
+    env: 'DM_LDAP_CONCURRENCY',
+    default: 10,
+  }),
   james_webadmin_url: opt.string({
     env: 'DM_JAMES_WEBADMIN_URL',
     default: 'http://localhost:8000',

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path, { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-import configArgs from '../src/config/args';
+import configArgs from '../src/bin/options';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const moduleDir = path.resolve(__dirname, '..');

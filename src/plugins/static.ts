@@ -27,7 +27,6 @@ import express from 'express';
 
 import DmPlugin, { defineRoute, type Role } from '../abstract/plugin';
 import type { DM } from '../bin';
-import { STATIC_CSP, STATIC_FRAME_OPTIONS } from '../config/args';
 import { notFound, serverError } from '../lib/expressFormatedResponses';
 import {
   configuredSchemaFiles,
@@ -36,7 +35,12 @@ import {
   staticName,
 } from '../lib/schemaFile';
 
-import { staticOptions, type StaticOptions } from './static.options';
+import {
+  STATIC_CSP,
+  STATIC_FRAME_OPTIONS,
+  staticOptions,
+  type StaticOptions,
+} from './static.options';
 
 /**
  * The path of a request as the configuration writes it: `schemaUrl` puts
@@ -367,7 +371,10 @@ export default class Static extends DmPlugin {
    */
   private configuredSchemas(rep: string): Map<string, string> {
     const byUrl = new Map<string, string>();
-    for (const file of configuredSchemaFiles(this.config)) {
+    for (const file of configuredSchemaFiles(
+      this.config,
+      this.server.configTemplate
+    )) {
       const url = schemaUrl(this.config, file);
       if (!url) continue;
       const underStatic = join(rep, url.substring(url.indexOf('/schemas/')));

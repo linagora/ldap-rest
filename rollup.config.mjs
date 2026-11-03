@@ -155,6 +155,7 @@ export default async () => {
     {
       input: [
         'src/bin/index.ts',
+        'src/bin/options.ts',
         'src/hooks.ts',
         ...p.map(file => `${PLUGINS_SRC_DIR}/${file}`),
         ...a.map(file => `src/abstract/${file}`),
