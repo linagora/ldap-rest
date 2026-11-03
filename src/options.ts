@@ -3,50 +3,27 @@
  * declarations of the plugins its `--plugin` entries load.
  *
  * The core is the only mandatory package; importing every plugin here would
- * make the umbrella depend on all of them. `composeOptions` is the two-phase
- * read, and `src/options.full.ts` keeps the complete set for the build
- * scripts and the option snapshot. See
+ * make the umbrella depend on all of them. `src/options.full.ts` keeps the
+ * complete set for the build scripts and the tests. See
  * `docs/development/modularization-plan.md`.
  */
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 
-import coreConfigArgs from '@ldap-rest/core/config/args';
 import {
   pluginEntriesFrom,
   pluginOptionEntries,
   type PluginRoots,
 } from '@ldap-rest/core/config/pluginOptions';
-import type {
-  ConfigEntry,
-  ConfigTemplate,
-} from '@ldap-rest/core/lib/parseConfig';
-import { setShippedSchemasPath } from '@ldap-rest/core/lib/schemaFile';
-import { setServerVersion } from '@ldap-rest/core/lib/version';
+import type { ConfigTemplate } from '@ldap-rest/core/lib/parseConfig';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const packageRoot = join(here, '..');
-const shippedSchemas = join(packageRoot, 'static', 'schemas');
-setShippedSchemasPath(shippedSchemas);
-setServerVersion(
-  (
-    JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
-      version?: string;
-    }
-  ).version
-);
+import { coreOptions, here, withoutCoreDuplicates } from './coreOptions';
+
+export { coreOptions as default } from './coreOptions';
 
 const roots: PluginRoots = {
   pluginRoot: join(here, 'plugins'),
   resolveBase: join(here, 'bin'),
 };
-
-const coreOptions: ConfigTemplate = coreConfigArgs.map(entry =>
-  entry[0] === '--schemas-path'
-    ? ([entry[0], entry[1], shippedSchemas, ...entry.slice(3)] as ConfigEntry)
-    : entry
-);
 
 /**
  * The core options and the declarations of `entries`, which default to the
@@ -56,7 +33,8 @@ const coreOptions: ConfigTemplate = coreConfigArgs.map(entry =>
 export async function composeOptions(
   entries: readonly string[] = pluginEntriesFrom()
 ): Promise<ConfigTemplate> {
-  return [...coreOptions, ...(await pluginOptionEntries(entries, roots))];
+  return withoutCoreDuplicates([
+    ...coreOptions,
+    ...(await pluginOptionEntries(entries, roots)),
+  ]);
 }
-
-export default coreOptions;

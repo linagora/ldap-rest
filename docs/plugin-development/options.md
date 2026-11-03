@@ -80,6 +80,24 @@ Each declaration takes:
 | `aliases`    | Former CLI names still accepted, without the leading `--`             |
 | `envAliases` | Former environment variables still accepted, read when `env` is unset |
 
+### Reading another plugin's options
+
+An option an entry in `dependencies` declares is read by the plugin that
+depends on it. Name that module in `optionDependencies` so phase 1 reads its
+declarations before the instance loads it:
+
+```typescript
+export default class LifecycleEvents extends DmPlugin {
+  static optionDefinitions = lifecycleOptions;
+  static optionDependencies = ['core/rabbitmq'];
+  dependencies = { rabbitmq: 'core/rabbitmq' };
+}
+```
+
+An option the core or several families read is declared in the core options
+(`packages/core/src/config/args.ts`) instead, so it keeps its default, type
+and environment variable whether or not the plugin serving it is named.
+
 ## Reading options
 
 The plugin names the declaration as a static field, and asks for the values in

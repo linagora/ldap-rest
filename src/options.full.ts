@@ -2,25 +2,15 @@
  * The complete option set: the core options followed by every plugin
  * family's declarations.
  *
- * The core package declares only the options it reads. This umbrella module
- * composes them with the plugin families' declarations and is the template
- * the umbrella's `DM` passes to the core. See
+ * The server reads only the plugins its command names; this module keeps the
+ * complete set for the build scripts, the option snapshot and the tests. See
  * `docs/development/modularization-plan.md`.
  */
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
-
-import coreConfigArgs from '@ldap-rest/core/config/args';
 import { toConfigEntries } from '@ldap-rest/core/config/options';
-import type {
-  ConfigEntry,
-  ConfigTemplate,
-} from '@ldap-rest/core/lib/parseConfig';
+import type { ConfigTemplate } from '@ldap-rest/core/lib/parseConfig';
 import { scimOptions } from '@ldap-rest/core/lib/scim/options';
-import { setShippedSchemasPath } from '@ldap-rest/core/lib/schemaFile';
-import { setServerVersion } from '@ldap-rest/core/lib/version';
 
+import { coreOptions, withoutCoreDuplicates } from './coreOptions';
 import { bclOptions } from './plugins/bcl.options';
 import { metricsOptions } from './plugins/metrics.options';
 import { rabbitmqOptions } from './plugins/rabbitmq.options';
@@ -65,23 +55,6 @@ import { twakeInstancesOptions } from './plugins/twake/twakeInstances.options';
 import { twakeLifecycleOptions } from './plugins/twake/twakeLifecycle.options';
 import { twakeSpacesOptions } from './plugins/twake/twakeSpaces.options';
 import { twakeTombstoneOptions } from './plugins/twake/twakeTombstone.options';
-
-const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-const shippedSchemas = join(packageRoot, 'static', 'schemas');
-setShippedSchemasPath(shippedSchemas);
-setServerVersion(
-  (
-    JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
-      version?: string;
-    }
-  ).version
-);
-
-const coreOptions: ConfigTemplate = coreConfigArgs.map(entry =>
-  entry[0] === '--schemas-path'
-    ? ([entry[0], entry[1], shippedSchemas, ...entry.slice(3)] as ConfigEntry)
-    : entry
-);
 
 const configArgs: ConfigTemplate = [
   ...coreOptions,
@@ -185,4 +158,4 @@ const configArgs: ConfigTemplate = [
   ...toConfigEntries(scimOptions),
 ];
 
-export default configArgs;
+export default withoutCoreDuplicates(configArgs);
