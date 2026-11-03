@@ -44,6 +44,15 @@ describe('plugin option entries', () => {
       ).to.deep.equal(['core/metrics', 'core/ldap/groups', 'core/ldap/raw']);
     });
 
+    it('splits the plural form on whitespace, as the parser does', () => {
+      expect(
+        pluginEntriesFrom(
+          ['node', 'ldap-rest', '--plugins', 'core/metrics core/static'],
+          {}
+        )
+      ).to.deep.equal(['core/metrics', 'core/static']);
+    });
+
     it('reads DM_PLUGINS before the command line, as the parser does', () => {
       expect(
         pluginEntriesFrom(['node', 'ldap-rest', '--plugin', 'a'], {

@@ -67,6 +67,7 @@ export function pluginEntriesFrom(
 ): string[] {
   // The parser reads an array option's environment value before appending the
   // command-line ones, so a plugin's place in the list follows the same order.
+  // `--plugins` is the plural form: it splits on whitespace too.
   const entries: string[] = [];
   const envValue = env.DM_PLUGINS;
   if (envValue !== undefined && envValue.trim() !== '')
@@ -79,7 +80,13 @@ export function pluginEntriesFrom(
         `Error in command line: ${argv[i]} has an empty value. Leave it out ` +
           'to keep the default'
       );
-    entries.push(...splitValue(value, 'identifiers', 'singular'));
+    entries.push(
+      ...splitValue(
+        value,
+        'identifiers',
+        argv[i] === '--plugins' ? 'plural' : 'singular'
+      )
+    );
     i++;
   }
   return entries;

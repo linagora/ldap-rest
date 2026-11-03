@@ -12,6 +12,8 @@ import { pathToFileURL } from 'url';
 import { expect } from 'chai';
 import { parseConfig } from '@ldap-rest/core/lib/parseConfig';
 
+import { DM } from '../../src/bin';
+
 interface BuiltOptions {
   composeOptions: (
     entries: readonly string[]
@@ -59,6 +61,17 @@ describe('composeOptions on the built server', () => {
     expect(await names(['core/auth/authzScope'])).to.include(
       '--authz-scope-source'
     );
+  });
+
+  it('parses a dependency option in the template the command uses', async () => {
+    const argv = process.argv;
+    process.argv = ['node', 'ldap-rest', '--twake-group-max-page-limit', '12'];
+    try {
+      const dm = new DM(await compose(['core/twake/spaces']));
+      expect(dm.config.twake_group_max_page_limit).to.equal(12);
+    } finally {
+      process.argv = argv;
+    }
   });
 
   it('declares an option once', async () => {

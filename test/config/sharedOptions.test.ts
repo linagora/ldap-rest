@@ -37,4 +37,15 @@ describe('shared options', () => {
       const coreEntry = core.get(entry[0]) as ConfigEntry;
       expect(effective(entry)).to.deep.equal(effective(coreEntry));
     });
+
+  // The authorization code reads these before any plugin is loaded
+  for (const key of [
+    'authz_filter_attached_entries',
+    'authz_for',
+    'authz_combine',
+    'ldap_organization_link_attribute',
+  ])
+    it(`carries ${key} before plugins load`, () => {
+      expect(core.has(`--${key.replace(/_/g, '-')}`)).to.equal(true);
+    });
 });
