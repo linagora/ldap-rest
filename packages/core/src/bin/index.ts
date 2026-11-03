@@ -1127,6 +1127,7 @@ export class DM {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             pluginModule = pluginModule.default;
           }
+          this.assertPluginOptions(pluginName, pluginModule as typeof DmPlugin);
           let obj;
           if (overrides) {
             const newConfig = { ...this.config, ...overrides };
@@ -1169,6 +1170,29 @@ export class DM {
   }
 
   /**
+   * A plugin whose declarations never reached the template would read an
+   * untyped CLI value, or its default from nowhere. Fail before `new`, not in
+   * the plugin's constructor.
+   */
+  private assertPluginOptions(
+    pluginName: string,
+    plugin: typeof DmPlugin
+  ): void {
+    const definitions = plugin.optionDefinitions ?? {};
+    const missing = Object.keys(definitions).filter(
+      key => !this.optionKeys.has(key)
+    );
+    if (missing.length === 0) return;
+    const names = missing.map(key => `--${key.replace(/_/g, '-')}`);
+    throw new Error(
+      `Plugin ${pluginName} declares the ` +
+        `${missing.length === 1 ? `option ${names[0]}` : `options ${names.join(', ')}`} ` +
+        'the configuration template does not carry: name its module in ' +
+        '--plugin, or in the optionDependencies of a plugin that depends on it'
+    );
+  }
+
+  /**
    * A dependency the loader reads options from must have had them composed:
    * otherwise a CLI value reached the parser untyped. Naming its module in
    * `optionDependencies` is what phase 1 follows.
@@ -1182,10 +1206,11 @@ export class DM {
       key => !this.optionKeys.has(key)
     );
     if (missing.length === 0) return;
+    const names = missing.map(key => `--${key.replace(/_/g, '-')}`);
     throw new Error(
-      `${obj.name} depends on ${dependency}, whose option ` +
-        `${missing.map(key => `--${key.replace(/_/g, '-')}`).join(', ')} ` +
-        'is not in the configuration template: add ' +
+      `${obj.name} depends on ${dependency}, whose ` +
+        `${missing.length === 1 ? `option ${names[0]} is` : `options ${names.join(', ')} are`} ` +
+        'not in the configuration template: add ' +
         `${obj.dependencies?.[dependency] ?? dependency} to the ` +
         'optionDependencies of ' +
         `${obj.constructor.name}`

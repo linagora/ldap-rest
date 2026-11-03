@@ -158,4 +158,7 @@ const configArgs: ConfigTemplate = [
   ...toConfigEntries(scimOptions),
 ];
 
+/** The plugin declarations alone, before the core entries drop their copies */
+export const pluginConfigArgs = configArgs.slice(coreOptions.length);
+
 export default withoutCoreDuplicates(configArgs);
