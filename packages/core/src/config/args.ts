@@ -4,9 +4,6 @@
  * plugin families' options.
  * @author Xavier Guimard <xguimard@linagora.com>
  */
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
 
@@ -522,19 +519,9 @@ const configArgs: ConfigTemplate = [
   ['--ldap-cache-ttl', 'DM_LDAP_CACHE_TTL', 0, 'number'], // seconds, 0 = off
   ['--ldap-pool-size', 'DM_LDAP_POOL_SIZE', 5, 'number'],
   ['--ldap-connection-ttl', 'DM_LDAP_CONNECTION_TTL', 60, 'number'], // seconds
-  [
-    '--schemas-path',
-    'DM_SCHEMAS_PATH',
-    join(
-      dirname(fileURLToPath(import.meta.url)),
-      '..',
-      '..',
-      '..',
-      '..',
-      'static',
-      'schemas'
-    ),
-  ],
+  // The umbrella sets its own shipped schemas as the default; a core-only
+  // embedder names this option.
+  ['--schemas-path', 'DM_SCHEMAS_PATH', ''],
 
   // Special attributes
   ['--mail-attribute', 'DM_MAIL_ATTRIBUTE', 'mail'],

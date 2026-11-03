@@ -39,11 +39,4 @@ export default AuthLLNG;
 // @public (undocumented)
 type LlngHandler = lemonldapNgHandler;
 
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
-
 ```

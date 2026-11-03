@@ -7,14 +7,6 @@
 import type { Request as Request_2 } from 'express';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 export type BaseMap = Record<string, BaseMapEntry>;
 
 // @public (undocumented)
@@ -36,22 +28,6 @@ export class BaseResolver {
     userBase(req?: DmRequest | {
         user?: string;
     }): string;
-}
-
-// @public (undocumented)
-interface BooleanOption extends OptionSpec<boolean> {
-    // (undocumented)
-    readonly type: 'boolean';
-}
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
 }
 
 // @public (undocumented)

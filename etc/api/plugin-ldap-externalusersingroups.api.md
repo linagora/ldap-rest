@@ -16,14 +16,6 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 class ExternalUsersInGroups extends DmPlugin {
     constructor(server: DM);
     // (undocumented)
@@ -51,12 +43,5 @@ export default ExternalUsersInGroups;
 
 // @public
 export const mailDomainOf: (mail: string) => string;
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
 
 ```

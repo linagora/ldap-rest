@@ -16,16 +16,6 @@ export const metricsOptions: {
 export function metricsOptionsOf(config: Config): MetricsOptions;
 
 // @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
 type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
 
 // (No @packageDocumentation comment for this package)

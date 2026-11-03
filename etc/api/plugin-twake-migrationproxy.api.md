@@ -17,14 +17,6 @@ import { TObject } from '@sinclair/typebox';
 import { TString } from '@sinclair/typebox';
 import type winston from 'winston';
 
-// @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
 // @public
 export const MailMigrationParams: TObject<    {
 user: TString;
@@ -59,36 +51,6 @@ class MigrationProxy extends TwakePlugin {
     roles: Role[];
 }
 export default MigrationProxy;
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
-
-// @public
-interface TwakeConnection {
-    // (undocumented)
-    concurrency: number;
-    concurrencyOption: string;
-    // (undocumented)
-    token: string;
-    tokenOption: string;
-    // (undocumented)
-    url: string;
-    urlOption: string;
-}
 
 // @public
 abstract class TwakePlugin extends DmPlugin {

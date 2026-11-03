@@ -20,14 +20,6 @@ import { TString } from '@sinclair/typebox';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 export const EraseTombstoneBody: TObject<    {
 dn: TString;
 force: TOptional<TBoolean>;
@@ -37,28 +29,6 @@ force: TOptional<TBoolean>;
 export const EraseTombstoneResponse: TObject<    {
 success: TBoolean;
 }>;
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
-
-// @public (undocumented)
-interface TombstoneApi {
-    keeps(dn: string): boolean;
-}
 
 // @public (undocumented)
 class TwakeTombstone extends DmPlugin {

@@ -16,14 +16,6 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 class LdapOrganizations extends DmPlugin {
     constructor(dm: DM);
     // (undocumented)
@@ -82,22 +74,5 @@ class LdapOrganizations extends DmPlugin {
     searchOrganisationTree(dn: string, query: string, req?: Request_2): Promise<AttributesList[]>;
 }
 export default LdapOrganizations;
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
 
 ```

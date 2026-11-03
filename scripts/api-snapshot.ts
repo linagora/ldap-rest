@@ -54,12 +54,11 @@ const pluginEntries: Record<string, string> = Object.fromEntries(
 );
 
 export const API_ENTRIES: Record<string, string> = {
-  'ldap-rest': 'packages/core/src/bin/index.d.ts',
-  expressformatedresponses:
-    'packages/core/src/lib/expressFormatedResponses.d.ts',
-  hooks: 'packages/core/src/hooks.d.ts',
-  ldapactions: 'packages/core/src/lib/ldapActions.d.ts',
-  plugin: 'packages/core/src/abstract/plugin.d.ts',
+  'ldap-rest': 'src/bin/index.d.ts',
+  expressformatedresponses: 'src/lib/expressFormatedResponses.d.ts',
+  hooks: 'src/hooks.d.ts',
+  ldapactions: 'src/lib/ldapActions.d.ts',
+  plugin: 'src/abstract/plugin.d.ts',
   ...pluginEntries,
 };
 
@@ -146,6 +145,11 @@ export function stripCoreDeclarations(
   report: string,
   core: Set<string>
 ): string {
+  // The umbrella report re-exports the core declarations with `export`; a
+  // plugin report carries the same declaration without it.
+  const comparable = (block: string): string =>
+    block.replace(/^export\s+/m, '');
+  const coreBlocks = new Set([...core].map(comparable));
   const lines = report.split('\n');
   const fence = lines.findIndex(line => line.startsWith('```'));
   const start = lines.findIndex(line => line.startsWith('// @'));
@@ -158,7 +162,7 @@ export function stripCoreDeclarations(
   const flush = (): void => {
     if (current.length === 0) return;
     const block = current.join('\n').trimEnd();
-    if (!core.has(block)) out.push(...current);
+    if (!coreBlocks.has(comparable(block))) out.push(...current);
     current = [];
   };
   for (const line of lines.slice(start, end === -1 ? undefined : end)) {

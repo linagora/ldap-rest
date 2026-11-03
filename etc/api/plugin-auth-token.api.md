@@ -16,14 +16,6 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 class AuthToken extends AuthBase {
     constructor(...args: ConstructorParameters<typeof AuthBase>);
     // (undocumented)

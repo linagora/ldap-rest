@@ -28,25 +28,9 @@ policy: TUnion<[TString, TNull]>;
 }>;
 
 // @public (undocumented)
-interface BooleanOption extends OptionSpec<boolean> {
-    // (undocumented)
-    readonly type: 'boolean';
-}
-
-// @public (undocumented)
 export const ExpiringQuery: TObject<    {
 days: TOptional<TInteger>;
 }>;
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
 
 // @public (undocumented)
 class PasswordPolicy extends DmPlugin {
@@ -76,11 +60,6 @@ class PasswordPolicy extends DmPlugin {
 }
 export default PasswordPolicy;
 
-// @public (undocumented)
-interface PasswordPolicyApi {
-    policyBase(): string;
-}
-
 // @public
 export const PolicyParams: TObject<    {
 cn: TString;
@@ -90,13 +69,6 @@ cn: TString;
 export const PolicyUserParams: TObject<    {
 id: TString;
 }>;
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
 
 // @public (undocumented)
 export const UnlockResponse: TObject<    {

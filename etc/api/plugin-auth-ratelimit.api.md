@@ -16,16 +16,6 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
 class RateLimit extends DmPlugin {
     constructor(...args: ConstructorParameters<typeof DmPlugin>);
     // (undocumented)

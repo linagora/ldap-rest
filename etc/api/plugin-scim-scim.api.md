@@ -19,30 +19,6 @@ import { TString } from '@sinclair/typebox';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
-interface BooleanOption extends OptionSpec<boolean> {
-    // (undocumented)
-    readonly type: 'boolean';
-}
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
 class Scim extends DmPlugin {
     constructor(server: DM);
     // (undocumented)
@@ -92,12 +68,6 @@ class Scim extends DmPlugin {
 }
 export default Scim;
 
-// @public (undocumented)
-interface ScimApi {
-    readonly userLockAttribute: string;
-    readonly userLockValue: string;
-}
-
 // @public
 export function scimBodyParser(options: ScimOptions): RequestHandler;
 
@@ -142,13 +112,6 @@ const scimOptions: {
     scim_etag: BooleanOption;
     scim_base_url: StringOption;
 };
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
 
 // @public (undocumented)
 export function writeScimErrorFromException(res: Response_2, err: unknown, fallbackStatus?: number): void;

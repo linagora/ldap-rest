@@ -5,16 +5,6 @@
 ```ts
 
 // @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
 export type StorageOptions = OptionsOf<typeof storageOptions>;
 
 // @public (undocumented)

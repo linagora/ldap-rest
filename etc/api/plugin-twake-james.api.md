@@ -18,20 +18,6 @@ import { TString } from '@sinclair/typebox';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
-interface BooleanOption extends OptionSpec<boolean> {
-    // (undocumented)
-    readonly type: 'boolean';
-}
-
-// @public (undocumented)
 type Identity = {
     id: string;
     email: string;
@@ -97,42 +83,12 @@ class James extends TwakePlugin {
 export default James;
 
 // @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
 export const QuotaParams: TObject<    {
 user: TString;
 }>;
 
 // @public
 export type Signatures = Pick<Identity, 'htmlSignature' | 'textSignature'>;
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
-
-// @public
-interface TwakeConnection {
-    // (undocumented)
-    concurrency: number;
-    concurrencyOption: string;
-    // (undocumented)
-    token: string;
-    tokenOption: string;
-    // (undocumented)
-    url: string;
-    urlOption: string;
-}
 
 // @public
 abstract class TwakePlugin extends DmPlugin {

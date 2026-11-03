@@ -180,7 +180,7 @@ export class DM {
   /** `Config` keys the parser knew, for `DmPlugin.options` */
   readonly optionKeys: ReadonlySet<string>;
   /** Where `core/x` plugin entries resolve, injected by the umbrella. */
-  private readonly pluginRoot: string;
+  private readonly pluginRoot?: string;
   /** Directory a relative `--plugin` entry is resolved from. */
   private readonly resolveBase: string;
   ready: Promise<void>;
@@ -349,7 +349,7 @@ export class DM {
 
   constructor(
     options: ConfigTemplate = coreConfigArgs,
-    pluginRoot = join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins'),
+    pluginRoot?: string,
     resolveBase = dirname(fileURLToPath(import.meta.url))
   ) {
     this.configTemplate = options;
@@ -1046,8 +1046,13 @@ export class DM {
    *          otherwise (a package, resolved by node)
    */
   private resolveModule(module: string): string {
-    if (module.startsWith('core/'))
+    if (module.startsWith('core/')) {
+      if (!this.pluginRoot)
+        throw new Error(
+          `Cannot resolve ${module}: no plugin root was given to the server`
+        );
       return module.replace('core/', this.pluginRoot + '/').replace(/$/, '.js');
+    }
     if (module.startsWith('.'))
       return fileURLToPath(
         new URL(module, pathToFileURL(this.resolveBase + '/'))

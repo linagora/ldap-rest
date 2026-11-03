@@ -13,39 +13,6 @@ export interface FilterOptions {
 }
 
 // @public
-interface MappingEntry {
-    // (undocumented)
-    converter?: 'boolean' | 'number' | 'string';
-    // (undocumented)
-    ldap?: string;
-    // (undocumented)
-    ldapPrimary?: string;
-    // (undocumented)
-    ldapSecondary?: string;
-    // (undocumented)
-    multi?: 'single' | 'array';
-    // (undocumented)
-    operational?: boolean;
-    // (undocumented)
-    readOnly?: boolean;
-    // (undocumented)
-    scim: string;
-    // (undocumented)
-    sub?: Record<string, string>;
-    subDn?: string[];
-}
-
-// @public (undocumented)
-interface ResourceMapping {
-    // (undocumented)
-    entries: MappingEntry[];
-    // (undocumented)
-    resourceType: 'User' | 'Group';
-    // (undocumented)
-    schemas: string[];
-}
-
-// @public
 export function scimFilterToLdap(filter: string, mapping: ResourceMapping, opts?: FilterOptions): TranslatedFilter;
 
 // @public (undocumented)

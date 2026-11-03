@@ -37,11 +37,4 @@ class AuthFake extends AuthBase {
 }
 export default AuthFake;
 
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
-
 ```

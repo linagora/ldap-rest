@@ -75,22 +75,4 @@ class RabbitMq extends DmPlugin {
 }
 export default RabbitMq;
 
-// @public (undocumented)
-interface RabbitMqApi {
-    getRawClient(): Promise<object | null>;
-    // (undocumented)
-    publish(exchange: string, routingKey: string, message: RabbitMessage, options?: PublishOptions): Promise<void>;
-    // (undocumented)
-    subscribe(exchange: string, routingKey: string, queue: string, handler: RabbitMessageHandler, options?: SubscribeOptions): Promise<void>;
-    // (undocumented)
-    unsubscribe(queue: string): Promise<void>;
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
-
 ```

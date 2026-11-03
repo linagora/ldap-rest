@@ -51,36 +51,6 @@ class Drive extends TwakePlugin {
 }
 export default Drive;
 
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
-
-// @public
-interface TwakeConnection {
-    // (undocumented)
-    concurrency: number;
-    concurrencyOption: string;
-    // (undocumented)
-    token: string;
-    tokenOption: string;
-    // (undocumented)
-    url: string;
-    urlOption: string;
-}
-
 // @public
 abstract class TwakePlugin extends DmPlugin {
     constructor(server: DM, connection: TwakeConnection);

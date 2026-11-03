@@ -9,6 +9,6 @@
     "rootDir": "./",
     "types": ["node", "mocha"]
   },
-  "include": ["src/**/*", "packages/core/src/**/*", "test/**/*"],
+  "include": ["src/**/*", "packages/core/src/types/**/*.d.ts", "test/**/*"],
   "exclude": ["node_modules", "dist", "packages/*/dist"]
 }

@@ -32,14 +32,4 @@ class Metrics extends DmPlugin {
 }
 export default Metrics;
 
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
 ```

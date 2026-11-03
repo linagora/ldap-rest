@@ -16,14 +16,6 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface ArrayOption extends OptionSpec<string[]> {
-    readonly kind?: ArrayKind;
-    readonly plural?: string;
-    // (undocumented)
-    readonly type: 'array';
-}
-
-// @public (undocumented)
 class AuthzDynamic extends AuthBase {
     constructor(server: DM);
     afterChain(req: DmRequest, res: Response_2, next: () => void): void;
@@ -63,12 +55,6 @@ export interface AuthzDynamicRequest extends DmRequest {
 }
 
 // @public (undocumented)
-interface BooleanOption extends OptionSpec<boolean> {
-    // (undocumented)
-    readonly type: 'boolean';
-}
-
-// @public (undocumented)
 export interface BranchAcl {
     // (undocumented)
     delete?: boolean;
@@ -78,23 +64,6 @@ export interface BranchAcl {
     read?: boolean;
     // (undocumented)
     write?: boolean;
-}
-
-// @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
 }
 
 // @public (undocumented)

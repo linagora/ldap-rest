@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-import fs from 'fs';
+import fs, { rmSync } from 'fs';
 import { builtinModules } from 'module';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
@@ -24,6 +24,7 @@ const commonPlugins = dir => [
     declarationMap: false,
     sourceMap: process.env.NODE_ENV !== 'production',
     include: ['src/**/*'],
+    exclude: ['packages/core/**', 'test/**'],
     outDir: dir,
   }),
   process.env.NODE_ENV === 'production' &&
@@ -170,7 +171,18 @@ export default async () => {
         banner: '',
         preserveModules: true,
       },
-      plugins: commonPlugins('dist'),
+      plugins: [
+        ...commonPlugins('dist'),
+        {
+          // The root program follows `@ldap-rest/core` through the tsconfig
+          // paths and emits its declarations beside the umbrella's; nothing
+          // references the copy.
+          name: 'drop-core-declarations',
+          writeBundle() {
+            rmSync('dist/packages', { recursive: true, force: true });
+          },
+        },
+      ],
       external,
     },
   ];

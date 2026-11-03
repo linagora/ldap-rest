@@ -51,12 +51,6 @@ export const invalid: (message: string, code?: string) => RouteError;
 export function isDisplayName(name: unknown): name is string;
 
 // @public (undocumented)
-interface JsonOption<T> extends OptionSpec<T> {
-    // (undocumented)
-    readonly type: 'json';
-}
-
-// @public (undocumented)
 class LdapGroups extends DmPlugin {
     constructor(server: DM);
     protected adaptSchema(schema: Schema): Schema;
@@ -152,16 +146,6 @@ export const NAME_RULE = "name must be a non-blank string of at most 256 charact
 export const notFound: (what: string) => RouteError;
 
 // @public (undocumented)
-interface NumberOption extends OptionSpec<number> {
-    // (undocumented)
-    readonly max?: number;
-    // (undocumented)
-    readonly min?: number;
-    // (undocumented)
-    readonly type: 'number';
-}
-
-// @public (undocumented)
 export const ORG = "{org}";
 
 // @public (undocumented)
@@ -193,13 +177,6 @@ export class RouteError extends Error {
     readonly code: string;
     // (undocumented)
     readonly status: number;
-}
-
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
 }
 
 // @public (undocumented)
@@ -267,43 +244,6 @@ class TwakeGroups extends LdapGroups {
     users(org: string, usernames: string[], attributes: string[], req?: Request_2): Promise<AttributesList[]>;
 }
 export default TwakeGroups;
-
-// @public (undocumented)
-interface TwakeGroupsApi {
-    // (undocumented)
-    checkOrganization(org: string, req?: Request_2): Promise<void>;
-    // (undocumented)
-    readonly cn: string;
-    // (undocumented)
-    groupBaseOf(org: string): string;
-    // (undocumented)
-    groupOf(org: string, entry: AttributesList): Record<string, unknown>;
-    // (undocumented)
-    groups(org: string, filter: string, attributes?: string[], req?: Request_2): Promise<AttributesList[]>;
-    // (undocumented)
-    readonly maxPage: number;
-    // (undocumented)
-    memberPage(p: Page, org: string, names: string[], extra?: (username: string) => Record<string, unknown>, req?: Request_2): Promise<{
-        members: Record<string, unknown>[];
-        pagination: Record<string, number | boolean>;
-    }>;
-    // (undocumented)
-    organizationOf(dn: string): string | undefined;
-    // (undocumented)
-    organizationRoute(context: string, handler: (req: Request_2, res: Response_2, org: string) => Promise<void>, plugin?: string): (req: Request_2, res: Response_2) => Promise<void>;
-    // (undocumented)
-    page(req: Request_2, sortable: string[]): Page;
-    // (undocumented)
-    sorted<T extends Record<string, unknown>>(items: T[], sortBy: string | undefined, desc: boolean): T[];
-    // (undocumented)
-    tombstonesOf(org: string): Promise<string[]>;
-    // (undocumented)
-    readonly userAttribute: string;
-    // (undocumented)
-    userBaseOf(org: string): string;
-    // (undocumented)
-    users(org: string, usernames: string[], attributes: string[], req?: Request_2): Promise<AttributesList[]>;
-}
 
 // @public (undocumented)
 export const TwakeOrganizationParams: TObject<    {

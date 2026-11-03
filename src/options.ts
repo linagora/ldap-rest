@@ -7,10 +7,19 @@
  * the umbrella's `DM` passes to the core. See
  * `docs/development/modularization-plan.md`.
  */
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
 import coreConfigArgs from '@ldap-rest/core/config/args';
 import { toConfigEntries } from '@ldap-rest/core/config/options';
-import type { ConfigTemplate } from '@ldap-rest/core/lib/parseConfig';
+import type {
+  ConfigEntry,
+  ConfigTemplate,
+} from '@ldap-rest/core/lib/parseConfig';
 import { scimOptions } from '@ldap-rest/core/lib/scim/options';
+import { setShippedSchemasPath } from '@ldap-rest/core/lib/schemaFile';
+import { setServerVersion } from '@ldap-rest/core/lib/version';
 
 import { bclOptions } from './plugins/bcl.options';
 import { metricsOptions } from './plugins/metrics.options';
@@ -57,8 +66,25 @@ import { twakeLifecycleOptions } from './plugins/twake/twakeLifecycle.options';
 import { twakeSpacesOptions } from './plugins/twake/twakeSpaces.options';
 import { twakeTombstoneOptions } from './plugins/twake/twakeTombstone.options';
 
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+const shippedSchemas = join(packageRoot, 'static', 'schemas');
+setShippedSchemasPath(shippedSchemas);
+setServerVersion(
+  (
+    JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
+      version?: string;
+    }
+  ).version
+);
+
+const coreOptions: ConfigTemplate = coreConfigArgs.map(entry =>
+  entry[0] === '--schemas-path'
+    ? ([entry[0], entry[1], shippedSchemas, ...entry.slice(3)] as ConfigEntry)
+    : entry
+);
+
 const configArgs: ConfigTemplate = [
-  ...coreConfigArgs,
+  ...coreOptions,
 
   // LDAP organizations
   ...toConfigEntries(organizationOptions),

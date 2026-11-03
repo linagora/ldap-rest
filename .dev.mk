@@ -29,7 +29,6 @@ builddev: $(CORE_DIST) $(DSTFILES) $(DSTBROWSER) Dockerfile
 _builddev:
 	npx rimraf dist
 	cd packages/core && npx rollup -c
-	cd ../..
 	npx rollup -c
 	npx rollup -c rollup.browser.config.mjs
 	node scripts/moveBrowserLibs.mjs

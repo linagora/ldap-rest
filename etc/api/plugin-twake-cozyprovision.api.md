@@ -46,11 +46,4 @@ class CozyProvision extends DmPlugin {
 }
 export default CozyProvision;
 
-// @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
-
 ```

@@ -16,19 +16,6 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public (undocumented)
-interface StringOption extends OptionSpec<string> {
-    readonly choices?: readonly string[];
-    // (undocumented)
-    readonly type: 'string';
-}
-
-// @public (undocumented)
-interface TrashApi {
-    readonly trashBase: string;
-    readonly watchedBases: readonly string[];
-}
-
-// @public (undocumented)
 class TrashPlugin extends DmPlugin {
     constructor(dm: typeof DmPlugin.prototype.server);
     // (undocumented)

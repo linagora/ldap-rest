@@ -9,6 +9,6 @@
       "@ldap-rest/core/*": ["./packages/core/dist/*"]
     }
   },
-  "include": ["src/**/*", "packages/core/src/**/*"],
+  "include": ["src/**/*", "packages/core/src/types/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

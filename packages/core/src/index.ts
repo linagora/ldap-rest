@@ -6,14 +6,14 @@
  * the core itself imports no plugin family. See
  * `docs/development/modularization-plan.md`.
  */
-export * from './abstract/ldapFlat';
-export * from './abstract/plugin';
-export * from './abstract/twakePlugin';
-export * from './bin';
-export * from './config/args';
-export * from './config/options';
-export * from './config/schema';
-export * from './hooks';
-export * from './lib/expressFormatedResponses';
-export * from './lib/ldapActions';
-export * from './lib/parseConfig';
+export * from './abstract/ldapFlat.js';
+export * from './abstract/plugin.js';
+export * from './abstract/twakePlugin.js';
+export * from './bin/index.js';
+export * from './config/args.js';
+export * from './config/options.js';
+export * from './config/schema.js';
+export * from './hooks.js';
+export * from './lib/expressFormatedResponses.js';
+export * from './lib/ldapActions.js';
+export * from './lib/parseConfig.js';
