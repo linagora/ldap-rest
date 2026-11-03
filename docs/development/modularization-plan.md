@@ -76,6 +76,11 @@ Rules:
   the umbrella or another plugin package: a plugin package cannot depend on
   `ldap-rest` without a cycle. `ldapActions`, the parser and the services are
   core, so using them loads no plugin.
+- Until phase 3 publishes `@ldap-rest/core`, the umbrella bundles it nested
+  under its own `node_modules`, out of reach of an external plugin: such a
+  plugin imports the umbrella sub-paths (`ldap-rest/plugin`,
+  `ldap-rest/hooks`, …). No plugin package that depends on `@ldap-rest/core`
+  is extracted before the core is published.
 - A plugin package is installed by the deployment, not by `ldap-rest`; being
   installed does not load it. `DM` loads only the `--plugin` entries and the
   priority list, so `cleanup-external-users` in `ldap-externalusers` never

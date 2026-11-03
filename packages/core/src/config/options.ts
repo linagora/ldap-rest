@@ -2,8 +2,8 @@
  * Configuration options declared by the code that reads them.
  *
  * A plugin describes its options next to its implementation with
- * {@link defineOptions}; `src/bin/options.ts` concatenates the declarations so
- * the parser sees the same entries it always did. {@link readOptions} gives a
+ * {@link defineOptions}; the host composes those declarations with the core
+ * options so the parser sees a single template. {@link readOptions} gives a
  * plugin typed values, with the defaults applied and the value checked once.
  *
  * See `docs/plugin-development/options.md`.

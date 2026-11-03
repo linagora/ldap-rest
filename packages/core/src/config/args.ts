@@ -1,7 +1,7 @@
 /**
  * Core command-line options, their environment variables, defaults and types,
- * and the TypeScript declaration of config. `src/bin/options.ts` appends the
- * plugin families' options.
+ * and the TypeScript declaration of config. The host appends its plugin
+ * families' options.
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { AttributesList } from '../lib/ldapActions';
