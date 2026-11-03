@@ -193,10 +193,14 @@ DM_JAMES_WEBADMIN_TOKEN=test-token
 
 ### Standard Usage (via DM)
 
+The `DM` helper starts a server with every option declared. The umbrella's
+default template carries the core options only, since the command line composes
+the plugins it names.
+
 Most tests don't need direct LDAP access - they test via the API:
 
 ```typescript
-import { DM } from '../../../src/bin';
+import { DM } from '../../../helpers/dm';
 
 describe('My plugin', () => {
   let server: DM;
@@ -307,7 +311,7 @@ describe('My test', () => {
 Simply write tests without any LDAP setup:
 
 ```typescript
-import { DM } from '../../../src/bin';
+import { DM } from '../../../helpers/dm';
 
 describe('New plugin', () => {
   let server: DM;
