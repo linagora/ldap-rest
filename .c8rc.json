@@ -13,7 +13,6 @@
     "packages/core/src/hooks.ts",
     "packages/core/src/config/schema.ts",
     "packages/core/src/**/types.ts",
-    "packages/storage/src/**/types.ts",
     "test/**",
     "dist/**"
   ],

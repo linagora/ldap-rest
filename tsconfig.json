@@ -5,10 +5,7 @@
       "@ldap-rest/core": ["./packages/core/src/index.ts"],
       "@ldap-rest/core/*": ["./packages/core/src/*"],
       "@ldap-rest/storage": ["./packages/storage/src/storage.ts"],
-      "@ldap-rest/storage/*": [
-        "./packages/storage/src/storage/*",
-        "./packages/storage/src/*"
-      ],
+      "@ldap-rest/storage/*": ["./packages/storage/src/storage/*"],
       "@ldap-rest/storage/options": [
         "./packages/storage/src/storage.options.ts"
       ]

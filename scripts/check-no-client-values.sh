@@ -35,7 +35,7 @@ if [ -z "$expression" ]; then
   exit 0
 fi
 
-if grep -rniaE "$expression" "$root/src" "$root/packages/core/src"; then
+if grep -rniaE "$expression" "$root/src" "$root"/packages/*/src; then
   cat >&2 <<'EOF'
 
 check-no-client-values: the lines above put a deployment-specific value in the
