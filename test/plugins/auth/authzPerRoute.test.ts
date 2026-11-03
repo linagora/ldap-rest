@@ -2,7 +2,7 @@ import type { Express } from 'express';
 import request from 'supertest';
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthToken from '../../../src/plugins/auth/token';
 import AuthzPerRoute, {
   globToRegex,

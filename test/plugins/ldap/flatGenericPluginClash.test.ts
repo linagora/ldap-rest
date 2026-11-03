@@ -9,7 +9,7 @@
  */
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapFlatGeneric, {
   ldapPluginCollections,
 } from '../../../src/plugins/ldap/flatGeneric';

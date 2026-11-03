@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { expect } from 'chai';
 import supertest from 'supertest';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import Scim from '../../../src/plugins/scim/scim';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 

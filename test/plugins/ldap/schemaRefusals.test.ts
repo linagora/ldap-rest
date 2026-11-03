@@ -12,7 +12,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import { isSchemaRefusal } from '@ldap-rest/core/lib/ldapCodes';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 

@@ -13,7 +13,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import { parseDirectoryDate } from '@ldap-rest/core/lib/utils';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapEnterpriseRules, {

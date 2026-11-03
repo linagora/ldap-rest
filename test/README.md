@@ -80,7 +80,7 @@ test/
 
 ```typescript
 import { expect } from 'chai';
-import { DM } from '../../src/bin';
+import { DM } from '../../helpers/dm';
 
 describe('My Feature', () => {
   let server: DM;

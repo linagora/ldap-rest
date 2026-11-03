@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import TrashPlugin from '../../../src/plugins/ldap/trash';
 
 describe('Trash Plugin', function () {

@@ -27,7 +27,8 @@ import {
   setLogger,
 } from '@ldap-rest/core/lib/expressFormatedResponses';
 
-import { DM, type Config } from '../../../src/bin';
+import { type Config } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthToken from '../../../src/plugins/auth/token';
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';

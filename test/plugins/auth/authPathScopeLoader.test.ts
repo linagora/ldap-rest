@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 
 /**
  * The same scoping, exercised through the real plugin loader rather than

@@ -20,7 +20,7 @@ import type { SearchResult } from 'ldapts';
 import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 import type { Hooks } from '@ldap-rest/core/hooks';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import {
   hasExternalLdap,

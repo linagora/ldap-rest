@@ -17,7 +17,7 @@ import TwakeInstances, {
   type WorkplaceCreated,
 } from '../../../src/plugins/twake/instances';
 import { outboundCalls } from '../../helpers/metrics';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 
 const USERS = `ou=users,${process.env.DM_LDAP_BASE}`;
 const ORGS = `ou=in-orgs,${process.env.DM_LDAP_BASE}`;

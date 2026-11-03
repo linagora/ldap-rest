@@ -14,7 +14,7 @@ import {
   shippedSchemasPath,
 } from '@ldap-rest/core/lib/schemaFile';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 import ConfigApi from '../../src/plugins/configApi';
 import LdapBulkImport from '../../src/plugins/ldap/bulkImport';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';

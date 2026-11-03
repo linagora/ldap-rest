@@ -7,7 +7,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 

@@ -19,7 +19,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import pluginPriority from '@ldap-rest/core/config/priority.json';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 
 const PROBE = '../../test/fixtures/plugins/xffProbe.js';
 const TRUSTED_PROXY = '../../dist/plugins/auth/trustedProxy.js';

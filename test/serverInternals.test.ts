@@ -6,11 +6,12 @@ import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 import type { Hooks } from '@ldap-rest/core/hooks';
 import { jsonBodyParser } from '@ldap-rest/core/lib/rawBody';
 
-import { DM } from '../src/bin';
 import HelloWorld from '../src/plugins/demo/helloworld';
 import RateLimit from '../src/plugins/auth/rateLimit';
 import AuthToken from '../src/plugins/auth/token';
 import TrustedProxy from '../src/plugins/auth/trustedProxy';
+
+import { DM } from './helpers/dm';
 
 /** Express 5 exposes the layer stack as `router`, Express 4 as `_router` */
 interface AppInternal {

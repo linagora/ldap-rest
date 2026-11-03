@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import request from 'supertest';
 
-import { DM } from '../src/bin';
+import { DM } from './helpers/dm';
 
 describe('Plugin Loading', () => {
   let server: DM | null;

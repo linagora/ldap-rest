@@ -19,7 +19,7 @@ import supertest from 'supertest';
 import type { Express, Request, Response } from 'express';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
 import AuthToken from '../../../src/plugins/auth/token';
 import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';

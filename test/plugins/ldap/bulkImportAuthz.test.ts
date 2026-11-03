@@ -18,7 +18,7 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import { AUTHZ_REFUSED } from '@ldap-rest/core/lib/errors';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import LdapBulkImport from '../../../src/plugins/ldap/bulkImport';
 import {

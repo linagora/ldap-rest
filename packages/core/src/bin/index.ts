@@ -14,7 +14,7 @@
 
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import { fileURLToPath, pathToFileURL } from 'url';
+import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 import express from 'express';
@@ -23,6 +23,7 @@ import type winston from 'winston';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import { ConfigParser, type ConfigTemplate } from '../lib/parseConfig';
+import { entryModule, resolvePluginModule } from '../config/pluginOptions';
 import { unknownEnvironmentOptions } from '../config/options';
 import { keepRawBody } from '../lib/rawBody';
 import coreConfigArgs, { type Config } from '../config/args';
@@ -1028,8 +1029,7 @@ export class DM {
    * @returns the module it names
    */
   private static moduleOf(entry: string): string {
-    const colon = entry.indexOf(':');
-    return colon === -1 ? entry : entry.substring(0, colon);
+    return entryModule(entry);
   }
 
   /**
@@ -1046,18 +1046,10 @@ export class DM {
    *          otherwise (a package, resolved by node)
    */
   private resolveModule(module: string): string {
-    if (module.startsWith('core/')) {
-      if (!this.pluginRoot)
-        throw new Error(
-          `Cannot resolve ${module}: no plugin root was given to the server`
-        );
-      return module.replace('core/', this.pluginRoot + '/').replace(/$/, '.js');
-    }
-    if (module.startsWith('.'))
-      return fileURLToPath(
-        new URL(module, pathToFileURL(this.resolveBase + '/'))
-      );
-    return module;
+    return resolvePluginModule(module, {
+      pluginRoot: this.pluginRoot,
+      resolveBase: this.resolveBase,
+    });
   }
 
   loadPlugin(pluginName: string): Promise<boolean> {

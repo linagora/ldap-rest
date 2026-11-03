@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { expect } from 'chai';
 import supertest from 'supertest';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 import ConfigApi, { configApiResponse } from '../../src/plugins/configApi';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';

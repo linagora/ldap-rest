@@ -22,7 +22,7 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import { statusCodeOf } from '@ldap-rest/core/lib/errors';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import LdapGroups from '../../../src/plugins/ldap/groups';

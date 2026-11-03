@@ -3,7 +3,7 @@ import type { ParsedUrlQuery } from 'querystring';
 import nock from 'nock';
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import Drive from '../../../src/plugins/twake/drive';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';

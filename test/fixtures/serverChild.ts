@@ -7,7 +7,7 @@
  */
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 
 const mode = process.argv[2] ?? 'crash';
 const say = (what: string): void => {

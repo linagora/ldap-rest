@@ -4,7 +4,7 @@ import path from 'path';
 import { expect } from 'chai';
 import supertest from 'supertest';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapBulkImport from '../../../src/plugins/ldap/bulkImport';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';

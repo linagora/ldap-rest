@@ -3,9 +3,10 @@
  * plugin tree it loads.
  *
  * The core server knows only its own options and no plugin layout. Here,
- * where every plugin family is available, the default template is the
- * composed one and `core/x` resolves beside this file; a caller that embeds
- * the core directly passes its own. See
+ * where every plugin family is available, `core/x` resolves beside this file.
+ * The default template carries the core options only: `bin/index.mjs` composes
+ * it with the plugins the command line names. `test/helpers/dm.ts` keeps the
+ * complete set for a server a test constructs. See
  * `docs/development/modularization-plan.md`.
  */
 import { dirname, join } from 'path';

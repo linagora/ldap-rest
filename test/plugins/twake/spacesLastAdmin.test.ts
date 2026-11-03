@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import supertest from 'supertest';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';

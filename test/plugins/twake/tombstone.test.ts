@@ -12,7 +12,7 @@ import { TombstoneService } from '@ldap-rest/core/lib/services/tombstone';
 import { TrashService } from '@ldap-rest/core/lib/services/trash';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TrashPlugin from '../../../src/plugins/ldap/trash';

@@ -24,7 +24,7 @@ import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import Scim from '../../../src/plugins/scim/scim';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import { waitFor } from '../../helpers/waitFor';
 
 /** Minimal auth plugin: identifies the caller from the `x-scim-user` header. */

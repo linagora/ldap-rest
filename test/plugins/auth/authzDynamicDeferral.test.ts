@@ -26,7 +26,7 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 const ROUTE_PLUGIN = '../../dist/plugins/demo/helloworld.js';

@@ -10,7 +10,7 @@ import {
   SNAPSHOT_PATH,
   serializeOptionsSnapshot,
 } from '../../scripts/options-snapshot';
-import configArgs from '../../src/bin/options';
+import configArgs from '../../src/options.full';
 
 const config: ConfigEntry[] = [
   ['--port', 'DM_PORT', 8081, 'number'],

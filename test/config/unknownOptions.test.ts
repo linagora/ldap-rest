@@ -10,8 +10,8 @@ import {
   unknownEnvironmentOptions,
 } from '@ldap-rest/core/config/options';
 
-import configArgs from '../../src/bin/options';
-import { DM } from '../../src/bin';
+import configArgs from '../../src/options.full';
+import { DM } from '../helpers/dm';
 
 describe('unknown options', () => {
   it('keeps the CLI arguments no entry declares', () => {

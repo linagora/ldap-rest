@@ -6,7 +6,7 @@ import {
 } from '@ldap-rest/core/lib/expressFormatedResponses';
 import { AUTHZ_REFUSED } from '@ldap-rest/core/lib/errors';
 
-import { DM } from '../src/bin';
+import { DM } from './helpers/dm';
 
 describe('Error Handling', () => {
   let server: DM | null;

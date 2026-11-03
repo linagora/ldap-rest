@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { DM } from '../dist/bin/index.js';
+import { composeOptions } from '../dist/options.js';
 
 // Parse CLI arguments
 const args = process.argv.slice(2);
@@ -47,7 +48,7 @@ Examples:
   process.exit(0);
 }
 
-const server = new DM();
+const server = new DM(await composeOptions());
 
 await server.ready;
 await server.run();

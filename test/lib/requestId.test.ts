@@ -19,7 +19,7 @@ import {
 import ValkeyStore from '../../src/plugins/storage/valkey';
 import PostgresStore from '../../src/plugins/storage/postgres';
 import WebLogs from '../../src/plugins/weblogs';
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;

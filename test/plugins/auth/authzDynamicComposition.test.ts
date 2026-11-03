@@ -13,7 +13,7 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import AuthToken from '../../../src/plugins/auth/token';
 import LdapGroups from '../../../src/plugins/ldap/groups';

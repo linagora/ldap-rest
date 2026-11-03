@@ -27,7 +27,7 @@ import type { Hooks } from '@ldap-rest/core/hooks';
 
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import Scim from '../../../src/plugins/scim/scim';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
 
 function wireHooks(server: DM, plugin: { hooks?: Hooks }): void {

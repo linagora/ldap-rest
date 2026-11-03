@@ -37,6 +37,10 @@
       "import": "./dist/lib/ldapActions.js",
       "types": "./dist/src/lib/ldapActions.d.ts"
     },
+    "./options": {
+      "import": "./dist/options.js",
+      "types": "./dist/src/options.d.ts"
+    },
     "./plugin-auth-auth.options": {
       "import": "./dist/plugins/auth/auth.options.js",
       "types": "./dist/src/plugins/auth/auth.options.d.ts"

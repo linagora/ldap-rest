@@ -4,7 +4,7 @@ import nock from 'nock';
 import type { Express } from 'express';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import CrowdSec from '../../../src/plugins/auth/crowdsec';
 import { outboundCalls } from '../../helpers/metrics';
 

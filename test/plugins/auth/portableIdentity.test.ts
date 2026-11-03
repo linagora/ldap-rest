@@ -18,7 +18,7 @@ import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthToken from '../../../src/plugins/auth/token';
 import AuthTotp from '../../../src/plugins/auth/totp';
 import AuthHmac from '../../../src/plugins/auth/hmac';

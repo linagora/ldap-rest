@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthzScope from '../../../src/plugins/auth/authzScope';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';

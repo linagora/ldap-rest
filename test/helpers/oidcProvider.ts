@@ -8,9 +8,10 @@ import { expect } from 'chai';
 import nock from 'nock';
 import supertest from 'supertest';
 
-import { DM } from '../../src/bin';
 import OpenIDConnect from '../../src/plugins/auth/openidconnect';
 import ConfigApi from '../../src/plugins/configApi';
+
+import { DM } from './dm';
 
 export const SECRET = 'a-secret-long-enough-for-the-library';
 export const BASE_URL = 'http://localhost:3000';

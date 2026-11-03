@@ -4,7 +4,7 @@ import type { Express } from 'express';
 import request from 'supertest';
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthTotp from '../../../src/plugins/auth/totp';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 

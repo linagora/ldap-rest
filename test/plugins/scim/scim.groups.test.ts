@@ -3,7 +3,7 @@ import supertest from 'supertest';
 import type { Hooks } from '@ldap-rest/core/hooks';
 
 import Scim from '../../../src/plugins/scim/scim';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 
 describe('SCIM Groups (integration)', function () {
   let server: DM;

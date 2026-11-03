@@ -4,7 +4,7 @@ import type { SearchResult } from 'ldapts';
 import LdapDepartmentSync from '../../../src/plugins/ldap/departmentSync';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

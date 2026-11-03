@@ -9,7 +9,7 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import LdapGroups from '../../../src/plugins/ldap/groups';

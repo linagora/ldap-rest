@@ -15,7 +15,7 @@
  */
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
 
 describe('OpenID Connect, the Back-Channel Logout configuration', function () {

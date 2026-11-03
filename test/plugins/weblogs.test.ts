@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 import WebLogs from '../../src/plugins/weblogs';
 
 describe('weblogs', () => {

@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import request from 'supertest';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AppAccountsApi from '../../../src/plugins/twake/appAccountsApi';
 import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsistency';
 import OnChange from '../../../src/plugins/ldap/onChange';

@@ -17,7 +17,7 @@ import { fileURLToPath } from 'url';
 
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import {

@@ -23,7 +23,7 @@ import type {
   SearchResult,
 } from '@ldap-rest/core/lib/ldapActions';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';

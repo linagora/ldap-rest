@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import nock from 'nock';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import James from '../../../src/plugins/twake/james';
 
 /**

@@ -8,7 +8,7 @@ import supertest from 'supertest';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 import { ScimService } from '@ldap-rest/core/lib/services/scim';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import Scim from '../../../src/plugins/scim/scim';
 import TwakeLifecycleEvents, {
