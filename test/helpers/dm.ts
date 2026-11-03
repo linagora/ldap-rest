@@ -22,14 +22,35 @@ export class DM extends UmbrellaDM {
 /** A plugin class, as the option composition reads it */
 interface PluginClass {
   optionDefinitions?: OptionSet;
+  optionDependencies?: readonly string[];
 }
 
-/** The core options plus the declarations of the plugins a test registers */
-export function optionsFor(...plugins: PluginClass[]): ConfigTemplate {
-  return withoutCoreDuplicates([
-    ...coreOptions,
-    ...plugins.flatMap(plugin =>
-      toConfigEntries(plugin.optionDefinitions ?? {})
-    ),
-  ]);
+/**
+ * The core options plus the declarations of the plugins a test registers,
+ * following their `optionDependencies` as `composeOptions` does. `dependencies`
+ * maps a module name to its class, so a test names every module the plugins
+ * depend on even when it declares no options.
+ */
+export function optionsFor(
+  plugins: readonly PluginClass[],
+  dependencies: Record<string, PluginClass> = {}
+): ConfigTemplate {
+  const queue = [...plugins];
+  const seen = new Set<PluginClass>();
+  const config: ConfigTemplate = [...coreOptions];
+  while (queue.length > 0) {
+    const plugin = queue.shift() as PluginClass;
+    if (seen.has(plugin)) continue;
+    seen.add(plugin);
+    config.push(...toConfigEntries(plugin.optionDefinitions ?? {}));
+    for (const module of plugin.optionDependencies ?? []) {
+      const dependency = dependencies[module];
+      if (!dependency)
+        throw new Error(
+          `optionsFor: pass ${module} in the dependencies of the test`
+        );
+      queue.push(dependency);
+    }
+  }
+  return withoutCoreDuplicates(config);
 }

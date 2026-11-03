@@ -30,6 +30,7 @@ import type { Role } from '@ldap-rest/core/abstract/plugin';
 import { DM, optionsFor } from '../../helpers/dm';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import LdapDepartmentSync from '../../../src/plugins/ldap/departmentSync';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 class TestAuthPlugin extends AuthBase {
@@ -103,7 +104,11 @@ describe('Authorization by attachment', function () {
     });
     process.env.DM_AUTHZ_PER_BRANCH_CACHE_TTL = '60';
 
-    server = new DM(optionsFor(AuthzPerBranch, LdapFlatGeneric));
+    server = new DM(
+      optionsFor([AuthzPerBranch, LdapFlatGeneric], {
+        'core/ldap/departmentSync': LdapDepartmentSync,
+      })
+    );
     await server.ready;
     server.config.ldap_flat_schema = ['./static/schemas/twake/users.json'];
 

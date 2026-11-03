@@ -1168,6 +1168,30 @@ export class DM {
     }
   }
 
+  /**
+   * A dependency the loader reads options from must have had them composed:
+   * otherwise a CLI value reached the parser untyped. Naming its module in
+   * `optionDependencies` is what phase 1 follows.
+   */
+  private assertDependencyOptions(obj: DmPlugin, dependency: string): void {
+    const loaded = this.loadedPlugins[dependency];
+    if (!loaded) return;
+    const definitions =
+      (loaded.constructor as typeof DmPlugin).optionDefinitions ?? {};
+    const missing = Object.keys(definitions).filter(
+      key => !this.optionKeys.has(key)
+    );
+    if (missing.length === 0) return;
+    throw new Error(
+      `${obj.name} depends on ${dependency}, whose option ` +
+        `${missing.map(key => `--${key.replace(/_/g, '-')}`).join(', ')} ` +
+        'is not in the configuration template: add ' +
+        `${obj.dependencies?.[dependency] ?? dependency} to the ` +
+        'optionDependencies of ' +
+        `${obj.constructor.name}`
+    );
+  }
+
   async registerPlugin(
     pluginName: string,
     obj: DmPlugin,
@@ -1197,6 +1221,7 @@ export class DM {
           );
           await this.loadPlugin(obj.dependencies[dependency]);
         }
+        this.assertDependencyOptions(obj, dependency);
       }
     }
     if (this._compositionState.composed) await this.admitToComposition(obj);

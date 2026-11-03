@@ -82,9 +82,10 @@ Each declaration takes:
 
 ### Reading another plugin's options
 
-An option an entry in `dependencies` declares is read by the plugin that
-depends on it. Name that module in `optionDependencies` so phase 1 reads its
-declarations before the instance loads it:
+Name in `optionDependencies` every module in `dependencies` that declares
+options, so phase 1 reads its declarations before the instance loads it. The
+loader refuses to start when a dependency declares an option the template does
+not carry, and names the module to add:
 
 ```typescript
 export default class LifecycleEvents extends DmPlugin {
