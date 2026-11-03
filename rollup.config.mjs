@@ -24,7 +24,7 @@ const commonPlugins = dir => [
     declarationMap: false,
     sourceMap: process.env.NODE_ENV !== 'production',
     include: ['src/**/*'],
-    exclude: ['packages/core/**', 'test/**'],
+    exclude: ['packages/**', 'test/**'],
     outDir: dir,
   }),
   process.env.NODE_ENV === 'production' &&

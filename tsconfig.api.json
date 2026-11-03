@@ -6,11 +6,28 @@
     "outDir": "./temp/api/declarations",
     "paths": {
       "@ldap-rest/core": ["./packages/core/dist/index.d.ts"],
-      "@ldap-rest/core/*": ["./packages/core/dist/*"],
+      "@ldap-rest/core/*": ["./packages/core/dist/*.d.ts"],
+      "@ldap-rest/core/config/priority.json": [
+        "./packages/core/dist/config/priority.json"
+      ],
+      "@ldap-rest/core/lib/entities": [
+        "./packages/core/dist/lib/entities/index.d.ts"
+      ],
+      "@ldap-rest/core/lib/services": [
+        "./packages/core/dist/lib/services/index.d.ts"
+      ],
+      "@ldap-rest/core/bin": ["./packages/core/dist/bin/index.d.ts"],
       "@ldap-rest/storage": ["./packages/storage/dist/storage.d.ts"],
-      "@ldap-rest/storage/*": ["./packages/storage/dist/storage/*.d.ts"],
       "@ldap-rest/storage/options": [
         "./packages/storage/dist/storage.options.d.ts"
+      ],
+      "@ldap-rest/storage/file": ["./packages/storage/dist/storage/file.d.ts"],
+      "@ldap-rest/storage/ldap": ["./packages/storage/dist/storage/ldap.d.ts"],
+      "@ldap-rest/storage/postgres": [
+        "./packages/storage/dist/storage/postgres.d.ts"
+      ],
+      "@ldap-rest/storage/valkey": [
+        "./packages/storage/dist/storage/valkey.d.ts"
       ]
     }
   },

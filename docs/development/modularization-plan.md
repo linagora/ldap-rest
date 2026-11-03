@@ -145,7 +145,10 @@ families do not import each other, and `ldapActions` is a stable façade.
 ### Phase 2 — Workspaces and extraction
 
 1. (**done**) Set up npm workspaces, `packages/`, a shared `tsconfig.base.json`
-   and per-package builds.
+   and per-package builds. Nothing outside a package names it:
+   `scripts/packages.mjs` builds the packages in dependency order and derives
+   their TypeScript paths from their `exports`, see
+   [Workspace packages](packages.md).
 2. (**done**) Extract `@ldap-rest/core`, with the `ldap-rest` umbrella depending
    on it and re-exporting the existing entry points. `ConfigTemplate` and
    `ConfigEntry` are exported from the core; the umbrella re-exports the whole
@@ -160,7 +163,7 @@ families do not import each other, and `ldapActions` is a stable façade.
    ldap → scim → twake → misc. (**started**) The storage plugin, its options
    and its backends live in `packages/storage` (`@ldap-rest/storage`); the
    umbrella keeps the `./plugin-storage*` shims and bundles the package until
-   phase 3 publishes it.
+   phase 3 publishes it. Splitting it into one package per backend is [#651].
 5. Extract `browser` and `schemas`.
 6. After each step: `npm run test:dev`, `npm run check`,
    `npm run check:openapi`, `npm run check:options`, and the `contracts` job.
@@ -236,3 +239,4 @@ core package. The next steps are:
 [#594]: https://github.com/linagora/ldap-rest/issues/594
 [#595]: https://github.com/linagora/ldap-rest/issues/595
 [#603]: https://github.com/linagora/ldap-rest/issues/603
+[#651]: https://github.com/linagora/ldap-rest/issues/651

@@ -49,6 +49,8 @@ Work on ldap-rest itself.
   contract, the snapshots that detect it and the deprecation window.
 - **[Modularization plan](development/modularization-plan.md)** - How the
   `@ldap-rest/*` split and the remaining code-quality issues are sequenced.
+- **[Workspace packages](development/packages.md)** - What a package under
+  `packages/` holds, and how to add one.
 
 ## API stability
 

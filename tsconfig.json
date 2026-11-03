@@ -3,12 +3,27 @@
   "compilerOptions": {
     "paths": {
       "@ldap-rest/core": ["./packages/core/src/index.ts"],
-      "@ldap-rest/core/*": ["./packages/core/src/*"],
+      "@ldap-rest/core/*": ["./packages/core/src/*.ts"],
+      "@ldap-rest/core/config/priority.json": [
+        "./packages/core/src/config/priority.json"
+      ],
+      "@ldap-rest/core/lib/entities": [
+        "./packages/core/src/lib/entities/index.ts"
+      ],
+      "@ldap-rest/core/lib/services": [
+        "./packages/core/src/lib/services/index.ts"
+      ],
+      "@ldap-rest/core/bin": ["./packages/core/src/bin/index.ts"],
       "@ldap-rest/storage": ["./packages/storage/src/storage.ts"],
-      "@ldap-rest/storage/*": ["./packages/storage/src/storage/*"],
       "@ldap-rest/storage/options": [
         "./packages/storage/src/storage.options.ts"
-      ]
+      ],
+      "@ldap-rest/storage/file": ["./packages/storage/src/storage/file.ts"],
+      "@ldap-rest/storage/ldap": ["./packages/storage/src/storage/ldap.ts"],
+      "@ldap-rest/storage/postgres": [
+        "./packages/storage/src/storage/postgres.ts"
+      ],
+      "@ldap-rest/storage/valkey": ["./packages/storage/src/storage/valkey.ts"]
     },
     "outDir": "./dist",
     "rootDir": "./",
@@ -17,7 +32,7 @@
   "include": [
     "src/**/*",
     "packages/core/src/types/**/*.d.ts",
-    "packages/storage/src/**/*",
+    "packages/*/src/**/*",
     "test/**/*"
   ],
   "exclude": ["node_modules", "dist", "packages/*/dist"]
