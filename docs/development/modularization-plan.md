@@ -60,28 +60,41 @@ Rules:
   (`packages/core/src/lib/services`) or hooks.
 - `TwakeGroups extends LdapGroups` is either the one documented exception or
   the shared base moves to `core`.
-- `ldap-rest` stays the entry package: it depends on every plugin package,
-  keeps the `ldap-rest` CLI and the `core/…` namespace, and re-exports the
-  former sub-paths (`ldap-rest/plugin-auth-authzlinid1`, …). The split is
-  therefore not breaking for users.
+- `ldap-rest` stays the entry package: it depends on `@ldap-rest/core` and on
+  the plugins declared mandatory, not on every plugin package. A deployment
+  installs the optional plugins it needs (`npm install
+@ldap-rest/twake-james`); the umbrella keeps the `ldap-rest` CLI and the
+  `core/…` namespace, and re-exports the former sub-paths
+  (`ldap-rest/plugin-auth-authzlinid1`, …). The split is therefore not breaking
+  for users that installed the same plugins.
 - A plugin package ships the commands that belong to its feature:
   `@ldap-rest/ldap-externalusers` owns `cleanup-external-users`,
   `@ldap-rest/twake-james` owns `sync-james`, and
-  `@ldap-rest/twake-appaccounts` owns `sync-app-accounts`. npm installs the
-  `bin` of a dependency, so installing `ldap-rest` keeps every command.
+  `@ldap-rest/twake-appaccounts` owns `sync-app-accounts`. A command is
+  installed with its plugin package, not with `ldap-rest`: installing
+  `ldap-rest` alone no longer provides them.
 - A script that needs a `DM` uses `@ldap-rest/core` and its own option set, not
   the umbrella or another plugin package: a plugin package cannot depend on
   `ldap-rest` without a cycle. `ldapActions`, the parser and the services are
   core, so using them loads no plugin.
-- Being a dependency of `ldap-rest` only installs a plugin package; it does not
-  load the plugin. `DM` loads only the `--plugin` entries and the priority
-  list, so `cleanup-external-users` in `ldap-externalusers` never loads the
-  LDAP plugins (and there is no aggregate `@ldap-rest/ldap` package).
-- The umbrella keeps only the main `ldap-rest` command, the option composition
-  and the `DM` subclass that supplies the plugin tree.
-- The core parser accepts an injected `OptionSet`; the umbrella composes the
-  option sets of every plugin. `Config` may stay a type-only aggregate in
-  `core`, but runtime option imports leave the core.
+- A plugin package is installed by the deployment, not by `ldap-rest`; being
+  installed does not load it. `DM` loads only the `--plugin` entries and the
+  priority list, so `cleanup-external-users` in `ldap-externalusers` never
+  loads the LDAP plugins (and there is no aggregate `@ldap-rest/ldap` package).
+  The loader maps `core/…` to the package that provides it: naming a plugin
+  whose package is absent is an error at startup, an uninstalled optional
+  plugin in the priority list is skipped.
+- The umbrella keeps only the main `ldap-rest` command, the loader that maps
+  `core/…` to plugin packages, and the `DM` subclass that supplies the plugin
+  tree.
+- The parser is two-phase: it reads the core options and the `--plugin` entries
+  first, imports the named plugin packages, collects their `optionDefinitions`,
+  then parses the full configuration. The umbrella does not import every
+  plugin's option set; `src/options.ts` is the temporary composition for the
+  monolith, not the target.
+- A plugin package exports its option set next to its class. A named plugin
+  whose package is absent is an error; an optional package the configuration
+  does not name is not needed.
 - Each package builds on its own with a shared configuration; the umbrella
   re-exports.
 
@@ -134,12 +147,15 @@ families do not import each other, and `ldapActions` is a stable façade.
    `ConfigEntry` are exported from the core; the umbrella re-exports the whole
    core API. The core is bundled in the umbrella tarball until phase 3
    publishes the scoped packages.
-3. Extract one package per plugin, grouped for the order: storage → auth →
+3. Make the parser two-phase before the first optional package leaves the
+   monolith: read `--plugin`, import those packages, collect their option
+   definitions, then parse. Replace `src/options.ts`.
+4. Extract one package per plugin, grouped for the order: storage → auth →
    ldap → scim → twake → misc.
-4. Extract `browser` and `schemas`.
-5. After each step: `npm run test:dev`, `npm run check`,
+5. Extract `browser` and `schemas`.
+6. After each step: `npm run test:dev`, `npm run check`,
    `npm run check:openapi`, `npm run check:options`, and the `contracts` job.
-6. Update the Dockerfile, the `bin/` scripts, the examples and the docs.
+7. Update the Dockerfile, the `bin/` scripts, the examples and the docs.
 
 Outcome: a modular repository, with `ldap-rest` still installable and
 compatible.
@@ -190,6 +206,9 @@ phase 1.
    split per package with declaration merging?
 5. **Build**: Rollup per package (consistent with today) or `tsc` with
    generated exports?
+6. **Mandatory plugins**: which packages must `ldap-rest` depend on and load by
+   default? Start with `@ldap-rest/core` only, and add a plugin only when the
+   umbrella cannot start without it.
 
 ## First actions
 
