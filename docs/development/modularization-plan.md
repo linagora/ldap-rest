@@ -29,43 +29,55 @@ Between plugin families the only coupling left is
 
 ## Target architecture
 
-An npm workspaces monorepo with an umbrella package that preserves the public
-API:
+An npm workspaces monorepo with one package per plugin and an umbrella that
+preserves the public API. Today's `./plugin-*` entries already separate the
+plugins:
 
 ```text
 packages/
-  core/                 @ldap-rest/core
-  plugin-auth/          @ldap-rest/plugin-auth
-  plugin-ldap/          @ldap-rest/plugin-ldap
-  plugin-scim/          @ldap-rest/plugin-scim
-  plugin-storage/       @ldap-rest/plugin-storage
-  plugin-twake/         @ldap-rest/plugin-twake
-  plugin-misc/          @ldap-rest/plugin-misc
-  browser/              @ldap-rest/browser
-  schemas/              @ldap-rest/schemas
-  ldap-rest/            umbrella package (CLI and re-exports)
+  core/                   @ldap-rest/core
+  ldap-externalusers/     @ldap-rest/ldap-externalusers
+  ldap-groups/            @ldap-rest/ldap-groups
+  ldap-organizations/     @ldap-rest/ldap-organizations
+  auth-token/             @ldap-rest/auth-token
+  twake-james/            @ldap-rest/twake-james
+  twake-appaccounts/      @ldap-rest/twake-appaccounts
+  scim/                   @ldap-rest/scim
+  browser/                @ldap-rest/browser
+  schemas/                @ldap-rest/schemas
+  ldap-rest/              umbrella package (main CLI and re-exports)
 ```
+
+The list is illustrative: the package name follows the plugin's feature name,
+and each package may expose more than one entry point when the plugin already
+has several (`twake-appaccounts` keeps its API and consistency classes
+together, `scim` its modules).
 
 Rules:
 
-- `core` depends on no family; a family depends on no other family. Cross-family
-  needs go through services (`packages/core/src/lib/services`) or hooks.
+- `core` depends on no plugin; a plugin package depends on no other plugin
+  package. Cross-plugin needs go through services
+  (`packages/core/src/lib/services`) or hooks.
 - `TwakeGroups extends LdapGroups` is either the one documented exception or
   the shared base moves to `core`.
-- `ldap-rest` stays the entry package: it depends on every package, keeps the
-  CLI and the `core/…` namespace, and re-exports the former sub-paths
-  (`ldap-rest/plugin-auth-authzlinid1`, …). The split is therefore not breaking
-  for users.
+- `ldap-rest` stays the entry package: it depends on every plugin package,
+  keeps the `ldap-rest` CLI and the `core/…` namespace, and re-exports the
+  former sub-paths (`ldap-rest/plugin-auth-authzlinid1`, …). The split is
+  therefore not breaking for users.
+- A plugin package ships the commands that belong to its feature:
+  `@ldap-rest/ldap-externalusers` owns `cleanup-external-users`,
+  `@ldap-rest/twake-james` owns `sync-james`, and
+  `@ldap-rest/twake-appaccounts` owns `sync-app-accounts`. npm installs the
+  `bin` of a dependency, so installing `ldap-rest` keeps every command.
+- A script that needs a `DM` uses `@ldap-rest/core` and its own option set, not
+  the umbrella: a plugin package cannot depend on `ldap-rest` without a
+  cycle. The umbrella keeps only the main `ldap-rest` command, the option
+  composition and the `DM` subclass that supplies the plugin tree.
 - The core parser accepts an injected `OptionSet`; the umbrella composes the
-  option sets of every family. `Config` may stay a type-only aggregate in
+  option sets of every plugin. `Config` may stay a type-only aggregate in
   `core`, but runtime option imports leave the core.
 - Each package builds on its own with a shared configuration; the umbrella
-  re-exports. The Twake-specific `bin/` scripts move to their package or to a
-  `@ldap-rest/cli` package.
-
-A package per plugin (`@ldap-rest/authz-linid1`, …) is possible, but start with
-families and extract optional plugins individually later. Otherwise the first
-day costs 66 packages and 66 release cycles.
+  re-exports.
 
 ## Phases
 
@@ -116,8 +128,8 @@ families do not import each other, and `ldapActions` is a stable façade.
    `ConfigEntry` are exported from the core; the umbrella re-exports the whole
    core API. The core is bundled in the umbrella tarball until phase 3
    publishes the scoped packages.
-3. Extract the families in dependency order: storage → auth → ldap → scim →
-   twake → misc.
+3. Extract one package per plugin, grouped for the order: storage → auth →
+   ldap → scim → twake → misc.
 4. Extract `browser` and `schemas`.
 5. After each step: `npm run test:dev`, `npm run check`,
    `npm run check:openapi`, `npm run check:options`, and the `contracts` job.
@@ -162,8 +174,8 @@ phase 1.
 
 ## Decisions to make
 
-1. **Granularity**: packages per family (recommended) or one package per plugin
-   from the start?
+1. **Granularity** (**decided**): one package per plugin, as today's
+   `./plugin-*` entries are split.
 2. **Versioning** (**decided**): 3.0.0 with the former sub-paths removed, on
    the `v3.0` branch.
 3. **`TwakeGroups extends LdapGroups`**: documented exception, or move the
@@ -178,7 +190,8 @@ phase 1.
 Phases 0 and 1 are done, and phase 2 has started with the workspaces and the
 core package. The next steps are:
 
-1. Extract the families in dependency order, then `browser` and `schemas`.
+1. Extract the plugin packages in dependency order, then `browser` and
+   `schemas`.
 2. Finish [#549] part 2 in phase 3.
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397
