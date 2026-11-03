@@ -60,11 +60,10 @@ Rules:
   (`packages/core/src/lib/services`) or hooks.
 - `TwakeGroups extends LdapGroups` is either the one documented exception or
   the shared base moves to `core`.
-- `ldap-rest` stays the entry package: it depends on `@ldap-rest/core` and on
-  the plugins declared mandatory, not on every plugin package. A deployment
-  installs the optional plugins it needs (`npm install
-@ldap-rest/twake-james`); the umbrella keeps the `ldap-rest` CLI and the
-  `core/…` namespace, and re-exports the former sub-paths
+- `ldap-rest` stays the entry package: it depends on `@ldap-rest/core` only;
+  every plugin package is optional. A deployment installs the plugins it needs
+  (`npm install @ldap-rest/twake-james`); the umbrella keeps the `ldap-rest`
+  CLI and the `core/…` namespace, and re-exports the former sub-paths
   (`ldap-rest/plugin-auth-authzlinid1`, …). The split is therefore not breaking
   for users that installed the same plugins.
 - A plugin package ships the commands that belong to its feature:
@@ -206,9 +205,8 @@ phase 1.
    split per package with declaration merging?
 5. **Build**: Rollup per package (consistent with today) or `tsc` with
    generated exports?
-6. **Mandatory plugins**: which packages must `ldap-rest` depend on and load by
-   default? Start with `@ldap-rest/core` only, and add a plugin only when the
-   umbrella cannot start without it.
+6. **Mandatory plugins** (**decided**): only `@ldap-rest/core`. Every plugin
+   package is optional and installed by the deployment.
 
 ## First actions
 
