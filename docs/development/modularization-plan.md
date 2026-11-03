@@ -114,7 +114,10 @@ families do not import each other, and `ldapActions` is a stable façade.
 1. Set up npm workspaces, `packages/`, a shared `tsconfig` and per-package
    builds.
 2. Extract `@ldap-rest/core` first, with the `ldap-rest` umbrella depending on
-   it and re-exporting the existing entry points.
+   it and re-exporting the existing entry points. Export `ConfigTemplate` and
+   `ConfigEntry` from the umbrella: `DM`'s constructor already names them in
+   the published reports, but no entry point exports them yet, so an external
+   caller cannot pass a template.
 3. Extract the families in dependency order: storage → auth → ldap → scim →
    twake → misc.
 4. Extract `browser` and `schemas`.
