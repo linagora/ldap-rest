@@ -40,7 +40,8 @@ packages/<name>/
    exact version and in `bundledDependencies`. Until phase 3 publishes the
    packages, the umbrella ships them in its own tarball.
 4. Run `npm run sync:packages`, which writes the package's TypeScript paths
-   into `tsconfig.json` and `tsconfig.api.json`.
+   into `tsconfig.json` and `tsconfig.api.json`, and its sources into the
+   coverage roots of `.c8rc.json` (c8 takes directories there, not globs).
 5. Keep the former sub-paths of the umbrella as one-line re-exports of the
    package, so the split breaks no import.
 
@@ -49,13 +50,13 @@ was forgotten.
 
 ## Commands
 
-| Command                          | What it does                                                      |
-| -------------------------------- | ----------------------------------------------------------------- |
-| `npm run build:packages`         | Builds every package, dependencies first                          |
-| `./.dev.mk buildpackages`        | The same, for the packages whose sources or dependencies changed  |
-| `npm run sync:packages`          | Writes the TypeScript paths of every package                      |
-| `npm run check:packages`         | Fails when those paths are stale or the umbrella misses a package |
-| `node scripts/packages.mjs list` | Prints the package directories in build order                     |
+| Command                          | What it does                                                     |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `npm run build:packages`         | Builds every package, dependencies first                         |
+| `./.dev.mk buildpackages`        | The same, for the packages whose sources or dependencies changed |
+| `npm run sync:packages`          | Writes the TypeScript paths and coverage roots of every package  |
+| `npm run check:packages`         | Fails when those are stale or the umbrella misses a package      |
+| `node scripts/packages.mjs list` | Prints the package directories in build order                    |
 
 `npm run build:dev`, `npm run test:dev` and `npm run build:prod` build the
 packages first; so do `check:api` and `snapshot:api`, which read the built

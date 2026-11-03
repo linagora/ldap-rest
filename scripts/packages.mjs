@@ -8,8 +8,9 @@
  *   node scripts/packages.mjs list           package directories, dependencies first
  *   node scripts/packages.mjs build          build every package, dependencies first
  *   node scripts/packages.mjs build --stale  build only the packages whose inputs changed
- *   node scripts/packages.mjs sync           write the TypeScript paths of every package
- *   node scripts/packages.mjs check          fail when the paths or the umbrella's
+ *   node scripts/packages.mjs sync           write the TypeScript paths and the coverage
+ *                                            roots of every package
+ *   node scripts/packages.mjs check          fail when those or the umbrella's
  *                                            dependencies miss a package
  *
  * See docs/development/packages.md.
@@ -156,19 +157,40 @@ function pathsOf(target) {
   return paths;
 }
 
-const TSCONFIGS = [
-  { file: 'tsconfig.json', target: 'sources' },
-  { file: 'tsconfig.api.json', target: 'declarations' },
+/**
+ * The configuration files that name every package, and what `sync` sets in
+ * each. c8 takes its `src` entries as directories, not globs, so the coverage
+ * roots are listed one per package like the TypeScript paths.
+ */
+const GENERATED = [
+  {
+    file: 'tsconfig.json',
+    set: config => (config.compilerOptions.paths = pathsOf('sources')),
+  },
+  {
+    file: 'tsconfig.api.json',
+    set: config => (config.compilerOptions.paths = pathsOf('declarations')),
+  },
+  {
+    file: '.c8rc.json',
+    set: config =>
+      (config.src = [
+        'src',
+        ...packages()
+          .map(pkg => `${pkg.dir}/src`)
+          .sort(),
+      ]),
+  },
 ];
 
-/** Each tsconfig as `sync` writes it, beside its current text */
-async function tsconfigs() {
+/** Each generated file as `sync` writes it, beside its current text */
+async function generated() {
   const prettier = await import('prettier');
   return Promise.all(
-    TSCONFIGS.map(async ({ file, target }) => {
+    GENERATED.map(async ({ file, set }) => {
       const current = readFileSync(path.join(root, file), 'utf8');
       const config = JSON.parse(current);
-      config.compilerOptions.paths = pathsOf(target);
+      set(config);
       const options = await prettier.resolveConfig(path.join(root, file));
       const wanted = await prettier.format(JSON.stringify(config), {
         ...options,
@@ -180,7 +202,7 @@ async function tsconfigs() {
 }
 
 async function sync() {
-  for (const { file, current, wanted } of await tsconfigs()) {
+  for (const { file, current, wanted } of await generated()) {
     if (current === wanted) continue;
     await writeFile(path.join(root, file), wanted);
     console.log(`packages: wrote ${file}`);
@@ -189,11 +211,9 @@ async function sync() {
 
 async function check() {
   const problems = [];
-  for (const { file, current, wanted } of await tsconfigs())
+  for (const { file, current, wanted } of await generated())
     if (current !== wanted)
-      problems.push(
-        `${file}: its paths do not match the packages' exports; run npm run sync:packages`
-      );
+      problems.push(`${file} is stale: run npm run sync:packages`);
 
   // Until phase 3 publishes the packages, the umbrella ships them in its own
   // tarball: one it does not depend on and bundle is missing once installed.
