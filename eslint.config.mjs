@@ -252,8 +252,6 @@ export default [
     files: ['src/**/*.ts', 'packages/core/src/**/*.ts'],
     ignores: [
       'src/browser/**',
-      'src/lib/ldap/operations.ts',
-      'src/lib/ldap/read.ts',
       'packages/core/src/lib/ldap/operations.ts',
       'packages/core/src/lib/ldap/read.ts',
     ],
@@ -298,10 +296,8 @@ export default [
   // what a plugin declared. See docs/plugin-development/hooks.md
   {
     files: [
-      'src/lib/hookBus.ts',
       'src/abstract/plugin.ts',
       'src/bin/index.ts',
-      'src/lib/authz/composition.ts',
       'packages/core/src/lib/hookBus.ts',
       'packages/core/src/abstract/plugin.ts',
       'packages/core/src/bin/index.ts',
@@ -324,7 +320,6 @@ export default [
   {
     files: ['src/**/*.ts', 'packages/core/src/**/*.ts'],
     ignores: [
-      'src/config/schema.ts',
       'src/lib/entitySchema/**',
       'packages/core/src/config/schema.ts',
       'packages/core/src/lib/entitySchema/**',
@@ -364,7 +359,6 @@ export default [
     ignores: [
       'src/browser/**',
       'src/abstract/plugin.ts',
-      'src/lib/instanceProviders.ts',
       'packages/core/src/abstract/plugin.ts',
       'packages/core/src/lib/instanceProviders.ts',
     ],
