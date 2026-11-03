@@ -41,6 +41,8 @@ class LdapEnterpriseRules extends DmPlugin {
         enterprise_domain_link_attribute: StringOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     provides: ServiceProvider<ReferenceRewriterApi>[];
     rewriteReferences(references: DnReference[], oldDn: string, newDn: string, req?: Request_2): Promise<ReferenceRewriteReport>;
     // (undocumented)

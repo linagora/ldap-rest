@@ -57,6 +57,8 @@ class TwakeTombstone extends DmPlugin {
         twake_tombstone_group_bases: ArrayOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     provides: ServiceProvider<TombstoneApi>[];
     // (undocumented)
     roles: Role[];

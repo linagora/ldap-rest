@@ -119,6 +119,8 @@ class LdapGroups extends DmPlugin {
     // (undocumented)
     static optionDefinitions: OptionSet;
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     renameGroup(cn: string, newCn: string, req?: Request_2): Promise<boolean>;
     // (undocumented)
     roles: Role[];

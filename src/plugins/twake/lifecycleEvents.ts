@@ -281,7 +281,11 @@ export default class TwakeLifecycleEvents extends DmPlugin {
   name = 'twakeLifecycleEvents';
   roles: Role[] = ['consistency'] as const;
 
-  static optionDependencies = ['core/ldap/onChange', 'core/rabbitmq'];
+  static optionDependencies = [
+    'core/ldap/onChange',
+    'core/rabbitmq',
+    'core/scim/scim',
+  ];
 
   dependencies = {
     onLdapChange: 'core/ldap/onChange',
@@ -295,7 +299,7 @@ export default class TwakeLifecycleEvents extends DmPlugin {
   constructor(server: DM) {
     super(server);
     const settings = this.options(twakeLifecycleOptions);
-    this.attrs = lifecycleAttributes(this.config);
+    this.attrs = lifecycleAttributes(this.config, this);
     this.memberAttribute = settings.twake_lifecycle_member_attribute;
     this.rules = parseRules(settings.twake_lifecycle_rules);
     // An operational attribute such as pwdAccountLockedTime or entryUUID is

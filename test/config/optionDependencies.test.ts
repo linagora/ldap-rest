@@ -1,6 +1,7 @@
 /**
- * A dependency whose options were not composed cannot be typed: the loader
- * refuses to start rather than let a CLI value reach the parser untyped.
+ * Reading another plugin's option set is refused until its declarations are
+ * composed: otherwise the startup report calls the keys unknown while the
+ * plugin keeps reading them.
  */
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
 import { defineOptions, opt } from '@ldap-rest/core/config/options';
@@ -8,32 +9,20 @@ import { expect } from 'chai';
 
 import { DM, optionsFor } from '../helpers/dm';
 
-class MissingDep extends DmPlugin {
-  static optionDefinitions = defineOptions({
-    not_composed: opt.number({ default: 1 }),
-  });
-  name = 'missingDep';
-}
-
-class Dependent extends DmPlugin {
-  name = 'dependent';
-  dependencies = { missingDep: 'core/missingDep' };
+class Reader extends DmPlugin {
+  name = 'reader';
 }
 
 describe('dependency options', () => {
-  it('refuses a dependency whose option is not in the template', async () => {
+  it('refuses an option set the template does not carry', async () => {
     const server = new DM(optionsFor([]));
     await server.ready;
-    server.loadedPlugins['missingDep'] = new MissingDep(server);
-    let refused: Error | undefined;
-    await server
-      .registerPlugin('dependent', new Dependent(server))
-      .catch((error: Error) => {
-        refused = error;
-      });
-    expect(refused, 'refused').to.be.instanceOf(Error);
-    expect(refused!.message).to.match(
-      /add core\/missingDep to the optionDependencies of Dependent/
+    const reader = new Reader(server);
+    const notComposed = defineOptions({
+      not_composed: opt.number({ default: 1 }),
+    });
+    expect(() => reader.optionsFrom(notComposed)).to.throw(
+      /reads --not-composed[\s\S]*optionDependencies/
     );
   });
 });

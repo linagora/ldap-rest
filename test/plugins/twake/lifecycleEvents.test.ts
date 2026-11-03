@@ -5,6 +5,8 @@ import path from 'node:path';
 import { expect } from 'chai';
 import type { Request } from 'express';
 import supertest from 'supertest';
+import type DmPlugin from '@ldap-rest/core/abstract/plugin';
+import { readOptions } from '@ldap-rest/core/config/options';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 import { ScimService } from '@ldap-rest/core/lib/services/scim';
 
@@ -955,14 +957,19 @@ describe('Twake lifecycle events plugin', function () {
 
   describe('lock', () => {
     const lock = (options: Partial<typeof dm.config>) => {
-      const { lock, lockValue } = lifecycleAttributes({
+      const config = {
         ...dm.config,
         twake_lifecycle_lock_attribute: '',
         twake_lifecycle_lock_value: '',
         scim_user_lock_attribute: '',
         scim_user_lock_value: '',
         ...options,
-      });
+      };
+      const reader = {
+        optionsFrom: (definitions: Parameters<typeof readOptions>[0]) =>
+          readOptions(definitions, config),
+      } as unknown as DmPlugin;
+      const { lock, lockValue } = lifecycleAttributes(config, reader);
       return [lock, lockValue];
     };
 

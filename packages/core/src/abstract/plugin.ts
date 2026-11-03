@@ -235,6 +235,30 @@ export default abstract class DmPlugin {
   }
 
   /**
+   * Values of another plugin's declarations, read and checked. A key its
+   * template does not carry would reach the parser untyped and the startup
+   * report would call it unknown: refuse it and name what to add.
+   */
+  optionsFrom<T extends OptionSet>(definitions: T): OptionsOf<T> {
+    const missing = Object.keys(definitions).filter(
+      key => !this.server.optionKeys.has(key)
+    );
+    if (missing.length > 0)
+      throw new Error(
+        `${this.constructor.name} reads ` +
+          `${missing.map(key => `--${key.replace(/_/g, '-')}`).join(', ')}, ` +
+          'which the configuration template does not carry: name the module ' +
+          'that declares them in its optionDependencies'
+      );
+    return readOptions(
+      definitions,
+      this.config,
+      this.server.optionKeys,
+      message => this.logger.warn(message)
+    ) as OptionsOf<T>;
+  }
+
+  /**
    * Uniq ID, to be used when calling hooks
    *
    * Example: plugin/ldap/groups has 2 events for some operations,

@@ -35,11 +35,11 @@ import { instanceSlug } from '@ldap-rest/core/lib/instanceProviders';
 import { isChildOf } from '@ldap-rest/core/lib/utils';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
-import { scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
+import { scimOptions } from '@ldap-rest/core/lib/scim/options';
 import type { ScimUser } from '@ldap-rest/core/lib/scim/types';
 
 import { clouderyOptions, clouderyOptionsOf } from './cloudery.options';
-import { cozyOptionsOf } from './cozy.options';
+import { cozyOptions } from './cozy.options';
 
 type ReqWithUser = Request & { user?: string };
 
@@ -88,7 +88,11 @@ export default class ClouderyProvision extends DmPlugin {
   name = 'clouderyProvision';
   roles: Role[] = ['consistency'] as const;
 
-  static optionDependencies = ['core/rabbitmq'];
+  static optionDependencies = [
+    'core/rabbitmq',
+    'core/twake/cozyProvision',
+    'core/scim/scim',
+  ];
 
   dependencies = { rabbitmq: 'core/rabbitmq' };
 
@@ -126,8 +130,8 @@ export default class ClouderyProvision extends DmPlugin {
   constructor(server: DM) {
     super(server);
     const settings = clouderyOptionsOf(server.config);
-    const cozy = cozyOptionsOf(server.config);
-    const scim = scimOptionsOf(server.config);
+    const cozy = this.optionsFrom(cozyOptions);
+    const scim = this.optionsFrom(scimOptions);
 
     this.managerUrl = settings.cloudery_manager_url.replace(/\/$/, '');
     this.managerToken = settings.cloudery_manager_token;

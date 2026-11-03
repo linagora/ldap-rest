@@ -27,12 +27,11 @@ interface LinkedAttributes {
   path: string;
 }
 
-import {
-  organizationOptionsOf,
-  type OrganizationOptions,
-} from './ldap.options';
+import { organizationOptions, type OrganizationOptions } from './ldap.options';
 
 export default class LdapDepartmentSync extends DmPlugin {
+  static optionDependencies = ['core/ldap/organizations'];
+
   name = 'ldapDepartmentSync';
   roles: Role[] = ['consistency'] as const;
 
@@ -42,7 +41,7 @@ export default class LdapDepartmentSync extends DmPlugin {
 
   constructor(server: DM) {
     super(server);
-    this.settings = organizationOptionsOf(server.config);
+    this.settings = this.optionsFrom(organizationOptions);
 
     this.linkAttr = this.settings.ldap_organization_link_attribute;
     this.pathAttr = this.settings.ldap_organization_path_attribute;

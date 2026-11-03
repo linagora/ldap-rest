@@ -6,6 +6,7 @@
  * `core/twake/lifecycleEvents` reads, and `core/twake/tombstone` writes.
  */
 import type { Config } from '@ldap-rest/core';
+import type DmPlugin from '@ldap-rest/core/abstract/plugin';
 import type {
   AttributesList,
   AttributeValue,
@@ -16,9 +17,12 @@ import {
   holdsValue,
   resolveLockConfig,
 } from '@ldap-rest/core/lib/scim/mapping';
-import { scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
+import { scimOptions, scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
 
-import { twakeLifecycleOptionsOf } from './twakeLifecycle.options';
+import {
+  twakeLifecycleOptions,
+  twakeLifecycleOptionsOf,
+} from './twakeLifecycle.options';
 
 export type DeletedAtFormat = 'iso8601' | 'generalizedTime';
 
@@ -33,9 +37,16 @@ export interface LifecycleAttributes {
   reason: string;
 }
 
-export function lifecycleAttributes(config: Config): LifecycleAttributes {
-  const settings = twakeLifecycleOptionsOf(config);
-  const scimSettings = scimOptionsOf(config);
+export function lifecycleAttributes(
+  config: Config,
+  reader?: DmPlugin
+): LifecycleAttributes {
+  const settings = reader
+    ? reader.optionsFrom(twakeLifecycleOptions)
+    : twakeLifecycleOptionsOf(config);
+  const scimSettings = reader
+    ? reader.optionsFrom(scimOptions)
+    : scimOptionsOf(config);
   const format = settings.twake_lifecycle_deleted_at_format;
   if (format !== 'iso8601' && format !== 'generalizedTime') {
     throw new Error(

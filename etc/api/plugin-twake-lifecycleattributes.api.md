@@ -4,6 +4,17 @@
 
 ```ts
 
+import type { Entry } from 'ldapts';
+import express from 'express';
+import type { Express as Express_2 } from 'express';
+import pLimit from 'p-limit';
+import type { Request as Request_2 } from 'express';
+import type { Response as Response_2 } from 'express';
+import type { SearchOptions } from 'ldapts';
+import type { SearchResult } from 'ldapts';
+import { Server } from 'http';
+import type winston from 'winston';
+
 // @public (undocumented)
 export type DeletedAtFormat = 'iso8601' | 'generalizedTime';
 
@@ -40,14 +51,12 @@ export interface LifecycleAttributes {
 }
 
 // @public (undocumented)
-export function lifecycleAttributes(config: Config): LifecycleAttributes;
+export function lifecycleAttributes(config: Config, reader?: DmPlugin): LifecycleAttributes;
 
 // @public
 export function parseDeletedAt(value: string): Date | undefined;
 
 // @public
 export function valueOf<T>(entry: Record<string, T>, attribute: string): T | undefined;
-
-// (No @packageDocumentation comment for this package)
 
 ```

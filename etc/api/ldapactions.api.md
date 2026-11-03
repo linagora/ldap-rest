@@ -848,6 +848,7 @@ abstract class DmPlugin {
     static optionDefinitions: OptionSet;
     static optionDependencies: readonly string[];
     options<T extends OptionSet>(definitions: T): OptionsOf<T>;
+    optionsFrom<T extends OptionSet>(definitions: T): OptionsOf<T>;
     provides?: ServiceProvider<unknown>[];
     // (undocumented)
     registeredHooks: Hooks;

@@ -191,14 +191,15 @@ export const GroupRenameBody = Type.Object({ newCn: Type.String() });
 
 import {
   groupsOptions,
-  groupsOptionsOf,
-  organizationOptionsOf,
+  organizationOptions,
   type GroupsOptions,
   type OrganizationOptions,
 } from './ldap.options';
 
 export default class LdapGroups extends DmPlugin {
   static optionDefinitions: OptionSet = groupsOptions;
+
+  static optionDependencies = ['core/ldap/organizations'];
 
   name = 'ldapGroups';
   roles: Role[] = ['api', 'configurable'] as const;
@@ -208,11 +209,11 @@ export default class LdapGroups extends DmPlugin {
   schema?: Schema;
 
   private get groupSettings(): GroupsOptions {
-    return groupsOptionsOf(this.config);
+    return this.optionsFrom(groupsOptions);
   }
 
   private get orgSettings(): OrganizationOptions {
-    return organizationOptionsOf(this.config);
+    return this.optionsFrom(organizationOptions);
   }
 
   constructor(server: DM) {

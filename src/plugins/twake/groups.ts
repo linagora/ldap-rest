@@ -46,7 +46,7 @@ import {
   loadMappingFile,
   mergeMapping,
 } from '@ldap-rest/core/lib/scim/mapping';
-import { scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
+import { scimOptions } from '@ldap-rest/core/lib/scim/options';
 import type { ScimGroup } from '@ldap-rest/core/lib/scim/types';
 import { outsideRequest } from '@ldap-rest/core/lib/requestContext';
 import {
@@ -247,6 +247,8 @@ export const OrganizationGroupMemberParams = Type.Object({
 export default class TwakeGroups extends LdapGroups {
   static optionDefinitions = twakeGroupsOptions;
 
+  static optionDependencies = ['core/twake/lifecycleEvents', 'core/scim/scim'];
+
   name = 'twakeGroups';
   provides = [TwakeGroupsService.with(this)];
 
@@ -273,7 +275,7 @@ export default class TwakeGroups extends LdapGroups {
       if (pattern.split(ORG).length !== 2)
         throw new Error(`${this.name}: ${option} must hold ${ORG} once`);
     this.groupPattern = branchPattern(this.groupBase);
-    this.attrs = lifecycleAttributes(this.config);
+    this.attrs = lifecycleAttributes(this.config, this);
     this.orgPattern = settings.twake_group_organization_dn;
     this.displayName = settings.twake_group_display_name_attribute;
     this.color = settings.twake_group_color_attribute;
@@ -425,7 +427,7 @@ export default class TwakeGroups extends LdapGroups {
    */
   afterLoad(): void {
     if (!this.server.pluginInfo.has('scim')) return;
-    const scim = scimOptionsOf(this.config);
+    const scim = this.optionsFrom(scimOptions);
     const rdn = scim.scim_group_rdn_attribute;
     const override = scim.scim_group_mapping;
     const writer = mergeMapping(

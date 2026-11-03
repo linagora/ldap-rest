@@ -95,6 +95,10 @@ export default class LifecycleEvents extends DmPlugin {
 }
 ```
 
+Read such a set through `this.optionsFrom(set)`, not the `readOptions`
+helper: `optionsFrom` refuses a key the template does not carry, which is what
+makes the rule above mechanical.
+
 An option the core or several families read is declared in the core options
 (`packages/core/src/config/args.ts`) instead, so it keeps its default, type
 and environment variable whether or not the plugin serving it is named.

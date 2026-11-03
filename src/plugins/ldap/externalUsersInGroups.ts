@@ -33,7 +33,7 @@ export const mailDomainOf = (mail: string): string => {
         .replace(/\.$/, '');
 };
 
-import { externalUsersOptions, groupsOptionsOf } from './ldap.options';
+import { externalUsersOptions, groupsOptions } from './ldap.options';
 
 export default class ExternalUsersInGroups extends DmPlugin {
   static optionDefinitions = externalUsersOptions;
@@ -85,7 +85,8 @@ export default class ExternalUsersInGroups extends DmPlugin {
                 objectClass:
                   this.options(externalUsersOptions).external_branch_class,
                 mail,
-                [groupsOptionsOf(this.config).ldap_groups_main_attribute]: mail,
+                [this.optionsFrom(groupsOptions).ldap_groups_main_attribute]:
+                  mail,
                 sn: mail,
               };
               [m, entry] = await this.hookBus.chain('externaluserentry', [
