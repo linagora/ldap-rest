@@ -12,8 +12,6 @@ import { pathToFileURL } from 'url';
 import { expect } from 'chai';
 import { parseConfig } from '@ldap-rest/core/lib/parseConfig';
 
-import { DM } from '../../src/bin';
-
 interface BuiltOptions {
   composeOptions: (
     entries: readonly string[]
@@ -21,6 +19,7 @@ interface BuiltOptions {
 }
 
 const built = path.join(__dirname, '..', '..', 'dist', 'options.js');
+const builtServer = path.join(__dirname, '..', '..', 'dist', 'bin', 'index.js');
 
 const compose = async (
   entries: readonly string[]
@@ -65,9 +64,29 @@ describe('composeOptions on the built server', () => {
 
   it('parses a dependency option in the template the command uses', async () => {
     const argv = process.argv;
-    process.argv = ['node', 'ldap-rest', '--twake-group-max-page-limit', '12'];
+    process.argv = [
+      'node',
+      'ldap-rest',
+      '--plugin',
+      'core/twake/spaces',
+      '--twake-space-base',
+      'ou=spaces,{org}',
+      '--twake-group-base',
+      'ou=groups,{org}',
+      '--twake-group-user-base',
+      'ou=users,{org}',
+      '--twake-group-max-page-limit',
+      '12',
+    ];
     try {
+      const { DM } = (await import(pathToFileURL(builtServer).href)) as {
+        DM: new (options: Parameters<typeof parseConfig>[0]) => {
+          config: Record<string, unknown>;
+          ready: Promise<void>;
+        };
+      };
       const dm = new DM(await compose(['core/twake/spaces']));
+      await dm.ready;
       expect(dm.config.twake_group_max_page_limit).to.equal(12);
     } finally {
       process.argv = argv;

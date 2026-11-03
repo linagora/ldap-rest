@@ -8,6 +8,10 @@
 import type { ConfigTemplate } from '@ldap-rest/core/lib/parseConfig';
 import { toConfigEntries } from '@ldap-rest/core/config/options';
 import type { OptionSet } from '@ldap-rest/core/config/options';
+import {
+  optionDefinitionsOf,
+  optionDependenciesOf,
+} from '@ldap-rest/core/config/pluginOptions';
 
 import { DM as UmbrellaDM } from '../../src/bin';
 import { coreOptions, withoutCoreDuplicates } from '../../src/coreOptions';
@@ -42,8 +46,8 @@ export function optionsFor(
     const plugin = queue.shift() as PluginClass;
     if (seen.has(plugin)) continue;
     seen.add(plugin);
-    config.push(...toConfigEntries(plugin.optionDefinitions ?? {}));
-    for (const module of plugin.optionDependencies ?? []) {
+    config.push(...toConfigEntries(optionDefinitionsOf(plugin)));
+    for (const module of optionDependenciesOf(plugin)) {
       const dependency = dependencies[module];
       if (!dependency)
         throw new Error(

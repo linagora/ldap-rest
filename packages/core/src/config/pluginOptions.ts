@@ -14,13 +14,45 @@ import { splitValue } from '../lib/parseConfig';
 import { toConfigEntries, type OptionSet } from './options';
 
 /** A plugin class, or the module that exports it */
-interface PluginModule {
-  default?: {
-    optionDefinitions?: OptionSet;
-    /** Modules whose options this plugin reads, besides its own */
-    optionDependencies?: readonly string[];
-  };
+interface PluginClass {
   optionDefinitions?: OptionSet;
+  /** Modules whose options this plugin reads, besides its own */
+  optionDependencies?: readonly string[];
+}
+
+interface PluginModule extends PluginClass {
+  default?: PluginClass;
+}
+
+/** A class and its bases, base first */
+function optionChain(plugin: PluginClass): PluginClass[] {
+  const chain: PluginClass[] = [];
+  let current: unknown = plugin;
+  while (current && current !== Function.prototype) {
+    chain.unshift(current as PluginClass);
+    current = Object.getPrototypeOf(current) as unknown;
+  }
+  return chain;
+}
+
+/**
+ * The declarations a plugin class carries, its parents' included: a subclass
+ * that overrides `optionDefinitions` still reads what its base declared.
+ */
+export function optionDefinitionsOf(plugin: PluginClass): OptionSet {
+  const merged: OptionSet = {};
+  for (const entry of optionChain(plugin))
+    Object.assign(merged, entry.optionDefinitions ?? {});
+  return merged;
+}
+
+/** Every module a plugin class and its bases read options from */
+export function optionDependenciesOf(plugin: PluginClass): string[] {
+  return [
+    ...new Set(
+      optionChain(plugin).flatMap(entry => entry.optionDependencies ?? [])
+    ),
+  ];
 }
 
 /** The module part of a `--plugin` entry: `module:name:{json}` keeps `module` */
@@ -116,17 +148,15 @@ export async function pluginOptionEntries(
     // The loader resolves an absolute path as `DM.loadPlugin` does; a package
     // name stays a bare specifier for node.
     const imported = await load(resolvePluginModule(module, roots));
-    const definitions =
-      imported.default?.optionDefinitions ?? imported.optionDefinitions;
-    if (definitions)
-      for (const option of toConfigEntries(definitions))
-        if (!seenOptions.has(option[0])) {
-          seenOptions.add(option[0]);
-          config.push(option);
-        }
+    const plugin = imported.default ?? imported;
+    for (const option of toConfigEntries(optionDefinitionsOf(plugin)))
+      if (!seenOptions.has(option[0])) {
+        seenOptions.add(option[0]);
+        config.push(option);
+      }
     // A plugin reads the options of what it depends on before registering it,
     // so phase 1 reads those declarations too.
-    queue.push(...(imported.default?.optionDependencies ?? []));
+    queue.push(...optionDependenciesOf(plugin));
   }
   return config;
 }

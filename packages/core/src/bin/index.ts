@@ -23,7 +23,11 @@ import type winston from 'winston';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import { ConfigParser, type ConfigTemplate } from '../lib/parseConfig';
-import { entryModule, resolvePluginModule } from '../config/pluginOptions';
+import {
+  entryModule,
+  optionDefinitionsOf,
+  resolvePluginModule,
+} from '../config/pluginOptions';
 import { unknownEnvironmentOptions } from '../config/options';
 import { keepRawBody } from '../lib/rawBody';
 import coreConfigArgs, { type Config } from '../config/args';
@@ -1178,7 +1182,7 @@ export class DM {
     pluginName: string,
     plugin: typeof DmPlugin
   ): void {
-    const definitions = plugin.optionDefinitions ?? {};
+    const definitions = optionDefinitionsOf(plugin);
     const missing = Object.keys(definitions).filter(
       key => !this.optionKeys.has(key)
     );

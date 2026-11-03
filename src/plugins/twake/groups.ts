@@ -410,7 +410,10 @@ export default class TwakeGroups extends LdapGroups {
     // the routes does.
     scimgroupcreate: ([group, req, base]: [ScimGroup, Request, string?]) => {
       // A hook written for the two-element form drops the base
-      base ??= new BaseResolver(this.config).groupBase(req);
+      base ??= new BaseResolver(
+        this.config,
+        this.optionsFrom(scimOptions)
+      ).groupBase(req);
       return [
         this.groupPattern.test(parseDn(base).join(','))
           ? { ...group, id: randomUUID() }

@@ -171,7 +171,10 @@ export default class ClouderyProvision extends DmPlugin {
     this.pollIntervalMs = settings.cloudery_workflow_poll_interval_ms;
     this.maxPollAttempts = settings.cloudery_workflow_max_attempts;
 
-    this.baseResolver = new BaseResolver(this.config);
+    this.baseResolver = new BaseResolver(
+      this.config,
+      this.optionsFrom(scimOptions)
+    );
 
     if (!this.managerUrl) {
       this.logger.warn(
