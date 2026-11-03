@@ -6,7 +6,7 @@ import type { Role } from '@ldap-rest/core/abstract/plugin';
 import type { ModifyRequest } from '@ldap-rest/core/lib/ldapActions';
 
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapOrganization from '../../../src/plugins/ldap/organizations';
 import {
   skipIfMissingEnvVars,

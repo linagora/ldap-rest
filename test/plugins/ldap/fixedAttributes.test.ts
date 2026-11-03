@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 
 describe('Fixed attributes validation', function () {
   let server: DM;

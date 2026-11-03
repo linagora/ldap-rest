@@ -12,7 +12,7 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import {

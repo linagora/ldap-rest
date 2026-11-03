@@ -4,7 +4,7 @@ import type { AddressInfo } from 'net';
 import { expect } from 'chai';
 import type { RequestHandler } from 'express';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthHmac from '../../../src/plugins/auth/hmac';
 import { HmacAuthClient } from '../../../src/browser/shared/utils/hmac';
 

@@ -101,6 +101,8 @@ class LdapGroups extends DmPlugin {
     // (undocumented)
     static optionDefinitions: OptionSet;
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     renameGroup(cn: string, newCn: string, req?: Request_2): Promise<boolean>;
     // (undocumented)
     roles: Role[];
@@ -223,6 +225,8 @@ class TwakeGroups extends LdapGroups {
         twake_group_max_page_limit: NumberOption;
         twake_group_member_fields: JsonOption<    {}>;
     };
+    // (undocumented)
+    static optionDependencies: string[];
     organizationOf(dn: string): string | undefined;
     organizationRoute(context: string, handler: (req: Request_2, res: Response_2, org: string) => Promise<void>, plugin?: string): (req: Request_2, res: Response_2) => Promise<void>;
     page(req: Request_2, sortable: string[]): Page;

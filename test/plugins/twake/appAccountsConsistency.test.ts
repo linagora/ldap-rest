@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsistency';
 import OnChange from '../../../src/plugins/ldap/onChange';
 import { waitForEntry, waitForNoEntry } from '../../helpers/waitFor';

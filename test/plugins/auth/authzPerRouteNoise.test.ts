@@ -18,7 +18,7 @@ import supertest from 'supertest';
 import type { Express, Request, Response } from 'express';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
 
 class AnyRoute extends DmPlugin {

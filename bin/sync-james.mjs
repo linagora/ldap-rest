@@ -7,6 +7,7 @@
  */
 
 import { DM } from '../dist/bin/index.js';
+import { composeOptions } from '../dist/options.js';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -85,7 +86,7 @@ function getAliases(value) {
 }
 
 async function syncJames() {
-  const dm = new DM();
+  const dm = new DM(await composeOptions(['core/twake/james']));
   await dm.ready;
 
   const mailAttr = dm.config.mail_attribute || 'mail';

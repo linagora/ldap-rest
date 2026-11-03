@@ -19,7 +19,7 @@ import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import { currentRequest } from '@ldap-rest/core/lib/requestContext';
 import { asyncHandler } from '@ldap-rest/core/lib/utils';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 

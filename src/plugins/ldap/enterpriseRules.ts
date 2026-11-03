@@ -366,14 +366,16 @@ export function mailInDomains(
 
 import {
   enterpriseRulesOptions,
-  groupsOptionsOf,
-  organizationOptionsOf,
+  groupsOptions,
+  organizationOptions,
   type EnterpriseRulesOptions,
   type OrganizationOptions,
 } from './ldap.options';
 
 export default class LdapEnterpriseRules extends DmPlugin {
   static optionDefinitions = enterpriseRulesOptions;
+
+  static optionDependencies = ['core/ldap/organizations', 'core/ldap/groups'];
 
   name = 'ldapEnterpriseRules';
   provides = [ReferenceRewriterService.with(this)];
@@ -390,8 +392,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
   constructor(server: DM) {
     super(server);
     this.enterpriseSettings = this.options(enterpriseRulesOptions);
-    this.orgSettings = organizationOptionsOf(server.config);
-    this.dummyMember = groupsOptionsOf(server.config).group_dummy_user;
+    this.orgSettings = this.optionsFrom(organizationOptions);
+    this.dummyMember = this.optionsFrom(groupsOptions).group_dummy_user;
     this.topOrganization = this.orgSettings.ldap_top_organization;
     this.logger.info('Enterprise directory rules enabled');
   }

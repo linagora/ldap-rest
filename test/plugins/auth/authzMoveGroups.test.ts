@@ -6,7 +6,7 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import {
   skipIfMissingEnvVars,

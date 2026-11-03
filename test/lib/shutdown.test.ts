@@ -8,7 +8,7 @@ import supertest from 'supertest';
 import type { Express, Request, Response } from 'express';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 
 /** A request on a keep-alive connection, answered when the server answers */
 const get = (

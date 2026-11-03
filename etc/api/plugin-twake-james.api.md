@@ -77,6 +77,8 @@ class James extends TwakePlugin {
         james_team_mailbox_any_domain: BooleanOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
     updateJamesIdentity(dn: string, mail: string, displayName: string, signatures?: Signatures): Promise<void>;
 }

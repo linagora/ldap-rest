@@ -1,7 +1,7 @@
 import nock from 'nock';
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import Calendar from '../../../src/plugins/twake/calendar';
 import CalendarResources from '../../../src/plugins/twake/calendarResources';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';

@@ -72,11 +72,11 @@ import {
   valueOf,
 } from './lifecycleAttributes';
 import {
-  twakeGroupsOptionsOf,
+  twakeGroupsOptions,
   type TwakeGroupsOptions,
 } from './twakeGroups.options';
 import {
-  twakeInstancesOptionsOf,
+  twakeInstancesOptions,
   type TwakeInstancesOptions,
 } from './twakeInstances.options';
 import { twakeSpacesOptions } from './twakeSpaces.options';
@@ -239,6 +239,14 @@ export default class TwakeSpaces extends DmPlugin {
 
   name = 'twakeSpaces';
   roles: Role[] = ['api'];
+  static optionDependencies = [
+    'core/rabbitmq',
+    'core/twake/groups',
+    'core/twake/instances',
+    'core/twake/lifecycleEvents',
+    'core/scim/scim',
+  ];
+
   dependencies: Record<string, string> = {
     twakeGroups: 'core/twake/groups',
     onLdapChange: 'core/ldap/onChange',
@@ -296,8 +304,8 @@ export default class TwakeSpaces extends DmPlugin {
   constructor(server: DM) {
     super(server);
     const settings = this.options(twakeSpacesOptions);
-    this.groupSettings = twakeGroupsOptionsOf(server.config);
-    this.instanceSettings = twakeInstancesOptionsOf(server.config);
+    this.groupSettings = this.optionsFrom(twakeGroupsOptions);
+    this.instanceSettings = this.optionsFrom(twakeInstancesOptions);
     this.spaceBase = settings.twake_space_base;
     if (this.spaceBase.split(ORG).length !== 2)
       throw new Error(`${this.name}: --twake-space-base must hold ${ORG} once`);
@@ -305,7 +313,7 @@ export default class TwakeSpaces extends DmPlugin {
     this.userPattern = branchPattern(
       this.groupSettings.twake_group_user_base || ''
     );
-    this.lifecycle = lifecycleAttributes(this.config);
+    this.lifecycle = lifecycleAttributes(this.config, this);
     this.displayName = settings.twake_space_display_name_attribute;
     this.roleAttributes = {
       admin: settings.twake_space_admin_attribute,

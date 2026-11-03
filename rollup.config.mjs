@@ -114,6 +114,10 @@ pkg.exports = {
     import: './dist/lib/ldapActions.js',
     types: './dist/src/lib/ldapActions.d.ts',
   },
+  './options': {
+    import: './dist/options.js',
+    types: './dist/src/options.d.ts',
+  },
 };
 
 export default async () => {
@@ -157,6 +161,7 @@ export default async () => {
       input: [
         'src/bin/index.ts',
         'src/bin/options.ts',
+        'src/options.ts',
         'src/hooks.ts',
         'src/lib/ldapActions.ts',
         'src/lib/expressFormatedResponses.ts',

@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import type { SearchResult } from 'ldapts';
 import supertest from 'supertest';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import Scim from '../../../src/plugins/scim/scim';
 import TwakeGroups, { withOrg } from '../../../src/plugins/twake/groups';
 

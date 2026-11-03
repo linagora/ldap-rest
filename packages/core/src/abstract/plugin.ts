@@ -97,6 +97,12 @@ export type Role =
 export default abstract class DmPlugin {
   /** Options this plugin declares, see `docs/plugin-development/options.md` */
   static optionDefinitions: OptionSet = {};
+  /**
+   * Modules whose options this plugin reads, besides its own. The server reads
+   * their declarations in phase 1, before the instance `dependencies` makes it
+   * load them.
+   */
+  static optionDependencies: readonly string[] = [];
 
   /**
    * Properties inherited from parent (DM)
@@ -225,6 +231,30 @@ export default abstract class DmPlugin {
       );
     return readOptions(declared, this.config, this.server.optionKeys, message =>
       this.logger.warn(message)
+    ) as OptionsOf<T>;
+  }
+
+  /**
+   * Values of another plugin's declarations, read and checked. A key its
+   * template does not carry would reach the parser untyped and the startup
+   * report would call it unknown: refuse it and name what to add.
+   */
+  optionsFrom<T extends OptionSet>(definitions: T): OptionsOf<T> {
+    const missing = Object.keys(definitions).filter(
+      key => !this.server.optionKeys.has(key)
+    );
+    if (missing.length > 0)
+      throw new Error(
+        `${this.constructor.name} reads ` +
+          `${missing.map(key => `--${key.replace(/_/g, '-')}`).join(', ')}, ` +
+          'which the configuration template does not carry: name the module ' +
+          'that declares them in its optionDependencies'
+      );
+    return readOptions(
+      definitions,
+      this.config,
+      this.server.optionKeys,
+      message => this.logger.warn(message)
     ) as OptionsOf<T>;
   }
 

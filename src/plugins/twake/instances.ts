@@ -95,6 +95,12 @@ export default class TwakeInstances extends DmPlugin {
   name = 'twakeInstances';
   roles: Role[] = ['consistency', 'api'] as const;
 
+  static optionDependencies = [
+    'core/rabbitmq',
+    'core/twake/lifecycleEvents',
+    'core/scim/scim',
+  ];
+
   dependencies = { rabbitmq: 'core/rabbitmq' };
 
   private readonly settings: TwakeInstancesOptions;
@@ -130,7 +136,7 @@ export default class TwakeInstances extends DmPlugin {
         throw new Error(
           `${this.name}: --twake-instance-id names {${name}}, which no --twake-instance-dn group captures`
         );
-    this.lifecycle = lifecycleAttributes(server.config);
+    this.lifecycle = lifecycleAttributes(server.config, this);
     this.fqdnAttribute = settings.twake_instance_fqdn_attribute;
     this.sentAttribute = settings.twake_instance_sent_attribute;
     const timeout = settings.twake_instance_timeout;

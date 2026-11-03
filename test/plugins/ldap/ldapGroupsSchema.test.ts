@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { expect } from 'chai';
 
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
 

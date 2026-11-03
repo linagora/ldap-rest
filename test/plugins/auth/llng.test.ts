@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import type { Express, Response } from 'express';
 import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthLLNG from '../../../src/plugins/auth/llng';
 
 /**

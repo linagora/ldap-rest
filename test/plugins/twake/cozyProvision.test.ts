@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import type { ScimUser } from '@ldap-rest/core/lib/scim/types';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import CozyProvision from '../../../src/plugins/twake/cozyProvision';
 
 interface PublishCall {

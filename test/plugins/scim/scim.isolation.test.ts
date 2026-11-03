@@ -11,7 +11,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 
 import Scim from '../../../src/plugins/scim/scim';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 
 describe('SCIM cross-tenant isolation (integration)', function () {
   let server: DM;

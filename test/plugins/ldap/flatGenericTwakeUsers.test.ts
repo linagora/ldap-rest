@@ -4,7 +4,7 @@ import { NotFoundError } from '@ldap-rest/core/lib/errors';
 
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 /**

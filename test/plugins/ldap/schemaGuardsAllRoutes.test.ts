@@ -19,7 +19,7 @@ import {
   type Schema,
 } from '@ldap-rest/core/config/schema';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapGroups from '../../../src/plugins/ldap/groups';

@@ -14,7 +14,7 @@ import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
 import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../src/plugins/ldap/organizations';

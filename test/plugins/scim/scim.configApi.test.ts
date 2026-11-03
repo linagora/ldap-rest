@@ -11,7 +11,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Config } from '@ldap-rest/core/config/args';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import Scim from '../../../src/plugins/scim/scim';
 import Static from '../../../src/plugins/static';
 

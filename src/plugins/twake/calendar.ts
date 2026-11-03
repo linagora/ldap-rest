@@ -59,6 +59,8 @@ export default class Calendar extends TwakePlugin {
   name = 'calendar';
   roles: Role[] = ['consistency'] as const;
 
+  static optionDependencies = ['core/ldap/onChange'];
+
   dependencies = {
     onLdapChange: 'core/ldap/onChange',
   };

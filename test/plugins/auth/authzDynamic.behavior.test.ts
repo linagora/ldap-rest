@@ -11,7 +11,7 @@ import type { Hooks } from '@ldap-rest/core/hooks';
 
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
 
 describe('authzDynamic behavioural regressions', function () {

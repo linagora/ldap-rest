@@ -106,6 +106,8 @@ class LdapFlatInstance extends LdapFlat {
 
   // Ensure department sync is loaded to maintain consistency
   // when organizations are renamed/moved
+  static optionDependencies = ['core/ldap/departmentSync'];
+
   dependencies = {
     departmentSync: 'core/ldap/departmentSync',
   };

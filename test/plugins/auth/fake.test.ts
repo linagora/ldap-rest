@@ -3,7 +3,7 @@ import request from 'supertest';
 import { expect } from 'chai';
 import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthFake from '../../../src/plugins/auth/fake';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 

@@ -4,7 +4,7 @@ import { NotFoundError } from '@ldap-rest/core/lib/errors';
 import type { Hooks } from '@ldap-rest/core/hooks';
 
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

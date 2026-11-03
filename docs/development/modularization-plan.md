@@ -151,9 +151,11 @@ families do not import each other, and `ldapActions` is a stable façade.
    `ConfigEntry` are exported from the core; the umbrella re-exports the whole
    core API. The core is bundled in the umbrella tarball until phase 3
    publishes the scoped packages.
-3. Make the parser two-phase before the first optional package leaves the
-   monolith: read `--plugin`, import those packages, collect their option
-   definitions, then parse. Replace `src/options.ts`.
+3. (**done**) Make the parser two-phase before the first optional package
+   leaves the monolith: `composeOptions` in `src/options.ts` reads `--plugin`,
+   imports those plugins and collects their `optionDefinitions`; the
+   umbrella's default template keeps the core options only. `src/options.full.ts`
+   keeps the complete set for the build scripts and the tests.
 4. Extract one package per plugin, grouped for the order: storage → auth →
    ldap → scim → twake → misc.
 5. Extract `browser` and `schemas`.

@@ -53,6 +53,8 @@ export default class MigrationProxy extends TwakePlugin {
   name = 'migrationProxy';
   roles: Role[] = ['consistency', 'api'] as const;
 
+  static optionDependencies = ['core/ldap/onChange'];
+
   dependencies = {
     onLdapChange: 'core/ldap/onChange',
   };

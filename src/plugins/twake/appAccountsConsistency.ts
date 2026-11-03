@@ -78,6 +78,8 @@ export default class AppAccountsConsistency extends DmPlugin {
   name = 'appAccountsConsistency';
   roles: Role[] = ['consistency'] as const;
 
+  static optionDependencies = ['core/ldap/onChange'];
+
   dependencies = {
     onLdapChange: 'core/ldap/onChange',
   };

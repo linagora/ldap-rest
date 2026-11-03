@@ -16,7 +16,7 @@
  */
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 
 /** As the loader spells it: relative to `src/bin`, which resolves it */
 const PLUGIN = '../../dist/plugins/auth/openidconnect.js';

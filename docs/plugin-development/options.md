@@ -3,10 +3,10 @@
 A core plugin declares its configuration options next to its code, in a
 `<plugin>.options.ts` file. A family that shares imports and lifecycle keeps
 one set per plugin in a single `<family>.options.ts` file, named after the
-family. `src/options.ts` concatenates those declarations on top of the
-core options in `packages/core/src/config/args.ts`, so the parser, the command line and the
-environment variables see the same entries as before. The plugin then reads
-typed values instead of casting `this.config`.
+family. The server reads them in two phases: the core options and the
+`--plugin` entries first, then the declarations of the named plugins, so a
+plugin package the configuration does not name is never imported. The plugin
+then reads typed values instead of casting `this.config`.
 
 ## Declaring options
 
@@ -80,6 +80,29 @@ Each declaration takes:
 | `aliases`    | Former CLI names still accepted, without the leading `--`             |
 | `envAliases` | Former environment variables still accepted, read when `env` is unset |
 
+### Reading another plugin's options
+
+Name in `optionDependencies` every module in `dependencies` that declares
+options, so phase 1 reads its declarations before the instance loads it. The
+loader refuses to start when a dependency declares an option the template does
+not carry, and names the module to add:
+
+```typescript
+export default class LifecycleEvents extends DmPlugin {
+  static optionDefinitions = lifecycleOptions;
+  static optionDependencies = ['core/rabbitmq'];
+  dependencies = { rabbitmq: 'core/rabbitmq' };
+}
+```
+
+Read such a set through `this.optionsFrom(set)`, not the `readOptions`
+helper: `optionsFrom` refuses a key the template does not carry, which is what
+makes the rule above mechanical.
+
+An option the core or several families read is declared in the core options
+(`packages/core/src/config/args.ts`) instead, so it keeps its default, type
+and environment variable whether or not the plugin serving it is named.
+
 ## Reading options
 
 The plugin names the declaration as a static field, and asks for the values in
@@ -111,27 +134,26 @@ cannot describe the wrong view.
 
 ## Wiring it in
 
-Import the declaration in `src/options.ts` and spread it where the
-plugin's options used to be:
+Name the declaration as the plugin class's `optionDefinitions`, as above.
+`composeOptions` in `src/options.ts` imports each plugin the `--plugin` entries
+name and adds its declarations to the core options; there is no list to edit.
+`bin/index.mjs` passes the result to `DM`. A command that needs its feature's
+options without starting the server names its own plugin entries:
 
-```typescript
-import { exampleOptions } from '../plugins/example/example.options';
-import { toConfigEntries } from '../config/options';
+```javascript
+import { DM } from 'ldap-rest';
+import { composeOptions } from 'ldap-rest/options';
 
-const configArgs: ConfigTemplate = [
-  // ...
-  ...toConfigEntries(exampleOptions),
-];
+const dm = new DM(await composeOptions(['core/twake/james']));
 ```
 
 The `Config` interface in `packages/core/src/config/args.ts` keeps the hand-written fields
 until every plugin has moved. A migrated plugin no longer reads them: it uses
 `options()`.
 
-Plugins outside the repository cannot add to `src/options.ts` yet, but they can
-declare options the same way and name them in `optionDefinitions`: the startup
-report subtracts those keys and their aliases, and `options()` reads a declared
-`env` variable or a deprecated CLI alias the parser did not carry, warning at
-startup for the alias as it does for a core option. An option without a
-declaration still reaches `this.config` from an unknown `--key value` pair, and
-the startup report names it.
+A plugin outside the repository declares options the same way: the startup
+report subtracts its keys and aliases, and `options()` reads a declared `env`
+variable or a deprecated CLI alias the parser did not carry, warning at startup
+for the alias as it does for a core option. An option without a declaration
+still reaches `this.config` from an unknown `--key value` pair, and the startup
+report names it.

@@ -13,7 +13,7 @@ import type {
   SearchResult,
 } from '@ldap-rest/core/lib/ldapActions';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 
 describe('Attribute names of a write', function () {

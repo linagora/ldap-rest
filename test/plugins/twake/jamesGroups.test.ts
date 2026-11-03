@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import { BadRequestError, ConflictError } from '@ldap-rest/core/lib/errors';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import James from '../../../src/plugins/twake/james';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapGroups from '../../../src/plugins/ldap/groups';

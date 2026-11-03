@@ -221,6 +221,8 @@ export default class James extends TwakePlugin {
   name = 'james';
   roles: Role[] = ['consistency', 'api', 'configurable'] as const;
 
+  static optionDependencies = ['core/ldap/onChange', 'core/ldap/groups'];
+
   dependencies = {
     onLdapChange: 'core/ldap/onChange',
     ldapGroups: 'core/ldap/groups',

@@ -21,6 +21,11 @@
 
 ### Changed
 
+- The server reads the options of the plugins its `--plugin` entries name
+  instead of a static list. A `DM` built without a template now parses the
+  core options only; an embedder passes the template of the plugins it loads,
+  or calls `composeOptions` from `ldap-rest/options`
+  ([details](docs/plugin-development/options.md#wiring-it-in)).
 - The SCIM types, the `SCHEMA_*` constants and `ChangesToNotify` are exported
   from `ldap-rest/hooks`; the former `./plugin-scim-types` and
   `./plugin-ldap-onchange` entries are deprecated and will be removed in

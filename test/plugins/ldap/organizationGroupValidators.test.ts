@@ -8,7 +8,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import {

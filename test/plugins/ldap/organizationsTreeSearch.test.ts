@@ -17,7 +17,7 @@ import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
 import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import {
   skipIfMissingEnvVars,

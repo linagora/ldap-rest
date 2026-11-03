@@ -4,7 +4,7 @@ import type { Schema } from '@ldap-rest/core/config/schema';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import { TrashService } from '@ldap-rest/core/lib/services/trash';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import James from '../../../src/plugins/twake/james';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapGroups from '../../../src/plugins/ldap/groups';

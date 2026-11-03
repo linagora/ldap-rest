@@ -6,7 +6,7 @@ import supertest from 'supertest';
 import { expect } from 'chai';
 import { schemaUrl } from '@ldap-rest/core/lib/schemaFile';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 import Static from '../../src/plugins/static';
 
 const dir = './test/__plugins__/static';

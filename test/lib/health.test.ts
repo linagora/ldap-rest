@@ -14,7 +14,7 @@ import {
   type Probed,
 } from '@ldap-rest/core/lib/health';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 import { LDAP_ENV_VARS, skipIfMissingEnvVars } from '../helpers/env';
 
 const never = (): Promise<never> => new Promise(() => undefined);

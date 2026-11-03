@@ -27,7 +27,8 @@ import {
   setLogger,
 } from '@ldap-rest/core/lib/expressFormatedResponses';
 
-import { DM, type Config } from '../../../src/bin';
+import { type Config } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthToken from '../../../src/plugins/auth/token';
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
@@ -338,6 +339,16 @@ describe('Authorization plugins loaded together', function () {
   });
 
   describe('at startup', () => {
+    it('should refuse attached-entry filtering without a link attribute', async () => {
+      const server = new DM();
+      await server.ready;
+      server.config.authz_filter_attached_entries = true;
+      server.config.ldap_organization_link_attribute = '';
+      expect(() => assertAuthzComposition(server)).to.throw(
+        /needs ldap_organization_link_attribute/
+      );
+    });
+
     it('should refuse two plugins judging the same requests, naming both', async () => {
       const { startup } = await build({ dynamic: true, perBranch: {} });
       expect(startup, 'refused').to.be.instanceOf(Error);

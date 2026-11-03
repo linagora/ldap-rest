@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
 import { serviceToken } from '@ldap-rest/core/lib/services';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 
 interface GreeterApi {
   greet(name: string): string;

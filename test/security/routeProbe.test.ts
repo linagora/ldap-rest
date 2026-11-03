@@ -43,7 +43,7 @@ import type { Role } from '@ldap-rest/core/abstract/plugin';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
-import { DM } from '../../src/bin';
+import { DM } from '../helpers/dm';
 import AuthzPerBranch from '../../src/plugins/auth/authzPerBranch';
 import AuthzLinid1 from '../../src/plugins/auth/authzLinid1';
 import AuthzDynamic from '../../src/plugins/auth/authzDynamic';

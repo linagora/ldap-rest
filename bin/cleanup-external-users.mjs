@@ -15,7 +15,7 @@
 import { parseConfig } from '@ldap-rest/core/lib/parseConfig';
 import ldapActions from '@ldap-rest/core/lib/ldapActions';
 import { buildLogger } from '@ldap-rest/core/logger/winston';
-import configArgs from '../dist/bin/options.js';
+import { composeOptions } from '../dist/options.js';
 
 // Parse CLI arguments
 const args = process.argv.slice(2);
@@ -58,7 +58,9 @@ const verbose = args.includes('--verbose');
 const quiet = args.includes('--quiet');
 
 // Parse config
-const config = parseConfig(configArgs);
+const config = parseConfig(
+  await composeOptions(['core/ldap/externalUsersInGroups', 'core/ldap/groups'])
+);
 const logger = buildLogger(config);
 
 // Simple LDAP wrapper to match what DM provides

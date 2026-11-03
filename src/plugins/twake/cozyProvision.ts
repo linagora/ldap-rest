@@ -36,6 +36,8 @@ export default class CozyProvision extends DmPlugin {
   name = 'cozyProvision';
   roles: Role[] = ['consistency'] as const;
 
+  static optionDependencies = ['core/rabbitmq'];
+
   dependencies = { rabbitmq: 'core/rabbitmq' };
 
   private readonly cozyAdminUrl: string;

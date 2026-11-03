@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 
 import Scim from '../../../src/plugins/scim/scim';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 
 /**
  * RFC 7644 section 3.4.2.4 — a list answers a window over the matching

@@ -13,7 +13,7 @@ import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 import { isAuthzRefusal } from '@ldap-rest/core/lib/errors';
 import { mostSpecificBranchRule } from '@ldap-rest/core/lib/authz/base';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 

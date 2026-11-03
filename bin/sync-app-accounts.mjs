@@ -7,6 +7,7 @@
  */
 
 import { DM } from '../dist/bin/index.js';
+import { composeOptions } from '../dist/options.js';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -44,7 +45,7 @@ const isNoSuchObject = err =>
   err?.code === 32 || /no such object|0x20/i.test(err?.message || '');
 
 async function syncAppAccounts() {
-  const dm = new DM();
+  const dm = new DM(await composeOptions(['core/twake/appAccountsApi']));
   await dm.ready;
 
   const mailAttr = dm.config.mail_attribute || 'mail';

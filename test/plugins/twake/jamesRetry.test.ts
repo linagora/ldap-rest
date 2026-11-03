@@ -3,7 +3,7 @@ import nock from 'nock';
 import type winston from 'winston';
 import { outboundRequestDuration } from '@ldap-rest/core/lib/metrics';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import James from '../../../src/plugins/twake/james';
 import { outboundCalls } from '../../helpers/metrics';
 

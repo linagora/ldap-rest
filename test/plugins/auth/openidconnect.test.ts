@@ -7,7 +7,7 @@ import DmPlugin from '@ldap-rest/core/abstract/plugin';
 // Taken from `Hooks`: chai's supertest brings a second copy of express's types
 type AuthTuple = Parameters<NonNullable<Hooks['beforeAuth']>>[0];
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
 
 // Simple test plugin to verify auth flow

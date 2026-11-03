@@ -8,7 +8,7 @@ import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
 import type { Hooks } from '@ldap-rest/core/hooks';
 
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import { waitFor } from '../../helpers/waitFor';
 
 const { DM_LDAP_GROUP_BASE } = process.env;

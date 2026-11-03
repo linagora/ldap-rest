@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { expect } from 'chai';
 import type { OidcSessionClaims } from '@ldap-rest/core/hooks';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import Bcl from '../../../src/plugins/bcl';
 import Storage from '../../../src/plugins/storage';
 

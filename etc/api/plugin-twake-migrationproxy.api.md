@@ -48,6 +48,8 @@ class MigrationProxy extends TwakePlugin {
         migration_proxy_retry_delay: NumberOption;
     };
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
 }
 export default MigrationProxy;

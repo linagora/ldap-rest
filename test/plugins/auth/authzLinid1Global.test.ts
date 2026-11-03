@@ -5,7 +5,7 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import PasswordPolicy from '../../../src/plugins/ldap/passwordPolicy';
 import { skipIfMissingEnvVars } from '../../helpers/env';

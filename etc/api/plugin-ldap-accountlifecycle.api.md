@@ -32,6 +32,8 @@ class LdapAccountLifecycle extends DmPlugin {
     // (undocumented)
     name: string;
     // (undocumented)
+    static optionDependencies: string[];
+    // (undocumented)
     roles: Role[];
 }
 export default LdapAccountLifecycle;

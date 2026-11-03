@@ -4,6 +4,26 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## To 3.0.0
+
+### An embedded `DM` composes its own options
+
+**Who is affected:** code that imports `DM` from `ldap-rest` and constructs it
+without a template.
+
+`new DM()` now parses the core options only. Pass the template of the plugins
+the server loads, or let `composeOptions` build it from the command line:
+
+```javascript
+import { DM } from 'ldap-rest';
+import { composeOptions } from 'ldap-rest/options';
+
+const server = new DM(await composeOptions());
+```
+
+The `ldap-rest` command does this already, so a deployment started from the
+command line needs no change.
+
 ## From 1.3.0
 
 ### A plugin with its own `service` member

@@ -38,7 +38,7 @@ import {
   isDnInBranch,
   normalizeDn,
 } from '@ldap-rest/core/lib/utils';
-import { scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
+import { scimOptions } from '@ldap-rest/core/lib/scim/options';
 
 import {
   first,
@@ -68,6 +68,8 @@ export const EraseTombstoneResponse = Type.Object({
 export default class TwakeTombstone extends DmPlugin {
   static optionDefinitions = twakeTombstoneOptions;
 
+  static optionDependencies = ['core/twake/lifecycleEvents', 'core/scim/scim'];
+
   name = 'twakeTombstone';
   roles: Role[] = ['consistency', 'api'] as const;
   provides = [TombstoneService.with(this)];
@@ -90,7 +92,7 @@ export default class TwakeTombstone extends DmPlugin {
   constructor(server: DM) {
     super(server);
     const settings = twakeTombstoneOptionsOf(server.config);
-    this.attrs = lifecycleAttributes(server.config);
+    this.attrs = lifecycleAttributes(server.config, this);
     if (!this.attrs.deleted)
       throw new Error(
         `${this.name}: --twake-lifecycle-deleted-attribute is required`
@@ -108,7 +110,7 @@ export default class TwakeTombstone extends DmPlugin {
     this.groupBases = settings.twake_tombstone_group_bases.length
       ? settings.twake_tombstone_group_bases
       : [server.config.ldap_group_base || server.config.ldap_base || ''];
-    this.scimPrefix = scimOptionsOf(server.config).scim_prefix;
+    this.scimPrefix = this.optionsFrom(scimOptions).scim_prefix;
     if (this.patterns.length === 0)
       this.logger.warn(
         `${this.name}: --twake-tombstone-dn is empty, every delete stays a delete`

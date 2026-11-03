@@ -10,8 +10,8 @@ import DmPlugin from '@ldap-rest/core/abstract/plugin';
 import { TwakePlugin } from '@ldap-rest/core/abstract/twakePlugin';
 import { scimOptions, scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
 
-import { DM } from '../../src/bin';
-import configArgs from '../../src/bin/options';
+import { DM } from '../helpers/dm';
+import configArgs from '../../src/options.full';
 import {
   perBranchOptions,
   crowdsecOptionsOf,

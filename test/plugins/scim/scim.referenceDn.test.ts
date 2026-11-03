@@ -6,7 +6,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 
 import Scim from '../../../src/plugins/scim/scim';
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 
 describe('SCIM mapped reference DNs', function () {
   let server: DM;

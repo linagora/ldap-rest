@@ -6,7 +6,7 @@ import type DmPlugin from '@ldap-rest/core/abstract/plugin';
 import HookBus from '@ldap-rest/core/lib/hookBus';
 import type { Hooks } from '@ldap-rest/core/hooks';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import OnLdapChange, {
   diffEntries,
   type ChangesToNotify,

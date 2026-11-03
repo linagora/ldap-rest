@@ -3,7 +3,7 @@ import nock from 'nock';
 import request from 'supertest';
 import type winston from 'winston';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import MigrationProxy from '../../../src/plugins/twake/migrationProxy';
 import { LDAP_ENV_VARS, skipIfMissingEnvVars } from '../../helpers/env';

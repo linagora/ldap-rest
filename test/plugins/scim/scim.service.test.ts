@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { providedService } from '@ldap-rest/core/lib/services';
 import { ScimService } from '@ldap-rest/core/lib/services/scim';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../helpers/dm';
 import Scim from '../../../src/plugins/scim/scim';
 
 describe('SCIM service', () => {
