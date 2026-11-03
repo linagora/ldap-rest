@@ -6,15 +6,23 @@
  * Supports user and group-based permissions with configurable defaults
  * @group Plugins
  */
-import type { DM } from '../../bin';
-import type { Hooks, MaybePromise } from '../../hooks';
-import type { ModifyRequest, SearchResult } from '../../lib/ldapActions';
-import type { AuthConfig, BranchPermissions } from '../../config/args';
-import type { DmRequest } from '../../lib/auth/base';
-import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base';
-import { AmbiguousIdentityError } from '../../lib/errors';
-import { escapeLdapFilter, normalizeDn } from '../../lib/utils';
-import { warnUnmatchedRuleKeys } from '../../lib/auth/base';
+import type { DM } from '@ldap-rest/core';
+import type { Hooks, MaybePromise } from '@ldap-rest/core/hooks';
+import type {
+  ModifyRequest,
+  SearchResult,
+} from '@ldap-rest/core/lib/ldapActions';
+import type {
+  AuthConfig,
+  BranchPermissions,
+} from '@ldap-rest/core/config/args';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import AuthzBase, {
+  mostSpecificBranchRule,
+} from '@ldap-rest/core/lib/authz/base';
+import { AmbiguousIdentityError } from '@ldap-rest/core/lib/errors';
+import { escapeLdapFilter, normalizeDn } from '@ldap-rest/core/lib/utils';
+import { warnUnmatchedRuleKeys } from '@ldap-rest/core/lib/auth/base';
 
 interface CachedGroups {
   groups: string[];

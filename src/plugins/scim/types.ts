@@ -7,4 +7,4 @@
  *
  * @deprecated import from `ldap-rest/hooks`; removed in 4.0.0
  */
-export * from '../../lib/scim/types';
+export * from '@ldap-rest/core/lib/scim/types';

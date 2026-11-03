@@ -12,14 +12,14 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Express, Response } from 'express';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
+import { currentRequest } from '@ldap-rest/core/lib/requestContext';
+import { asyncHandler } from '@ldap-rest/core/lib/utils';
 
 import { DM } from '../../../src/bin';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import DmPlugin, { type Role } from '../../../src/abstract/plugin';
-import type { Hooks } from '../../../src/hooks';
-import type { SearchResult } from '../../../src/lib/ldapActions';
-import { currentRequest } from '../../../src/lib/requestContext';
-import { asyncHandler } from '../../../src/lib/utils';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 

@@ -9,9 +9,12 @@ import { join } from 'path';
 
 import { expect } from 'chai';
 import supertest from 'supertest';
+import {
+  loadSchemaFile,
+  shippedSchemasPath,
+} from '@ldap-rest/core/lib/schemaFile';
 
 import { DM } from '../../src/bin';
-import { loadSchemaFile, shippedSchemasPath } from '../../src/lib/schemaFile';
 import ConfigApi from '../../src/plugins/configApi';
 import LdapBulkImport from '../../src/plugins/ldap/bulkImport';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';

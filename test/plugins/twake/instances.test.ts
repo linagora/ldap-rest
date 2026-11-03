@@ -2,22 +2,22 @@ import { expect } from 'chai';
 import type { Request } from 'express';
 import nock from 'nock';
 import supertest from 'supertest';
-
-import { DM } from '../../../src/bin';
-import { ForbiddenError } from '../../../src/lib/errors';
-import { outboundCalls } from '../../helpers/metrics';
+import { ForbiddenError } from '@ldap-rest/core/lib/errors';
 import {
   ClouderyProvider,
   CozyStackProvider,
-} from '../../../src/lib/instanceProviders';
+} from '@ldap-rest/core/lib/instanceProviders';
 import type {
   AttributesList,
   SearchResult,
-} from '../../../src/lib/ldapActions';
+} from '@ldap-rest/core/lib/ldapActions';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+
 import TwakeInstances, {
   type WorkplaceCreated,
 } from '../../../src/plugins/twake/instances';
-import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
+import { outboundCalls } from '../../helpers/metrics';
+import { DM } from '../../../src/bin';
 
 const USERS = `ou=users,${process.env.DM_LDAP_BASE}`;
 const ORGS = `ou=in-orgs,${process.env.DM_LDAP_BASE}`;

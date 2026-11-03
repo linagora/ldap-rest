@@ -5,21 +5,21 @@ import supertest from 'supertest';
 import Transport from 'winston-transport';
 import type { Express, Request, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
-
-import { DM } from '../../src/bin';
-import DmPlugin from '../../src/abstract/plugin';
-import WebLogs from '../../src/plugins/weblogs';
-import PostgresStore from '../../src/plugins/storage/postgres';
-import ValkeyStore from '../../src/plugins/storage/valkey';
-import { changeContext, requestId } from '../../src/lib/changeContext';
-import HookBus from '../../src/lib/hookBus';
-import type { Hooks } from '../../src/hooks';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import { changeContext, requestId } from '@ldap-rest/core/lib/changeContext';
+import HookBus from '@ldap-rest/core/lib/hookBus';
+import type { Hooks } from '@ldap-rest/core/hooks';
 import {
   currentLogContext,
   outsideAnyRequest,
   outsideRequest,
   runWithLogContext,
-} from '../../src/lib/requestContext';
+} from '@ldap-rest/core/lib/requestContext';
+
+import ValkeyStore from '../../src/plugins/storage/valkey';
+import PostgresStore from '../../src/plugins/storage/postgres';
+import WebLogs from '../../src/plugins/weblogs';
+import { DM } from '../../src/bin';
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;

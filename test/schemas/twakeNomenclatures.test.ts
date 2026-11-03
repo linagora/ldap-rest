@@ -2,9 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { expect } from 'chai';
-
-import type { Schema } from '../../src/config/schema';
-import { roleAttribute } from '../../src/config/schema';
+import type { Schema } from '@ldap-rest/core/config/schema';
+import { roleAttribute } from '@ldap-rest/core/config/schema';
 
 /**
  * A nomenclature schema file, typed with the entity fields this test reads

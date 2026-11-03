@@ -25,16 +25,18 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import type { Request } from 'express';
-
-import DmPlugin, { type Role, escapeDnValue } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import { Hooks } from '../../hooks';
-import { instanceSlug } from '../../lib/instanceProviders';
-import { isChildOf } from '../../lib/utils';
-import { RabbitMqService } from '../../lib/services/rabbitmq';
-import { BaseResolver } from '../../lib/scim/baseResolver';
-import { scimOptionsOf } from '../../lib/scim/options';
-import type { ScimUser } from '../../lib/scim/types';
+import DmPlugin, {
+  type Role,
+  escapeDnValue,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import { Hooks } from '@ldap-rest/core/hooks';
+import { instanceSlug } from '@ldap-rest/core/lib/instanceProviders';
+import { isChildOf } from '@ldap-rest/core/lib/utils';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
+import { scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
+import type { ScimUser } from '@ldap-rest/core/lib/scim/types';
 
 import { clouderyOptions, clouderyOptionsOf } from './cloudery.options';
 import { cozyOptionsOf } from './cozy.options';

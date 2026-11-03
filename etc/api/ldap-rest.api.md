@@ -795,7 +795,7 @@ export class ConflictError extends HttpError {
 
 // @public
 export class DM {
-    constructor(options?: ConfigTemplate);
+    constructor(options?: ConfigTemplate, pluginRoot?: string, resolveBase?: string);
     afterLoad(): void;
     // (undocumented)
     app: express.Express;

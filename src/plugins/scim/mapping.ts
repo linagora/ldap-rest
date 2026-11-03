@@ -5,4 +5,4 @@
  * Re-export of the SCIM mapping, moved to `lib/scim/mapping` so shared code
  * can use it without importing a plugin.
  */
-export * from '../../lib/scim/mapping';
+export * from '@ldap-rest/core/lib/scim/mapping';

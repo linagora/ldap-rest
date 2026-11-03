@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 
 import { expect } from 'chai';
+import type { ConfigEntry } from '@ldap-rest/core/lib/parseConfig';
 
 import {
   buildOptionsSnapshot,
@@ -10,7 +11,6 @@ import {
   serializeOptionsSnapshot,
 } from '../../scripts/options-snapshot';
 import configArgs from '../../src/bin/options';
-import type { ConfigEntry } from '../../src/lib/parseConfig';
 
 const config: ConfigEntry[] = [
   ['--port', 'DM_PORT', 8081, 'number'],

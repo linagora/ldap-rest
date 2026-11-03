@@ -12,10 +12,10 @@
  *   --quiet      Only show errors and deletions (WOULD DELETE in dry-run mode)
  */
 
-import { parseConfig } from '../dist/lib/parseConfig.js';
+import { parseConfig } from '@ldap-rest/core/lib/parseConfig';
+import ldapActions from '@ldap-rest/core/lib/ldapActions';
+import { buildLogger } from '@ldap-rest/core/logger/winston';
 import configArgs from '../dist/bin/options.js';
-import ldapActions from '../dist/lib/ldapActions.js';
-import { buildLogger } from '../dist/logger/winston.js';
 
 // Parse CLI arguments
 const args = process.argv.slice(2);

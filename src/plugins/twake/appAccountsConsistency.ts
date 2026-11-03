@@ -25,16 +25,20 @@
  * new address anyway.
  */
 
-import DmPlugin from '../../abstract/plugin';
-import type { Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
 import type {
   AttributesList,
   AttributeValue,
   SearchResult,
-} from '../../lib/ldapActions';
-import { Hooks } from '../../hooks';
-import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+} from '@ldap-rest/core/lib/ldapActions';
+import { Hooks } from '@ldap-rest/core/hooks';
+import {
+  escapeDnValue,
+  escapeLdapFilter,
+  isDnInBranch,
+} from '@ldap-rest/core/lib/utils';
 
 import {
   appAccountsOptions,

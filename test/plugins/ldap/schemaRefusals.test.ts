@@ -10,10 +10,10 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import { isSchemaRefusal } from '@ldap-rest/core/lib/ldapCodes';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import { isSchemaRefusal } from '../../../src/lib/ldapCodes';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Writes the directory refuses for their content', function () {

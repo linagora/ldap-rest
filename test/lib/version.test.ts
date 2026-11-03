@@ -16,8 +16,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 import { expect } from 'chai';
-
-import { readVersion, SERVER_VERSION } from '../../src/lib/version';
+import { readVersion, SERVER_VERSION } from '@ldap-rest/core/lib/version';
 
 describe('lib/version', () => {
   let dir: string;
@@ -90,13 +89,13 @@ describe('lib/version', () => {
     expect(walk('nested')).to.equal('1.2.1');
   });
 
-  it('reads a package.json up to three directories above, and no further', () => {
+  it('reads a package.json up to four directories above, and no further', () => {
     write(
       'p/package.json',
       JSON.stringify({ name: 'ldap-rest', version: '5.0.0' })
     );
-    expect(walk('p/a/b/c')).to.equal('5.0.0');
-    expect(walk('p/a/b/c/d')).to.equal(undefined);
+    expect(walk('p/a/b/c/d')).to.equal('5.0.0');
+    expect(walk('p/a/b/c/d/e')).to.equal(undefined);
   });
 
   it('finds the version of this repository from its own sources', () => {

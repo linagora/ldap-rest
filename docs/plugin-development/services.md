@@ -15,8 +15,8 @@ logs.
 
 Put the token and its interface in a module both sides import — a plugin
 family's own service in its own module. A service shared between families is
-declared in `src/lib/services/` and re-exported from `ldap-rest/plugin`, one
-of the package's entry points; a module under `src/lib/` has no export path of
+declared in `packages/core/src/lib/services/` and re-exported from `ldap-rest/plugin`, one
+of the package's entry points; a module under `packages/core/src/lib/` has no export path of
 its own.
 
 ```typescript

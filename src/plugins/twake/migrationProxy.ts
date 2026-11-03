@@ -11,15 +11,14 @@
  */
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
-
-import TwakePlugin from '../../abstract/twakePlugin';
-import { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
-import type { HealthStatus } from '../../lib/health';
-import type { AttributesList } from '../../lib/ldapActions';
-import { wantJson } from '../../lib/expressFormatedResponses';
-import { isDnInBranch, normalizeDn } from '../../lib/utils';
+import TwakePlugin from '@ldap-rest/core/abstract/twakePlugin';
+import { defineRoute, type Role } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import type { HealthStatus } from '@ldap-rest/core/lib/health';
+import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
+import { wantJson } from '@ldap-rest/core/lib/expressFormatedResponses';
+import { isDnInBranch, normalizeDn } from '@ldap-rest/core/lib/utils';
 
 import {
   migrationProxyOptions,

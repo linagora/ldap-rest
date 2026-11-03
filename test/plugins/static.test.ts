@@ -4,10 +4,10 @@ import { join, sep } from 'path';
 
 import supertest from 'supertest';
 import { expect } from 'chai';
+import { schemaUrl } from '@ldap-rest/core/lib/schemaFile';
 
 import { DM } from '../../src/bin';
 import Static from '../../src/plugins/static';
-import { schemaUrl } from '../../src/lib/schemaFile';
 
 const dir = './test/__plugins__/static';
 let dm: DM;

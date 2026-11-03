@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import { NotFoundError } from '@ldap-rest/core/lib/errors';
+import type { Hooks } from '@ldap-rest/core/hooks';
 
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import { DM } from '../../../src/bin';
-import { NotFoundError } from '../../../src/lib/errors';
-import type { Hooks } from '../../../src/hooks';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

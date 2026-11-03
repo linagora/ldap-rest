@@ -1,11 +1,11 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import { NotFoundError } from '@ldap-rest/core/lib/errors';
 
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import { DM } from '../../../src/bin';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
-import { NotFoundError } from '../../../src/lib/errors';
 
 /**
  * The Twake user schema generates `uid` from the mail address, computes the

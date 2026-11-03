@@ -1,11 +1,11 @@
 /** Keyed storage plugin options. */
-import type { Config } from '../config/args';
+import type { Config } from '@ldap-rest/core/config/args';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../config/options';
+} from '@ldap-rest/core/config/options';
 
 export const storageOptions = defineOptions({
   storage_backend: opt.string({ env: 'DM_STORAGE_BACKEND', default: '' }),

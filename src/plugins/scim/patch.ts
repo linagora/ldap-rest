@@ -23,20 +23,20 @@ import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
-} from '../../lib/ldapActions';
-import { extractLdapCode } from '../../lib/ldapCodes';
+} from '@ldap-rest/core/lib/ldapActions';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
 import {
   type ResourceMapping,
   type PatchOperation,
   type PatchRequest,
-} from '../../lib/scim/types';
+} from '@ldap-rest/core/lib/scim/types';
 import {
   ScimError,
   kindOf,
   scimInvalidPath,
   scimNoTarget,
   scimInvalidValue,
-} from '../../lib/scim/errors';
+} from '@ldap-rest/core/lib/scim/errors';
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
@@ -45,7 +45,7 @@ import {
   isDnSubAttribute,
   readActive,
   scimPathToLdapAttribute,
-} from '../../lib/scim/mapping';
+} from '@ldap-rest/core/lib/scim/mapping';
 
 export interface PatchContext {
   mapping: ResourceMapping;

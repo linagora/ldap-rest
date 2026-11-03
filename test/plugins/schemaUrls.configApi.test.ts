@@ -9,9 +9,9 @@ import { join } from 'path';
 
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { Config } from '@ldap-rest/core/config/args';
 
 import { DM } from '../../src/bin';
-import type { Config } from '../../src/config/args';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../src/plugins/ldap/organizations';

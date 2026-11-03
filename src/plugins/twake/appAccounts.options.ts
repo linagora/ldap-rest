@@ -2,7 +2,11 @@
  * Applicative accounts options, shared by `appAccountsApi` and
  * `appAccountsConsistency`. See `docs/plugin-development/options.md`.
  */
-import { defineOptions, opt, type OptionsOf } from '../../config/options';
+import {
+  defineOptions,
+  opt,
+  type OptionsOf,
+} from '@ldap-rest/core/config/options';
 
 export const appAccountsOptions = defineOptions({
   applicative_account_base: opt.string({

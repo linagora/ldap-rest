@@ -4,14 +4,14 @@
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-import type { Config } from '../../config/args';
-import type { AttributesList } from '../../lib/ldapActions';
+import type { Config } from '@ldap-rest/core/config/args';
+import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../../config/options';
+} from '@ldap-rest/core/config/options';
 
 const schemaPath = (...parts: string[]): string =>
   join(

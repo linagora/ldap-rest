@@ -1,4 +1,4 @@
-import { outboundRequestDuration } from '../../src/lib/metrics';
+import { outboundRequestDuration } from '@ldap-rest/core/lib/metrics';
 
 /** How many calls to `target` the outbound histogram holds under `status` */
 export const outboundCalls = async (

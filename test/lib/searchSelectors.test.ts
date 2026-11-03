@@ -4,11 +4,11 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../src/bin';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../src/plugins/ldap/organizations';
-import type { SearchResult } from '../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS_WITH_ORG } from '../helpers/env';
 
 describe('Attribute selectors in search results', function () {

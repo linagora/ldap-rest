@@ -1,6 +1,5 @@
 import { expect } from 'chai';
-
-import { matrixId } from '../../src/lib/instanceProviders';
+import { matrixId } from '@ldap-rest/core/lib/instanceProviders';
 
 describe('matrixId', () => {
   for (const [mail, id] of [

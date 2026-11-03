@@ -16,11 +16,14 @@
  *
  * @group Plugins
  */
-import DmPlugin from '../abstract/plugin';
-import type { DM } from '../bin';
-import type { OidcLogoutToken, OidcSessionClaims } from '../hooks';
-import { StorageService, type StorageApi } from '../lib/services/storage';
-import type Store from '../lib/storage/store';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { OidcLogoutToken, OidcSessionClaims } from '@ldap-rest/core/hooks';
+import {
+  StorageService,
+  type StorageApi,
+} from '@ldap-rest/core/lib/services/storage';
+import type Store from '@ldap-rest/core/lib/storage/store';
 
 import { bclOptions } from './bcl.options';
 

@@ -23,9 +23,8 @@ import { constants, promises as fs } from 'node:fs';
 import { join } from 'node:path';
 
 import type winston from 'winston';
-
-import Store, { type StoredRecord } from '../../lib/storage/store';
-import type { HealthStatus } from '../../lib/health';
+import Store, { type StoredRecord } from '@ldap-rest/core/lib/storage/store';
+import type { HealthStatus } from '@ldap-rest/core/lib/health';
 
 const errorText = (err: unknown): string =>
   err instanceof Error ? err.message : JSON.stringify(err);

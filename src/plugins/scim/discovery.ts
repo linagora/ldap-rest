@@ -9,10 +9,10 @@
  */
 import path from 'path';
 
-import type { Config } from '../../config/args';
-import type { DmRequest } from '../../lib/auth/base';
-import type { AuthenticatorsInfo } from '../../lib/services/authenticators';
-import { loadSchemaFile } from '../../lib/schemaFile';
+import type { Config } from '@ldap-rest/core/config/args';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { AuthenticatorsInfo } from '@ldap-rest/core/lib/services/authenticators';
+import { loadSchemaFile } from '@ldap-rest/core/lib/schemaFile';
 import {
   type ResourceTypeDefinition,
   type ServiceProviderConfig,
@@ -22,8 +22,8 @@ import {
   SCHEMA_RESOURCE_TYPE,
   SCHEMA_SCHEMA,
   SCHEMA_SERVICE_PROVIDER_CONFIG,
-} from '../../lib/scim/types';
-import type { ScimOptions } from '../../lib/scim/options';
+} from '@ldap-rest/core/lib/scim/types';
+import type { ScimOptions } from '@ldap-rest/core/lib/scim/options';
 
 export interface DiscoveryOptions {
   config: Config;

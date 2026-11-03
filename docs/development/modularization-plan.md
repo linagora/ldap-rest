@@ -16,15 +16,13 @@ internal split. [#593], [#594], [#595] and [#603] are done.
 
 ## What blocks #397 today
 
-The core declares the options it reads. What remains is runtime coupling and
-packaging:
+`@ldap-rest/core` is a package of its own. What remains is extracting the
+plugin families and the umbrella:
 
-- `DM`'s default constructor argument still imports `src/bin/options.ts`, and
-  through it every plugin family. The template is already injectable; phase 2
-  drops the default and has the umbrella pass it, when `options.ts` moves out
-  of the core package.
-- The single package generates 88 `./plugin-*` exports from
-  `rollup.config.mjs`, with no npm workspaces.
+- The plugin families still live in the umbrella's `src/plugins/`, and the
+  single package generates 88 `./plugin-*` exports from `rollup.config.mjs`.
+- The umbrella composes the options in `src/options.ts` and passes them to the
+  core `DM`; the core itself imports no family.
 
 Between plugin families the only coupling left is
 `TwakeGroups extends LdapGroups`.
@@ -51,7 +49,7 @@ packages/
 Rules:
 
 - `core` depends on no family; a family depends on no other family. Cross-family
-  needs go through services (`src/lib/services`) or hooks.
+  needs go through services (`packages/core/src/lib/services`) or hooks.
 - `TwakeGroups extends LdapGroups` is either the one documented exception or
   the shared base moves to `core`.
 - `ldap-rest` stays the entry package: it depends on every package, keeps the
@@ -95,29 +93,29 @@ the public types have a baseline.
      `TwakeGroupsApi`, `AuthenticatorsInfo` service interfaces;
    - replace the 68 `loadedPlugins` reads and the 17 `requirePlugin` uses;
    - move `ChangesToNotify` out of `plugins/ldap/onChange.ts` and the SCIM
-     types out of `plugins/scim/` into `src/lib/`;
+     types out of `plugins/scim/` into `packages/core/src/lib/`;
    - ESLint: forbid `loadedPlugins` under `src/plugins/**` and imports between
      plugin families.
-2. [#594]: extract the operation pipeline into `src/lib/ldap/operations.ts`,
+2. [#594]: extract the operation pipeline into `packages/core/src/lib/ldap/operations.ts`,
    bring `ldapActions.ts` under 400 lines, add the file-size test, move the
    ESLint exemption, add the type test on `ldap-rest/ldapactions`.
-3. Options refactor (**done**): `src/config/args.ts` holds the core options
-   only; `src/bin/options.ts` composes the family option sets; `DM` accepts the
-   template as a constructor parameter; `priority.json` moved to
-   `src/config/priority.json`.
+3. Options refactor (**done**): `packages/core/src/config/args.ts` holds the
+   core options only; `src/options.ts` composes the family option sets; `DM`
+   accepts the template as a constructor parameter; `priority.json` moved to
+   `packages/core/src/config/priority.json`.
 
-Outcome: `src/hooks.ts` imports no plugin, the core reads no `loadedPlugins`,
+Outcome: `packages/core/src/hooks.ts` imports no plugin, the core reads no `loadedPlugins`,
 families do not import each other, and `ldapActions` is a stable façade.
 
 ### Phase 2 — Workspaces and extraction
 
-1. Set up npm workspaces, `packages/`, a shared `tsconfig` and per-package
-   builds.
-2. Extract `@ldap-rest/core` first, with the `ldap-rest` umbrella depending on
-   it and re-exporting the existing entry points. Export `ConfigTemplate` and
-   `ConfigEntry` from the umbrella: `DM`'s constructor already names them in
-   the published reports, but no entry point exports them yet, so an external
-   caller cannot pass a template.
+1. (**done**) Set up npm workspaces, `packages/`, a shared `tsconfig.base.json`
+   and per-package builds.
+2. (**done**) Extract `@ldap-rest/core`, with the `ldap-rest` umbrella depending
+   on it and re-exporting the existing entry points. `ConfigTemplate` and
+   `ConfigEntry` are exported from the core; the umbrella re-exports the whole
+   core API. The core is bundled in the umbrella tarball until phase 3
+   publishes the scoped packages.
 3. Extract the families in dependency order: storage → auth → ldap → scim →
    twake → misc.
 4. Extract `browser` and `schemas`.
@@ -177,12 +175,11 @@ phase 1.
 
 ## First actions
 
-Phases 0 and 1 are done. The next steps are:
+Phases 0 and 1 are done, and phase 2 has started with the workspaces and the
+core package. The next steps are:
 
-1. Set up the npm workspaces and extract `@ldap-rest/core`, moving
-   `src/bin/options.ts` to the umbrella.
-2. Extract the families in dependency order, then `browser` and `schemas`.
-3. Finish [#549] part 2 in phase 3.
+1. Extract the families in dependency order, then `browser` and `schemas`.
+2. Finish [#549] part 2 in phase 3.
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397
 [#549]: https://github.com/linagora/ldap-rest/issues/549

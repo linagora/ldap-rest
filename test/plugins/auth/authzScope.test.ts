@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 
 import { DM } from '../../../src/bin';
 import AuthzScope from '../../../src/plugins/auth/authzScope';
@@ -9,7 +10,6 @@ import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import PasswordPolicy from '../../../src/plugins/ldap/passwordPolicy';
-import type { DmRequest } from '../../../src/lib/auth/base';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

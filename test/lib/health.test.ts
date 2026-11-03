@@ -4,17 +4,17 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import express from 'express';
 import type { Response } from 'express';
-
-import { DM } from '../../src/bin';
-import DmPlugin, { type Role } from '../../src/abstract/plugin';
-import AuthBase, { type DmRequest } from '../../src/lib/auth/base';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import {
   PROBE_TTL_MS,
   mountHealth,
   readiness,
   type HealthStatus,
   type Probed,
-} from '../../src/lib/health';
+} from '@ldap-rest/core/lib/health';
+
+import { DM } from '../../src/bin';
 import { LDAP_ENV_VARS, skipIfMissingEnvVars } from '../helpers/env';
 
 const never = (): Promise<never> => new Promise(() => undefined);

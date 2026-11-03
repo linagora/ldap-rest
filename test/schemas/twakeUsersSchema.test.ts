@@ -2,9 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { expect } from 'chai';
-
-import type { LocalizedText, Schema } from '../../src/config/schema';
-import { roleAttribute } from '../../src/config/schema';
+import type { LocalizedText, Schema } from '@ldap-rest/core/config/schema';
+import { roleAttribute } from '@ldap-rest/core/config/schema';
 
 const read = (relative: string): Schema =>
   JSON.parse(

@@ -3,9 +3,8 @@ import os from 'os';
 import path from 'path';
 
 import { expect } from 'chai';
-
-import { BaseResolver } from '../../../src/lib/scim/baseResolver';
-import type { Config } from '../../../src/config/args';
+import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
+import type { Config } from '@ldap-rest/core/config/args';
 
 function cfg(overrides: Partial<Config> = {}): Config {
   return {

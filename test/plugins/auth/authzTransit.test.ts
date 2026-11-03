@@ -10,11 +10,11 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Response } from 'express';
+import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
 
 import { DM } from '../../../src/bin';
-import type { AttributesList } from '../../../src/lib/ldapActions';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Role } from '../../../src/abstract/plugin';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { skipIfMissingEnvVars } from '../../helpers/env';

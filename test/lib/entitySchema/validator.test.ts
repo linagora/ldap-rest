@@ -3,11 +3,10 @@
  * reduced to a set of DNs.
  */
 import { expect } from 'chai';
-
-import type { Schema } from '../../../src/config/schema';
-import { BadRequestError } from '../../../src/lib/errors';
-import { EntityValidator } from '../../../src/lib/entitySchema/validator';
-import type { ModifyRequest } from '../../../src/lib/ldapActions';
+import type { Schema } from '@ldap-rest/core/config/schema';
+import { BadRequestError } from '@ldap-rest/core/lib/errors';
+import { EntityValidator } from '@ldap-rest/core/lib/entitySchema/validator';
+import type { ModifyRequest } from '@ldap-rest/core/lib/ldapActions';
 
 const users = 'ou=users,dc=example,dc=com';
 const bob = `uid=bob,${users}`;

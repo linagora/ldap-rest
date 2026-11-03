@@ -19,6 +19,8 @@ export const shippedSchemasPath = join(
   dirname(fileURLToPath(import.meta.url)),
   '..',
   '..',
+  '..',
+  '..',
   'static',
   'schemas'
 );

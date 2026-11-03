@@ -36,13 +36,14 @@ import { join } from 'path';
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Response } from 'express';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import { unregisteredRoutes } from '@ldap-rest/core/lib/route';
+import type DmPlugin from '@ldap-rest/core/abstract/plugin';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
 import { DM } from '../../src/bin';
-import AuthBase, { type DmRequest } from '../../src/lib/auth/base';
-import { unregisteredRoutes } from '../../src/lib/route';
-import type DmPlugin from '../../src/abstract/plugin';
-import type { Role } from '../../src/abstract/plugin';
-import type { SearchResult } from '../../src/lib/ldapActions';
 import AuthzPerBranch from '../../src/plugins/auth/authzPerBranch';
 import AuthzLinid1 from '../../src/plugins/auth/authzLinid1';
 import AuthzDynamic from '../../src/plugins/auth/authzDynamic';
@@ -67,7 +68,6 @@ import ExternalUsersInGroups from '../../src/plugins/ldap/externalUsersInGroups'
 import TwakeTombstone from '../../src/plugins/twake/tombstone';
 import TwakeInstances from '../../src/plugins/twake/instances';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
-import { RabbitMqService } from '../../src/lib/services/rabbitmq';
 
 /** Authentication reduced to a header */
 class TestAuth extends AuthBase {

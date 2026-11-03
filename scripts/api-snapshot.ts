@@ -54,11 +54,12 @@ const pluginEntries: Record<string, string> = Object.fromEntries(
 );
 
 export const API_ENTRIES: Record<string, string> = {
-  'ldap-rest': 'src/bin/index.d.ts',
-  expressformatedresponses: 'src/lib/expressFormatedResponses.d.ts',
-  hooks: 'src/hooks.d.ts',
-  ldapactions: 'src/lib/ldapActions.d.ts',
-  plugin: 'src/abstract/plugin.d.ts',
+  'ldap-rest': 'packages/core/src/bin/index.d.ts',
+  expressformatedresponses:
+    'packages/core/src/lib/expressFormatedResponses.d.ts',
+  hooks: 'packages/core/src/hooks.d.ts',
+  ldapactions: 'packages/core/src/lib/ldapActions.d.ts',
+  plugin: 'packages/core/src/abstract/plugin.d.ts',
   ...pluginEntries,
 };
 

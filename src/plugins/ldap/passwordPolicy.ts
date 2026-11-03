@@ -14,25 +14,27 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { Type } from '@sinclair/typebox';
 import type { Express, Request } from 'express';
-
 import DmPlugin, {
   defineRoute,
   type Role,
   BadRequestError,
   ConflictError,
   NotFoundError,
-} from '../../abstract/plugin';
-import type { ModifyRequest, SearchResult } from '../../lib/ldapActions';
+} from '@ldap-rest/core/abstract/plugin';
+import type {
+  ModifyRequest,
+  SearchResult,
+} from '@ldap-rest/core/lib/ldapActions';
 import {
   escapeDnValue,
   escapeLdapFilter,
   normalizeDn,
   parseDirectoryDate,
   validateDnValue,
-} from '../../lib/utils';
-import { jsonBody } from '../../lib/expressFormatedResponses';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { PasswordPolicyService } from '../../lib/services/passwordPolicy';
+} from '@ldap-rest/core/lib/utils';
+import { jsonBody } from '@ldap-rest/core/lib/expressFormatedResponses';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
+import { PasswordPolicyService } from '@ldap-rest/core/lib/services/passwordPolicy';
 
 // ppolicy operational attributes to read
 const PPOLICY_ATTRS = [

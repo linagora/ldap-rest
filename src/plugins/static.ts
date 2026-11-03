@@ -24,16 +24,21 @@ import { validateHeaderValue } from 'http';
 
 import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
-
-import DmPlugin, { defineRoute, type Role } from '../abstract/plugin';
-import type { DM } from '../bin';
-import { notFound, serverError } from '../lib/expressFormatedResponses';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import {
+  notFound,
+  serverError,
+} from '@ldap-rest/core/lib/expressFormatedResponses';
 import {
   configuredSchemaFiles,
   loadSchemaFileAsync,
   schemaUrl,
   staticName,
-} from '../lib/schemaFile';
+} from '@ldap-rest/core/lib/schemaFile';
 
 import {
   STATIC_CSP,

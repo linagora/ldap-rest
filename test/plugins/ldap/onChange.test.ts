@@ -1,6 +1,10 @@
 import { expect } from 'chai';
 import type { Entry } from 'ldapts';
 import type { Request } from 'express';
+import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
+import type DmPlugin from '@ldap-rest/core/abstract/plugin';
+import HookBus from '@ldap-rest/core/lib/hookBus';
+import type { Hooks } from '@ldap-rest/core/hooks';
 
 import { DM } from '../../../src/bin';
 import OnLdapChange, {
@@ -9,10 +13,6 @@ import OnLdapChange, {
 } from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
-import type { ChangeContext } from '../../../src/lib/changeContext';
-import type DmPlugin from '../../../src/abstract/plugin';
-import HookBus from '../../../src/lib/hookBus';
-import type { Hooks } from '../../../src/hooks';
 
 type EntryChange = [string, Entry | null, Entry | null, ChangeContext];
 

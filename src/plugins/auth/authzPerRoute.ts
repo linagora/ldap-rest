@@ -8,16 +8,15 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Express, Request, Response, NextFunction } from 'express';
-
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import { forbidden } from '../../lib/expressFormatedResponses';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import { forbidden } from '@ldap-rest/core/lib/expressFormatedResponses';
 import {
   assertIdentityMode,
   identityFor,
   warnUnmatchedRuleKeys,
   type DmRequest,
-} from '../../lib/auth/base';
-import { authzFor, servesRequest } from '../../lib/authz/composition';
+} from '@ldap-rest/core/lib/auth/base';
+import { authzFor, servesRequest } from '@ldap-rest/core/lib/authz/composition';
 
 import { perRouteOptions } from './auth.options';
 

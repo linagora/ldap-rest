@@ -1,7 +1,6 @@
 import { expect } from 'chai';
-
-import { createEntityRegistry } from '../../src/lib/entities';
-import type { Schema } from '../../src/config/schema';
+import { createEntityRegistry } from '@ldap-rest/core/lib/entities';
+import type { Schema } from '@ldap-rest/core/config/schema';
 
 const schema = (attribute: string): Schema =>
   ({

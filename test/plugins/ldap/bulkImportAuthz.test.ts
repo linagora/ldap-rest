@@ -14,13 +14,13 @@ import { join } from 'node:path';
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Response } from 'express';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
+import { AUTHZ_REFUSED } from '@ldap-rest/core/lib/errors';
 
 import { DM } from '../../../src/bin';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
-import type { Role } from '../../../src/abstract/plugin';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import LdapBulkImport from '../../../src/plugins/ldap/bulkImport';
-import { AUTHZ_REFUSED } from '../../../src/lib/errors';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

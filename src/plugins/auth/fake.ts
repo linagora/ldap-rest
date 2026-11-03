@@ -7,9 +7,8 @@
  * @group Plugins
  */
 import type { Response } from 'express';
-
-import AuthBase, { type DmRequest } from '../../lib/auth/base';
-import type { Role } from '../../abstract/plugin';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
 
 import { fakeOptions } from './auth.options';
 

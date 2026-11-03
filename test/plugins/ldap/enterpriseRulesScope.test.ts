@@ -11,11 +11,11 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import { parseDirectoryDate } from '@ldap-rest/core/lib/utils';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import { parseDirectoryDate } from '../../../src/lib/utils';
 import LdapEnterpriseRules, {
   startOfUtcDay,
 } from '../../../src/plugins/ldap/enterpriseRules';

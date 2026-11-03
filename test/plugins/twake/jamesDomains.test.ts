@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import nock from 'nock';
+import type { Schema } from '@ldap-rest/core/config/schema';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
+import { TrashService } from '@ldap-rest/core/lib/services/trash';
 
-import type { Schema } from '../../../src/config/schema';
-import type { SearchResult } from '../../../src/lib/ldapActions';
-import { TrashService } from '../../../src/lib/services/trash';
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';

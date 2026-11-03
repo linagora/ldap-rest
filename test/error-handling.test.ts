@@ -1,9 +1,12 @@
 import { expect } from 'chai';
 import request from 'supertest';
+import {
+  serverErrorBody,
+  setDebug,
+} from '@ldap-rest/core/lib/expressFormatedResponses';
+import { AUTHZ_REFUSED } from '@ldap-rest/core/lib/errors';
 
-import { DM } from '../src/bin/index';
-import { serverErrorBody, setDebug } from '../src/lib/expressFormatedResponses';
-import { AUTHZ_REFUSED } from '../src/lib/errors';
+import { DM } from '../src/bin';
 
 describe('Error Handling', () => {
   let server: DM | null;

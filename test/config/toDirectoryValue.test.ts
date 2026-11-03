@@ -1,11 +1,13 @@
 import { expect } from 'chai';
-
 import {
   type Schema,
   toDirectoryChanges,
   toDirectoryEntry,
-} from '../../src/config/schema';
-import type { AttributesList, ModifyRequest } from '../../src/lib/ldapActions';
+} from '@ldap-rest/core/config/schema';
+import type {
+  AttributesList,
+  ModifyRequest,
+} from '@ldap-rest/core/lib/ldapActions';
 
 describe('toDirectoryValue', () => {
   const schema = {

@@ -9,34 +9,33 @@
  */
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
-
 import DmPlugin, {
   defineRoute,
   type EntityDeclaration,
   type Role,
-} from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { OptionSet } from '../../config/options';
-import type { Hooks } from '../../hooks';
-import type ldapActions from '../../lib/ldapActions';
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { OptionSet } from '@ldap-rest/core/config/options';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import type ldapActions from '@ldap-rest/core/lib/ldapActions';
 import type {
   AttributesList,
   AttributeValue,
   LdapList,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import { assertModifyRequest } from '../../lib/ldapActions';
+} from '@ldap-rest/core/lib/ldapActions';
+import { assertModifyRequest } from '@ldap-rest/core/lib/ldapActions';
 import {
   jsonBody,
   ok,
   tryMethod,
   wantJson,
   WriteResponse,
-} from '../../lib/expressFormatedResponses';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { loadSchemaFileAsync } from '../../lib/schemaFile';
-import { staticSchemaUrl } from '../../lib/staticFiles';
+} from '@ldap-rest/core/lib/expressFormatedResponses';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
+import { loadSchemaFileAsync } from '@ldap-rest/core/lib/schemaFile';
+import { staticSchemaUrl } from '@ldap-rest/core/lib/staticFiles';
 import {
   assertedRdnValue,
   escapeDnValue,
@@ -53,24 +52,24 @@ import {
   parseDn,
   substringSearchFilter,
   validateDnValue,
-} from '../../lib/utils';
+} from '@ldap-rest/core/lib/utils';
 import {
   BadRequestError,
   ConflictError,
   HttpError,
   isAuthzRefusal,
   NotFoundError,
-} from '../../lib/errors';
-import type { Schema } from '../../config/schema';
+} from '@ldap-rest/core/lib/errors';
+import type { Schema } from '@ldap-rest/core/config/schema';
 import {
   assertClientMaySet,
   modifiedAttributeNames,
   toDirectoryEntry,
-} from '../../config/schema';
+} from '@ldap-rest/core/config/schema';
 import {
   applyFixedDefaults,
   EntityValidator,
-} from '../../lib/entitySchema/validator';
+} from '@ldap-rest/core/lib/entitySchema/validator';
 
 export interface postAdd {
   cn?: string;

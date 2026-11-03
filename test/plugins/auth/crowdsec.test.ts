@@ -2,10 +2,10 @@ import { expect } from 'chai';
 import request from 'supertest';
 import nock from 'nock';
 import type { Express } from 'express';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
 
 import { DM } from '../../../src/bin';
 import CrowdSec from '../../../src/plugins/auth/crowdsec';
-import DmPlugin from '../../../src/abstract/plugin';
 import { outboundCalls } from '../../helpers/metrics';
 
 // Simple plugin to test CrowdSec blocking

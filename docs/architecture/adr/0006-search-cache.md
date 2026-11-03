@@ -46,4 +46,4 @@ Writes made elsewhere — another replica, an LSC synchronisation, a hand-run
   entries must accept a miss or leave the cache off.
 
 See [configuration](../../usage/configuration.md#the-search-cache) and
-`src/lib/ldap/searchCache.ts`.
+`packages/core/src/lib/ldap/searchCache.ts`.

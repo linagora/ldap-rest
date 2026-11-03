@@ -1,7 +1,6 @@
 import { expect } from 'chai';
-
-import ldapActions from '../../src/lib/ldapActions';
-import type { RequestBoundLdap } from '../../src/lib/ldapActions';
+import ldapActions from '@ldap-rest/core/lib/ldapActions';
+import type { RequestBoundLdap } from '@ldap-rest/core/lib/ldapActions';
 
 /**
  * The authorization plugins hook `ldap*request` and judge by the request an

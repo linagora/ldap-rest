@@ -5,16 +5,15 @@
  * SCIM Groups resource handler — direct access via ldapActions.
  */
 import type winston from 'winston';
-
-import type ldapActions from '../../lib/ldapActions';
+import type ldapActions from '@ldap-rest/core/lib/ldapActions';
 import type {
   AttributesList,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import type { Config } from '../../config/args';
-import type { DmRequest } from '../../lib/auth/base';
-import type HookBus from '../../lib/hookBus';
+} from '@ldap-rest/core/lib/ldapActions';
+import type { Config } from '@ldap-rest/core/config/args';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type HookBus from '@ldap-rest/core/lib/hookBus';
 import {
   escapeDnValue,
   escapeLdapFilter,
@@ -23,7 +22,7 @@ import {
   parseDn,
   rdnValue,
   validateDnValue,
-} from '../../lib/utils';
+} from '@ldap-rest/core/lib/utils';
 import {
   type ResourceMapping,
   type ScimGroup,
@@ -31,8 +30,8 @@ import {
   type PatchRequest,
   type MultiValued,
   SCHEMA_LIST_RESPONSE,
-} from '../../lib/scim/types';
-import { BaseResolver } from '../../lib/scim/baseResolver';
+} from '@ldap-rest/core/lib/scim/types';
+import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
 import {
   DEFAULT_GROUP_MAPPING,
   loadMappingFile,
@@ -42,7 +41,7 @@ import {
   scimGroupToLdap,
   requiredLdapAttributes,
   type MappingContext,
-} from '../../lib/scim/mapping';
+} from '@ldap-rest/core/lib/scim/mapping';
 import {
   extractLdapCode,
   kindOf,
@@ -50,8 +49,8 @@ import {
   scimInvalidValue,
   scimNotFound,
   scimUniqueness,
-} from '../../lib/scim/errors';
-import type { ScimOptions } from '../../lib/scim/options';
+} from '@ldap-rest/core/lib/scim/errors';
+import type { ScimOptions } from '@ldap-rest/core/lib/scim/options';
 
 import { scimFilterToLdap } from './filter';
 import { pagedSearch } from './list';

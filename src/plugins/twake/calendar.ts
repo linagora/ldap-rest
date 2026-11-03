@@ -1,9 +1,12 @@
-import TwakePlugin from '../../abstract/twakePlugin';
-import { type Role } from '../../abstract/plugin';
-import type { AttributesList, ModifyRequest } from '../../lib/ldapActions';
-import type { ChangesToNotify } from '../../lib/changes';
-import { Hooks, MaybePromise } from '../../hooks';
-import { isDnInBranch, rdnValue } from '../../lib/utils';
+import TwakePlugin from '@ldap-rest/core/abstract/twakePlugin';
+import { type Role } from '@ldap-rest/core/abstract/plugin';
+import type {
+  AttributesList,
+  ModifyRequest,
+} from '@ldap-rest/core/lib/ldapActions';
+import type { ChangesToNotify } from '@ldap-rest/core/lib/changes';
+import { Hooks, MaybePromise } from '@ldap-rest/core/hooks';
+import { isDnInBranch, rdnValue } from '@ldap-rest/core/lib/utils';
 
 import { calendarOptions, calendarOptionsOf } from './calendar.options';
 
@@ -68,7 +71,7 @@ export default class Calendar extends TwakePlugin {
   private firstnameAttr: string;
   private lastnameAttr: string;
 
-  constructor(server: import('../../bin').DM) {
+  constructor(server: import('@ldap-rest/core').DM) {
     const settings = calendarOptionsOf(server.config);
     super(server, {
       url: settings.calendar_webadmin_url,

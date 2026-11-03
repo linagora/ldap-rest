@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import type { Client } from 'ldapts';
-
-import LdapPool, { type PoolLogger } from '../../../src/lib/ldap/pool';
+import LdapPool, { type PoolLogger } from '@ldap-rest/core/lib/ldap/pool';
 
 /** A client the pool drives without a directory behind it. */
 class FakeClient {

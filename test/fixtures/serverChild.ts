@@ -5,8 +5,9 @@
  * serves: `crash` throws where nothing catches, `crash-hangs` throws with
  * a plugin whose `close()` never settles, `signal` waits for one.
  */
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
+
 import { DM } from '../../src/bin';
-import DmPlugin from '../../src/abstract/plugin';
 
 const mode = process.argv[2] ?? 'crash';
 const say = (what: string): void => {

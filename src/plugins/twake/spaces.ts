@@ -10,38 +10,43 @@ import { randomUUID } from 'node:crypto';
 
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
-
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
-import type { ChangeContext } from '../../lib/changeContext';
-import { BadRequestError } from '../../lib/errors';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { providedService } from '../../lib/services';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
+import { BadRequestError } from '@ldap-rest/core/lib/errors';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
+import { providedService } from '@ldap-rest/core/lib/services';
 import {
   TombstoneService,
   type TombstoneApi,
-} from '../../lib/services/tombstone';
-import { TrashService } from '../../lib/services/trash';
+} from '@ldap-rest/core/lib/services/tombstone';
+import { TrashService } from '@ldap-rest/core/lib/services/trash';
 import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import { currentOperation } from '../../lib/operation';
+} from '@ldap-rest/core/lib/ldapActions';
+import { currentOperation } from '@ldap-rest/core/lib/operation';
 import {
   escapeDnValue,
   escapeLdapFilter,
   parseDn,
   rdnValue,
   unescapeDnValue,
-} from '../../lib/utils';
-import { RabbitMqService, type RabbitMqApi } from '../../lib/services/rabbitmq';
+} from '@ldap-rest/core/lib/utils';
+import {
+  RabbitMqService,
+  type RabbitMqApi,
+} from '@ldap-rest/core/lib/services/rabbitmq';
 import {
   TwakeGroupsService,
   type TwakeGroupsApi,
-} from '../../lib/services/twakeGroups';
+} from '@ldap-rest/core/lib/services/twakeGroups';
 
 import {
   bodyOf,

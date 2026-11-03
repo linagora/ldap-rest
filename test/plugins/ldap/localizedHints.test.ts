@@ -5,9 +5,9 @@
  */
 import { expect } from 'chai';
 import supertest, { type Response } from 'supertest';
+import { localizedText } from '@ldap-rest/core/config/schema';
 
 import { DM } from '../../../src/bin';
-import { localizedText } from '../../../src/config/schema';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';

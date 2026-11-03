@@ -529,6 +529,8 @@ const configArgs: ConfigTemplate = [
       dirname(fileURLToPath(import.meta.url)),
       '..',
       '..',
+      '..',
+      '..',
       'static',
       'schemas'
     ),

@@ -40,4 +40,4 @@ silences the warning.
   `req.authenticators`; see
   [authorization composition](0003-authorization-composition.md).
 
-See `src/bin/index.ts` (`dispatchAuth`) and `src/lib/auth/base.ts`.
+See `packages/core/src/bin/index.ts` (`dispatchAuth`) and `packages/core/src/lib/auth/base.ts`.

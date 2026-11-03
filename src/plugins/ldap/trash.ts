@@ -13,13 +13,12 @@
  */
 
 import type { Request } from 'express';
-
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { Hooks } from '../../hooks';
-import type { SearchResult } from '../../lib/ldapActions';
-import { BadRequestError } from '../../lib/errors';
-import { TrashService } from '../../lib/services/trash';
-import { isDnInBranch, normalizeDn, parseDn } from '../../lib/utils';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
+import { BadRequestError } from '@ldap-rest/core/lib/errors';
+import { TrashService } from '@ldap-rest/core/lib/services/trash';
+import { isDnInBranch, normalizeDn, parseDn } from '@ldap-rest/core/lib/utils';
 
 import { trashOptions } from './ldap.options';
 

@@ -1,7 +1,7 @@
 # Core hooks
 
 Hooks are how plugins talk to each other. Each one is declared in
-[hooks.ts](../../src/hooks.ts), which is the reference for the arguments it
+[hooks.ts](../../packages/core/src/hooks.ts), which is the reference for the arguments it
 gets and what it must answer; a plugin subscribing to a hook it does not
 name there does not compile.
 
@@ -56,7 +56,7 @@ await server.hookBus.settled();
 
 ## Hooks
 
-<!-- hooks: generated from src/hooks.ts, do not edit by hand -->
+<!-- hooks: generated from packages/core/src/hooks.ts, do not edit by hand -->
 
 - **hello**: raised by the [demo plugin](../../src/plugins/demo/helloworld.ts) for `/hello`, answered by the demo plugins
 - **ldapsearchopts**: chained before any search, with its options

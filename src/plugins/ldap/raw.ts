@@ -19,20 +19,22 @@ import { Type } from '@sinclair/typebox';
 import type { Express, Request } from 'express';
 import { FilterParser } from 'ldapts';
 import type { SearchOptions, SearchResult } from 'ldapts';
-
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import { tryMethodData } from '../../lib/expressFormatedResponses';
-import { isDnInBranch, getParentDn, getRdn } from '../../lib/utils';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import { tryMethodData } from '@ldap-rest/core/lib/expressFormatedResponses';
+import { isDnInBranch, getParentDn, getRdn } from '@ldap-rest/core/lib/utils';
 import {
   BadRequestError,
   ForbiddenError,
   isAuthzRefusal,
   NotFoundError,
   ServiceUnavailableError,
-} from '../../lib/errors';
-import type { LdapSchema, SchemaIndex } from '../../lib/ldapSchema';
-import { outsideRequest } from '../../lib/requestContext';
+} from '@ldap-rest/core/lib/errors';
+import type { LdapSchema, SchemaIndex } from '@ldap-rest/core/lib/ldapSchema';
+import { outsideRequest } from '@ldap-rest/core/lib/requestContext';
 
 /**
  * The attribute names a parsed filter tests, at any depth. An extensible

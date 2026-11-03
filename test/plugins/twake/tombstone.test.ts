@@ -3,15 +3,16 @@ import { EventEmitter } from 'node:events';
 import { expect } from 'chai';
 import type { Request } from 'express';
 import supertest from 'supertest';
-
-import { DM } from '../../../src/bin';
 import type {
   AttributesList,
   SearchResult,
-} from '../../../src/lib/ldapActions';
-import { providedService } from '../../../src/lib/services';
-import { TombstoneService } from '../../../src/lib/services/tombstone';
-import { TrashService } from '../../../src/lib/services/trash';
+} from '@ldap-rest/core/lib/ldapActions';
+import { providedService } from '@ldap-rest/core/lib/services';
+import { TombstoneService } from '@ldap-rest/core/lib/services/tombstone';
+import { TrashService } from '@ldap-rest/core/lib/services/trash';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+
+import { DM } from '../../../src/bin';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TrashPlugin from '../../../src/plugins/ldap/trash';
@@ -20,7 +21,6 @@ import TwakeLifecycleEvents from '../../../src/plugins/twake/lifecycleEvents';
 import TwakeInstances from '../../../src/plugins/twake/instances';
 import TwakeTombstone from '../../../src/plugins/twake/tombstone';
 import { waitFor } from '../../helpers/waitFor';
-import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
 
 const LDAP_BASE = process.env.DM_LDAP_BASE as string;
 const USERS = `ou=users,${LDAP_BASE}`;

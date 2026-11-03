@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 import request from 'supertest';
 import type { Express, Request, Response } from 'express';
+import type { ChainedHook, Hooks } from '@ldap-rest/core/hooks';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 
 import { DM } from '../../../src/bin';
-import type { ChainedHook, Hooks } from '../../../src/hooks';
-import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import RateLimit from '../../../src/plugins/auth/rateLimit';
 
 // Simple auth plugin that accepts "valid-token" and rejects others

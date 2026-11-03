@@ -1,16 +1,16 @@
 import { expect } from 'chai';
 import request from 'supertest';
 import type { Express } from 'express';
+import AuthBase from '@ldap-rest/core/lib/auth/base';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import { jsonBodyParser } from '@ldap-rest/core/lib/rawBody';
 
 import { DM } from '../src/bin';
 import HelloWorld from '../src/plugins/demo/helloworld';
 import RateLimit from '../src/plugins/auth/rateLimit';
-import AuthBase from '../src/lib/auth/base';
 import AuthToken from '../src/plugins/auth/token';
-import DmPlugin, { type Role } from '../src/abstract/plugin';
-import type { Hooks } from '../src/hooks';
 import TrustedProxy from '../src/plugins/auth/trustedProxy';
-import { jsonBodyParser } from '../src/lib/rawBody';
 
 /** Express 5 exposes the layer stack as `router`, Express 4 as `_router` */
 interface AppInternal {

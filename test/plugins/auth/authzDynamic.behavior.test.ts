@@ -5,13 +5,13 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import { AUTHZ_REFUSED } from '@ldap-rest/core/lib/errors';
+import { currentRequest } from '@ldap-rest/core/lib/requestContext';
+import type { Hooks } from '@ldap-rest/core/hooks';
 
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
-import { AUTHZ_REFUSED } from '../../../src/lib/errors';
-import { currentRequest } from '../../../src/lib/requestContext';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
-import type { Hooks } from '../../../src/hooks';
 import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
 
 describe('authzDynamic behavioural regressions', function () {

@@ -1,11 +1,10 @@
 import { expect } from 'chai';
 import type { SearchOptions, SearchResult } from 'ldapts';
-
 import SearchCache, {
   digestKey,
   membersNamed,
   type CacheLogger,
-} from '../../../src/lib/ldap/searchCache';
+} from '@ldap-rest/core/lib/ldap/searchCache';
 
 const silentLogger: CacheLogger = { info: () => undefined };
 

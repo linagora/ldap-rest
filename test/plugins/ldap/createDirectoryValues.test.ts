@@ -5,11 +5,11 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import type { SearchResult } from '../../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Numbers and booleans on a creation', function () {

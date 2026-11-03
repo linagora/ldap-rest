@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import { TrashService } from '@ldap-rest/core/lib/services/trash';
 
 import { DM } from '../../../src/bin';
-import { TrashService } from '../../../src/lib/services/trash';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TrashPlugin from '../../../src/plugins/ldap/trash';
 import TwakeGroups from '../../../src/plugins/twake/groups';

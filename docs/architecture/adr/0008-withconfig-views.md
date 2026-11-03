@@ -51,7 +51,7 @@ overrides.
 - Tests may call `withConfig` to exercise option-dependent behaviour without
   building a second server.
 
-See `src/bin/index.ts` (`withConfig`, `importPlugin`) and
+See `packages/core/src/bin/index.ts` (`withConfig`, `importPlugin`) and
 [plugin options](../../plugin-development/options.md).
 
 [#625]: https://github.com/linagora/ldap-rest/issues/625

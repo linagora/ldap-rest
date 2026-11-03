@@ -1,6 +1,5 @@
 import { expect } from 'chai';
-
-import { instanceSlug } from '../../src/lib/instanceProviders';
+import { instanceSlug } from '@ldap-rest/core/lib/instanceProviders';
 
 describe('instanceSlug', () => {
   for (const [value, slug] of [

@@ -1,12 +1,12 @@
 import nock from 'nock';
 import { expect } from 'chai';
+import { BadRequestError, ConflictError } from '@ldap-rest/core/lib/errors';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import { BadRequestError, ConflictError } from '../../../src/lib/errors';
-import type { SearchResult } from '../../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 

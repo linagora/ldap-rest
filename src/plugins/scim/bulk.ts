@@ -11,9 +11,8 @@
  * dispatch).
  */
 import type winston from 'winston';
-
-import type { DmRequest } from '../../lib/auth/base';
-import type HookBus from '../../lib/hookBus';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type HookBus from '@ldap-rest/core/lib/hookBus';
 import {
   type BulkRequest,
   type BulkResponse,
@@ -23,14 +22,14 @@ import {
   type ScimGroup,
   type PatchRequest,
   SCHEMA_BULK_RESPONSE,
-} from '../../lib/scim/types';
-import type { ScimOptions } from '../../lib/scim/options';
+} from '@ldap-rest/core/lib/scim/types';
+import type { ScimOptions } from '@ldap-rest/core/lib/scim/options';
 import {
   kindOf,
   scimErrorFromException,
   scimInvalidValue,
   writeScimErrorFromException,
-} from '../../lib/scim/errors';
+} from '@ldap-rest/core/lib/scim/errors';
 
 import type { ScimUsers } from './users';
 import type { ScimGroups } from './groups';

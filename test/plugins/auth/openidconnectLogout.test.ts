@@ -13,13 +13,13 @@ import { join } from 'node:path';
 import type { Response } from 'express';
 import { expect } from 'chai';
 import nock from 'nock';
-
-import type { DM } from '../../../src/bin';
+import type { DM } from '@ldap-rest/core';
 import {
   currentLogContext,
   type LogContext,
-} from '../../../src/lib/requestContext';
-import { recordHookOwner } from '../../../src/lib/utils';
+} from '@ldap-rest/core/lib/requestContext';
+import { recordHookOwner } from '@ldap-rest/core/lib/utils';
+
 import Bcl from '../../../src/plugins/bcl';
 import Storage from '../../../src/plugins/storage';
 import {

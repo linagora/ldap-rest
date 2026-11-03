@@ -3,7 +3,7 @@
 #
 # The core knows roles and schemas. A suffix, a mail domain, a national phone
 # format, a nomenclature value or a quota default belongs to a schema or to a
-# command-line option — never to `src/`. A default that happens to be one
+# command-line option — never to `src/` or `packages/core/src/`. A default that happens to be one
 # customer's number is a leak just as much as a constant named after them.
 #
 # The list of forbidden values is the one thing this repository cannot carry:
@@ -35,7 +35,7 @@ if [ -z "$expression" ]; then
   exit 0
 fi
 
-if grep -rniaE "$expression" "$root/src"; then
+if grep -rniaE "$expression" "$root/src" "$root/packages/core/src"; then
   cat >&2 <<'EOF'
 
 check-no-client-values: the lines above put a deployment-specific value in the
@@ -45,4 +45,4 @@ EOF
   exit 1
 fi
 
-echo "check-no-client-values: src/ is free of deployment-specific values"
+echo "check-no-client-values: sources are free of deployment-specific values"

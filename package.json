@@ -796,19 +796,23 @@
     "LICENSE",
     "package.json"
   ],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "audit:directory": "tsx scripts/audit-directory.ts",
     "audit:prod": "tsx scripts/audit-prod.ts",
     "build": "npm run build:prod",
     "build:browser": "rollup -c rollup.browser.config.mjs",
+    "build:core": "rimraf packages/core/dist && cd packages/core && rollup -c",
     "build:dev": "./.dev.mk builddev",
     "build:docker": "./.dev.mk builddocker",
     "build:dockerfile": "./.dev.mk Dockerfile",
     "build:pages": "tsx scripts/build-pages.ts",
-    "build:prod": "npm run clean && NODE_ENV=production rollup -c && npm run build:browser && node scripts/moveBrowserLibs.mjs && npm run build:dockerfile",
+    "build:prod": "npm run clean && npm run build:core && NODE_ENV=production rollup -c && npm run build:browser && node scripts/moveBrowserLibs.mjs && npm run build:dockerfile",
     "build:watch": "rollup -c --watch",
     "check": "npm run check:ts && npm run lint && npm run format:check && npm run check:hooks && npm run check:comments && npm run check:no-client-values && npm run check:api && npm run check:openapi && npm run check:options",
-    "check:api": "tsx scripts/api-snapshot.ts --check",
+    "check:api": "npm run build:core && tsx scripts/api-snapshot.ts --check",
     "check:comments": "sh scripts/check-comments.sh",
     "check:hooks": "tsx scripts/hooks-doc.ts",
     "check:no-client-values": "sh scripts/check-no-client-values.sh",
@@ -816,7 +820,7 @@
     "check:options": "tsx scripts/options-snapshot.ts --check",
     "check:ts": "node ./node_modules/typescript/bin/tsc --noEmit",
     "check:ts7": "node ./node_modules/typescript7/bin/tsc --noEmit",
-    "clean": "rimraf dist/* static/browser/* coverage",
+    "clean": "rimraf dist/* static/browser/* packages/core/dist coverage",
     "coverage": "c8 --config .c8rc.json mocha",
     "coverage:check": "npm run check:ts && c8 --config .c8rc.json --exclude 'src/browser/**' --check-coverage --statements 84 --lines 84 --branches 75 --functions 86 mocha",
     "dev": "npm run start:dev",
@@ -828,7 +832,7 @@
     "generate:openapi": "tsx scripts/generate-openapi.ts",
     "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\" \"test/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" \"test/**/*.ts\" --fix",
-    "snapshot:api": "tsx scripts/api-snapshot.ts",
+    "snapshot:api": "npm run build:core && tsx scripts/api-snapshot.ts",
     "snapshot:options": "tsx scripts/options-snapshot.ts",
     "start:dev": "./.dev.mk start",
     "test": "npm run check:ts && mocha",
@@ -843,6 +847,7 @@
     "serialize-javascript": ">=7.0.3"
   },
   "dependencies": {
+    "@ldap-rest/core": "3.0.0",
     "@sinclair/typebox": "^0.34.52",
     "body-parser": "^2.2.0",
     "csv-parse": "^7.0.2",
@@ -902,6 +907,9 @@
     "pg": "^8.23.0",
     "re2": "^1.22.1"
   },
+  "bundledDependencies": [
+    "@ldap-rest/core"
+  ],
   "engines": {
     "node": ">=22"
   }

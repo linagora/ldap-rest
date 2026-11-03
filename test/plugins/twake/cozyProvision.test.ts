@@ -1,10 +1,10 @@
 import nock from 'nock';
 import { expect } from 'chai';
+import type { ScimUser } from '@ldap-rest/core/lib/scim/types';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 
 import { DM } from '../../../src/bin';
 import CozyProvision from '../../../src/plugins/twake/cozyProvision';
-import type { ScimUser } from '../../../src/lib/scim/types';
-import { RabbitMqService } from '../../../src/lib/services/rabbitmq';
 
 interface PublishCall {
   exchange: string;

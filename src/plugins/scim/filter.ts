@@ -19,14 +19,14 @@
  * All string values are escaped via escapeLdapFilter() before emission.
  * Unknown SCIM attribute paths cause a ScimError(invalidFilter, 400).
  */
-import { escapeLdapFilter } from '../../lib/utils';
-import type { ResourceMapping } from '../../lib/scim/types';
+import { escapeLdapFilter } from '@ldap-rest/core/lib/utils';
+import type { ResourceMapping } from '@ldap-rest/core/lib/scim/types';
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
   scimPathToLdapAttribute,
-} from '../../lib/scim/mapping';
-import { scimInvalidFilter } from '../../lib/scim/errors';
+} from '@ldap-rest/core/lib/scim/mapping';
+import { scimInvalidFilter } from '@ldap-rest/core/lib/scim/errors';
 
 type TokenKind =
   | 'LPAREN'

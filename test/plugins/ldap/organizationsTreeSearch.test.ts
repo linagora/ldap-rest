@@ -15,10 +15,10 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
+import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../../src/bin';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import type { AttributesList } from '../../../src/lib/ldapActions';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

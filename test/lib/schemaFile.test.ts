@@ -3,10 +3,8 @@ import os from 'os';
 import { join } from 'path';
 
 import { expect } from 'chai';
-
-import type { Config } from '../../src/bin';
-import configArgs from '../../src/bin/options';
-import { type Schema, schemaAttribute } from '../../src/config/schema';
+import type { Config } from '@ldap-rest/core';
+import { type Schema, schemaAttribute } from '@ldap-rest/core/config/schema';
 import {
   configuredSchemaFiles,
   loadSchemaFile,
@@ -15,7 +13,9 @@ import {
   resolveSchemaBase,
   schemaUrl,
   shippedSchemasPath,
-} from '../../src/lib/schemaFile';
+} from '@ldap-rest/core/lib/schemaFile';
+
+import configArgs from '../../src/bin/options';
 
 type TestSchema = {
   entity?: Record<string, unknown>;

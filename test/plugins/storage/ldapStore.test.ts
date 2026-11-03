@@ -8,10 +8,10 @@
  * branch is left as it was found.
  */
 import { expect } from 'chai';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../../src/bin';
 import LdapStore from '../../../src/plugins/storage/ldap';
-import type { SearchResult } from '../../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Keyed storage, in the directory', function () {

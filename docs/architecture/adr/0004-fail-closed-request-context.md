@@ -41,5 +41,5 @@ the request in its arguments and names it.
 - Errors and logging inherit the request id, which makes a write traceable to
   the request that caused it.
 
-See `src/lib/requestContext.ts` and `src/lib/ldapActions.ts`
+See `packages/core/src/lib/requestContext.ts` and `packages/core/src/lib/ldapActions.ts`
 (`forRequest`, `system`, `currentRequest`).

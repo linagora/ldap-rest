@@ -9,10 +9,12 @@
  * expose their configuration via getConfigApiData() method
  */
 import type { Express } from 'express';
-
-import DmPlugin, { defineRoute, type Role } from '../abstract/plugin';
-import { wantJson } from '../lib/expressFormatedResponses';
-import { SERVER_VERSION } from '../lib/version';
+import DmPlugin, {
+  defineRoute,
+  type Role,
+} from '@ldap-rest/core/abstract/plugin';
+import { wantJson } from '@ldap-rest/core/lib/expressFormatedResponses';
+import { SERVER_VERSION } from '@ldap-rest/core/lib/version';
 
 interface ConfigApiResponse {
   apiPrefix: string;

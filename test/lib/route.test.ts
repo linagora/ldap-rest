@@ -3,14 +3,13 @@ import bodyParser from 'body-parser';
 import express, { type Express } from 'express';
 import supertest from 'supertest';
 import { Type } from '@sinclair/typebox';
-
-import { BadRequestError } from '../../src/lib/errors';
-import { errorResponse } from '../../src/lib/expressFormatedResponses';
+import { BadRequestError } from '@ldap-rest/core/lib/errors';
+import { errorResponse } from '@ldap-rest/core/lib/expressFormatedResponses';
 import {
   defineRoute,
   registeredRoutes,
   unregisteredRoutes,
-} from '../../src/lib/route';
+} from '@ldap-rest/core/lib/route';
 
 const appWith = (): Express => {
   const app = express();

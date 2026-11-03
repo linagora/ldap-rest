@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 import nock from 'nock';
 import type winston from 'winston';
+import { outboundRequestDuration } from '@ldap-rest/core/lib/metrics';
 
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
-import { outboundRequestDuration } from '../../../src/lib/metrics';
 import { outboundCalls } from '../../helpers/metrics';
 
 /**

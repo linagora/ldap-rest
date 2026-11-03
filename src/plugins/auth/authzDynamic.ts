@@ -27,21 +27,20 @@
 
 import type { Express, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
-
-import { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import AuthBase, { type DmRequest } from '../../lib/auth/base';
-import { runTogether } from '../../lib/authz/composition';
-import { AuthzRefusedError } from '../../lib/errors';
+import { defineRoute, type Role } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import { runTogether } from '@ldap-rest/core/lib/authz/composition';
+import { AuthzRefusedError } from '@ldap-rest/core/lib/errors';
 import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import type { Hooks } from '../../hooks';
-import { ok, unauthorized } from '../../lib/expressFormatedResponses';
-import { getParentDn } from '../../lib/utils';
+} from '@ldap-rest/core/lib/ldapActions';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import { ok, unauthorized } from '@ldap-rest/core/lib/expressFormatedResponses';
+import { getParentDn } from '@ldap-rest/core/lib/utils';
 
 import { dynamicOptions } from './auth.options';
 import { verifyLdapPassword } from './authzDynamicHash';

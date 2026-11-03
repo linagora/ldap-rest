@@ -1,32 +1,31 @@
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
-
-import TwakePlugin from '../../abstract/twakePlugin';
-import type { HealthStatus } from '../../lib/health';
-import { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
+import TwakePlugin from '@ldap-rest/core/abstract/twakePlugin';
+import type { HealthStatus } from '@ldap-rest/core/lib/health';
+import { defineRoute, type Role } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
 import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import { ConflictError } from '../../lib/errors';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { currentOperation } from '../../lib/operation';
-import { Hooks } from '../../hooks';
-import type { ChangesToNotify } from '../../lib/changes';
-import { wantJson } from '../../lib/expressFormatedResponses';
-import { roleAttribute } from '../../config/schema';
-import { domainBranches, mailDomains } from '../../lib/mailDomains';
-import { TrashService } from '../../lib/services/trash';
+} from '@ldap-rest/core/lib/ldapActions';
+import { ConflictError } from '@ldap-rest/core/lib/errors';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
+import { currentOperation } from '@ldap-rest/core/lib/operation';
+import { Hooks } from '@ldap-rest/core/hooks';
+import type { ChangesToNotify } from '@ldap-rest/core/lib/changes';
+import { wantJson } from '@ldap-rest/core/lib/expressFormatedResponses';
+import { roleAttribute } from '@ldap-rest/core/config/schema';
+import { domainBranches, mailDomains } from '@ldap-rest/core/lib/mailDomains';
+import { TrashService } from '@ldap-rest/core/lib/services/trash';
 import {
   escapeLdapFilter,
   isDnInBranch,
   isDummyMemberDn,
   normalizeDn,
   parseDn,
-} from '../../lib/utils';
+} from '@ldap-rest/core/lib/utils';
 
 import {
   jamesOptions,
@@ -1438,7 +1437,7 @@ export default class James extends TwakePlugin {
    * Fallback logic: displayName → cn → givenName+sn → mail
    */
   private getDisplayNameFromAttributes(
-    attributes: import('../../lib/ldapActions').AttributesList
+    attributes: import('@ldap-rest/core/lib/ldapActions').AttributesList
   ): string | null {
     // 1. Try displayName first
     const displayName = this.attributeToString(

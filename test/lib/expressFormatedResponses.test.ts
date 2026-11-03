@@ -3,7 +3,6 @@ import express, { type Response } from 'express';
 import bodyParser from 'body-parser';
 import supertest from 'supertest';
 import type winston from 'winston';
-
 import {
   AUTHZ_REFUSED,
   AuthzRefusedError,
@@ -11,7 +10,7 @@ import {
   ForbiddenError,
   GatewayTimeoutError,
   NotFoundError,
-} from '../../src/lib/errors';
+} from '@ldap-rest/core/lib/errors';
 import {
   errorResponse,
   getLogger,
@@ -20,7 +19,7 @@ import {
   serverErrorBody,
   setDebug,
   setLogger,
-} from '../../src/lib/expressFormatedResponses';
+} from '@ldap-rest/core/lib/expressFormatedResponses';
 
 /**
  * `serverError` answers the request whatever it logs: a missing logger —

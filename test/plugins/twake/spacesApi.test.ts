@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import { AuthzRefusedError, ForbiddenError } from '@ldap-rest/core/lib/errors';
 
-import DmPlugin from '../../../src/abstract/plugin';
 import { DM } from '../../../src/bin';
-import type { Hooks } from '../../../src/hooks';
-import { AuthzRefusedError, ForbiddenError } from '../../../src/lib/errors';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';

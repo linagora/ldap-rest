@@ -1,11 +1,10 @@
 import { expect } from 'chai';
-
-import { scimErrorFromException } from '../../../src/lib/scim/errors';
+import { scimErrorFromException } from '@ldap-rest/core/lib/scim/errors';
 import {
   BadRequestError,
   ConflictError,
   HttpError,
-} from '../../../src/lib/errors';
+} from '@ldap-rest/core/lib/errors';
 
 const withCode = <T extends Error>(err: T, code: number): T =>
   Object.assign(err, { code });

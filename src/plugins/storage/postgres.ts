@@ -15,10 +15,12 @@
 import { AsyncResource } from 'node:async_hooks';
 
 import type winston from 'winston';
-
-import Store, { type StoredRecord } from '../../lib/storage/store';
-import { PROBE_TIMEOUT_MS, type HealthStatus } from '../../lib/health';
-import { outsideAnyRequest } from '../../lib/requestContext';
+import Store, { type StoredRecord } from '@ldap-rest/core/lib/storage/store';
+import {
+  PROBE_TIMEOUT_MS,
+  type HealthStatus,
+} from '@ldap-rest/core/lib/health';
+import { outsideAnyRequest } from '@ldap-rest/core/lib/requestContext';
 
 type Pg = typeof import('pg');
 type Pool = InstanceType<Pg['Pool']>;

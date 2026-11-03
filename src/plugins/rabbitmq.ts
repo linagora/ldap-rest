@@ -17,17 +17,17 @@
  *   await rmq?.publish('auth', 'user.created', message);
  */
 
-import DmPlugin from '../abstract/plugin';
-import type { DM } from '../bin';
-import { outsideAnyRequest } from '../lib/requestContext';
-import type { HealthStatus } from '../lib/health';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import { outsideAnyRequest } from '@ldap-rest/core/lib/requestContext';
+import type { HealthStatus } from '@ldap-rest/core/lib/health';
 import {
   RabbitMqService,
   type PublishOptions,
   type RabbitMessage,
   type RabbitMessageHandler,
   type SubscribeOptions,
-} from '../lib/services/rabbitmq';
+} from '@ldap-rest/core/lib/services/rabbitmq';
 
 import { rabbitmqOptions } from './rabbitmq.options';
 
@@ -36,7 +36,7 @@ export type {
   RabbitMessage,
   RabbitMessageHandler,
   SubscribeOptions,
-} from '../lib/services/rabbitmq';
+} from '@ldap-rest/core/lib/services/rabbitmq';
 
 /**
  * Subset of `@linagora/rabbitmq-client`'s `RabbitMQClient` that this plugin

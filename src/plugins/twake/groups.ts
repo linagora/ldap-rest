@@ -12,25 +12,24 @@ import { randomUUID } from 'node:crypto';
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
-
-import type { EntityDeclaration } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Schema, SchemaAttribute } from '../../config/schema';
-import type { Hooks } from '../../hooks';
+import type { EntityDeclaration } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { Schema, SchemaAttribute } from '@ldap-rest/core/config/schema';
+import type { Hooks } from '@ldap-rest/core/hooks';
 import {
   AUTHZ_REFUSED,
   BadRequestError,
   HttpError,
   isAuthzRefusal,
-} from '../../lib/errors';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { defineRoute } from '../../lib/route';
+} from '@ldap-rest/core/lib/errors';
+import { extractLdapCode } from '@ldap-rest/core/lib/ldapCodes';
+import { defineRoute } from '@ldap-rest/core/lib/route';
 import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
+} from '@ldap-rest/core/lib/ldapActions';
 import {
   escapeDnValue,
   escapeLdapFilter,
@@ -40,17 +39,21 @@ import {
   parseDn,
   rdnValue,
   unescapeDnValue,
-} from '../../lib/utils';
-import { BaseResolver } from '../../lib/scim/baseResolver';
+} from '@ldap-rest/core/lib/utils';
+import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
 import {
   DEFAULT_GROUP_MAPPING,
   loadMappingFile,
   mergeMapping,
-} from '../../lib/scim/mapping';
-import { scimOptionsOf } from '../../lib/scim/options';
-import type { ScimGroup } from '../../lib/scim/types';
-import { outsideRequest } from '../../lib/requestContext';
-import { TwakeGroupsService, type Page } from '../../lib/services/twakeGroups';
+} from '@ldap-rest/core/lib/scim/mapping';
+import { scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
+import type { ScimGroup } from '@ldap-rest/core/lib/scim/types';
+import { outsideRequest } from '@ldap-rest/core/lib/requestContext';
+import {
+  TwakeGroupsService,
+  type Page,
+} from '@ldap-rest/core/lib/services/twakeGroups';
+
 // TwakeGroups extends LdapGroups, the one documented family exception
 // eslint-disable-next-line local/no-plugin-family-import
 import LdapGroups from '../ldap/groups';
@@ -153,7 +156,7 @@ export function bodyOf(req: Request): Record<string, unknown> {
   return body as Record<string, unknown>;
 }
 
-export type { Page } from '../../lib/services/twakeGroups';
+export type { Page } from '@ldap-rest/core/lib/services/twakeGroups';
 
 /** The values of an attribute, whatever shape the directory gave them. */
 export function values(value: AttributeValue | undefined): string[] {

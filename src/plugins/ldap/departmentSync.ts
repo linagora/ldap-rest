@@ -8,11 +8,10 @@
  */
 
 import type { SearchResult } from 'ldapts';
-
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
-import { roleAttribute } from '../../config/schema';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { Hooks } from '@ldap-rest/core/hooks';
+import { roleAttribute } from '@ldap-rest/core/config/schema';
 import {
   getParentDn,
   escapeLdapFilter,
@@ -20,7 +19,7 @@ import {
   normalizeDn,
   parseDn,
   rdnValue,
-} from '../../lib/utils';
+} from '@ldap-rest/core/lib/utils';
 
 /** The attributes an entry uses to name its organization and copy its path */
 interface LinkedAttributes {

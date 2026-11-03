@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { expect } from 'chai';
 import nock from 'nock';
 import supertest from 'supertest';
+import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 
 import { DM } from '../../src/bin';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
@@ -10,7 +11,6 @@ import LdapEnterpriseRules from '../../src/plugins/ldap/enterpriseRules';
 import LdapGroups from '../../src/plugins/ldap/groups';
 import OnLdapChange from '../../src/plugins/ldap/onChange';
 import James from '../../src/plugins/twake/james';
-import type { SearchResult } from '../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 import { waitFor } from '../helpers/waitFor';
 

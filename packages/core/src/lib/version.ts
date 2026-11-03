@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-/** `start` and the three directories above it */
-const SEARCH_DEPTH = 4;
+/** `start` and the four directories above it */
+const SEARCH_DEPTH = 5;
 
 /**
  * The version of this package, read from the `package.json` that ships with

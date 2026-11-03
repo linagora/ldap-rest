@@ -15,11 +15,11 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const HOOKS = path.join(root, 'src', 'hooks.ts');
+const HOOKS = path.join(root, 'packages', 'core', 'src', 'hooks.ts');
 const DOC = path.join(root, 'docs', 'plugin-development', 'hooks.md');
 
 const BEGIN =
-  '<!-- hooks: generated from src/hooks.ts, do not edit by hand -->';
+  '<!-- hooks: generated from packages/core/src/hooks.ts, do not edit by hand -->';
 const END = '<!-- /hooks -->';
 
 /**
