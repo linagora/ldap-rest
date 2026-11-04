@@ -1,5 +1,5 @@
 /**
- * @module core/auth/trustedProxy
+ * @module @ldap-rest/auth-trustedproxy
  * Trusted proxy plugin to validate X-Forwarded-For headers
  *
  * This plugin validates that X-Forwarded-For headers only come from trusted

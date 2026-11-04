@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/authzLinid1
+ * @module @ldap-rest/authz-linid1
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Authorization plugin based on twakeLocalAdminLink LDAP attribute

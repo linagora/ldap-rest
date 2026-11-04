@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/authzScope
+ * @module @ldap-rest/authz-scope
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Tells a client what the signed-in administrator may actually do, before it

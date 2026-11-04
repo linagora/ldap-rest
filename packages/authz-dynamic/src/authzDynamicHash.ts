@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/authzDynamicHash
+ * @module @ldap-rest/authz-dynamic/hash
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Verify bearer tokens against LDAP `userPassword` hashes.

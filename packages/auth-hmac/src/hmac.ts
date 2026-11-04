@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/hmac
+ * @module @ldap-rest/auth-hmac
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * HMAC-SHA256 request signing authentication plugin

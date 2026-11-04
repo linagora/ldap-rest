@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/totp
+ * @module @ldap-rest/auth-totp
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * TOTP-based authentication plugin

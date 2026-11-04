@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/fake
+ * @module @ldap-rest/auth-fake
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Development authentication: every request is served as the identity given

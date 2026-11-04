@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/authzPerBranch
+ * @module @ldap-rest/authz-perbranch
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Authorization plugin that restricts LDAP access by branch

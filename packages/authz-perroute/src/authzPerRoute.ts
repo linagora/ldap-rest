@@ -1,5 +1,5 @@
 /**
- * @module core/auth/authzPerRoute
+ * @module @ldap-rest/authz-perroute
  * Route-level authorization plugin.
  *
  * Restricts access by HTTP method + path based on the authenticated user name

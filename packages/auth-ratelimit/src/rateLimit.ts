@@ -1,5 +1,5 @@
 /**
- * @module core/auth/rateLimit
+ * @module @ldap-rest/auth-ratelimit
  * Rate limiting plugin to prevent brute-force attacks
  *
  * This plugin adds rate limiting middleware specifically for authentication

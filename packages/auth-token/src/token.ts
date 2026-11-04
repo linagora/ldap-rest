@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/token
+ * @module @ldap-rest/auth-token
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Token-based authentication plugin

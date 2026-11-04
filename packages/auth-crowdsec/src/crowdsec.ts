@@ -1,5 +1,5 @@
 /**
- * @module core/auth/crowdsec
+ * @module @ldap-rest/auth-crowdsec
  * CrowdSec integration plugin to block banned IPs
  *
  * This plugin integrates with CrowdSec Local API to check if incoming

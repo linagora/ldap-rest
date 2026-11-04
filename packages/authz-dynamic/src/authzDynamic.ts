@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/authzDynamic
+ * @module @ldap-rest/authz-dynamic
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * LDAP-backed authentication + per-branch authorization plugin.
