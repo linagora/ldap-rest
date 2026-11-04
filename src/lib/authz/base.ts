@@ -85,6 +85,11 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   private static readonly widenedForLink = Symbol('widened for the link');
 
+  /** Searches widened to carry `objectClass`, by the same means and for the same reason. */
+  private static readonly widenedForObjectClass = Symbol(
+    'widened for object classes'
+  );
+
   roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
 
@@ -1134,6 +1139,19 @@ export default abstract class AuthzBase extends DmPlugin {
             [AuthzBase.widenedForLink]: true,
           } as SearchOptions;
         }
+        // The organization classes tell an organization from an account or a
+        // group carrying no link; the caller may not have asked for them.
+        if (!AuthzBase.wantsAttribute(opts, 'objectClass')) {
+          const asked = opts.attributes;
+          const list = Array.isArray(asked)
+            ? asked.map(String)
+            : [String(asked)];
+          opts = {
+            ...opts,
+            attributes: [...list, 'objectClass'],
+            [AuthzBase.widenedForObjectClass]: true,
+          } as SearchOptions;
+        }
         return [base, opts, req];
       }
 
@@ -1256,16 +1274,31 @@ export default abstract class AuthzBase extends DmPlugin {
         return readable.get(key)!;
       };
 
-      // The top organization is the root of the only tree there is: an entry
-      // under it is an organization, whatever its classes. Nomenclature
-      // containers sit outside it and stay reference data. The transit
-      // branch is the exception: any administrator hands entries over
-      // through it, so its entry has to stay readable for a move to name it.
-      const top = this.config.ldap_top_organization;
-      const organization = (dn: string): boolean =>
-        !!top &&
-        isDnInBranch(dn, top) &&
-        !(transitKey && normalizeDn(dn) === transitKey);
+      // An organization is recognised by its classes, as `core/ldap/organizations`
+      // reads one: an account or a group carrying no link is not one. It is
+      // judged by `getUserPermissions` rather than by the authorized branches
+      // alone, so that a global write branch, read by every administrator,
+      // stays readable. The transit branch is the other exception: any
+      // administrator hands entries over through it, so its entry has to stay
+      // readable for a move to name it.
+      const organizationClasses = (this.config.ldap_organization_class ?? [])
+        .filter(name => name.toLowerCase() !== 'top')
+        .map(name => name.toLowerCase());
+      const organization = (entry: AttributesList): boolean => {
+        const classes = ([] as unknown[])
+          .concat(entry.objectClass ?? [])
+          .map(name => String(name).toLowerCase());
+        return organizationClasses.some(name => classes.includes(name));
+      };
+      const readsOrganisation = async (value: string): Promise<boolean> => {
+        const key = normalizeDn(value);
+        if (!readable.has(key))
+          readable.set(
+            key,
+            (await this.getUserPermissions(user, value)).read === true
+          );
+        return readable.get(key)!;
+      };
 
       const attached = [];
       for (const entry of result.searchEntries) {
@@ -1277,13 +1310,16 @@ export default abstract class AuthzBase extends DmPlugin {
         if (values.length === 0) {
           // An organization with no link is the branch itself: read it only
           // where the caller reads that branch, as its accounts are.
-          if (organization(String(entry.dn))) {
-            if (!(await reads(String(entry.dn)))) {
-              this.logger.debug(
-                `${this.name}: hiding ${String(entry.dn)} from ${req!.user}, outside the branches they hold`
-              );
-              continue;
-            }
+          const dn = String(entry.dn);
+          if (
+            organization(entry) &&
+            !(transitKey && normalizeDn(dn) === transitKey) &&
+            !(await readsOrganisation(dn))
+          ) {
+            this.logger.debug(
+              `${this.name}: hiding ${dn} from ${req!.user}, outside the branches they hold`
+            );
+            continue;
           }
           attached.push(entry);
           continue;
@@ -1317,6 +1353,15 @@ export default abstract class AuthzBase extends DmPlugin {
         ]
       ) {
         for (const entry of result.searchEntries) delete entry[linkAttr];
+      }
+
+      // The classes were added to the projection for the same reason.
+      if (
+        (opts as { [key: symbol]: unknown } | undefined)?.[
+          AuthzBase.widenedForObjectClass
+        ]
+      ) {
+        for (const entry of result.searchEntries) delete entry.objectClass;
       }
 
       return [result, req, opts];

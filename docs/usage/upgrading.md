@@ -6,6 +6,18 @@ decision or a configuration change appear here; see the
 
 ## From 2.0.2
 
+### A console on another origin must be trusted for logout
+
+**Who is affected:** a deployment whose console is served from an origin
+other than `--base-url`, for example a front-end calling the API with its own
+`apiBaseUrl`.
+
+`/logout` refuses a request a browser reports as coming from another site.
+List the console's origin in `--oidc-logout-origins` (or
+`DM_OIDC_LOGOUT_ORIGINS`, comma-separated); otherwise its sign-out link
+answers `403` and the session stays. A console served by ldap-rest itself,
+from `--base-url`, needs nothing.
+
 ### The organization tree is held to branches
 
 **Who is affected:** a deployment using `core/auth/authzLinid1`, or

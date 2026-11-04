@@ -166,6 +166,11 @@ export const openidconnectOptions = defineOptions({
     default: '',
   }),
   base_url: opt.string({ env: 'DM_BASE_URL', default: '' }),
+  oidc_logout_origins: opt.array({
+    env: 'DM_OIDC_LOGOUT_ORIGINS',
+    default: [],
+    plural: 'oidc-logout-origins',
+  }),
 });
 export type OpenidconnectOptions = OptionsOf<typeof openidconnectOptions>;
 
