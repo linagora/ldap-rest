@@ -84,11 +84,14 @@ export default [
 
   // A route is declared with `defineRoute`: see
   // docs/plugin-development/routes.md. The files in
-  // eslint-rules/route-allowlist.json have not moved yet.
+  // eslint-rules/route-allowlist.json have not moved yet. These rules follow
+  // the plugin code, not the directory it sits in: a plugin that moved to a
+  // package keeps answering to them.
   {
     files: [
       'src/plugins/**/*.ts',
       'src/abstract/**/*.ts',
+      'packages/*/src/**/*.ts',
       'packages/core/src/abstract/**/*.ts',
     ],
     plugins: {
@@ -102,19 +105,18 @@ export default [
         },
       },
     },
+  },
+
+  {
+    files: ['src/plugins/**/*.ts', 'packages/*/src/**/*.ts'],
+    ignores: ['packages/core/src/**'],
     rules: {
       'local/no-raw-route': 'error',
       'local/no-config-cast': 'error',
-    },
-  },
-
-  // A plugin reaches another one through its service: see
-  // docs/plugin-development/services.md. Plugin families are separable: see
-  // docs/development/modularization-plan.md; `TwakeGroups extends LdapGroups`
-  // is the one exception, marked at its import.
-  {
-    files: ['src/plugins/**/*.ts'],
-    rules: {
+      // A plugin reaches another one through its service: see
+      // docs/plugin-development/services.md. Plugin families are separable:
+      // see docs/development/modularization-plan.md; `TwakeGroups extends
+      // LdapGroups` is the one exception, marked at its import.
       'local/no-loaded-plugins': 'error',
       'local/no-plugin-family-import': 'error',
       'local/no-ldap-internals': 'error',
@@ -122,7 +124,11 @@ export default [
   },
   {
     files: ['src/abstract/**/*.ts', 'packages/core/src/abstract/**/*.ts'],
-    rules: { 'local/no-ldap-internals': 'error' },
+    rules: {
+      'local/no-raw-route': 'error',
+      'local/no-config-cast': 'error',
+      'local/no-ldap-internals': 'error',
+    },
   },
 
   // Browser-specific config

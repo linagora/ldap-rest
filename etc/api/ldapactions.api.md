@@ -763,12 +763,13 @@ type ConfigTemplate = ConfigEntry[];
 
 // @public
 class DM {
-    constructor(options?: ConfigTemplate, pluginRoot?: string, resolveBase?: string);
+    constructor(options?: ConfigTemplate, pluginRoot?: string, resolveBase?: string, pluginModules?: Readonly<Record<string, string>>);
     afterLoad(): void;
     // (undocumented)
     app: express.Express;
     authenticators: AuthBase[];
     readonly authenticatorsInfo: AuthenticatorsInfo;
+    canonicalModule(entry: string): string;
     get composed(): boolean;
     // (undocumented)
     config: Config;

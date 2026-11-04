@@ -5,10 +5,10 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import { isAuthzRefusal } from '@ldap-rest/core/lib/errors';
+import AuthzLinid1 from '@ldap-rest/authz-linid1';
+import AuthzScope from '@ldap-rest/authz-scope';
 
 import { DM } from '../../helpers/dm';
-import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
-import AuthzScope from '../../../src/plugins/auth/authzScope';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 

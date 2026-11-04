@@ -26,15 +26,15 @@ import {
   getLogger,
   setLogger,
 } from '@ldap-rest/core/lib/expressFormatedResponses';
+import AuthToken from '@ldap-rest/auth-token';
+import AuthzDynamic from '@ldap-rest/authz-dynamic';
+import AuthzLinid1 from '@ldap-rest/authz-linid1';
+import AuthzPerBranch from '@ldap-rest/authz-perbranch';
+import AuthzPerRoute from '@ldap-rest/authz-perroute';
+import { ssha } from '@ldap-rest/authz-dynamic/hash';
 
-import { type Config } from '../../../src/bin';
 import { DM } from '../../helpers/dm';
-import AuthToken from '../../../src/plugins/auth/token';
-import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
-import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
-import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
-import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
-import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
+import { type Config } from '../../../src/bin';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 const DYNAMIC_TOKEN = 'dynamic-token-for-authz-composition';

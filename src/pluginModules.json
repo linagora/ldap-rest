@@ -1,0 +1,17 @@
+{
+  "core/auth/authzDynamic": "@ldap-rest/authz-dynamic",
+  "core/auth/authzLinid1": "@ldap-rest/authz-linid1",
+  "core/auth/authzPerBranch": "@ldap-rest/authz-perbranch",
+  "core/auth/authzPerRoute": "@ldap-rest/authz-perroute",
+  "core/auth/authzScope": "@ldap-rest/authz-scope",
+  "core/auth/crowdsec": "@ldap-rest/auth-crowdsec",
+  "core/auth/fake": "@ldap-rest/auth-fake",
+  "core/auth/hmac": "@ldap-rest/auth-hmac",
+  "core/auth/llng": "@ldap-rest/auth-llng",
+  "core/auth/openidconnect": "@ldap-rest/auth-openidconnect",
+  "core/auth/rateLimit": "@ldap-rest/auth-ratelimit",
+  "core/auth/token": "@ldap-rest/auth-token",
+  "core/auth/totp": "@ldap-rest/auth-totp",
+  "core/auth/trustedProxy": "@ldap-rest/auth-trustedproxy",
+  "core/storage": "@ldap-rest/storage"
+}

@@ -2,9 +2,9 @@ import { expect } from 'chai';
 import request from 'supertest';
 import type { Express, Request, Response } from 'express';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import TrustedProxy from '@ldap-rest/auth-trustedproxy';
 
 import { DM } from '../../helpers/dm';
-import TrustedProxy from '../../../src/plugins/auth/trustedProxy';
 
 // Simple plugin that exposes the X-Forwarded-For header value and trusted proxy info
 class HeaderInspector extends DmPlugin {

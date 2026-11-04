@@ -1,0 +1,39 @@
+{
+  "name": "@ldap-rest/auth-token",
+  "version": "3.0.0",
+  "description": "LDAP-Rest token authentication plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/auth-token"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/token.ts",
+      "types": "./dist/token.d.ts",
+      "import": "./dist/token.js"
+    },
+    "./options": {
+      "development": "./src/token.options.ts",
+      "types": "./dist/token.options.d.ts",
+      "import": "./dist/token.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "express": "^5.1.0"
+  }
+}

@@ -4,29 +4,72 @@
 
 ```ts
 
-import type { ConfigParams } from 'express-openid-connect';
 import type { Entry } from 'ldapts';
 import express from 'express';
 import type { Express as Express_2 } from 'express';
 import pLimit from 'p-limit';
 import type { Request as Request_2 } from 'express';
+import type { RequestHandler } from 'express';
 import type { Response as Response_2 } from 'express';
 import type { SearchOptions } from 'ldapts';
 import type { SearchResult } from 'ldapts';
 import { Server } from 'http';
 import type winston from 'winston';
 
+// @public
+interface OidcConfig {
+    afterCallback: (req: Request_2, res: Response_2, session: any) => Promise<any>;
+    // (undocumented)
+    authorizationParams: {
+        response_type: string;
+        scope: string;
+    };
+    // (undocumented)
+    authRequired: boolean;
+    // (undocumented)
+    backchannelLogout: {
+        onLogoutToken: (token: object) => Promise<void>;
+        onLogin: (req: DmRequest) => Promise<void>;
+        isLoggedOut: (req: DmRequest) => Promise<boolean>;
+    };
+    // (undocumented)
+    baseURL: string;
+    // (undocumented)
+    clientID: string;
+    // (undocumented)
+    clientSecret: string;
+    // (undocumented)
+    idpLogout: boolean;
+    // (undocumented)
+    issuerBaseURL: string;
+    // (undocumented)
+    routes: {
+        logout: boolean;
+    };
+    // (undocumented)
+    secret: string;
+}
+
+// @public
+interface OidcLibrary {
+    // (undocumented)
+    auth(config: OidcConfig): RequestHandler;
+    // (undocumented)
+    requiresAuth(): RequestHandler;
+}
+
 // @public (undocumented)
 class OpenIDConnect extends AuthBase {
     constructor(server: DM);
-    api(app: Express_2): void;
+    api(app: Express_2): Promise<void>;
     authMethod(req: DmRequest, res: Response_2, next: () => void): void;
-    buildConfig(): ConfigParams;
+    buildConfig(): OidcConfig;
     // (undocumented)
     configApiKey: string;
     getConfigApiData(): Record<string, unknown>;
     // (undocumented)
     protected identitySource(): string;
+    protected loadLibrary(): Promise<OidcLibrary>;
     // (undocumented)
     name: string;
     // (undocumented)

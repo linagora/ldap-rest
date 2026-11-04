@@ -42,13 +42,13 @@ import type DmPlugin from '@ldap-rest/core/abstract/plugin';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+import AuthzPerBranch from '@ldap-rest/authz-perbranch';
+import AuthzLinid1 from '@ldap-rest/authz-linid1';
+import AuthzDynamic from '@ldap-rest/authz-dynamic';
+import { ssha } from '@ldap-rest/authz-dynamic/hash';
+import AuthzScope from '@ldap-rest/authz-scope';
 
 import { DM } from '../helpers/dm';
-import AuthzPerBranch from '../../src/plugins/auth/authzPerBranch';
-import AuthzLinid1 from '../../src/plugins/auth/authzLinid1';
-import AuthzDynamic from '../../src/plugins/auth/authzDynamic';
-import { ssha } from '../../src/plugins/auth/authzDynamicHash';
-import AuthzScope from '../../src/plugins/auth/authzScope';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../src/plugins/ldap/organizations';
 import LdapGroups from '../../src/plugins/ldap/groups';

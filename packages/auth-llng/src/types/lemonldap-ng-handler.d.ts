@@ -1,16 +1,16 @@
 /**
  * Fallback ambient declaration for `lemonldap-ng-handler`.
  *
- * It is an optional dependency (see package.json's `optionalDependencies`)
- * and in turn depends on the native `re2` module. `re2`'s `engines`
- * constraint means it — and so `lemonldap-ng-handler` with it — is missing
- * from node_modules on some Node versions the project still supports: no
- * single `re2` version satisfies every supported Node version at once.
+ * It is an optional peer of this package (see package.json) and in turn
+ * depends on the native `re2` module. `re2`'s `engines` constraint means it —
+ * and so `lemonldap-ng-handler` with it — is missing from node_modules on
+ * some Node versions the project still supports: no single `re2` version
+ * satisfies every supported Node version at once.
  *
  * Without this file, `tsc` fails with "Cannot find module
- * 'lemonldap-ng-handler'" whenever the package happens to be absent, which
- * breaks the build for the whole project over one optional plugin. This
- * declares only what src/plugins/auth/llng.ts uses.
+ * 'lemonldap-ng-handler'" whenever the module happens to be absent, which
+ * breaks the build over one optional plugin. This declares only what
+ * `llng.ts` uses.
  *
  * An ambient module declaration takes precedence over the resolved package,
  * so `tsc` checks against this file even when `lemonldap-ng-handler` is
@@ -20,8 +20,7 @@
  */
 declare module 'lemonldap-ng-handler' {
   import type { Response } from 'express';
-
-  import type { DmRequest } from '../lib/auth/base';
+  import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 
   export function init(args: {
     configStorage?: { confFile?: string; [key: string]: unknown };

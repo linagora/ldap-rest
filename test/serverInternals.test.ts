@@ -5,11 +5,11 @@ import AuthBase from '@ldap-rest/core/lib/auth/base';
 import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 import type { Hooks } from '@ldap-rest/core/hooks';
 import { jsonBodyParser } from '@ldap-rest/core/lib/rawBody';
+import RateLimit from '@ldap-rest/auth-ratelimit';
+import AuthToken from '@ldap-rest/auth-token';
+import TrustedProxy from '@ldap-rest/auth-trustedproxy';
 
 import HelloWorld from '../src/plugins/demo/helloworld';
-import RateLimit from '../src/plugins/auth/rateLimit';
-import AuthToken from '../src/plugins/auth/token';
-import TrustedProxy from '../src/plugins/auth/trustedProxy';
 
 import { DM } from './helpers/dm';
 
@@ -355,6 +355,23 @@ describe('Server internals', () => {
         layer => layer.route?.path === path
       ).length;
     };
+
+    it('should name one module the same whichever spelling designates it', () => {
+      const dm = new DM();
+      // The package answers for the `core/…` entry, and for itself
+      expect(dm.canonicalModule('core/auth/token')).to.equal(
+        '@ldap-rest/auth-token'
+      );
+      expect(dm.canonicalModule('@ldap-rest/auth-token')).to.equal(
+        '@ldap-rest/auth-token'
+      );
+      expect(dm.canonicalModule('@ldap-rest/auth-token:second')).to.equal(
+        '@ldap-rest/auth-token'
+      );
+      // A plugin no package provides keeps its own name
+      expect(dm.canonicalModule('core/weblogs')).to.equal('core/weblogs');
+      expect(dm.canonicalModule(hello)).to.equal(hello);
+    });
 
     it('should load a module listed twice once, without a warning', async () => {
       const dm = new DM();

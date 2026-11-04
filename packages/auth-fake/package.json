@@ -1,0 +1,39 @@
+{
+  "name": "@ldap-rest/auth-fake",
+  "version": "3.0.0",
+  "description": "LDAP-Rest fake authentication plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/auth-fake"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/fake.ts",
+      "types": "./dist/fake.d.ts",
+      "import": "./dist/fake.js"
+    },
+    "./options": {
+      "development": "./src/fake.options.ts",
+      "types": "./dist/fake.options.d.ts",
+      "import": "./dist/fake.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "express": "^5.1.0"
+  }
+}

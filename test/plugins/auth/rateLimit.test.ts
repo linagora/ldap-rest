@@ -3,9 +3,9 @@ import request from 'supertest';
 import type { Express, Request, Response } from 'express';
 import type { ChainedHook, Hooks } from '@ldap-rest/core/hooks';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import RateLimit from '@ldap-rest/auth-ratelimit';
 
 import { DM } from '../../helpers/dm';
-import RateLimit from '../../../src/plugins/auth/rateLimit';
 
 // Simple auth plugin that accepts "valid-token" and rejects others
 class TestAuthPlugin extends AuthBase {

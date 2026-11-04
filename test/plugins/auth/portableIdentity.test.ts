@@ -17,13 +17,13 @@ import type { Express, Request, Response } from 'express';
 import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
+import AuthToken from '@ldap-rest/auth-token';
+import AuthTotp from '@ldap-rest/auth-totp';
+import AuthHmac from '@ldap-rest/auth-hmac';
+import OpenIDConnect from '@ldap-rest/auth-openidconnect';
+import AuthzPerRoute from '@ldap-rest/authz-perroute';
 
 import { DM } from '../../helpers/dm';
-import AuthToken from '../../../src/plugins/auth/token';
-import AuthTotp from '../../../src/plugins/auth/totp';
-import AuthHmac from '../../../src/plugins/auth/hmac';
-import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
-import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
 
 /** Reports what the authenticators left on the request */
 class Probe extends DmPlugin {
@@ -109,17 +109,25 @@ describe('The two names of a caller', function () {
       const plugin = new OpenIDConnect(server);
       // The library's router is what reads the session; here it is the
       // session, so the claim handling is what the test is about.
-      (
-        plugin as unknown as {
-          router: (req: unknown, res: unknown, next: () => void) => void;
-        }
-      ).router = (req, _res, next) => {
+      const internals = plugin as unknown as {
+        router: (req: unknown, res: unknown, next: () => void) => void;
+        library: {
+          requiresAuth: () => (
+            req: unknown,
+            res: unknown,
+            next: () => void
+          ) => void;
+        };
+      };
+      internals.router = (req, _res, next) => {
         (req as { oidc: unknown }).oidc = {
           isAuthenticated: () => true,
           user: { sub: 'auth0|17', preferred_username: 'dwho' },
         };
         next();
       };
+      // `api()` loads the library, and this test serves a request instead
+      internals.library = { requiresAuth: () => (_req, _res, next) => next() };
 
       const req = { headers: {} } as unknown as DmRequest;
       let passed = false;

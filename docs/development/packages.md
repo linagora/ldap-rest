@@ -40,13 +40,23 @@ packages/<name>/
    exact version and in `bundledDependencies`. Until phase 3 publishes the
    packages, the umbrella ships them in its own tarball.
 4. Run `npm run sync:packages`, which writes the package's TypeScript paths
-   into `tsconfig.json` and `tsconfig.api.json`, and its sources into the
-   coverage roots of `.c8rc.json` (c8 takes directories there, not globs).
+   into `tsconfig.json` and `tsconfig.api.json`, its sources into the
+   coverage roots of `.c8rc.json` (c8 takes directories there, not globs), and
+   every shim's `core/…` name into `src/pluginModules.json`.
 5. Keep the former sub-paths of the umbrella as one-line re-exports of the
    package, so the split breaks no import.
 
 `npm run check:packages`, part of `npm run check`, fails when step 3 or 4
-was forgotten.
+was forgotten, and when a package's sources import a module its
+`package.json` does not declare: a type import leaves every build here green
+and fails in a consumer's tree instead.
+
+`src/pluginModules.json` is the bridge between the two names a plugin has:
+it maps each `core/…` entry to the package its shim re-exports, and
+`DM.canonicalModule` reads it wherever a plugin is recognised rather than
+loaded — the priority list, the deduplication of `--plugin` entries, and the
+plugins that look for a dependency. A configuration may therefore name either
+spelling, and a plugin may depend on either.
 
 ## Commands
 

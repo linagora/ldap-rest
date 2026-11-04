@@ -1,12 +1,10 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { expect } from 'chai';
+import AuthToken from '@ldap-rest/auth-token';
+import AuthzPerRoute, { globToRegex } from '@ldap-rest/authz-perroute';
 
 import { DM } from '../../helpers/dm';
-import AuthToken from '../../../src/plugins/auth/token';
-import AuthzPerRoute, {
-  globToRegex,
-} from '../../../src/plugins/auth/authzPerRoute';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 
 describe('AuthzPerRoute', () => {

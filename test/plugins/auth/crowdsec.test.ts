@@ -3,9 +3,9 @@ import request from 'supertest';
 import nock from 'nock';
 import type { Express } from 'express';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import CrowdSec from '@ldap-rest/auth-crowdsec';
 
 import { DM } from '../../helpers/dm';
-import CrowdSec from '../../../src/plugins/auth/crowdsec';
 import { outboundCalls } from '../../helpers/metrics';
 
 // Simple plugin to test CrowdSec blocking

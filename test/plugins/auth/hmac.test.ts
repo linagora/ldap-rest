@@ -6,9 +6,9 @@ import multer from 'multer';
 import { expect } from 'chai';
 import { scimOptions } from '@ldap-rest/core/lib/scim/options';
 import { readOptions } from '@ldap-rest/core/config/options';
+import AuthHmac from '@ldap-rest/auth-hmac';
 
 import { DM } from '../../helpers/dm';
-import AuthHmac from '../../../src/plugins/auth/hmac';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 import { scimBodyParser } from '../../../src/plugins/scim/scim';
 

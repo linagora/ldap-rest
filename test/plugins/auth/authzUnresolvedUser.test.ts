@@ -18,9 +18,9 @@ import supertest from 'supertest';
 import type { Response } from 'express';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
+import AuthzLinid1 from '@ldap-rest/authz-linid1';
 
 import { DM } from '../../helpers/dm';
-import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 

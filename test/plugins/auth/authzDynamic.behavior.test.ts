@@ -8,11 +8,11 @@ import supertest from 'supertest';
 import { AUTHZ_REFUSED } from '@ldap-rest/core/lib/errors';
 import { currentRequest } from '@ldap-rest/core/lib/requestContext';
 import type { Hooks } from '@ldap-rest/core/hooks';
+import AuthzDynamic from '@ldap-rest/authz-dynamic';
+import { ssha } from '@ldap-rest/authz-dynamic/hash';
 
-import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../helpers/dm';
-import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
 
 describe('authzDynamic behavioural regressions', function () {
   let server: DM;

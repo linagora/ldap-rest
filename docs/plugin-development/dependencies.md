@@ -598,6 +598,14 @@ configurations that carry per-instance options into the parallel batch —
 `core/auth/trustedProxy` named that way registered after the routes it
 guards.
 
+A plugin that has a package is named once, in the list, under either
+spelling: `DM.canonicalModule` reads `src/pluginModules.json` — written by
+`npm run sync:packages` from the umbrella's shims — and the entry the
+configuration wrote is compared under the package name. The same table is
+what makes `core/auth/token` and `@ldap-rest/auth-token` load one instance
+rather than two, and what a plugin reads to recognise a dependency named
+either way.
+
 ## Hook Execution Order
 
 Hooks are executed in the order plugins are loaded, with one exception: the

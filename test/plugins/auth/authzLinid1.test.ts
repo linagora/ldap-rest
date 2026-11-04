@@ -4,9 +4,9 @@ import supertest from 'supertest';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import { AmbiguousIdentityError } from '@ldap-rest/core/lib/errors';
+import AuthzLinid1 from '@ldap-rest/authz-linid1';
 
 import { DM } from '../../helpers/dm';
-import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import LdapOrganization from '../../../src/plugins/ldap/organizations';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 

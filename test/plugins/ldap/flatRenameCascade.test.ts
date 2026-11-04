@@ -22,6 +22,7 @@ import type {
   SearchOptions,
   SearchResult,
 } from '@ldap-rest/core/lib/ldapActions';
+import AuthzLinid1 from '@ldap-rest/authz-linid1';
 
 import { DM } from '../../helpers/dm';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
@@ -30,7 +31,6 @@ import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import ExternalUsersInGroups from '../../../src/plugins/ldap/externalUsersInGroups';
 import DepartmentSync from '../../../src/plugins/ldap/departmentSync';
-import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

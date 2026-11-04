@@ -1,0 +1,127 @@
+/**
+ * @module @ldap-rest/auth-ratelimit
+ * Rate limiting plugin to prevent brute-force attacks
+ *
+ * This plugin adds rate limiting middleware specifically for authentication
+ * to protect against brute-force attacks. It should be loaded BEFORE auth plugins.
+ *
+ * Uses an Express middleware to check rate limits before processing, and
+ * a middleware per request. It describes an `afterAuth` hook tracking failed
+ * authentication attempts, which it has never registered — the counting is
+ * per request, whatever the request turns out to be.
+ *
+ * @author Xavier Guimard <xguimard@linagora.com>
+ */
+import type { Express, Request, Response, NextFunction } from 'express';
+import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
+
+import { rateLimitOptions } from './rateLimit.options';
+
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+export default class RateLimit extends DmPlugin {
+  static optionDefinitions = rateLimitOptions;
+
+  name = 'rateLimit';
+  roles: Role[] = ['protect'] as const;
+  private store: Map<string, RateLimitEntry> = new Map();
+  private windowMs: number;
+  private maxRequests: number;
+
+  constructor(...args: ConstructorParameters<typeof DmPlugin>) {
+    super(...args);
+    const settings = this.options(rateLimitOptions);
+    this.windowMs = settings.rate_limit_window_ms;
+    this.maxRequests = settings.rate_limit_max;
+
+    this.logger.info(
+      `Auth rate limiting enabled: ${this.maxRequests} failed attempts per ${this.windowMs / 1000} seconds`
+    );
+  }
+
+  api(app: Express): void {
+    // The limiter keys on the client IP taken from X-Forwarded-For, which a
+    // client can set to anything. That is only safe because trustedProxy —
+    // loaded first — strips the header on requests that do not come from a
+    // declared proxy. Without it, rotating the header defeats the limiter
+    // entirely and the brute-force protection is decorative, with nothing to
+    // show for it in the logs.
+    if (!this.server.pluginInfo.has('trustedProxy'))
+      this.logger.warn(
+        'Auth rate limiting keys on X-Forwarded-For but core/auth/trustedProxy ' +
+          'is not loaded: a client can forge that header and evade the limit. ' +
+          'Load core/auth/trustedProxy, or put the API behind a proxy that ' +
+          'overwrites the header.'
+      );
+
+    // Middleware to check rate limits and track failed authentications
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      const ip = this.getClientIp(req);
+      const now = Date.now();
+      const entry = this.store.get(ip);
+
+      // Clean up expired entries
+      if (entry && now > entry.resetTime) {
+        this.store.delete(ip);
+      }
+
+      // Check if IP is rate limited
+      const currentEntry = this.store.get(ip);
+      if (
+        currentEntry &&
+        currentEntry.count >= this.maxRequests &&
+        now <= currentEntry.resetTime
+      ) {
+        this.logger.warn(
+          `Rate limiting ${ip}: ${currentEntry.count}/${this.maxRequests} failed attempts`
+        );
+        return res.status(429).json({
+          error: 'Too many authentication attempts, please try again later',
+          retryAfter: Math.ceil((currentEntry.resetTime - now) / 1000),
+        });
+      }
+
+      // Track failed auth attempts using the 'finish' event
+      res.on('finish', () => {
+        if (res.statusCode === 401 || res.statusCode === 403) {
+          const entry = this.store.get(ip);
+          const now = Date.now();
+
+          if (!entry || now > entry.resetTime) {
+            // Create new entry
+            this.store.set(ip, {
+              count: 1,
+              resetTime: now + this.windowMs,
+            });
+          } else {
+            // Increment existing entry
+            entry.count++;
+          }
+
+          this.logger.debug(
+            `Failed auth from ${ip}: ${this.store.get(ip)?.count}/${this.maxRequests}`
+          );
+        }
+      });
+
+      next();
+    });
+  }
+
+  private getClientIp(req: Request): string {
+    // Support X-Forwarded-For header for proxied requests
+    // The header can be string | string[] | undefined
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+      // If it's an array, take the first element, otherwise use the string directly
+      const forwardedStr = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+      // X-Forwarded-For can contain multiple IPs separated by commas (client, proxy1, proxy2...)
+      // The first IP is the original client
+      return forwardedStr.split(',')[0].trim();
+    }
+    return req.socket.remoteAddress || 'unknown';
+  }
+}

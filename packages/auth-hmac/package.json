@@ -1,0 +1,39 @@
+{
+  "name": "@ldap-rest/auth-hmac",
+  "version": "3.0.0",
+  "description": "LDAP-Rest HMAC authentication plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/auth-hmac"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/hmac.ts",
+      "types": "./dist/hmac.d.ts",
+      "import": "./dist/hmac.js"
+    },
+    "./options": {
+      "development": "./src/hmac.options.ts",
+      "types": "./dist/hmac.options.d.ts",
+      "import": "./dist/hmac.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "express": "^5.1.0"
+  }
+}

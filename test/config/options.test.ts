@@ -9,18 +9,18 @@ import { ConfigParser } from '@ldap-rest/core/lib/parseConfig';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
 import { TwakePlugin } from '@ldap-rest/core/abstract/twakePlugin';
 import { scimOptions, scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
-
-import { DM } from '../helpers/dm';
-import configArgs from '../../src/options.full';
+import { crowdsecOptionsOf } from '@ldap-rest/auth-crowdsec/options';
+import { dynamicOptionsOf } from '@ldap-rest/authz-dynamic/options';
+import { hmacOptionsOf } from '@ldap-rest/auth-hmac/options';
 import {
   perBranchOptions,
-  crowdsecOptionsOf,
-  dynamicOptionsOf,
-  hmacOptionsOf,
   perBranchOptionsOf,
-  rateLimitOptionsOf,
-  totpOptionsOf,
-} from '../../src/plugins/auth/auth.options';
+} from '@ldap-rest/authz-perbranch/options';
+import { rateLimitOptionsOf } from '@ldap-rest/auth-ratelimit/options';
+import { totpOptionsOf } from '@ldap-rest/auth-totp/options';
+
+import configArgs from '../../src/options.full';
+import { DM } from '../helpers/dm';
 import {
   organizationOptions,
   passwordPolicyOptions,

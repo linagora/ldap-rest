@@ -18,6 +18,7 @@
 import { spawnSync } from 'child_process';
 import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'fs';
 import { writeFile } from 'fs/promises';
+import { builtinModules } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -158,6 +159,80 @@ function pathsOf(target) {
 }
 
 /**
+ * The module names the umbrella serves, as `core/…` to the package the shim
+ * of that name re-exports. A configuration may name either spelling; the
+ * server reads this table to know that they designate the same plugin.
+ */
+function pluginModules() {
+  const pluginRoot = path.join(root, 'src', 'plugins');
+  const names = new Set(packages().map(pkg => pkg.name));
+  const modules = {};
+  for (const file of entriesUnder(pluginRoot)) {
+    if (!file.endsWith('.ts')) continue;
+    const text = readFileSync(file, 'utf8');
+    // A shim re-exports one package's default export: either through
+    // `export { default } from '…'`, or — the deprecated alias — by importing
+    // it and exporting it as the default of this file. The specifier has to be
+    // the package itself: a sub-path such as `@ldap-rest/storage/file` names a
+    // backend, not the plugin, and must keep its own name.
+    const reexport =
+      /export\s*\{[^}]*\bdefault\b[^}]*\}\s*from\s*'(@ldap-rest\/[^']+)'/.exec(
+        text
+      );
+    const alias =
+      /import\s+(\w+)\s+from\s*'(@ldap-rest\/[^']+)'[\s\S]*\bexport\s+default\s+\1\s*;/.exec(
+        text
+      );
+    const specifier = reexport?.[1] ?? alias?.[2];
+    if (!specifier || !names.has(specifier)) continue;
+    const name = path
+      .relative(pluginRoot, file)
+      .replace(/\.ts$/, '')
+      .split(path.sep)
+      .join('/');
+    modules[`core/${name}`] = specifier;
+  }
+  return Object.fromEntries(
+    Object.entries(modules).sort(([a], [b]) => a.localeCompare(b))
+  );
+}
+
+/**
+ * The bare modules a package's sources import, without the sub-path and
+ * without Node's builtins. An optional peer loaded with `import()` counts:
+ * the import is written in the sources all the same.
+ */
+function importsOf(dir) {
+  const builtin = new Set([
+    ...builtinModules,
+    ...builtinModules.map(name => `node:${name}`),
+  ]);
+  const files = entriesUnder(path.join(root, dir, 'src'));
+  const patterns = [
+    /(?:^|\n)\s*(?:import|export)\b[^;]*?\bfrom\s*['"]([^'"]+)['"]/g,
+    /\bimport\s*\(\s*['"]([^'"]+)['"]/g,
+    /(?:^|\n)\s*import\s+['"]([^'"]+)['"]/g,
+  ];
+  const names = new Set();
+  for (const file of files) {
+    if (!file.endsWith('.ts')) continue;
+    const text = readFileSync(file, 'utf8');
+    for (const pattern of patterns)
+      for (const [, specifier] of text.matchAll(pattern)) names.add(specifier);
+  }
+  return [...names]
+    .filter(specifier => !specifier.startsWith('.'))
+    .map(specifier => {
+      const parts = specifier.split('/');
+      return parts[0].startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+    })
+    .filter(
+      name => !builtin.has(name) && !builtin.has(name.replace(/^node:/, ''))
+    )
+    .filter((name, index, all) => all.indexOf(name) === index);
+}
+
+/**
  * The configuration files that name every package, and what `sync` sets in
  * each. c8 takes its `src` entries as directories, not globs, so the coverage
  * roots are listed one per package like the TypeScript paths.
@@ -181,20 +256,22 @@ const GENERATED = [
           .sort(),
       ]),
   },
+  { file: 'src/pluginModules.json', build: pluginModules },
 ];
 
 /** Each generated file as `sync` writes it, beside its current text */
 async function generated() {
   const prettier = await import('prettier');
   return Promise.all(
-    GENERATED.map(async ({ file, set }) => {
-      const current = readFileSync(path.join(root, file), 'utf8');
-      const config = JSON.parse(current);
-      set(config);
-      const options = await prettier.resolveConfig(path.join(root, file));
+    GENERATED.map(async ({ file, set, build }) => {
+      const target = path.join(root, file);
+      const current = existsSync(target) ? readFileSync(target, 'utf8') : '';
+      const config = build ? build() : JSON.parse(current);
+      if (set) set(config);
+      const options = await prettier.resolveConfig(target);
       const wanted = await prettier.format(JSON.stringify(config), {
         ...options,
-        filepath: path.join(root, file),
+        filepath: target,
       });
       return { file, current, wanted };
     })
@@ -228,6 +305,20 @@ async function check() {
       );
     if (!bundled.has(pkg.name))
       problems.push(`package.json: bundledDependencies must list ${pkg.name}`);
+
+    // A type import leaves every build green and fails in a consumer's tree
+    // instead: what a package imports, it declares.
+    const declared = new Set([
+      ...Object.keys(pkg.manifest.dependencies ?? {}),
+      ...Object.keys(pkg.manifest.peerDependencies ?? {}),
+      ...Object.keys(pkg.manifest.optionalDependencies ?? {}),
+      '@ldap-rest/core',
+    ]);
+    for (const name of importsOf(pkg.dir))
+      if (!declared.has(name))
+        problems.push(
+          `${pkg.dir}: imports "${name}" without declaring it in peerDependencies`
+        );
   }
 
   if (problems.length) {

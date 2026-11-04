@@ -1,10 +1,10 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { expect } from 'chai';
+import AuthToken from '@ldap-rest/auth-token';
 
 import { type Config } from '../../../src/bin';
 import { DM } from '../../helpers/dm';
-import AuthToken from '../../../src/plugins/auth/token';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 
 /**

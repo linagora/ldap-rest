@@ -17,6 +17,81 @@
         "./packages/core/dist/lib/services/index.d.ts"
       ],
       "@ldap-rest/core/bin": ["./packages/core/dist/bin/index.d.ts"],
+      "@ldap-rest/auth-crowdsec": [
+        "./packages/auth-crowdsec/dist/crowdsec.d.ts"
+      ],
+      "@ldap-rest/auth-crowdsec/options": [
+        "./packages/auth-crowdsec/dist/crowdsec.options.d.ts"
+      ],
+      "@ldap-rest/auth-fake": ["./packages/auth-fake/dist/fake.d.ts"],
+      "@ldap-rest/auth-fake/options": [
+        "./packages/auth-fake/dist/fake.options.d.ts"
+      ],
+      "@ldap-rest/auth-hmac": ["./packages/auth-hmac/dist/hmac.d.ts"],
+      "@ldap-rest/auth-hmac/options": [
+        "./packages/auth-hmac/dist/hmac.options.d.ts"
+      ],
+      "@ldap-rest/auth-llng": ["./packages/auth-llng/dist/llng.d.ts"],
+      "@ldap-rest/auth-llng/options": [
+        "./packages/auth-llng/dist/llng.options.d.ts"
+      ],
+      "@ldap-rest/auth-openidconnect": [
+        "./packages/auth-openidconnect/dist/openidconnect.d.ts"
+      ],
+      "@ldap-rest/auth-openidconnect/options": [
+        "./packages/auth-openidconnect/dist/openidconnect.options.d.ts"
+      ],
+      "@ldap-rest/auth-ratelimit": [
+        "./packages/auth-ratelimit/dist/rateLimit.d.ts"
+      ],
+      "@ldap-rest/auth-ratelimit/options": [
+        "./packages/auth-ratelimit/dist/rateLimit.options.d.ts"
+      ],
+      "@ldap-rest/auth-token": ["./packages/auth-token/dist/token.d.ts"],
+      "@ldap-rest/auth-token/options": [
+        "./packages/auth-token/dist/token.options.d.ts"
+      ],
+      "@ldap-rest/auth-totp": ["./packages/auth-totp/dist/totp.d.ts"],
+      "@ldap-rest/auth-totp/options": [
+        "./packages/auth-totp/dist/totp.options.d.ts"
+      ],
+      "@ldap-rest/auth-trustedproxy": [
+        "./packages/auth-trustedproxy/dist/trustedProxy.d.ts"
+      ],
+      "@ldap-rest/auth-trustedproxy/options": [
+        "./packages/auth-trustedproxy/dist/trustedProxy.options.d.ts"
+      ],
+      "@ldap-rest/authz-dynamic": [
+        "./packages/authz-dynamic/dist/authzDynamic.d.ts"
+      ],
+      "@ldap-rest/authz-dynamic/options": [
+        "./packages/authz-dynamic/dist/authzDynamic.options.d.ts"
+      ],
+      "@ldap-rest/authz-dynamic/hash": [
+        "./packages/authz-dynamic/dist/authzDynamicHash.d.ts"
+      ],
+      "@ldap-rest/authz-linid1": [
+        "./packages/authz-linid1/dist/authzLinid1.d.ts"
+      ],
+      "@ldap-rest/authz-linid1/options": [
+        "./packages/authz-linid1/dist/authzLinid1.options.d.ts"
+      ],
+      "@ldap-rest/authz-perbranch": [
+        "./packages/authz-perbranch/dist/authzPerBranch.d.ts"
+      ],
+      "@ldap-rest/authz-perbranch/options": [
+        "./packages/authz-perbranch/dist/authzPerBranch.options.d.ts"
+      ],
+      "@ldap-rest/authz-perroute": [
+        "./packages/authz-perroute/dist/authzPerRoute.d.ts"
+      ],
+      "@ldap-rest/authz-perroute/options": [
+        "./packages/authz-perroute/dist/authzPerRoute.options.d.ts"
+      ],
+      "@ldap-rest/authz-scope": ["./packages/authz-scope/dist/authzScope.d.ts"],
+      "@ldap-rest/authz-scope/options": [
+        "./packages/authz-scope/dist/authzScope.options.d.ts"
+      ],
       "@ldap-rest/storage": ["./packages/storage/dist/storage.d.ts"],
       "@ldap-rest/storage/options": [
         "./packages/storage/dist/storage.options.d.ts"
@@ -31,6 +106,6 @@
       ]
     }
   },
-  "include": ["src/**/*", "packages/core/src/types/**/*.d.ts"],
+  "include": ["src/**/*", "packages/*/src/types/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

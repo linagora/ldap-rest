@@ -1,0 +1,200 @@
+/**
+ * @module @ldap-rest/auth-totp
+ * @author Xavier Guimard <xguimard@linagora.com>
+ *
+ * TOTP-based authentication plugin
+ * @group Plugins
+ */
+import { createHmac } from 'crypto';
+
+import type { Response } from 'express';
+import { unauthorized } from '@ldap-rest/core/lib/expressFormatedResponses';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
+
+import { totpOptions } from './totp.options';
+
+interface TotpUser {
+  name: string;
+  secret: string; // Base32 encoded secret
+  digits: number; // Number of digits in TOTP code
+}
+
+export default class AuthTotp extends AuthBase {
+  static optionDefinitions = totpOptions;
+
+  protected knownIdentities(): string[] {
+    return this.totpUsers.map(user => user.name);
+  }
+
+  protected identitySource(): string {
+    return 'req.user and req.userName: the name given in --auth-totp';
+  }
+
+  name = 'authTotp';
+  roles: Role[] = ['auth'] as const;
+  private totpUsers: TotpUser[] = [];
+  private window: number; // Time window for validation (±window * step seconds)
+  private step: number; // Time step in seconds (typically 30)
+
+  constructor(...args: ConstructorParameters<typeof AuthBase>) {
+    super(...args);
+
+    // Parse TOTP configuration
+    const settings = this.options(totpOptions);
+    const totpConfig = settings.auth_totp;
+    this.window = settings.auth_totp_window;
+    this.step = settings.auth_totp_step;
+
+    totpConfig.forEach((entry, index) => {
+      const parts = entry.split(':');
+      // Format: "secret:name" or "secret:name:digits"
+      const [secret, name, digitsField] = parts.map(p => p.trim());
+      const digits = digitsField === undefined ? 6 : Number(digitsField);
+      const fail = (why: string): never => {
+        throw new Error(
+          `Invalid --auth-totp entry at index ${index}: ${why}; entries ` +
+            'are separated by `,`, `;` or newlines'
+        );
+      };
+      if (parts.length < 2 || parts.length > 3 || !secret || !name)
+        fail('expected "secret:name[:digits]"');
+      if (!this.isValidBase32(secret)) fail('the secret is not Base32');
+      if (
+        digitsField === '' ||
+        !Number.isInteger(digits) ||
+        digits < 6 ||
+        digits > 10
+      )
+        fail('digits must be an integer from 6 to 10');
+
+      this.totpUsers.push({ name, secret, digits });
+    });
+
+    if (this.totpUsers.length === 0) {
+      this.logger.warn('No valid TOTP users configured');
+    } else {
+      this.logger.info(
+        `TOTP authentication initialized with ${this.totpUsers.length} user(s)`
+      );
+    }
+  }
+
+  authMethod(req: DmRequest, res: Response, next: () => void): void {
+    const authHeader = req.headers['authorization'];
+
+    if (!authHeader || !/^Bearer .+/.test(authHeader)) {
+      this.logger.warn('Missing or invalid Authorization header');
+      return unauthorized(res);
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    // Try to validate token against all configured users
+    for (const user of this.totpUsers) {
+      if (this.verifyTotp(user.secret, token, user.digits)) {
+        this.logger.debug(
+          `TOTP authentication successful for user: ${user.name}`
+        );
+        this.publishIdentity(req, user.name);
+        return next();
+      }
+    }
+
+    this.logger.warn(`Unauthorized TOTP token: ${token}`);
+    return unauthorized(res);
+  }
+
+  /**
+   * Verify a TOTP token against a secret
+   */
+  private verifyTotp(secret: string, token: string, digits: number): boolean {
+    const now = Math.floor(Date.now() / 1000);
+
+    // Check current time window and adjacent windows
+    for (let i = -this.window; i <= this.window; i++) {
+      const counter = Math.floor(now / this.step) + i;
+      const expectedToken = this.generateTotp(secret, counter, digits);
+
+      if (expectedToken === token) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Generate a TOTP token using HMAC-SHA1
+   */
+  private generateTotp(
+    secret: string,
+    counter: number,
+    digits: number
+  ): string {
+    // Decode Base32 secret
+    const key = this.base32Decode(secret);
+
+    // Convert counter to 8-byte buffer (big-endian)
+    const counterBuffer = Buffer.alloc(8);
+    counterBuffer.writeBigUInt64BE(BigInt(counter));
+
+    // Generate HMAC-SHA1
+    const hmac = createHmac('sha1', key);
+    hmac.update(counterBuffer);
+    const hash = hmac.digest();
+
+    // Dynamic truncation (RFC 4226)
+    const offset = hash[hash.length - 1] & 0x0f;
+    const truncatedHash =
+      ((hash[offset] & 0x7f) << 24) |
+      ((hash[offset + 1] & 0xff) << 16) |
+      ((hash[offset + 2] & 0xff) << 8) |
+      (hash[offset + 3] & 0xff);
+
+    // Generate N-digit code
+    const code = truncatedHash % Math.pow(10, digits);
+    return code.toString().padStart(digits, '0');
+  }
+
+  /**
+   * Decode a Base32 string to Buffer
+   */
+  private base32Decode(input: string): Buffer {
+    const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    // Remove trailing padding characters (avoid ReDoS by using simple loop instead of regex)
+    let cleanInput = input.toUpperCase();
+    while (cleanInput.endsWith('=')) {
+      cleanInput = cleanInput.slice(0, -1);
+    }
+
+    let bits = 0;
+    let value = 0;
+    const output: number[] = [];
+
+    for (let i = 0; i < cleanInput.length; i++) {
+      const idx = base32Chars.indexOf(cleanInput[i]);
+      if (idx === -1) {
+        throw new Error(`Invalid Base32 character: ${cleanInput[i]}`);
+      }
+
+      value = (value << 5) | idx;
+      bits += 5;
+
+      if (bits >= 8) {
+        output.push((value >>> (bits - 8)) & 0xff);
+        bits -= 8;
+      }
+    }
+
+    return Buffer.from(output);
+  }
+
+  /**
+   * Validate if a string is valid Base32
+   */
+  private isValidBase32(input: string): boolean {
+    const base32Regex = /^[A-Z2-7]+=*$/;
+    return base32Regex.test(input.toUpperCase());
+  }
+}

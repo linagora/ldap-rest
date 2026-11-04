@@ -17,9 +17,9 @@ import supertest from 'supertest';
 import type { Response } from 'express';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
+import AuthzPerBranch from '@ldap-rest/authz-perbranch';
 
 import { DM } from '../../helpers/dm';
-import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import TrashPlugin from '../../../src/plugins/ldap/trash';

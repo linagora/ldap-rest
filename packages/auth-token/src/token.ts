@@ -1,0 +1,70 @@
+/**
+ * @module @ldap-rest/auth-token
+ * @author Xavier Guimard <xguimard@linagora.com>
+ *
+ * Token-based authentication plugin
+ * @group Plugins
+ */
+import type { Response } from 'express';
+import { unauthorized } from '@ldap-rest/core/lib/expressFormatedResponses';
+import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
+
+import { tokenOptions } from './token.options';
+
+export default class AuthToken extends AuthBase {
+  static optionDefinitions = tokenOptions;
+
+  protected knownIdentities(): string[] {
+    return [...new Set(this.tokenMap.values())];
+  }
+
+  protected identitySource(): string {
+    return 'req.user and req.userName: the name given in --auth-token';
+  }
+
+  name = 'authToken';
+  roles: Role[] = ['auth'] as const;
+  private tokenMap: Map<string, string> = new Map(); // token -> name
+
+  constructor(...args: ConstructorParameters<typeof AuthBase>) {
+    super(...args);
+
+    // Parse tokens and build token map
+    const tokens = this.options(tokenOptions).auth_token;
+    tokens.forEach((tokenEntry, index) => {
+      if (tokenEntry.includes(':')) {
+        // Format: "token:name"
+        const [token, name] = tokenEntry.split(':', 2);
+        this.tokenMap.set(token.trim(), name.trim());
+      } else {
+        // Legacy format: just token, use index as name
+        this.tokenMap.set(tokenEntry.trim(), `token ${index}`);
+      }
+    });
+  }
+
+  authMethod(req: DmRequest, res: Response, next: () => void): void {
+    let token = req.headers['authorization'];
+
+    if (!token || !/^Bearer .+/.test(token)) {
+      this.logger.warn('Missing or invalid Authorization header');
+      return unauthorized(res);
+    }
+    token = token.split(' ')[1];
+
+    const userName = this.tokenMap.get(token);
+    if (!userName) {
+      // Mask token in logs to prevent credential exposure
+      const maskedToken =
+        token.length > 8 ? `${token.substring(0, 8)}...` : '***';
+      this.logger.warn(`Unauthorized token: ${maskedToken}`);
+      return unauthorized(res);
+    }
+
+    // The name given in `--auth-token`, which is what a rule keyed on this
+    // plugin names: the same value under both keys.
+    this.publishIdentity(req, userName);
+    next();
+  }
+}

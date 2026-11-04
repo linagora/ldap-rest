@@ -3,9 +3,9 @@ import { createHmac } from 'crypto';
 import type { Express } from 'express';
 import request from 'supertest';
 import { expect } from 'chai';
+import AuthTotp from '@ldap-rest/auth-totp';
 
 import { DM } from '../../helpers/dm';
-import AuthTotp from '../../../src/plugins/auth/totp';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 
 /**

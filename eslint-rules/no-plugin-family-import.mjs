@@ -30,7 +30,22 @@ const familyOf = file => {
   )
     return 'storage';
   if (/(?:^|\/)src\/plugins\//.test(normalized)) return 'misc';
-  return undefined;
+  return packageFamily(
+    /(?:^|\/)packages\/([^/]+)\/src(?:\/|$)/.exec(normalized)?.[1]
+  );
+};
+
+/**
+ * The family a plugin package holds: `@ldap-rest/auth-token` and
+ * `@ldap-rest/authz-scope` are both the former `src/plugins/auth/`.
+ */
+const packageFamily = name => {
+  if (!name) return undefined;
+  const short = name.replace(/^@ldap-rest\//, '');
+  if (short === 'storage') return 'storage';
+  const family = /^(auth|authz|ldap|scim|twake)(?:-|$)/.exec(short);
+  if (!family) return undefined;
+  return family[1] === 'authz' ? 'auth' : family[1];
 };
 
 export default {
@@ -52,9 +67,12 @@ export default {
     if (!own) return {};
 
     const check = (node, source) => {
-      if (typeof source !== 'string' || !source.startsWith('.')) return;
-      const target = path.resolve(path.dirname(file), source);
-      const other = familyOf(target);
+      if (typeof source !== 'string') return;
+      const other = source.startsWith('@ldap-rest/')
+        ? packageFamily(source)
+        : source.startsWith('.')
+          ? familyOf(path.resolve(path.dirname(file), source))
+          : undefined;
       if (!other || other === own) return;
       context.report({
         node,

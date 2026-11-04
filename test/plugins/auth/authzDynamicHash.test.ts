@@ -1,12 +1,11 @@
 import crypto from 'crypto';
 
 import { expect } from 'chai';
-
 import {
   verifyLdapPassword,
   ssha,
   sshaHash,
-} from '../../../src/plugins/auth/authzDynamicHash';
+} from '@ldap-rest/authz-dynamic/hash';
 
 function ldapify(prefix: string, digest: Buffer): string {
   return `{${prefix}}${digest.toString('base64')}`;

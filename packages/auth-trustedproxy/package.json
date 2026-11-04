@@ -1,0 +1,39 @@
+{
+  "name": "@ldap-rest/auth-trustedproxy",
+  "version": "3.0.0",
+  "description": "LDAP-Rest trusted proxy authentication plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/auth-trustedproxy"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/trustedProxy.ts",
+      "types": "./dist/trustedProxy.d.ts",
+      "import": "./dist/trustedProxy.js"
+    },
+    "./options": {
+      "development": "./src/trustedProxy.options.ts",
+      "types": "./dist/trustedProxy.options.d.ts",
+      "import": "./dist/trustedProxy.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "express": "^5.1.0"
+  }
+}

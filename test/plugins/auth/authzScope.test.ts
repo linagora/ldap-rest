@@ -1,12 +1,12 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import AuthzScope from '@ldap-rest/authz-scope';
+import AuthzLinid1 from '@ldap-rest/authz-linid1';
+import AuthzPerRoute from '@ldap-rest/authz-perroute';
+import AuthzPerBranch from '@ldap-rest/authz-perbranch';
 
 import { DM } from '../../helpers/dm';
-import AuthzScope from '../../../src/plugins/auth/authzScope';
-import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
-import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
-import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import PasswordPolicy from '../../../src/plugins/ldap/passwordPolicy';
