@@ -16,7 +16,11 @@ const { auth, requiresAuth } = oidc;
 
 import AuthBase, { DmRequest } from '../../lib/auth/base';
 import { type Role } from '../../abstract/plugin';
-import { serverError, unauthorized } from '../../lib/expressFormatedResponses';
+import {
+  forbidden,
+  serverError,
+  unauthorized,
+} from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 
@@ -313,6 +317,42 @@ export default class OpenIDConnect extends AuthBase {
   }
 
   /**
+   * Whether a browser reports the request as coming from another site.
+   *
+   * `/logout` is a `GET` a link reaches, so a page on another site can end
+   * the session without a token. The origin is what tells the caller's own
+   * link apart from someone else's. `Sec-Fetch-Site` answers where a browser
+   * sends it; `Origin` and `Referer` cover the others. A client sending none
+   * of them — a script, a server — is not a browser navigating from another
+   * site, and is let through.
+   *
+   * @param req incoming request
+   * @returns true when the request comes from another site
+   */
+  private crossSite(req: DmRequest): boolean {
+    const site = req.headers['sec-fetch-site'];
+    if (typeof site === 'string')
+      return site !== 'same-origin' && site !== 'none';
+
+    let base: string;
+    try {
+      base = new URL(this.options(openidconnectOptions).base_url).origin;
+    } catch {
+      return false;
+    }
+    for (const name of ['origin', 'referer'] as const) {
+      const value = req.headers[name];
+      if (typeof value !== 'string') continue;
+      try {
+        if (new URL(value).origin !== base) return true;
+      } catch {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Read the session, then require one.
    *
    * `requiresAuth()` runs *after* the router, so `req.oidc` exists when the
@@ -329,6 +369,12 @@ export default class OpenIDConnect extends AuthBase {
    * @param next called once the request carries an identity
    */
   authMethod(req: DmRequest, res: Response, next: () => void): void {
+    if (
+      (req.method === 'GET' || req.method === 'HEAD') &&
+      LOGOUT.test(req.path) &&
+      this.crossSite(req)
+    )
+      return forbidden(res, 'Cross-site logout refused');
     if (!this.router)
       return serverError(
         res,

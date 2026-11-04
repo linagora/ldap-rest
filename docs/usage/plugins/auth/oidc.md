@@ -113,6 +113,12 @@ browser is sent to the provider's `end_session_endpoint` with the id token as
 No `post_logout_redirect_uri` is sent: the caller ends on the provider's own
 logout page, and nothing has to be registered there.
 
+A request a browser reports as coming from another site — `Sec-Fetch-Site`
+other than `same-origin` or `none`, or an `Origin` or `Referer` naming another
+origin — is refused (`403`) and leaves the session alone. `/logout` is a `GET`
+a link reaches and asks for no token, so without that check any page could end
+an administrator's session.
+
 Ending the cookie alone would not log anyone out: every guarded path goes
 through the provider, which still holds its session and logs the caller back
 in without asking anything.
