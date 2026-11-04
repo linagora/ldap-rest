@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `/logout` refuses a request a browser reports as coming from another site
+  (`403`) and leaves the session alone, where a cross-site link ended it; a
+  console served from another origin lists it in `--oidc-logout-origins`
+  ([GHSA-7p36-74gx-462q](https://github.com/linagora/twake-directory-manager/security/advisories/GHSA-7p36-74gx-462q),
+  [details](docs/usage/plugins/auth/oidc.md#logout),
+  [upgrading](docs/usage/upgrading.md#a-console-on-another-origin-must-be-trusted-for-logout)).
+- The organization tree is held to the caller's branches: another branch's
+  description, sub-organizations and local administrators no longer come back
+  from `GET /ldap/organizations/:dn`, its subnode listings or its searches
+  ([GHSA-f7wx-7vp6-6g99](https://github.com/linagora/twake-directory-manager/security/advisories/GHSA-f7wx-7vp6-6g99),
+  [details](docs/usage/plugins/auth/authz-linid1.md#what-an-administrator-reads),
+  [upgrading](docs/usage/upgrading.md#the-organization-tree-is-held-to-branches)).
+
 ## v2.0.2 (2026-11-04)
 
 ### Security

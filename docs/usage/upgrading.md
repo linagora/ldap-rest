@@ -4,6 +4,40 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## From 2.0.2
+
+### A console on another origin must be trusted for logout
+
+**Who is affected:** a deployment whose console is served from an origin
+other than `--base-url`, for example a front-end calling the API with its own
+`apiBaseUrl`.
+
+`/logout` refuses a request a browser reports as coming from another site.
+List the console's origin in `--oidc-logout-origins` (or
+`DM_OIDC_LOGOUT_ORIGINS`, comma-separated); otherwise its sign-out link
+answers `403` and the session stays. A console served by ldap-rest itself,
+from `--base-url`, needs nothing.
+
+### The organization tree is held to branches
+
+**Who is affected:** a deployment using `core/auth/authzLinid1`, or
+`core/auth/authzPerBranch` with `--authz-filter-attached-entries`.
+
+An administrator no longer reads the organizations of another branch: a
+single read answers `404`, and a subnode listing or a search returns only the
+branches they hold. The tree names every branch, its description and its
+local administrators, which an administrator of one branch has no business
+reading. `organizations/top` still answers one of their branches — or the
+top organization for a caller named in no `twakeLocalAdminLink` — and the
+transit branch's own entry stays readable so that the console can open its
+card from the scope banner. Naming the tree top directly is refused like any
+organization outside their branches.
+
+A console drawing the whole tree from an administrator's session draws their
+branches only. A client that listed the tree to let one administrator choose
+another branch as a destination loses that choice; the write was refused on
+the destination branch anyway.
+
 ## From 1.3.0
 
 ### A plugin with its own `service` member

@@ -16,7 +16,11 @@ const { auth, requiresAuth } = oidc;
 
 import AuthBase, { DmRequest } from '../../lib/auth/base';
 import { type Role } from '../../abstract/plugin';
-import { serverError, unauthorized } from '../../lib/expressFormatedResponses';
+import {
+  forbidden,
+  serverError,
+  unauthorized,
+} from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 
@@ -113,6 +117,16 @@ export default class OpenIDConnect extends AuthBase {
       'base_url',
     ] as const) {
       if (!this.config[p]) throw new Error(`Missing config parameter ${p}`);
+    }
+    for (const origin of this.options(openidconnectOptions)
+      .oidc_logout_origins) {
+      try {
+        new URL(origin);
+      } catch {
+        throw new Error(
+          `${this.name}: --oidc-logout-origins holds "${origin}", which is not a URL`
+        );
+      }
     }
   }
 
@@ -313,6 +327,58 @@ export default class OpenIDConnect extends AuthBase {
   }
 
   /**
+   * Origins a logout may come from: `--base-url`, and the consoles named in
+   * `--oidc-logout-origins` when they are served elsewhere.
+   */
+  private logoutOrigins(): string[] {
+    const { base_url, oidc_logout_origins } =
+      this.options(openidconnectOptions);
+    const origins = new Set<string>();
+    for (const value of [base_url, ...oidc_logout_origins]) {
+      try {
+        origins.add(new URL(value).origin);
+      } catch {
+        // `--base-url` is checked by the library; a configured origin was
+        // refused at startup.
+      }
+    }
+    return [...origins];
+  }
+
+  /**
+   * Whether a browser reports the request as coming from another site.
+   *
+   * `/logout` is a `GET` a link reaches, so a page on another site can end
+   * the session without a token. The origin is what tells the caller's own
+   * link apart from someone else's. `Sec-Fetch-Site` answers where a browser
+   * sends it; `Origin` and `Referer` cover the others, and name the console
+   * when it is served from another origin. A client sending none of them — a
+   * script, a server — is not a browser navigating from another site, and is
+   * let through.
+   *
+   * @param req incoming request
+   * @returns true when the request comes from another site
+   */
+  private crossSite(req: DmRequest): boolean {
+    const site = req.headers['sec-fetch-site'];
+    if (site === 'same-origin' || site === 'none') return false;
+
+    const trusted = this.logoutOrigins();
+    let seen = false;
+    for (const name of ['origin', 'referer'] as const) {
+      const value = req.headers[name];
+      if (typeof value !== 'string') continue;
+      seen = true;
+      try {
+        if (trusted.includes(new URL(value).origin)) return false;
+      } catch {
+        return true;
+      }
+    }
+    return typeof site === 'string' || seen;
+  }
+
+  /**
    * Read the session, then require one.
    *
    * `requiresAuth()` runs *after* the router, so `req.oidc` exists when the
@@ -329,6 +395,12 @@ export default class OpenIDConnect extends AuthBase {
    * @param next called once the request carries an identity
    */
   authMethod(req: DmRequest, res: Response, next: () => void): void {
+    if (
+      (req.method === 'GET' || req.method === 'HEAD') &&
+      LOGOUT.test(req.path) &&
+      this.crossSite(req)
+    )
+      return forbidden(res, 'Cross-site logout refused');
     if (!this.router)
       return serverError(
         res,
