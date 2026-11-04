@@ -7610,67 +7610,72 @@
   ],
   "components": {
     "schemas": {
-      "Config": {
+      "AppAccount": {
         "type": "object",
-        "description": "Aggregated server configuration. `apiPrefix`, `ldapBase` and\n`features` are always present; `version` is present unless the server\ncould not read it at start-up; `features` is a dynamic map whose keys\nare the names of loaded plugins that declare the `configurable` role.\nEach plugin contributes an arbitrary sub-object — consult the\nindividual plugin documentation for its exact shape.\n",
-        "additionalProperties": true,
+        "description": "An application-specific identity attached to a user.  App accounts\nallow a single principal user to authenticate as different named\n\"devices\" or \"applications\" each with its own credential, while\nsharing the same mail address.\n",
+        "required": [
+          "uid"
+        ],
         "properties": {
-          "apiPrefix": {
+          "uid": {
             "type": "string",
-            "description": "The API base path configured on this server.",
-            "example": "/api"
+            "description": "Unique identifier of the app account.  Format:\n`<prefix>_c<8-digits>`, where `<prefix>` is the `:user` path param\n(the resolution value — the mail by default) sanitized into a\nuid-safe token (e.g. `alice@example.com` -> `alice_example_com`).\n",
+            "example": "alice_example_com_c04729183"
           },
-          "ldapBase": {
+          "name": {
             "type": "string",
-            "description": "The root LDAP suffix used by this server.",
-            "example": "dc=example,dc=com"
-          },
-          "version": {
-            "type": "string",
-            "description": "The server's version, as its package declares it. A client reads it\nto tell an administrator the server is older than it supports; a\nserver that cannot tell its version leaves the field out.\n",
-            "example": "1.2.1"
-          },
-          "features": {
-            "type": "object",
-            "description": "Per-plugin configuration blocks.  Keys match the plugin's\n`name` field; values are plugin-specific objects.\n",
-            "additionalProperties": true,
-            "example": {
-              "ldapGroups": {
-                "enabled": true,
-                "base": "ou=groups,dc=example,dc=com",
-                "mainAttribute": "cn",
-                "objectClass": [
-                  "top",
-                  "groupOfNames"
-                ]
-              },
-              "static": {
-                "enabled": true,
-                "staticPath": "/static"
-              },
-              "appAccountsApi": {
-                "enabled": true,
-                "base": "ou=app-accounts,dc=example,dc=com",
-                "maxAccounts": 5
-              }
-            }
+            "description": "Human-readable label (stored as LDAP `description`).",
+            "example": "Work laptop"
           }
         },
         "example": {
-          "apiPrefix": "/api",
-          "ldapBase": "dc=example,dc=com",
-          "version": "1.2.1",
-          "features": {
-            "ldapGroups": {
-              "enabled": true,
-              "base": "ou=groups,dc=example,dc=com",
-              "mainAttribute": "cn"
-            },
-            "static": {
-              "enabled": true,
-              "staticPath": "/static"
-            }
+          "uid": "alice_c04729183",
+          "name": "Work laptop"
+        }
+      },
+      "AppAccountCreate": {
+        "type": "object",
+        "description": "Request body for creating a new app account.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Optional human-readable label for the new account.",
+            "example": "Work laptop"
           }
+        },
+        "example": {
+          "name": "Work laptop"
+        }
+      },
+      "AppAccountCreated": {
+        "type": "object",
+        "description": "Response returned when a new app account is successfully created.\nThe one-time cleartext password is included here and never returned\nagain — callers must store it immediately.\n",
+        "required": [
+          "uid",
+          "pwd",
+          "mail"
+        ],
+        "properties": {
+          "uid": {
+            "type": "string",
+            "description": "Identifier of the newly created app account.",
+            "example": "alice_c04729183"
+          },
+          "pwd": {
+            "type": "string",
+            "description": "One-time cleartext password generated for this account.\nFormat: 6 blocks of 4 characters separated by `-`\n(e.g. `Ab3@-xYz!-9pQ#-Sv4$-mN8!-pQ5@`).\nOpenLDAP hashes it via ppolicy before storage.\n",
+            "example": "Ab3@-xYz!-9pQ#-Sv4$-mN8!-pQ5@"
+          },
+          "mail": {
+            "type": "string",
+            "description": "Mail address of the principal account this app account belongs to.",
+            "example": "alice@example.com"
+          }
+        },
+        "example": {
+          "uid": "alice_c04729183",
+          "pwd": "Ab3@-xYz!-9pQ#-Sv4$-mN8!-pQ5@",
+          "mail": "alice@example.com"
         }
       },
       "BulkImportResult": {
@@ -7784,6 +7789,320 @@
           }
         }
       },
+      "Config": {
+        "type": "object",
+        "description": "Aggregated server configuration. `apiPrefix`, `ldapBase` and\n`features` are always present; `version` is present unless the server\ncould not read it at start-up; `features` is a dynamic map whose keys\nare the names of loaded plugins that declare the `configurable` role.\nEach plugin contributes an arbitrary sub-object — consult the\nindividual plugin documentation for its exact shape.\n",
+        "additionalProperties": true,
+        "properties": {
+          "apiPrefix": {
+            "type": "string",
+            "description": "The API base path configured on this server.",
+            "example": "/api"
+          },
+          "ldapBase": {
+            "type": "string",
+            "description": "The root LDAP suffix used by this server.",
+            "example": "dc=example,dc=com"
+          },
+          "version": {
+            "type": "string",
+            "description": "The server's version, as its package declares it. A client reads it\nto tell an administrator the server is older than it supports; a\nserver that cannot tell its version leaves the field out.\n",
+            "example": "1.2.1"
+          },
+          "features": {
+            "type": "object",
+            "description": "Per-plugin configuration blocks.  Keys match the plugin's\n`name` field; values are plugin-specific objects.\n",
+            "additionalProperties": true,
+            "example": {
+              "ldapGroups": {
+                "enabled": true,
+                "base": "ou=groups,dc=example,dc=com",
+                "mainAttribute": "cn",
+                "objectClass": [
+                  "top",
+                  "groupOfNames"
+                ]
+              },
+              "static": {
+                "enabled": true,
+                "staticPath": "/static"
+              },
+              "appAccountsApi": {
+                "enabled": true,
+                "base": "ou=app-accounts,dc=example,dc=com",
+                "maxAccounts": 5
+              }
+            }
+          }
+        },
+        "example": {
+          "apiPrefix": "/api",
+          "ldapBase": "dc=example,dc=com",
+          "version": "1.2.1",
+          "features": {
+            "ldapGroups": {
+              "enabled": true,
+              "base": "ou=groups,dc=example,dc=com",
+              "mainAttribute": "cn"
+            },
+            "static": {
+              "enabled": true,
+              "staticPath": "/static"
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "What was refused, in English."
+          },
+          "code": {
+            "type": "string",
+            "description": "For a client to explain the refusal in its own words, when there\nis one: `unique` (a value already used), `mailDomain` (an address\noutside the authorised mail domains), `forbidden` (the caller may\nnot act on this branch). Absent for any other refusal, which only\n`error` describes. The Twake groups API answers its own codes\n(`INVALID_INPUT`, `REFUSED`…).\n"
+          },
+          "attribute": {
+            "type": "string",
+            "description": "The attribute refused, for `unique` and `mailDomain`."
+          },
+          "value": {
+            "type": "string",
+            "description": "The value refused, for `unique` and `mailDomain`."
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The authorised mail domains, for `mailDomain`."
+          }
+        },
+        "example": {
+          "error": "entity: \"value\" is already used (attribute must be unique)",
+          "code": "unique",
+          "attribute": "attribute",
+          "value": "value"
+        }
+      },
+      "ExpiringAccount": {
+        "type": "object",
+        "description": "User whose password is expiring within the warning window.",
+        "required": [
+          "dn",
+          "expiresAt",
+          "daysUntilExpiration"
+        ],
+        "properties": {
+          "dn": {
+            "type": "string",
+            "example": "uid=bob",
+            "ou=users": null,
+            "dc=example": null,
+            "dc=com": null
+          },
+          "uid": {
+            "type": "string",
+            "example": "bob"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Bob Builder"
+          },
+          "mail": {
+            "type": "string",
+            "example": "bob@example.com"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-05-01T08:00:00.000Z"
+          },
+          "daysUntilExpiration": {
+            "type": "integer",
+            "example": 6
+          }
+        }
+      },
+      "FlatCreate": {
+        "type": "object",
+        "description": "Body for creating a new entry. The plugin's `mainAttribute` field\n(e.g. `uid`) is required and used to build the DN. All other\nattributes are plugin-specific; unknown attributes are accepted\nunless the plugin's schema is in strict mode.\n",
+        "additionalProperties": true,
+        "example": {
+          "uid": "carol",
+          "cn": "Carol White",
+          "sn": "White",
+          "mail": "carol@example.com"
+        }
+      },
+      "FlatEntry": {
+        "type": "object",
+        "description": "A single LDAP entry from a flat branch. The `dn` field is always\npresent; all other fields depend on the concrete plugin's schema\n(e.g. `uid`, `cn`, `mail`, `sn` for users).\n",
+        "required": [
+          "dn"
+        ],
+        "properties": {
+          "dn": {
+            "type": "string",
+            "description": "Fully-qualified distinguished name of the entry.",
+            "example": "uid=alice,ou=users,dc=example,dc=com"
+          }
+        },
+        "additionalProperties": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "example": {
+          "dn": "uid=alice,ou=users,dc=example,dc=com",
+          "uid": "alice",
+          "cn": "Alice Smith",
+          "sn": "Smith",
+          "mail": "alice@example.com"
+        }
+      },
+      "FlatList": {
+        "type": "object",
+        "description": "A map of entries returned by the LIST endpoint, keyed by the\nentry's `mainAttribute` value (e.g. the `uid` for users). This\nis the `LdapList` shape (`Record<string, FlatEntry>`).\n",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/FlatEntry"
+        },
+        "example": {
+          "alice": {
+            "dn": "uid=alice,ou=users,dc=example,dc=com",
+            "uid": "alice",
+            "cn": "Alice Smith",
+            "mail": "alice@example.com"
+          },
+          "bob": {
+            "dn": "uid=bob,ou=users,dc=example,dc=com",
+            "uid": "bob",
+            "cn": "Bob Jones",
+            "mail": "bob@example.com"
+          }
+        }
+      },
+      "FlatModify": {
+        "type": "object",
+        "description": "Partial-update body. Supports `add`, `replace`, and `delete`\nmaps matching the LDAP modify operation. The `mainAttribute`\n(e.g. `uid`) cannot be changed through this endpoint — use the\nrename API instead.\n",
+        "properties": {
+          "add": {
+            "type": "object",
+            "description": "Attributes whose values are appended.",
+            "additionalProperties": true
+          },
+          "replace": {
+            "type": "object",
+            "description": "Attributes whose values are replaced wholesale.",
+            "additionalProperties": true
+          },
+          "delete": {
+            "description": "Attributes (or specific values) to remove. Either an array\nof attribute names or a map of attribute → value(s).\n",
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
+          }
+        },
+        "example": {
+          "replace": {
+            "mail": "carol.white@example.com",
+            "cn": "Carol White-Smith"
+          }
+        }
+      },
+      "FlatMoveRequest": {
+        "type": "object",
+        "description": "Body for moving an entry to a different organisational unit.\nRequires `ldap_organization_link_attribute` and\n`ldap_organization_path_attribute` to be defined in the plugin's\nschema.\n",
+        "required": [
+          "targetOrgDn"
+        ],
+        "properties": {
+          "targetOrgDn": {
+            "type": "string",
+            "description": "DN of the destination organisational unit.",
+            "example": "ou=engineering,ou=departments,dc=example,dc=com"
+          }
+        },
+        "example": {
+          "targetOrgDn": "ou=engineering,ou=departments,dc=example,dc=com"
+        }
+      },
+      "FlatRenameRequest": {
+        "type": "object",
+        "description": "Body for changing the identifier of an entry. The field is named\n`newId` for every resource, whatever that resource calls its\n`mainAttribute`.\n",
+        "required": [
+          "newId"
+        ],
+        "properties": {
+          "newId": {
+            "type": "string",
+            "description": "New value of the resource's `mainAttribute`. A value, not a DN.\n",
+            "example": "bob"
+          }
+        },
+        "example": {
+          "newId": "bob"
+        }
+      },
+      "FlatRenameResult": {
+        "type": "object",
+        "description": "Outcome of a rename: the entry's new DN, and how many references to\nthe old one were rewritten.\n",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "False when a reference could not be rewritten."
+          },
+          "dn": {
+            "type": "string",
+            "description": "DN the entry now has."
+          },
+          "referencesUpdated": {
+            "type": "integer",
+            "description": "References rewritten to the new DN."
+          },
+          "referencesFailed": {
+            "type": "array",
+            "description": "References left naming the old DN, counted per attribute. The\nreferring entries are named in the server log, not here.\n",
+            "items": {
+              "type": "object",
+              "properties": {
+                "attribute": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "example": {
+          "success": true,
+          "dn": "uid=bob,ou=users,dc=example,dc=com",
+          "referencesUpdated": 3
+        }
+      },
       "Group": {
         "type": "object",
         "description": "An LDAP group entry (groupOfNames / groupOfUniqueNames).",
@@ -7866,41 +8185,157 @@
           "description": "Updated description"
         }
       },
-      "Error": {
+      "JamesQuotaUsage": {
         "type": "object",
+        "description": "Quota information for a mailbox user as returned by the James\nWebAdmin API (`GET /quota/users/{mail}`). Contains separate\ncounters for message count and storage size.\n",
+        "properties": {
+          "count": {
+            "type": "object",
+            "description": "Message-count quota.",
+            "properties": {
+              "used": {
+                "type": "integer",
+                "description": "Number of messages currently stored.",
+                "example": 142
+              },
+              "max": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Maximum number of messages allowed. `null` means unlimited.\n",
+                "example": 10000
+              }
+            }
+          },
+          "size": {
+            "type": "object",
+            "description": "Storage-size quota (bytes).",
+            "properties": {
+              "used": {
+                "type": "integer",
+                "description": "Bytes currently used.",
+                "example": 524288000
+              },
+              "max": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Maximum bytes allowed. `null` means unlimited.\n",
+                "example": 2147483648
+              }
+            }
+          }
+        },
+        "example": {
+          "count": {
+            "used": 142,
+            "max": 10000
+          },
+          "size": {
+            "used": 524288000,
+            "max": 2147483648
+          }
+        }
+      },
+      "LdapSchema": {
+        "type": "object",
+        "description": "A JSON schema file served from the `schemas/` sub-directory of the\nstatic path.  These schemas describe LDAP entity types (users, groups,\norganizations, …) and are consumed by browser-embedded editors to\nrender attribute forms and validate input before submission.\n\nThe server replaces `__FOO_BAR__` placeholders on the fly with the\nvalue of the corresponding `--foo-bar` CLI option so that a single\nschema file can be shared between server-side validation and\nclient-side rendering. A schema that `extends` another is served\nmerged with it.\n",
+        "additionalProperties": true,
+        "example": {
+          "entity": {
+            "name": "standardUser",
+            "mainAttribute": "uid",
+            "objectClass": [
+              "top",
+              "inetOrgPerson"
+            ],
+            "singularName": "user",
+            "pluralName": "users",
+            "base": "ou=users,dc=example,dc=com"
+          },
+          "strict": true,
+          "attributes": {
+            "uid": {
+              "type": "string",
+              "required": true,
+              "role": "identifier"
+            },
+            "cn": {
+              "type": "string",
+              "required": true
+            }
+          }
+        }
+      },
+      "LockedAccount": {
+        "type": "object",
+        "description": "User account that is currently locked.",
         "required": [
-          "error"
+          "dn",
+          "failureCount"
         ],
         "properties": {
-          "error": {
+          "dn": {
             "type": "string",
-            "description": "What was refused, in English."
+            "example": "uid=charlie",
+            "ou=users": null,
+            "dc=example": null,
+            "dc=com": null
           },
-          "code": {
+          "uid": {
             "type": "string",
-            "description": "For a client to explain the refusal in its own words, when there\nis one: `unique` (a value already used), `mailDomain` (an address\noutside the authorised mail domains), `forbidden` (the caller may\nnot act on this branch). Absent for any other refusal, which only\n`error` describes. The Twake groups API answers its own codes\n(`INVALID_INPUT`, `REFUSED`…).\n"
+            "example": "charlie"
           },
-          "attribute": {
+          "displayName": {
             "type": "string",
-            "description": "The attribute refused, for `unique` and `mailDomain`."
+            "example": "Charlie Chaplin"
           },
-          "value": {
+          "mail": {
             "type": "string",
-            "description": "The value refused, for `unique` and `mailDomain`."
+            "example": "charlie@example.com"
           },
-          "domains": {
+          "lockedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-04-24T14:30:00.000Z"
+          },
+          "failureCount": {
+            "type": "integer",
+            "example": 5
+          }
+        }
+      },
+      "OrgSummary": {
+        "type": "object",
+        "description": "Lightweight organization reference (used in node lists).",
+        "required": [
+          "dn",
+          "ou"
+        ],
+        "properties": {
+          "dn": {
+            "type": "string",
+            "example": "ou=HR",
+            "ou=organizations": null,
+            "dc=example": null,
+            "dc=com": null
+          },
+          "ou": {
+            "type": "string",
+            "example": "HR"
+          },
+          "description": {
+            "type": "string"
+          },
+          "objectClass": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "The authorised mail domains, for `mailDomain`."
+            "example": [
+              "top",
+              "organizationalUnit"
+            ]
           }
-        },
-        "example": {
-          "error": "entity: \"value\" is already used (attribute must be unique)",
-          "code": "unique",
-          "attribute": "attribute",
-          "value": "value"
         }
       },
       "Organization": {
@@ -7953,40 +8388,6 @@
             "description": "DNs of entries linked to this organization.",
             "example": [
               "uid=alice,ou=users,dc=example,dc=com"
-            ]
-          }
-        }
-      },
-      "OrgSummary": {
-        "type": "object",
-        "description": "Lightweight organization reference (used in node lists).",
-        "required": [
-          "dn",
-          "ou"
-        ],
-        "properties": {
-          "dn": {
-            "type": "string",
-            "example": "ou=HR",
-            "ou=organizations": null,
-            "dc=example": null,
-            "dc=com": null
-          },
-          "ou": {
-            "type": "string",
-            "example": "HR"
-          },
-          "description": {
-            "type": "string"
-          },
-          "objectClass": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "top",
-              "organizationalUnit"
             ]
           }
         }
@@ -8109,92 +8510,14 @@
           }
         }
       },
-      "PasswordStatus": {
+      "PasswordPolicyChanges": {
         "type": "object",
-        "description": "Current password status for a specific user account.",
-        "required": [
-          "dn",
-          "passwordSet",
-          "isExpired",
-          "isExpiringSoon",
-          "mustChange",
-          "isLocked",
-          "failureCount",
-          "graceLoginsUsed"
-        ],
-        "properties": {
-          "dn": {
-            "type": "string",
-            "description": "Fully-qualified DN of the user.",
-            "example": "uid=alice,ou=users,dc=example,dc=com"
-          },
-          "passwordSet": {
-            "type": "boolean",
-            "description": "Whether a userPassword attribute is present.",
-            "example": true
-          },
-          "lastChanged": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "ISO-8601 timestamp of last password change, or null if never set.",
-            "example": "2026-01-15T10:00:00.000Z"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "ISO-8601 expiry timestamp, or null if no max age is configured.",
-            "example": "2026-04-15T10:00:00.000Z"
-          },
-          "daysUntilExpiration": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Remaining days until expiry (negative means already expired).",
-            "example": 80
-          },
-          "isExpired": {
-            "type": "boolean",
-            "example": false
-          },
-          "isExpiringSoon": {
-            "type": "boolean",
-            "description": "True when expiry is within the configured warning window.",
-            "example": false
-          },
-          "mustChange": {
-            "type": "boolean",
-            "description": "True when `pwdReset` is set (admin forced change).",
-            "example": false
-          },
-          "isLocked": {
-            "type": "boolean",
-            "description": "True when the account is currently locked.",
-            "example": false
-          },
-          "lockedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "ISO-8601 timestamp of lockout, or null.",
-            "example": null
-          },
-          "failureCount": {
-            "type": "integer",
-            "description": "Number of recorded bind failures still within the window.",
-            "example": 0
-          },
-          "graceLoginsUsed": {
-            "type": "integer",
-            "description": "Number of grace logins already consumed.",
-            "example": 0
-          },
-          "policy": {
-            "type": "string",
-            "nullable": true,
-            "description": "DN of the policy the status was computed with: the one the\naccount's `pwdPolicySubentry` names, else the default one.\n",
-            "example": "cn=default,ou=policies,dc=example,dc=com"
-          }
+        "description": "Attributes to set, by name as in `PasswordPolicyEntry`. `null` removes\nthe attribute. On `PATCH`, `dn`, `cn`, `isDefault` and the read-only\nattributes are accepted only with the value the entry already has.\n",
+        "additionalProperties": true,
+        "example": {
+          "pwdMaxAge": 31536000,
+          "pwdLockout": true,
+          "pwdExpireWarning": null
         }
       },
       "PasswordPolicyEntry": {
@@ -8299,91 +8622,91 @@
           }
         }
       },
-      "PasswordPolicyChanges": {
+      "PasswordStatus": {
         "type": "object",
-        "description": "Attributes to set, by name as in `PasswordPolicyEntry`. `null` removes\nthe attribute. On `PATCH`, `dn`, `cn`, `isDefault` and the read-only\nattributes are accepted only with the value the entry already has.\n",
-        "additionalProperties": true,
-        "example": {
-          "pwdMaxAge": 31536000,
-          "pwdLockout": true,
-          "pwdExpireWarning": null
-        }
-      },
-      "ExpiringAccount": {
-        "type": "object",
-        "description": "User whose password is expiring within the warning window.",
+        "description": "Current password status for a specific user account.",
         "required": [
           "dn",
-          "expiresAt",
-          "daysUntilExpiration"
+          "passwordSet",
+          "isExpired",
+          "isExpiringSoon",
+          "mustChange",
+          "isLocked",
+          "failureCount",
+          "graceLoginsUsed"
         ],
         "properties": {
           "dn": {
             "type": "string",
-            "example": "uid=bob",
-            "ou=users": null,
-            "dc=example": null,
-            "dc=com": null
+            "description": "Fully-qualified DN of the user.",
+            "example": "uid=alice,ou=users,dc=example,dc=com"
           },
-          "uid": {
-            "type": "string",
-            "example": "bob"
+          "passwordSet": {
+            "type": "boolean",
+            "description": "Whether a userPassword attribute is present.",
+            "example": true
           },
-          "displayName": {
+          "lastChanged": {
             "type": "string",
-            "example": "Bob Builder"
-          },
-          "mail": {
-            "type": "string",
-            "example": "bob@example.com"
+            "format": "date-time",
+            "nullable": true,
+            "description": "ISO-8601 timestamp of last password change, or null if never set.",
+            "example": "2026-01-15T10:00:00.000Z"
           },
           "expiresAt": {
             "type": "string",
             "format": "date-time",
-            "example": "2026-05-01T08:00:00.000Z"
+            "nullable": true,
+            "description": "ISO-8601 expiry timestamp, or null if no max age is configured.",
+            "example": "2026-04-15T10:00:00.000Z"
           },
           "daysUntilExpiration": {
             "type": "integer",
-            "example": 6
-          }
-        }
-      },
-      "LockedAccount": {
-        "type": "object",
-        "description": "User account that is currently locked.",
-        "required": [
-          "dn",
-          "failureCount"
-        ],
-        "properties": {
-          "dn": {
-            "type": "string",
-            "example": "uid=charlie",
-            "ou=users": null,
-            "dc=example": null,
-            "dc=com": null
+            "nullable": true,
+            "description": "Remaining days until expiry (negative means already expired).",
+            "example": 80
           },
-          "uid": {
-            "type": "string",
-            "example": "charlie"
+          "isExpired": {
+            "type": "boolean",
+            "example": false
           },
-          "displayName": {
-            "type": "string",
-            "example": "Charlie Chaplin"
+          "isExpiringSoon": {
+            "type": "boolean",
+            "description": "True when expiry is within the configured warning window.",
+            "example": false
           },
-          "mail": {
-            "type": "string",
-            "example": "charlie@example.com"
+          "mustChange": {
+            "type": "boolean",
+            "description": "True when `pwdReset` is set (admin forced change).",
+            "example": false
+          },
+          "isLocked": {
+            "type": "boolean",
+            "description": "True when the account is currently locked.",
+            "example": false
           },
           "lockedAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true,
-            "example": "2026-04-24T14:30:00.000Z"
+            "description": "ISO-8601 timestamp of lockout, or null.",
+            "example": null
           },
           "failureCount": {
             "type": "integer",
-            "example": 5
+            "description": "Number of recorded bind failures still within the window.",
+            "example": 0
+          },
+          "graceLoginsUsed": {
+            "type": "integer",
+            "description": "Number of grace logins already consumed.",
+            "example": 0
+          },
+          "policy": {
+            "type": "string",
+            "nullable": true,
+            "description": "DN of the policy the status was computed with: the one the\naccount's `pwdPolicySubentry` names, else the default one.\n",
+            "example": "cn=default,ou=policies,dc=example,dc=com"
           }
         }
       },
@@ -8451,6 +8774,44 @@
           }
         }
       },
+      "RawChild": {
+        "type": "object",
+        "description": "Direct child of an entry, as needed to draw a tree node.",
+        "required": [
+          "dn",
+          "rdn",
+          "objectClass",
+          "hasChildren"
+        ],
+        "properties": {
+          "dn": {
+            "type": "string",
+            "example": "uid=alice",
+            "ou=users": null,
+            "dc=example": null,
+            "dc=com": null
+          },
+          "rdn": {
+            "type": "string",
+            "example": "uid=alice"
+          },
+          "objectClass": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "top",
+              "inetOrgPerson"
+            ]
+          },
+          "hasChildren": {
+            "type": "boolean",
+            "description": "Whether the entry has at least one child. Only computed when the\n`children` query parameter is set, otherwise always false.\n",
+            "example": false
+          }
+        }
+      },
       "RawEntry": {
         "type": "object",
         "description": "A directory entry with all its attributes, as stored.",
@@ -8495,41 +8856,509 @@
           }
         }
       },
-      "RawChild": {
+      "ScimBulkRequest": {
         "type": "object",
-        "description": "Direct child of an entry, as needed to draw a tree node.",
+        "description": "SCIM 2.0 Bulk request (urn:ietf:params:scim:api:messages:2.0:BulkRequest,\nRFC 7644 §3.7).\n",
         "required": [
-          "dn",
-          "rdn",
-          "objectClass",
-          "hasChildren"
+          "schemas",
+          "Operations"
         ],
         "properties": {
-          "dn": {
-            "type": "string",
-            "example": "uid=alice",
-            "ou=users": null,
-            "dc=example": null,
-            "dc=com": null
-          },
-          "rdn": {
-            "type": "string",
-            "example": "uid=alice"
-          },
-          "objectClass": {
+          "schemas": {
             "type": "array",
             "items": {
               "type": "string"
             },
             "example": [
-              "top",
-              "inetOrgPerson"
+              "urn:ietf:params:scim:api:messages:2.0:BulkRequest"
             ]
           },
-          "hasChildren": {
-            "type": "boolean",
-            "description": "Whether the entry has at least one child. Only computed when the\n`children` query parameter is set, otherwise always false.\n",
-            "example": false
+          "failOnErrors": {
+            "type": "integer",
+            "description": "Stop processing after this many errors. Omit or set to 0 to\ncontinue on errors and process all operations.\n",
+            "example": 1
+          },
+          "Operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "method",
+                "path"
+              ],
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "POST",
+                    "PUT",
+                    "PATCH",
+                    "DELETE"
+                  ]
+                },
+                "bulkId": {
+                  "type": "string",
+                  "description": "Temporary client-assigned identifier for this operation.\nSubsequent operations in the same request may reference the\ncreated resource as \"bulkId:<value>\".\n"
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Resource path relative to the SCIM prefix (e.g. /Users or /Groups/123)."
+                },
+                "data": {
+                  "description": "Request body for POST/PUT/PATCH operations."
+                }
+              }
+            }
+          }
+        },
+        "example": {
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:BulkRequest"
+          ],
+          "failOnErrors": 1,
+          "Operations": [
+            {
+              "method": "POST",
+              "bulkId": "qwerty",
+              "path": "/Users",
+              "data": {
+                "schemas": [
+                  "urn:ietf:params:scim:schemas:core:2.0:User"
+                ],
+                "userName": "bjensen",
+                "name": {
+                  "familyName": "Jensen",
+                  "givenName": "Barbara"
+                }
+              }
+            },
+            {
+              "method": "DELETE",
+              "path": "/Users/2819c223-7f76-453a-919d-413861904646"
+            }
+          ]
+        }
+      },
+      "ScimBulkResponse": {
+        "type": "object",
+        "description": "SCIM 2.0 Bulk response (urn:ietf:params:scim:api:messages:2.0:BulkResponse).\n",
+        "required": [
+          "schemas",
+          "Operations"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
+            ]
+          },
+          "Operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "method",
+                "status"
+              ],
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "POST",
+                    "PUT",
+                    "PATCH",
+                    "DELETE"
+                  ]
+                },
+                "bulkId": {
+                  "type": "string"
+                },
+                "location": {
+                  "type": "string",
+                  "description": "URL of the created/modified resource."
+                },
+                "version": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "HTTP status code for this individual operation."
+                },
+                "response": {
+                  "$ref": "#/components/schemas/ScimError",
+                  "description": "Present only when the operation failed."
+                }
+              }
+            }
+          }
+        },
+        "example": {
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
+          ],
+          "Operations": [
+            {
+              "method": "POST",
+              "bulkId": "qwerty",
+              "location": "https://example.com/scim/v2/Users/2819c223-7f76-453a-919d-413861904646",
+              "status": "201"
+            },
+            {
+              "method": "DELETE",
+              "status": "204"
+            }
+          ]
+        }
+      },
+      "ScimError": {
+        "type": "object",
+        "description": "SCIM 2.0 error response (urn:ietf:params:scim:api:messages:2.0:Error).\n",
+        "required": [
+          "schemas",
+          "status"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "urn:ietf:params:scim:api:messages:2.0:Error"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "HTTP status code as a string.",
+            "example": "404"
+          },
+          "scimType": {
+            "type": "string",
+            "description": "SCIM error type keyword (RFC 7644 §3.12). One of: invalidFilter,\ntooMany, uniqueness, mutability, invalidSyntax, invalidPath,\nnoTarget, invalidValue, invalidVers, sensitive.\n",
+            "example": "mutability"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Human-readable error description.",
+            "example": "Resource 2819c223-7f76-453a-919d-413861904646 not found."
+          }
+        },
+        "example": {
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:Error"
+          ],
+          "status": "404",
+          "detail": "Resource 2819c223-7f76-453a-919d-413861904646 not found."
+        }
+      },
+      "ScimGroup": {
+        "type": "object",
+        "description": "SCIM 2.0 Group resource (RFC 7643 §4.2).\n",
+        "required": [
+          "schemas",
+          "displayName"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "urn:ietf:params:scim:schemas:core:2.0:Group"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "description": "Opaque server-assigned identifier.",
+            "example": "e9e30dba-f08f-4109-8486-d5c6a331660a"
+          },
+          "externalId": {
+            "type": "string",
+            "example": "00g1emaKYZTWRINFRGETl"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Tour Guides"
+          },
+          "members": {
+            "type": "array",
+            "description": "Members of the group.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "User or Group id"
+                },
+                "$ref": {
+                  "type": "string"
+                },
+                "display": {
+                  "type": "string"
+                }
+              }
+            },
+            "example": [
+              {
+                "value": "2819c223-7f76-453a-919d-413861904646",
+                "display": "Babs Jensen"
+              },
+              {
+                "value": "902c246b-6245-4190-8e05-00816be7344a",
+                "display": "Mandy Pepperidge"
+              }
+            ]
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "resourceType": {
+                "type": "string",
+                "example": "Group"
+              },
+              "created": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "lastModified": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "location": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ScimListResponse": {
+        "type": "object",
+        "description": "SCIM 2.0 list query response (urn:ietf:params:scim:api:messages:2.0:ListResponse).\n",
+        "required": [
+          "schemas",
+          "totalResults",
+          "Resources"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+            ]
+          },
+          "totalResults": {
+            "type": "integer",
+            "description": "Total number of matching resources.",
+            "example": 2
+          },
+          "startIndex": {
+            "type": "integer",
+            "description": "1-based index of the first result returned.",
+            "example": 1
+          },
+          "itemsPerPage": {
+            "type": "integer",
+            "description": "Number of resources returned in this page.",
+            "example": 2
+          },
+          "Resources": {
+            "type": "array",
+            "items": {},
+            "description": "The matching resources."
+          }
+        }
+      },
+      "ScimPatchOp": {
+        "type": "object",
+        "description": "SCIM 2.0 patch request body (urn:ietf:params:scim:api:messages:2.0:PatchOp,\nRFC 7644 §3.5.2).\n",
+        "required": [
+          "schemas",
+          "Operations"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            ]
+          },
+          "Operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "op"
+              ],
+              "properties": {
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "add",
+                    "remove",
+                    "replace",
+                    "Add",
+                    "Remove",
+                    "Replace"
+                  ]
+                },
+                "path": {
+                  "type": "string",
+                  "description": "SCIM attribute path (e.g. \"emails[type eq \\\"work\\\"].value\")."
+                },
+                "value": {
+                  "description": "New value for the target attribute."
+                }
+              }
+            }
+          }
+        },
+        "example": {
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
+            {
+              "op": "replace",
+              "path": "active",
+              "value": false
+            },
+            {
+              "op": "replace",
+              "path": "emails[type eq \"work\"].value",
+              "value": "bjensen@newdomain.example.com"
+            }
+          ]
+        }
+      },
+      "ScimResourceType": {
+        "type": "object",
+        "description": "SCIM 2.0 ResourceType definition (RFC 7643 §6).",
+        "required": [
+          "schemas",
+          "id",
+          "name",
+          "endpoint",
+          "schema"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "example": "User"
+          },
+          "name": {
+            "type": "string",
+            "example": "User"
+          },
+          "endpoint": {
+            "type": "string",
+            "example": "/Users"
+          },
+          "description": {
+            "type": "string",
+            "example": "User Account"
+          },
+          "schema": {
+            "type": "string",
+            "example": "urn:ietf:params:scim:schemas:core:2.0:User"
+          },
+          "schemaExtensions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "schema": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "resourceType": {
+                "type": "string",
+                "example": "ResourceType"
+              },
+              "location": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ScimSchema": {
+        "type": "object",
+        "description": "SCIM 2.0 Schema definition (RFC 7643 §7).",
+        "required": [
+          "schemas",
+          "id",
+          "name",
+          "attributes"
+        ],
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "urn:ietf:params:scim:schemas:core:2.0:Schema"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "example": "urn:ietf:params:scim:schemas:core:2.0:User"
+          },
+          "name": {
+            "type": "string",
+            "example": "User"
+          },
+          "description": {
+            "type": "string",
+            "example": "User Account"
+          },
+          "attributes": {
+            "type": "array",
+            "items": {},
+            "description": "Schema attribute definitions."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "resourceType": {
+                "type": "string",
+                "example": "Schema"
+              },
+              "location": {
+                "type": "string"
+              }
+            }
           }
         }
       },
@@ -8744,835 +9573,6 @@
               }
             }
           }
-        }
-      },
-      "ScimGroup": {
-        "type": "object",
-        "description": "SCIM 2.0 Group resource (RFC 7643 §4.2).\n",
-        "required": [
-          "schemas",
-          "displayName"
-        ],
-        "properties": {
-          "schemas": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "urn:ietf:params:scim:schemas:core:2.0:Group"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "description": "Opaque server-assigned identifier.",
-            "example": "e9e30dba-f08f-4109-8486-d5c6a331660a"
-          },
-          "externalId": {
-            "type": "string",
-            "example": "00g1emaKYZTWRINFRGETl"
-          },
-          "displayName": {
-            "type": "string",
-            "example": "Tour Guides"
-          },
-          "members": {
-            "type": "array",
-            "description": "Members of the group.",
-            "items": {
-              "type": "object",
-              "properties": {
-                "value": {
-                  "type": "string",
-                  "description": "User or Group id"
-                },
-                "$ref": {
-                  "type": "string"
-                },
-                "display": {
-                  "type": "string"
-                }
-              }
-            },
-            "example": [
-              {
-                "value": "2819c223-7f76-453a-919d-413861904646",
-                "display": "Babs Jensen"
-              },
-              {
-                "value": "902c246b-6245-4190-8e05-00816be7344a",
-                "display": "Mandy Pepperidge"
-              }
-            ]
-          },
-          "meta": {
-            "type": "object",
-            "properties": {
-              "resourceType": {
-                "type": "string",
-                "example": "Group"
-              },
-              "created": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "lastModified": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "location": {
-                "type": "string"
-              },
-              "version": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      },
-      "ScimListResponse": {
-        "type": "object",
-        "description": "SCIM 2.0 list query response (urn:ietf:params:scim:api:messages:2.0:ListResponse).\n",
-        "required": [
-          "schemas",
-          "totalResults",
-          "Resources"
-        ],
-        "properties": {
-          "schemas": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "urn:ietf:params:scim:api:messages:2.0:ListResponse"
-            ]
-          },
-          "totalResults": {
-            "type": "integer",
-            "description": "Total number of matching resources.",
-            "example": 2
-          },
-          "startIndex": {
-            "type": "integer",
-            "description": "1-based index of the first result returned.",
-            "example": 1
-          },
-          "itemsPerPage": {
-            "type": "integer",
-            "description": "Number of resources returned in this page.",
-            "example": 2
-          },
-          "Resources": {
-            "type": "array",
-            "items": {},
-            "description": "The matching resources."
-          }
-        }
-      },
-      "ScimError": {
-        "type": "object",
-        "description": "SCIM 2.0 error response (urn:ietf:params:scim:api:messages:2.0:Error).\n",
-        "required": [
-          "schemas",
-          "status"
-        ],
-        "properties": {
-          "schemas": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "urn:ietf:params:scim:api:messages:2.0:Error"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "description": "HTTP status code as a string.",
-            "example": "404"
-          },
-          "scimType": {
-            "type": "string",
-            "description": "SCIM error type keyword (RFC 7644 §3.12). One of: invalidFilter,\ntooMany, uniqueness, mutability, invalidSyntax, invalidPath,\nnoTarget, invalidValue, invalidVers, sensitive.\n",
-            "example": "mutability"
-          },
-          "detail": {
-            "type": "string",
-            "description": "Human-readable error description.",
-            "example": "Resource 2819c223-7f76-453a-919d-413861904646 not found."
-          }
-        },
-        "example": {
-          "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:Error"
-          ],
-          "status": "404",
-          "detail": "Resource 2819c223-7f76-453a-919d-413861904646 not found."
-        }
-      },
-      "ScimPatchOp": {
-        "type": "object",
-        "description": "SCIM 2.0 patch request body (urn:ietf:params:scim:api:messages:2.0:PatchOp,\nRFC 7644 §3.5.2).\n",
-        "required": [
-          "schemas",
-          "Operations"
-        ],
-        "properties": {
-          "schemas": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-            ]
-          },
-          "Operations": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "op"
-              ],
-              "properties": {
-                "op": {
-                  "type": "string",
-                  "enum": [
-                    "add",
-                    "remove",
-                    "replace",
-                    "Add",
-                    "Remove",
-                    "Replace"
-                  ]
-                },
-                "path": {
-                  "type": "string",
-                  "description": "SCIM attribute path (e.g. \"emails[type eq \\\"work\\\"].value\")."
-                },
-                "value": {
-                  "description": "New value for the target attribute."
-                }
-              }
-            }
-          }
-        },
-        "example": {
-          "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-          ],
-          "Operations": [
-            {
-              "op": "replace",
-              "path": "active",
-              "value": false
-            },
-            {
-              "op": "replace",
-              "path": "emails[type eq \"work\"].value",
-              "value": "bjensen@newdomain.example.com"
-            }
-          ]
-        }
-      },
-      "ScimBulkRequest": {
-        "type": "object",
-        "description": "SCIM 2.0 Bulk request (urn:ietf:params:scim:api:messages:2.0:BulkRequest,\nRFC 7644 §3.7).\n",
-        "required": [
-          "schemas",
-          "Operations"
-        ],
-        "properties": {
-          "schemas": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "urn:ietf:params:scim:api:messages:2.0:BulkRequest"
-            ]
-          },
-          "failOnErrors": {
-            "type": "integer",
-            "description": "Stop processing after this many errors. Omit or set to 0 to\ncontinue on errors and process all operations.\n",
-            "example": 1
-          },
-          "Operations": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "method",
-                "path"
-              ],
-              "properties": {
-                "method": {
-                  "type": "string",
-                  "enum": [
-                    "POST",
-                    "PUT",
-                    "PATCH",
-                    "DELETE"
-                  ]
-                },
-                "bulkId": {
-                  "type": "string",
-                  "description": "Temporary client-assigned identifier for this operation.\nSubsequent operations in the same request may reference the\ncreated resource as \"bulkId:<value>\".\n"
-                },
-                "path": {
-                  "type": "string",
-                  "description": "Resource path relative to the SCIM prefix (e.g. /Users or /Groups/123)."
-                },
-                "data": {
-                  "description": "Request body for POST/PUT/PATCH operations."
-                }
-              }
-            }
-          }
-        },
-        "example": {
-          "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:BulkRequest"
-          ],
-          "failOnErrors": 1,
-          "Operations": [
-            {
-              "method": "POST",
-              "bulkId": "qwerty",
-              "path": "/Users",
-              "data": {
-                "schemas": [
-                  "urn:ietf:params:scim:schemas:core:2.0:User"
-                ],
-                "userName": "bjensen",
-                "name": {
-                  "familyName": "Jensen",
-                  "givenName": "Barbara"
-                }
-              }
-            },
-            {
-              "method": "DELETE",
-              "path": "/Users/2819c223-7f76-453a-919d-413861904646"
-            }
-          ]
-        }
-      },
-      "ScimBulkResponse": {
-        "type": "object",
-        "description": "SCIM 2.0 Bulk response (urn:ietf:params:scim:api:messages:2.0:BulkResponse).\n",
-        "required": [
-          "schemas",
-          "Operations"
-        ],
-        "properties": {
-          "schemas": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
-            ]
-          },
-          "Operations": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "method",
-                "status"
-              ],
-              "properties": {
-                "method": {
-                  "type": "string",
-                  "enum": [
-                    "POST",
-                    "PUT",
-                    "PATCH",
-                    "DELETE"
-                  ]
-                },
-                "bulkId": {
-                  "type": "string"
-                },
-                "location": {
-                  "type": "string",
-                  "description": "URL of the created/modified resource."
-                },
-                "version": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string",
-                  "description": "HTTP status code for this individual operation."
-                },
-                "response": {
-                  "$ref": "#/components/schemas/ScimError",
-                  "description": "Present only when the operation failed."
-                }
-              }
-            }
-          }
-        },
-        "example": {
-          "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
-          ],
-          "Operations": [
-            {
-              "method": "POST",
-              "bulkId": "qwerty",
-              "location": "https://example.com/scim/v2/Users/2819c223-7f76-453a-919d-413861904646",
-              "status": "201"
-            },
-            {
-              "method": "DELETE",
-              "status": "204"
-            }
-          ]
-        }
-      },
-      "ScimResourceType": {
-        "type": "object",
-        "description": "SCIM 2.0 ResourceType definition (RFC 7643 §6).",
-        "required": [
-          "schemas",
-          "id",
-          "name",
-          "endpoint",
-          "schema"
-        ],
-        "properties": {
-          "schemas": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "example": "User"
-          },
-          "name": {
-            "type": "string",
-            "example": "User"
-          },
-          "endpoint": {
-            "type": "string",
-            "example": "/Users"
-          },
-          "description": {
-            "type": "string",
-            "example": "User Account"
-          },
-          "schema": {
-            "type": "string",
-            "example": "urn:ietf:params:scim:schemas:core:2.0:User"
-          },
-          "schemaExtensions": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "schema": {
-                  "type": "string"
-                },
-                "required": {
-                  "type": "boolean"
-                }
-              }
-            }
-          },
-          "meta": {
-            "type": "object",
-            "properties": {
-              "resourceType": {
-                "type": "string",
-                "example": "ResourceType"
-              },
-              "location": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      },
-      "ScimSchema": {
-        "type": "object",
-        "description": "SCIM 2.0 Schema definition (RFC 7643 §7).",
-        "required": [
-          "schemas",
-          "id",
-          "name",
-          "attributes"
-        ],
-        "properties": {
-          "schemas": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "urn:ietf:params:scim:schemas:core:2.0:Schema"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "example": "urn:ietf:params:scim:schemas:core:2.0:User"
-          },
-          "name": {
-            "type": "string",
-            "example": "User"
-          },
-          "description": {
-            "type": "string",
-            "example": "User Account"
-          },
-          "attributes": {
-            "type": "array",
-            "items": {},
-            "description": "Schema attribute definitions."
-          },
-          "meta": {
-            "type": "object",
-            "properties": {
-              "resourceType": {
-                "type": "string",
-                "example": "Schema"
-              },
-              "location": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      },
-      "LdapSchema": {
-        "type": "object",
-        "description": "A JSON schema file served from the `schemas/` sub-directory of the\nstatic path.  These schemas describe LDAP entity types (users, groups,\norganizations, …) and are consumed by browser-embedded editors to\nrender attribute forms and validate input before submission.\n\nThe server replaces `__FOO_BAR__` placeholders on the fly with the\nvalue of the corresponding `--foo-bar` CLI option so that a single\nschema file can be shared between server-side validation and\nclient-side rendering. A schema that `extends` another is served\nmerged with it.\n",
-        "additionalProperties": true,
-        "example": {
-          "entity": {
-            "name": "standardUser",
-            "mainAttribute": "uid",
-            "objectClass": [
-              "top",
-              "inetOrgPerson"
-            ],
-            "singularName": "user",
-            "pluralName": "users",
-            "base": "ou=users,dc=example,dc=com"
-          },
-          "strict": true,
-          "attributes": {
-            "uid": {
-              "type": "string",
-              "required": true,
-              "role": "identifier"
-            },
-            "cn": {
-              "type": "string",
-              "required": true
-            }
-          }
-        }
-      },
-      "AppAccount": {
-        "type": "object",
-        "description": "An application-specific identity attached to a user.  App accounts\nallow a single principal user to authenticate as different named\n\"devices\" or \"applications\" each with its own credential, while\nsharing the same mail address.\n",
-        "required": [
-          "uid"
-        ],
-        "properties": {
-          "uid": {
-            "type": "string",
-            "description": "Unique identifier of the app account.  Format:\n`<prefix>_c<8-digits>`, where `<prefix>` is the `:user` path param\n(the resolution value — the mail by default) sanitized into a\nuid-safe token (e.g. `alice@example.com` -> `alice_example_com`).\n",
-            "example": "alice_example_com_c04729183"
-          },
-          "name": {
-            "type": "string",
-            "description": "Human-readable label (stored as LDAP `description`).",
-            "example": "Work laptop"
-          }
-        },
-        "example": {
-          "uid": "alice_c04729183",
-          "name": "Work laptop"
-        }
-      },
-      "AppAccountCreated": {
-        "type": "object",
-        "description": "Response returned when a new app account is successfully created.\nThe one-time cleartext password is included here and never returned\nagain — callers must store it immediately.\n",
-        "required": [
-          "uid",
-          "pwd",
-          "mail"
-        ],
-        "properties": {
-          "uid": {
-            "type": "string",
-            "description": "Identifier of the newly created app account.",
-            "example": "alice_c04729183"
-          },
-          "pwd": {
-            "type": "string",
-            "description": "One-time cleartext password generated for this account.\nFormat: 6 blocks of 4 characters separated by `-`\n(e.g. `Ab3@-xYz!-9pQ#-Sv4$-mN8!-pQ5@`).\nOpenLDAP hashes it via ppolicy before storage.\n",
-            "example": "Ab3@-xYz!-9pQ#-Sv4$-mN8!-pQ5@"
-          },
-          "mail": {
-            "type": "string",
-            "description": "Mail address of the principal account this app account belongs to.",
-            "example": "alice@example.com"
-          }
-        },
-        "example": {
-          "uid": "alice_c04729183",
-          "pwd": "Ab3@-xYz!-9pQ#-Sv4$-mN8!-pQ5@",
-          "mail": "alice@example.com"
-        }
-      },
-      "AppAccountCreate": {
-        "type": "object",
-        "description": "Request body for creating a new app account.",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Optional human-readable label for the new account.",
-            "example": "Work laptop"
-          }
-        },
-        "example": {
-          "name": "Work laptop"
-        }
-      },
-      "JamesQuotaUsage": {
-        "type": "object",
-        "description": "Quota information for a mailbox user as returned by the James\nWebAdmin API (`GET /quota/users/{mail}`). Contains separate\ncounters for message count and storage size.\n",
-        "properties": {
-          "count": {
-            "type": "object",
-            "description": "Message-count quota.",
-            "properties": {
-              "used": {
-                "type": "integer",
-                "description": "Number of messages currently stored.",
-                "example": 142
-              },
-              "max": {
-                "type": "integer",
-                "nullable": true,
-                "description": "Maximum number of messages allowed. `null` means unlimited.\n",
-                "example": 10000
-              }
-            }
-          },
-          "size": {
-            "type": "object",
-            "description": "Storage-size quota (bytes).",
-            "properties": {
-              "used": {
-                "type": "integer",
-                "description": "Bytes currently used.",
-                "example": 524288000
-              },
-              "max": {
-                "type": "integer",
-                "nullable": true,
-                "description": "Maximum bytes allowed. `null` means unlimited.\n",
-                "example": 2147483648
-              }
-            }
-          }
-        },
-        "example": {
-          "count": {
-            "used": 142,
-            "max": 10000
-          },
-          "size": {
-            "used": 524288000,
-            "max": 2147483648
-          }
-        }
-      },
-      "FlatEntry": {
-        "type": "object",
-        "description": "A single LDAP entry from a flat branch. The `dn` field is always\npresent; all other fields depend on the concrete plugin's schema\n(e.g. `uid`, `cn`, `mail`, `sn` for users).\n",
-        "required": [
-          "dn"
-        ],
-        "properties": {
-          "dn": {
-            "type": "string",
-            "description": "Fully-qualified distinguished name of the entry.",
-            "example": "uid=alice,ou=users,dc=example,dc=com"
-          }
-        },
-        "additionalProperties": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          ]
-        },
-        "example": {
-          "dn": "uid=alice,ou=users,dc=example,dc=com",
-          "uid": "alice",
-          "cn": "Alice Smith",
-          "sn": "Smith",
-          "mail": "alice@example.com"
-        }
-      },
-      "FlatList": {
-        "type": "object",
-        "description": "A map of entries returned by the LIST endpoint, keyed by the\nentry's `mainAttribute` value (e.g. the `uid` for users). This\nis the `LdapList` shape (`Record<string, FlatEntry>`).\n",
-        "additionalProperties": {
-          "$ref": "#/components/schemas/FlatEntry"
-        },
-        "example": {
-          "alice": {
-            "dn": "uid=alice,ou=users,dc=example,dc=com",
-            "uid": "alice",
-            "cn": "Alice Smith",
-            "mail": "alice@example.com"
-          },
-          "bob": {
-            "dn": "uid=bob,ou=users,dc=example,dc=com",
-            "uid": "bob",
-            "cn": "Bob Jones",
-            "mail": "bob@example.com"
-          }
-        }
-      },
-      "FlatCreate": {
-        "type": "object",
-        "description": "Body for creating a new entry. The plugin's `mainAttribute` field\n(e.g. `uid`) is required and used to build the DN. All other\nattributes are plugin-specific; unknown attributes are accepted\nunless the plugin's schema is in strict mode.\n",
-        "additionalProperties": true,
-        "example": {
-          "uid": "carol",
-          "cn": "Carol White",
-          "sn": "White",
-          "mail": "carol@example.com"
-        }
-      },
-      "FlatModify": {
-        "type": "object",
-        "description": "Partial-update body. Supports `add`, `replace`, and `delete`\nmaps matching the LDAP modify operation. The `mainAttribute`\n(e.g. `uid`) cannot be changed through this endpoint — use the\nrename API instead.\n",
-        "properties": {
-          "add": {
-            "type": "object",
-            "description": "Attributes whose values are appended.",
-            "additionalProperties": true
-          },
-          "replace": {
-            "type": "object",
-            "description": "Attributes whose values are replaced wholesale.",
-            "additionalProperties": true
-          },
-          "delete": {
-            "description": "Attributes (or specific values) to remove. Either an array\nof attribute names or a map of attribute → value(s).\n",
-            "oneOf": [
-              {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              {
-                "type": "object",
-                "additionalProperties": true
-              }
-            ]
-          }
-        },
-        "example": {
-          "replace": {
-            "mail": "carol.white@example.com",
-            "cn": "Carol White-Smith"
-          }
-        }
-      },
-      "FlatMoveRequest": {
-        "type": "object",
-        "description": "Body for moving an entry to a different organisational unit.\nRequires `ldap_organization_link_attribute` and\n`ldap_organization_path_attribute` to be defined in the plugin's\nschema.\n",
-        "required": [
-          "targetOrgDn"
-        ],
-        "properties": {
-          "targetOrgDn": {
-            "type": "string",
-            "description": "DN of the destination organisational unit.",
-            "example": "ou=engineering,ou=departments,dc=example,dc=com"
-          }
-        },
-        "example": {
-          "targetOrgDn": "ou=engineering,ou=departments,dc=example,dc=com"
-        }
-      },
-      "FlatRenameRequest": {
-        "type": "object",
-        "description": "Body for changing the identifier of an entry. The field is named\n`newId` for every resource, whatever that resource calls its\n`mainAttribute`.\n",
-        "required": [
-          "newId"
-        ],
-        "properties": {
-          "newId": {
-            "type": "string",
-            "description": "New value of the resource's `mainAttribute`. A value, not a DN.\n",
-            "example": "bob"
-          }
-        },
-        "example": {
-          "newId": "bob"
-        }
-      },
-      "FlatRenameResult": {
-        "type": "object",
-        "description": "Outcome of a rename: the entry's new DN, and how many references to\nthe old one were rewritten.\n",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "description": "False when a reference could not be rewritten."
-          },
-          "dn": {
-            "type": "string",
-            "description": "DN the entry now has."
-          },
-          "referencesUpdated": {
-            "type": "integer",
-            "description": "References rewritten to the new DN."
-          },
-          "referencesFailed": {
-            "type": "array",
-            "description": "References left naming the old DN, counted per attribute. The\nreferring entries are named in the server log, not here.\n",
-            "items": {
-              "type": "object",
-              "properties": {
-                "attribute": {
-                  "type": "string"
-                },
-                "count": {
-                  "type": "integer"
-                }
-              }
-            }
-          }
-        },
-        "example": {
-          "success": true,
-          "dn": "uid=bob,ou=users,dc=example,dc=com",
-          "referencesUpdated": 3
         }
       }
     }

@@ -1357,12 +1357,21 @@ export class OpenAPIGenerator {
     }
 
     // The walk order follows the file layout, so a plugin that moves to a
-    // package would move its paths in the published document: sort them.
+    // package would move its paths and its schemas around in the published
+    // document: sort them.
+    const byName = (a: string, b: string): number =>
+      a < b ? -1 : a > b ? 1 : 0;
     spec.paths = Object.fromEntries(
-      Object.entries(spec.paths).sort(([a], [b]) =>
-        a < b ? -1 : a > b ? 1 : 0
-      )
+      Object.entries(spec.paths).sort(([a], [b]) => byName(a, b))
     );
+    if (spec.components?.schemas)
+      spec.components = {
+        schemas: Object.fromEntries(
+          Object.entries(spec.components.schemas).sort(([a], [b]) =>
+            byName(a, b)
+          )
+        ),
+      };
 
     return spec;
   }
