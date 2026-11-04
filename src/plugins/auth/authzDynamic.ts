@@ -41,7 +41,7 @@ import type {
 } from '../../lib/ldapActions';
 import type { Hooks } from '../../hooks';
 import { ok, unauthorized } from '../../lib/expressFormatedResponses';
-import { getParentDn } from '../../lib/utils';
+import { getParentDn, isDnInBranch } from '../../lib/utils';
 
 import { dynamicOptions } from './auth.options';
 import { verifyLdapPassword } from './authzDynamicHash';
@@ -90,15 +90,6 @@ function asString(v: AttributeValue | undefined): string | undefined {
   }
   if (Buffer.isBuffer(v)) return v.toString();
   return String(v);
-}
-
-/** Case-insensitive sub-branch membership: `dn` is at or under `branch`. */
-function isAtOrUnder(dn: string, branch: string): boolean {
-  const a = dn.toLowerCase().trim();
-  const b = branch.toLowerCase().trim();
-  if (!a || !b) return false;
-  if (a === b) return true;
-  return a.endsWith(',' + b);
 }
 
 export default class AuthzDynamic extends AuthBase {
@@ -672,7 +663,15 @@ export default class AuthzDynamic extends AuthBase {
     permission: 'read' | 'write' | 'delete'
   ): void {
     for (const acl of token.bases) {
-      if (!isAtOrUnder(branchOrDn, acl.dn)) continue;
+      let inside: boolean;
+      try {
+        inside = isDnInBranch(branchOrDn, acl.dn);
+      } catch {
+        // A DN the parser refuses names no branch: it grants nothing, and it
+        // must not hide the branches that follow it.
+        continue;
+      }
+      if (!inside) continue;
       if (acl[permission]) return;
     }
     this.logger.debug(
