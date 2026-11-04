@@ -47,7 +47,9 @@ packages/<name>/
    package, so the split breaks no import.
 
 `npm run check:packages`, part of `npm run check`, fails when step 3 or 4
-was forgotten.
+was forgotten, and when a package's sources import a module its
+`package.json` does not declare: a type import leaves every build here green
+and fails in a consumer's tree instead.
 
 `src/pluginModules.json` is the bridge between the two names a plugin has:
 it maps each `core/…` entry to the package its shim re-exports, and

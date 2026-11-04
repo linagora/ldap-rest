@@ -18,6 +18,7 @@
 import { spawnSync } from 'child_process';
 import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'fs';
 import { writeFile } from 'fs/promises';
+import { builtinModules } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -190,6 +191,41 @@ function pluginModules() {
 }
 
 /**
+ * The bare modules a package's sources import, without the sub-path and
+ * without Node's builtins. An optional peer loaded with `import()` counts:
+ * the import is written in the sources all the same.
+ */
+function importsOf(dir) {
+  const builtin = new Set([
+    ...builtinModules,
+    ...builtinModules.map(name => `node:${name}`),
+  ]);
+  const files = entriesUnder(path.join(root, dir, 'src'));
+  const patterns = [
+    /^\s*(?:import|export)\b[^;]*?\bfrom\s*['"]([^'"]+)['"]/gm,
+    /^\s*import\s*\(\s*['"]([^'"]+)['"]/gm,
+    /^\s*import\s+['"]([^'"]+)['"]/gm,
+  ];
+  const names = new Set();
+  for (const file of files) {
+    if (!file.endsWith('.ts')) continue;
+    const text = readFileSync(file, 'utf8');
+    for (const pattern of patterns)
+      for (const [, specifier] of text.matchAll(pattern)) names.add(specifier);
+  }
+  return [...names]
+    .filter(specifier => !specifier.startsWith('.'))
+    .map(specifier => {
+      const parts = specifier.split('/');
+      return parts[0].startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+    })
+    .filter(
+      name => !builtin.has(name) && !builtin.has(name.replace(/^node:/, ''))
+    )
+    .filter((name, index, all) => all.indexOf(name) === index);
+}
+
+/**
  * The configuration files that name every package, and what `sync` sets in
  * each. c8 takes its `src` entries as directories, not globs, so the coverage
  * roots are listed one per package like the TypeScript paths.
@@ -262,6 +298,20 @@ async function check() {
       );
     if (!bundled.has(pkg.name))
       problems.push(`package.json: bundledDependencies must list ${pkg.name}`);
+
+    // A type import leaves every build green and fails in a consumer's tree
+    // instead: what a package imports, it declares.
+    const declared = new Set([
+      ...Object.keys(pkg.manifest.dependencies ?? {}),
+      ...Object.keys(pkg.manifest.peerDependencies ?? {}),
+      ...Object.keys(pkg.manifest.optionalDependencies ?? {}),
+      '@ldap-rest/core',
+    ]);
+    for (const name of importsOf(pkg.dir))
+      if (!declared.has(name))
+        problems.push(
+          `${pkg.dir}: imports "${name}" without declaring it in peerDependencies`
+        );
   }
 
   if (problems.length) {
