@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/llng
+ * @module @ldap-rest/auth-llng
  * @group Plugins
  * @author Xavier Guimard <xguimard@linagora.com>
  *
@@ -16,7 +16,19 @@ import { llngOptions } from './llng.options';
 // src/types/lemonldap-ng-handler.d.ts. Written here, in a module, it would be
 // an augmentation of the package instead: conflicting with its types when it
 // is installed, rejected when it is absent.
-type LlngHandler = typeof import('lemonldap-ng-handler');
+
+/**
+ * What this plugin uses of `lemonldap-ng-handler`, declared here rather than
+ * read from the module: the package is an optional peer, and a published
+ * declaration naming it would fail to type-check wherever it is absent.
+ */
+interface LlngHandler {
+  init(args: {
+    configStorage?: { confFile?: string; [key: string]: unknown };
+    type?: string;
+  }): Promise<unknown>;
+  run(req: DmRequest, res: Response, next: () => void): void;
+}
 
 /**
  * `lemonldap-ng-handler` keeps its state at the module level — `init()`
@@ -80,7 +92,7 @@ export default class AuthLLNG extends AuthBase {
     // every request, so the plugin used to answer 500 to all of them while
     // `--llng-ini` was parsed and never read.
     // `--llng-ini` defaults to `/etc/lemonldap-ng/lemonldap-ng.ini`
-    // (auth.options.ts), so it names a real path in every deployment — there
+    // (llng.options.ts), so it names a real path in every deployment — there
     // is no "default configuration" case distinct from a confFile to report.
     const confFile = this.options(llngOptions).llng_ini;
     const previouslyFrom = initializedFrom.get(handler);

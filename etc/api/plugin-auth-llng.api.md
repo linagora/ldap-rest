@@ -7,7 +7,6 @@
 import type { Entry } from 'ldapts';
 import express from 'express';
 import type { Express as Express_2 } from 'express';
-import { lemonldapNgHandler } from 'lemonldap-ng-handler';
 import pLimit from 'p-limit';
 import type { Request as Request_2 } from 'express';
 import type { Response as Response_2 } from 'express';
@@ -36,7 +35,18 @@ class AuthLLNG extends AuthBase {
 }
 export default AuthLLNG;
 
-// @public (undocumented)
-type LlngHandler = lemonldapNgHandler;
+// @public
+interface LlngHandler {
+    // (undocumented)
+    init(args: {
+        configStorage?: {
+            confFile?: string;
+            [key: string]: unknown;
+        };
+        type?: string;
+    }): Promise<unknown>;
+    // (undocumented)
+    run(req: DmRequest, res: Response_2, next: () => void): void;
+}
 
 ```
