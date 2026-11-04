@@ -6,7 +6,4 @@ export {
   parseByteSize,
   startOfUtcDay,
 } from '@ldap-rest/ldap-enterpriserules';
-export type {
-  DnReference,
-  ReferenceRewriteReport,
-} from '@ldap-rest/ldap-enterpriserules';
+export type * from '@ldap-rest/ldap-enterpriserules';

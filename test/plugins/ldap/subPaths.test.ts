@@ -4,6 +4,9 @@
  * re-export exactly what its package does, until phase 3 removes the former
  * sub-paths.
  *
+ * Types are re-exported with `export type *`, so a type cannot be missing from
+ * a shim; this checks the runtime names, and `check:api` the declarations.
+ *
  * See `docs/development/modularization-plan.md`.
  */
 import { expect } from 'chai';

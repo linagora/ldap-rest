@@ -8,4 +8,4 @@ export {
   GroupRenameBody,
   GroupsQuery,
 } from '@ldap-rest/ldap-groups';
-export type { postAdd, postModify } from '@ldap-rest/ldap-groups';
+export type * from '@ldap-rest/ldap-groups';

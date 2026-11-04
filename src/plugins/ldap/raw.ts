@@ -5,10 +5,4 @@ export {
   RawDnParams,
   RawSearchQuery,
 } from '@ldap-rest/ldap-raw';
-export type {
-  RawAttribute,
-  RawChild,
-  RawChildren,
-  RawEntry,
-  RawSearchResult,
-} from '@ldap-rest/ldap-raw';
+export type * from '@ldap-rest/ldap-raw';
