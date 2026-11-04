@@ -173,14 +173,15 @@ function pluginModules() {
     // A shim re-exports one package's default export: either through
     // `export { default } from '…'`, or — the deprecated alias — by importing
     // it and exporting it as the default of this file.
-    const exported =
+    const reexport =
       /export\s*\{[^}]*\bdefault\b[^}]*\}\s*from\s*'@ldap-rest\/([a-z0-9-]+)/.exec(
         text
-      ) ??
-      /import\s+\w+\s+from\s*'@ldap-rest\/([a-z0-9-]+)'[\s\S]*\bexport\s+default\s+\w+/.exec(
+      );
+    const alias =
+      /import\s+(\w+)\s+from\s*'@ldap-rest\/([a-z0-9-]+)'[\s\S]*\bexport\s+default\s+\1\s*;/.exec(
         text
       );
-    const pkg = exported?.[1];
+    const pkg = reexport?.[1] ?? alias?.[2];
     if (!pkg || !names.has(`@ldap-rest/${pkg}`)) continue;
     const name = path
       .relative(pluginRoot, file)
