@@ -57,9 +57,11 @@ together, `scim` its modules).
 
 Rules:
 
-- `core` depends on no plugin; a plugin package depends on no other plugin
-  package. Cross-plugin needs go through services
-  (`packages/core/src/lib/services`) or hooks.
+- `core` depends on no plugin. A plugin package names another one only for
+  configuration: the options it reads, or a plugin its `optionDependencies`
+  or `dependencies` ask to have loaded (decision 7). Behaviour goes through
+  services (`packages/core/src/lib/services`) or hooks, never through another
+  plugin's code.
 - `TwakeGroups extends LdapGroups` is either the one documented exception or
   the shared base moves to `core`.
 - `ldap-rest` stays the entry package: it depends on `@ldap-rest/core` only;
