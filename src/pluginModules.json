@@ -13,5 +13,18 @@
   "core/auth/token": "@ldap-rest/auth-token",
   "core/auth/totp": "@ldap-rest/auth-totp",
   "core/auth/trustedProxy": "@ldap-rest/auth-trustedproxy",
+  "core/ldap/accountLifecycle": "@ldap-rest/ldap-accountlifecycle",
+  "core/ldap/bulkImport": "@ldap-rest/ldap-bulkimport",
+  "core/ldap/departmentSync": "@ldap-rest/ldap-departmentsync",
+  "core/ldap/enterpriseRules": "@ldap-rest/ldap-enterpriserules",
+  "core/ldap/externalUsersInGroups": "@ldap-rest/ldap-externalusers",
+  "core/ldap/flatGeneric": "@ldap-rest/ldap-flatgeneric",
+  "core/ldap/groups": "@ldap-rest/ldap-groups",
+  "core/ldap/onChange": "@ldap-rest/ldap-onchange",
+  "core/ldap/organization": "@ldap-rest/ldap-organizations",
+  "core/ldap/organizations": "@ldap-rest/ldap-organizations",
+  "core/ldap/passwordPolicy": "@ldap-rest/ldap-passwordpolicy",
+  "core/ldap/raw": "@ldap-rest/ldap-raw",
+  "core/ldap/trash": "@ldap-rest/ldap-trash",
   "core/storage": "@ldap-rest/storage"
 }
