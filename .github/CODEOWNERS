@@ -10,4 +10,6 @@
 /src/lib/requestContext.ts @yadd @rezk2ll
 /src/config/               @yadd @rezk2ll
 /src/plugins/auth/         @yadd @rezk2ll
+/packages/auth-*/          @yadd @rezk2ll
+/packages/authz-*/         @yadd @rezk2ll
 /.github/                  @yadd @rezk2ll
