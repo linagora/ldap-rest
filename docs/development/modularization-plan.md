@@ -91,7 +91,11 @@ Rules:
   loads the LDAP plugins (and there is no aggregate `@ldap-rest/ldap` package).
   The loader maps `core/…` to the package that provides it: naming a plugin
   whose package is absent is an error at startup, an uninstalled optional
-  plugin in the priority list is skipped.
+  plugin in the priority list is skipped. Until that loader exists, the map is
+  the umbrella's (`src/pluginModules.json`, read by `DM.canonicalModule`): a
+  `DM` built from the core alone knows only the spellings it is handed, so an
+  embedder naming a plugin by its package gets neither its rank in the
+  priority list nor the duplicate-load guard.
 - The umbrella keeps only the main `ldap-rest` command, the loader that maps
   `core/…` to plugin packages, and the `DM` subclass that supplies the plugin
   tree.
