@@ -24,6 +24,7 @@ import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import AuthzScope from '../../../src/plugins/auth/authzScope';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
+import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 
 class TestAuthPlugin extends AuthBase {
@@ -179,6 +180,10 @@ describe('AuthzLinid1 by attachment', function () {
     await server.registerPlugin('authzLinid1', new AuthzLinid1(server));
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
     await server.registerPlugin('ldapGroups', groupsPlugin);
+    await server.registerPlugin(
+      'ldapOrganizations',
+      new LdapOrganizations(server)
+    );
     const scope = new AuthzScope(server);
     await server.registerPlugin('authzScope', scope);
     scope.afterLoad();
@@ -297,6 +302,14 @@ describe('AuthzLinid1 by attachment', function () {
       const res = await request.get('/api/v1/authz/scope').set(as(ADMIN_A));
       expect(res.status).to.equal(200);
       expect(res.body).to.have.property('transit', transit);
+    });
+
+    it('opens the transit branch card', async () => {
+      const res = await request
+        .get(`/api/v1/ldap/organizations/${encodeURIComponent(transit)}`)
+        .set(as(ADMIN_A));
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      expect(res.body).to.have.property('dn', transit);
     });
 
     it('lists the accounts parked in transit', async () => {

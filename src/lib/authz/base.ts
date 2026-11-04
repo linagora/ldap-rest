@@ -1274,15 +1274,30 @@ export default abstract class AuthzBase extends DmPlugin {
         return readable.get(key)!;
       };
 
+      // An organization under a global write branch is read by every
+      // administrator, and `within` would refuse it: asked of the rules.
+      const readsOrganisation = async (value: string): Promise<boolean> => {
+        const key = normalizeDn(value);
+        if (!readable.has(key))
+          readable.set(
+            key,
+            (await this.getUserPermissions(user, value)).read === true
+          );
+        return readable.get(key)!;
+      };
+
       // An organization is an entry under the tree top carrying one of the
       // configured classes, as `core/ldap/organizations` reads one: `ou=users`
       // and `ou=nomenclature` sit outside the tree and stay reference data,
       // and an account or a group carrying no link is not an organization.
+      // The transit branch is not hidden: the console opens its card from the
+      // scope banner, and it is where entries change hands.
       const top = this.config.ldap_top_organization;
       const organizationClasses = (this.config.ldap_organization_class ?? [])
         .filter(name => name.toLowerCase() !== 'top')
         .map(name => name.toLowerCase());
       const organization = (dn: string, entry: AttributesList): boolean => {
+        if (transitKey && normalizeDn(dn) === transitKey) return false;
         if (!top || !isDnInBranch(dn, top)) return false;
         const classes = ([] as unknown[])
           .concat(entry.objectClass ?? [])
@@ -1301,7 +1316,7 @@ export default abstract class AuthzBase extends DmPlugin {
           // An organization with no link is the branch itself: read it only
           // where the caller reads that branch, as its accounts are.
           const dn = String(entry.dn);
-          if (organization(dn, entry) && !(await reads(dn))) {
+          if (organization(dn, entry) && !(await readsOrganisation(dn))) {
             this.logger.debug(
               `${this.name}: hiding ${dn} from ${req!.user}, outside the branches they hold`
             );

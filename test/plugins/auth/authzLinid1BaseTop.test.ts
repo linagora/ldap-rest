@@ -43,6 +43,7 @@ describe('authzLinid1 with the directory suffix as the tree top', function () {
   let groupBranch: string;
   let org: string;
   let other: string;
+  let globalWrite: string;
   const ADMIN = 'bttop.admin';
   const LOOSE = 'bttop.loose';
   const GROUP = 'bttop-group-loose';
@@ -65,6 +66,7 @@ describe('authzLinid1 with the directory suffix as the tree top', function () {
     groupBranch = `ou=groups,${base}`;
     org = `ou=BTOrg,${base}`;
     other = `ou=BTOther,${base}`;
+    globalWrite = `ou=BTDomains,${base}`;
 
     previousSchema = process.env.DM_LDAP_FLAT_SCHEMA;
     process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
@@ -73,6 +75,7 @@ describe('authzLinid1 with the directory suffix as the tree top', function () {
     await server.ready;
     // The suffix itself is the tree top: every entry is under it.
     server.config.ldap_top_organization = base;
+    server.config.authz_global_write_branch = [globalWrite];
 
     const user = (uid: string, link?: string): AttributesList => ({
       objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
@@ -113,6 +116,11 @@ describe('authzLinid1 with the directory suffix as the tree top', function () {
       cn: GROUP,
       member: `uid=${LOOSE},${userBranch}`,
     });
+    await server.ldap.delete(globalWrite).catch(() => undefined);
+    await server.ldap.add(globalWrite, {
+      objectClass: ['top', 'organizationalUnit'],
+      ou: 'BTDomains',
+    });
 
     await server.registerPlugin('testAuth', new TestAuthPlugin(server));
     await server.registerPlugin('authzLinid1', new AuthzLinid1(server));
@@ -130,7 +138,7 @@ describe('authzLinid1 with the directory suffix as the tree top', function () {
       await server.ldap
         .delete(`uid=${uid},${userBranch}`)
         .catch(() => undefined);
-    for (const dn of [org, other])
+    for (const dn of [org, other, globalWrite])
       await server.ldap.delete(dn).catch(() => undefined);
     if (previousSchema === undefined) delete process.env.DM_LDAP_FLAT_SCHEMA;
     else process.env.DM_LDAP_FLAT_SCHEMA = previousSchema;
@@ -159,6 +167,15 @@ describe('authzLinid1 with the directory suffix as the tree top', function () {
     )) as SearchResult;
     expect(found.searchEntries).to.have.length(1);
     expect(found.searchEntries[0]).not.to.have.property('objectClass');
+  });
+
+  it('keeps a global write branch readable under the tree top', async () => {
+    const found = (await server.ldap.search(
+      { paged: false, scope: 'base', attributes: ['ou'] },
+      globalWrite,
+      { user: ADMIN, headers: {} } as unknown as DmRequest
+    )) as SearchResult;
+    expect(found.searchEntries).to.have.length(1);
   });
 
   it('still hides an organization outside the caller branch', async () => {

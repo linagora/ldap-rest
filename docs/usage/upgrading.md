@@ -29,9 +29,9 @@ branches they hold. The tree names every branch, its description and its
 local administrators, which an administrator of one branch has no business
 reading. `organizations/top` still answers one of their branches — or the
 top organization for a caller named in no `twakeLocalAdminLink` — and the
-transit branch's own entry stays readable so that a move can name it. Naming
-the tree top directly is refused like any organization outside their
-branches.
+transit branch's own entry stays readable so that the console can open its
+card from the scope banner. Naming the tree top directly is refused like any
+organization outside their branches.
 
 A console drawing the whole tree from an administrator's session draws their
 branches only. A client that listed the tree to let one administrator choose

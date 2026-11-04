@@ -66,7 +66,8 @@ belongs to nobody's branch, and no administrator could list or change one.
 - Entries attached to nothing — a nomenclature value, a group or an account
   with no `twakeDepartmentLink` — are readable by every administrator:
   reference data. Writes to them are judged on their parent. The transit
-  branch's own entry stays readable too, so that a move can name it.
+  branch's own entry stays readable too: the console opens its card from the
+  scope banner.
 - A caller named in no `twakeLocalAdminLink` is refused every read (`403`)
   but the top organization's own entry, which `organizations/top` answers.
 
