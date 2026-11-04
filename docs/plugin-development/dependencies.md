@@ -598,6 +598,11 @@ configurations that carry per-instance options into the parallel batch —
 `core/auth/trustedProxy` named that way registered after the routes it
 guards.
 
+A plugin that has a package is named twice, one line per spelling
+(`core/auth/token` and `@ldap-rest/auth-token`), because the matching reads
+the module as the configuration wrote it: a deployment may name either. The
+two lines stay together, so the rank is the same whichever one is used.
+
 ## Hook Execution Order
 
 Hooks are executed in the order plugins are loaded, with one exception: the
