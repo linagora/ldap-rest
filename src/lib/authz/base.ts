@@ -85,14 +85,6 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   private static readonly widenedForLink = Symbol('widened for the link');
 
-  /**
-   * The search of the top organization by itself, which every caller may
-   * make (`getOrganisationTop`): granted by `ldapsearchrequest` whatever the
-   * rules say, it is not filtered by them either. A symbol key, for the
-   * reason given at {@link widenedForLink}.
-   */
-  private static readonly topOrganizationRead = Symbol('top organization');
-
   roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
 
@@ -1116,15 +1108,6 @@ export default abstract class AuthzBase extends DmPlugin {
         return [base, opts, req];
       }
 
-      // Allow base scope search on top organization (for getOrganisationTop)
-      if (base === this.config.ldap_top_organization && opts.scope === 'base') {
-        return [
-          base,
-          { ...opts, [AuthzBase.topOrganizationRead]: true } as SearchOptions,
-          req,
-        ];
-      }
-
       // Filtering, the search is granted broadly and `ldapsearchfilter`
       // below holds the accounts to the caller's branches: refusing it here
       // would take the tree and the reference data with it.
@@ -1166,9 +1149,11 @@ export default abstract class AuthzBase extends DmPlugin {
      * attached outside the branches this caller manages are dropped.
      *
      * Runs after the cache and carries the request, so what one caller may
-     * not see never reaches another. An entry with no organization link —
-     * an organization, a group, a nomenclature value — is left alone: those
-     * are the reference data every administrator reads.
+     * not see never reaches another. An organization is judged by the branch
+     * it sits in: the tree names every branch, its description and its local
+     * administrators, which an administrator of one branch has no business
+     * reading. A group or a nomenclature value carrying no link is left
+     * alone: those are the reference data every administrator reads.
      *
      * So is an entry attached to the transit branch: it is waiting for an
      * administrator to claim it.
@@ -1193,12 +1178,6 @@ export default abstract class AuthzBase extends DmPlugin {
       // narrower than the base may refuse part of what it holds: each entry
       // is read only where the caller may read it.
       if (!this.filtersAttachedEntries()) {
-        if (
-          (opts as { [key: symbol]: unknown } | undefined)?.[
-            AuthzBase.topOrganizationRead
-          ]
-        )
-          return pass;
         const keys = await this.ruleBranches(user);
         const kept = [];
         // An entry is under its parent's rule unless a rule names it
@@ -1264,7 +1243,7 @@ export default abstract class AuthzBase extends DmPlugin {
       const transitKey = this.transitKey();
 
       // Within a branch the caller holds, a narrower rule may still refuse
-      // the organization: asked once per organization
+      // the entry: asked once per DN
       const readable = new Map<string, boolean>();
       const reads = async (value: string): Promise<boolean> => {
         if (!within(value)) return false;
@@ -1277,6 +1256,17 @@ export default abstract class AuthzBase extends DmPlugin {
         return readable.get(key)!;
       };
 
+      // The top organization is the root of the only tree there is: an entry
+      // under it is an organization, whatever its classes. Nomenclature
+      // containers sit outside it and stay reference data. The transit
+      // branch is the exception: any administrator hands entries over
+      // through it, so its entry has to stay readable for a move to name it.
+      const top = this.config.ldap_top_organization;
+      const organization = (dn: string): boolean =>
+        !!top &&
+        isDnInBranch(dn, top) &&
+        !(transitKey && normalizeDn(dn) === transitKey);
+
       const attached = [];
       for (const entry of result.searchEntries) {
         const link = entry[linkAttr];
@@ -1285,6 +1275,16 @@ export default abstract class AuthzBase extends DmPlugin {
             ? []
             : (Array.isArray(link) ? link : [link]).map(String);
         if (values.length === 0) {
+          // An organization with no link is the branch itself: read it only
+          // where the caller reads that branch, as its accounts are.
+          if (organization(String(entry.dn))) {
+            if (!(await reads(String(entry.dn)))) {
+              this.logger.debug(
+                `${this.name}: hiding ${String(entry.dn)} from ${req!.user}, outside the branches they hold`
+              );
+              continue;
+            }
+          }
           attached.push(entry);
           continue;
         }

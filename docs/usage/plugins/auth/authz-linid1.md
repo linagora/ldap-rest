@@ -58,11 +58,15 @@ belongs to nobody's branch, and no administrator could list or change one.
 - Listings of accounts and groups drop the entries attached to an
   organization outside the caller's branches. A single read of one answers
   `404`.
-- Entries attached to nothing — the organizations, the nomenclature values, a
-  group or an account with no `twakeDepartmentLink` — are readable by every
-  administrator: the organization tree is reference data. Writes to them are
-  judged on their parent. The tree a console draws still starts at the
-  caller's own branches: see [getOrganisationTop Hook](#getorganisationtop-hook).
+- An organization is judged by the branch it sits in. The tree under the top
+  organization carries every branch's name, description and local
+  administrators, so a listing returns the caller's branches, and a direct
+  read of another branch answers `404`. `organizations/top` still answers one
+  of their branches: see [getOrganisationTop Hook](#getorganisationtop-hook).
+- Entries attached to nothing — a nomenclature value, a group or an account
+  with no `twakeDepartmentLink` — are readable by every administrator:
+  reference data. Writes to them are judged on their parent. The transit
+  branch's own entry stays readable too, so that a move can name it.
 - A caller named in no `twakeLocalAdminLink` is refused every read (`403`)
   but the top organization's own entry, which `organizations/top` answers.
 

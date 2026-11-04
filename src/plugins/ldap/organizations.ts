@@ -988,11 +988,12 @@ export default class LdapOrganizations extends DmPlugin {
     if (!this.settings.ldap_top_organization)
       throw new BadRequestError('No top organization configured');
 
-    // Get default top organization
-    const top = await this.server.ldap.search(
+    // Get default top organization, as the server: the hook below replaces
+    // it with the branches the caller holds, and the top entry is not for
+    // every caller to read by naming it.
+    const top = await this.server.ldap.system.search(
       { paged: false, scope: 'base' },
-      this.settings.ldap_top_organization,
-      req
+      this.settings.ldap_top_organization
     );
     if ((top as SearchResult).searchEntries.length !== 1)
       throw new NotFoundError('Top organization not found');
