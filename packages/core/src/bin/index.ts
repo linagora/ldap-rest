@@ -186,6 +186,8 @@ export class DM {
   readonly optionKeys: ReadonlySet<string>;
   /** Where `core/x` plugin entries resolve, injected by the umbrella. */
   private readonly pluginRoot?: string;
+  /** The package that answers for a `core/x` entry, injected by the umbrella. */
+  private readonly pluginModules: Readonly<Record<string, string>>;
   /** Directory a relative `--plugin` entry is resolved from. */
   private readonly resolveBase: string;
   ready: Promise<void>;
@@ -334,7 +336,7 @@ export class DM {
     return this.life.unhandledRejections;
   }
   /**
-   * The loads of `--plugin` entries without overrides, keyed by resolved
+   * The loads of `--plugin` entries without overrides, keyed by canonical
    * module and name. Regular plugins load in parallel and load their own
    * dependencies, so one module is often asked for twice: in the
    * configuration and by a plugin depending on it, or listed twice. The
@@ -355,13 +357,15 @@ export class DM {
   constructor(
     options: ConfigTemplate = coreConfigArgs,
     pluginRoot?: string,
-    resolveBase = dirname(fileURLToPath(import.meta.url))
+    resolveBase = dirname(fileURLToPath(import.meta.url)),
+    pluginModules: Readonly<Record<string, string>> = {}
   ) {
     this.configTemplate = options;
     this.optionKeys = new Set(
       options.map(entry => entry[0].replace(/^--?/, '').replace(/-/g, '_'))
     );
     this.pluginRoot = pluginRoot;
+    this.pluginModules = pluginModules;
     this.resolveBase = resolveBase;
     this.services.set(EntityRegistryService, this.entities);
     this.serviceOwners.set(EntityRegistryService, 'core');
@@ -457,9 +461,12 @@ export class DM {
       const logger = this.logger;
       const priorityPromise = (async (): Promise<void> => {
         for (const p of pluginPriority) {
-          const target = this.resolveModule(DM.moduleOf(p));
+          const target = this.canonicalModule(p);
+          const place = this.resolveModule(DM.moduleOf(p));
           const matching = regularPlugins.filter(
-            entry => this.resolveModule(DM.moduleOf(entry)) === target
+            entry =>
+              this.canonicalModule(entry) === target ||
+              this.resolveModule(DM.moduleOf(entry)) === place
           );
           if (matching.length === 0) continue;
           regularPlugins = regularPlugins.filter(
@@ -1056,6 +1063,22 @@ export class DM {
     });
   }
 
+  /**
+   * The name two spellings of one module share.
+   *
+   * A plugin that has a package can be named `core/ldap/groups` or
+   * `@ldap-rest/ldap-groups`: the same class, loaded once. The umbrella knows
+   * which packages answer for which `core/…` entry and passes the table; an
+   * entry it does not list keeps its own name.
+   *
+   * @param entry module part of a `--plugin` entry
+   * @returns the module's canonical name
+   */
+  canonicalModule(entry: string): string {
+    const module = DM.moduleOf(entry);
+    return this.pluginModules[module] ?? module;
+  }
+
   loadPlugin(pluginName: string): Promise<boolean> {
     let name: string | undefined;
     let overrides: Config | undefined;
@@ -1095,7 +1118,7 @@ export class DM {
     }
     const key = overrides
       ? undefined
-      : `${this.resolveModule(pluginName)}\0${name ?? ''}`;
+      : `${this.canonicalModule(pluginName)}\0${name ?? ''}`;
     const pending = key === undefined ? undefined : this.pluginLoads.get(key);
     if (pending) {
       this.logger.debug(`Plugin ${pluginName} already loaded, skipping`);

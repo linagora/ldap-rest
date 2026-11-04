@@ -356,6 +356,23 @@ describe('Server internals', () => {
       ).length;
     };
 
+    it('should name one module the same whichever spelling designates it', () => {
+      const dm = new DM();
+      // The package answers for the `core/…` entry, and for itself
+      expect(dm.canonicalModule('core/auth/token')).to.equal(
+        '@ldap-rest/auth-token'
+      );
+      expect(dm.canonicalModule('@ldap-rest/auth-token')).to.equal(
+        '@ldap-rest/auth-token'
+      );
+      expect(dm.canonicalModule('@ldap-rest/auth-token:second')).to.equal(
+        '@ldap-rest/auth-token'
+      );
+      // A plugin no package provides keeps its own name
+      expect(dm.canonicalModule('core/weblogs')).to.equal('core/weblogs');
+      expect(dm.canonicalModule(hello)).to.equal(hello);
+    });
+
     it('should load a module listed twice once, without a warning', async () => {
       const dm = new DM();
       await dm.ready;

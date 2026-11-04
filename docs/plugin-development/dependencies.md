@@ -598,10 +598,13 @@ configurations that carry per-instance options into the parallel batch —
 `core/auth/trustedProxy` named that way registered after the routes it
 guards.
 
-A plugin that has a package is named twice, one line per spelling
-(`core/auth/token` and `@ldap-rest/auth-token`), because the matching reads
-the module as the configuration wrote it: a deployment may name either. The
-two lines stay together, so the rank is the same whichever one is used.
+A plugin that has a package is named once, in the list, under either
+spelling: `DM.canonicalModule` reads `src/pluginModules.json` — written by
+`npm run sync:packages` from the umbrella's shims — and the entry the
+configuration wrote is compared under the package name. The same table is
+what makes `core/auth/token` and `@ldap-rest/auth-token` load one instance
+rather than two, and what a plugin reads to recognise a dependency named
+either way.
 
 ## Hook Execution Order
 

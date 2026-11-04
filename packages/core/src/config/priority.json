@@ -1,21 +1,12 @@
 [
   "core/storage",
-  "@ldap-rest/storage",
   "core/auth/trustedProxy",
-  "@ldap-rest/auth-trustedproxy",
   "core/weblogs",
   "core/auth/crowdsec",
-  "@ldap-rest/auth-crowdsec",
   "core/auth/rateLimit",
-  "@ldap-rest/auth-ratelimit",
   "core/auth/token",
-  "@ldap-rest/auth-token",
   "core/auth/fake",
-  "@ldap-rest/auth-fake",
   "core/auth/llng",
-  "@ldap-rest/auth-llng",
   "core/auth/openidconnect",
-  "@ldap-rest/auth-openidconnect",
-  "core/auth/authzPerRoute",
-  "@ldap-rest/authz-perroute"
+  "core/auth/authzPerRoute"
 ]

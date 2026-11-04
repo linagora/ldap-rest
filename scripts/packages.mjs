@@ -158,6 +158,38 @@ function pathsOf(target) {
 }
 
 /**
+ * The module names the umbrella serves, as `core/…` to the package the shim
+ * of that name re-exports. A configuration may name either spelling; the
+ * server reads this table to know that they designate the same plugin.
+ */
+function pluginModules() {
+  const pluginRoot = path.join(root, 'src', 'plugins');
+  const names = new Set(packages().map(pkg => pkg.name));
+  const modules = {};
+  for (const file of entriesUnder(pluginRoot)) {
+    if (!file.endsWith('.ts')) continue;
+    const text = readFileSync(file, 'utf8');
+    // A shim re-exports: it declares no class, no function and no constant
+    const pkg = /from '@ldap-rest\/([a-z0-9-]+)(?:'|\/)/.exec(text)?.[1];
+    if (!pkg || pkg === 'core' || !names.has(`@ldap-rest/${pkg}`)) continue;
+    if (
+      !/\bdefault\b/.test(text) ||
+      /\b(class|function|const|let)\b/.test(text)
+    )
+      continue;
+    const name = path
+      .relative(pluginRoot, file)
+      .replace(/\.ts$/, '')
+      .split(path.sep)
+      .join('/');
+    modules[`core/${name}`] = `@ldap-rest/${pkg}`;
+  }
+  return Object.fromEntries(
+    Object.entries(modules).sort(([a], [b]) => a.localeCompare(b))
+  );
+}
+
+/**
  * The configuration files that name every package, and what `sync` sets in
  * each. c8 takes its `src` entries as directories, not globs, so the coverage
  * roots are listed one per package like the TypeScript paths.
@@ -181,20 +213,22 @@ const GENERATED = [
           .sort(),
       ]),
   },
+  { file: 'src/pluginModules.json', build: pluginModules },
 ];
 
 /** Each generated file as `sync` writes it, beside its current text */
 async function generated() {
   const prettier = await import('prettier');
   return Promise.all(
-    GENERATED.map(async ({ file, set }) => {
-      const current = readFileSync(path.join(root, file), 'utf8');
-      const config = JSON.parse(current);
-      set(config);
-      const options = await prettier.resolveConfig(path.join(root, file));
+    GENERATED.map(async ({ file, set, build }) => {
+      const target = path.join(root, file);
+      const current = existsSync(target) ? readFileSync(target, 'utf8') : '';
+      const config = build ? build() : JSON.parse(current);
+      if (set) set(config);
+      const options = await prettier.resolveConfig(target);
       const wanted = await prettier.format(JSON.stringify(config), {
         ...options,
-        filepath: path.join(root, file),
+        filepath: target,
       });
       return { file, current, wanted };
     })
