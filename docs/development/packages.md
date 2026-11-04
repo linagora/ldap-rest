@@ -30,6 +30,11 @@ packages/<name>/
   ships more than its modules passes extra Rollup plugins:
   `packages/core` copies `priority.json`.
 - **`tsconfig.json`**: copy the one of `packages/storage`.
+- **Data files**: a package ships its own only. The schemas still live in the
+  umbrella's `static/schemas` until they have a package: a default option that
+  names one finds the nearest ancestor holding that directory, which is the
+  repository root, the package beside its build, or the copy the umbrella
+  bundles.
 
 ## Adding a package
 
