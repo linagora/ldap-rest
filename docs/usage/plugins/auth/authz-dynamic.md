@@ -118,7 +118,10 @@ description: {
 ```
 
 - **Sub-branch matching**: a permission on `ou=acme,dc=example,dc=com`
-  automatically covers `ou=users,ou=acme,…` and any sub-branch.
+  automatically covers `ou=users,ou=acme,…` and any sub-branch. Branches and
+  target DNs are compared RDN by RDN, so case, spacing, escapes, `;`
+  separators and attribute-type spellings (`ou`, `2.5.4.11`, `OID.2.5.4.11`)
+  do not matter; an escaped comma is part of a value, never a separator.
 - Absent flags default to `false`.
 - `tenant` is optional; if omitted, `req.user` falls back to the value of the
   configured `tenantAttribute` (default `cn`).

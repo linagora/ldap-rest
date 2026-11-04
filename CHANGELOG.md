@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Security
+
+- An `authzDynamic` token can no longer reach entries beside its ACL branches
+  by writing the DN with an escaped comma, and a branch configured with an
+  equivalent but different spelling (spaces, escapes, `;` separators, OID
+  attribute types) is accepted again
+  ([GHSA-5732-mx58-jf5p](https://github.com/linagora/ldap-rest/security/advisories/GHSA-5732-mx58-jf5p),
+  [details](docs/usage/plugins/auth/authz-dynamic.md#acl-json)).
+
 ## v2.0.1 (2026-11-02)
 
 Security update of the published image and a fix to plugin per-instance
