@@ -17,13 +17,13 @@ import type { Express, Request, Response } from 'express';
 import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
+import AuthToken from '@ldap-rest/auth-token';
+import AuthTotp from '@ldap-rest/auth-totp';
+import AuthHmac from '@ldap-rest/auth-hmac';
+import OpenIDConnect from '@ldap-rest/auth-openidconnect';
+import AuthzPerRoute from '@ldap-rest/authz-perroute';
 
 import { DM } from '../../helpers/dm';
-import AuthToken from '../../../src/plugins/auth/token';
-import AuthTotp from '../../../src/plugins/auth/totp';
-import AuthHmac from '../../../src/plugins/auth/hmac';
-import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
-import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
 
 /** Reports what the authenticators left on the request */
 class Probe extends DmPlugin {

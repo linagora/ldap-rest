@@ -1,0 +1,44 @@
+{
+  "name": "@ldap-rest/auth-llng",
+  "version": "3.0.0",
+  "description": "LDAP-Rest LemonLDAP::NG authentication plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/auth-llng"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/llng.ts",
+      "types": "./dist/llng.d.ts",
+      "import": "./dist/llng.js"
+    },
+    "./options": {
+      "development": "./src/llng.options.ts",
+      "types": "./dist/llng.options.d.ts",
+      "import": "./dist/llng.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "lemonldap-ng-handler": "^0.9.6"
+  },
+  "peerDependenciesMeta": {
+    "lemonldap-ng-handler": {
+      "optional": true
+    }
+  }
+}

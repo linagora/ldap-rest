@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import type { Express, Response } from 'express';
 import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import AuthLLNG from '@ldap-rest/auth-llng';
 
 import { DM } from '../../helpers/dm';
-import AuthLLNG from '../../../src/plugins/auth/llng';
 
 /**
  * `lemonldap-ng-handler` is an optional dependency (it drags in the native

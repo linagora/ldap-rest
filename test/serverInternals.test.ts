@@ -5,11 +5,11 @@ import AuthBase from '@ldap-rest/core/lib/auth/base';
 import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 import type { Hooks } from '@ldap-rest/core/hooks';
 import { jsonBodyParser } from '@ldap-rest/core/lib/rawBody';
+import RateLimit from '@ldap-rest/auth-ratelimit';
+import AuthToken from '@ldap-rest/auth-token';
+import TrustedProxy from '@ldap-rest/auth-trustedproxy';
 
 import HelloWorld from '../src/plugins/demo/helloworld';
-import RateLimit from '../src/plugins/auth/rateLimit';
-import AuthToken from '../src/plugins/auth/token';
-import TrustedProxy from '../src/plugins/auth/trustedProxy';
 
 import { DM } from './helpers/dm';
 

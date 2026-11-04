@@ -1,0 +1,38 @@
+{
+  "name": "@ldap-rest/auth-crowdsec",
+  "version": "3.0.0",
+  "description": "LDAP-Rest CrowdSec authentication guard",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/auth-crowdsec"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/crowdsec.ts",
+      "types": "./dist/crowdsec.d.ts",
+      "import": "./dist/crowdsec.js"
+    },
+    "./options": {
+      "development": "./src/crowdsec.options.ts",
+      "types": "./dist/crowdsec.options.d.ts",
+      "import": "./dist/crowdsec.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0"
+  }
+}

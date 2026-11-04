@@ -18,11 +18,11 @@ import nock from 'nock';
 import supertest from 'supertest';
 import type { Express, Request, Response } from 'express';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import OpenIDConnect from '@ldap-rest/auth-openidconnect';
+import AuthToken from '@ldap-rest/auth-token';
+import AuthzPerRoute from '@ldap-rest/authz-perroute';
 
 import { DM } from '../../helpers/dm';
-import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
-import AuthToken from '../../../src/plugins/auth/token';
-import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
 
 const OIDC_SERVER = 'http://oidc.example.test';
 

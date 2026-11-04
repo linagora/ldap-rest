@@ -1,0 +1,39 @@
+{
+  "name": "@ldap-rest/authz-scope",
+  "version": "3.0.0",
+  "description": "LDAP-Rest scope authorization plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/authz-scope"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/authzScope.ts",
+      "types": "./dist/authzScope.d.ts",
+      "import": "./dist/authzScope.js"
+    },
+    "./options": {
+      "development": "./src/authzScope.options.ts",
+      "types": "./dist/authzScope.options.d.ts",
+      "import": "./dist/authzScope.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@sinclair/typebox": "^0.34.52"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "@ldap-rest/authz-dynamic",
+  "version": "3.0.0",
+  "description": "LDAP-Rest dynamic authorization plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/authz-dynamic"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/authzDynamic.ts",
+      "types": "./dist/authzDynamic.d.ts",
+      "import": "./dist/authzDynamic.js"
+    },
+    "./options": {
+      "development": "./src/authzDynamic.options.ts",
+      "types": "./dist/authzDynamic.options.d.ts",
+      "import": "./dist/authzDynamic.options.js"
+    },
+    "./hash": {
+      "development": "./src/authzDynamicHash.ts",
+      "types": "./dist/authzDynamicHash.d.ts",
+      "import": "./dist/authzDynamicHash.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0"
+  }
+}

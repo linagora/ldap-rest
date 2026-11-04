@@ -14,9 +14,9 @@
  * that none of them is left to a default reaching for a store.
  */
 import { expect } from 'chai';
+import OpenIDConnect from '@ldap-rest/auth-openidconnect';
 
 import { DM } from '../../helpers/dm';
-import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
 
 describe('OpenID Connect, the Back-Channel Logout configuration', function () {
   let server: DM;

@@ -1,11 +1,11 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Hooks } from '@ldap-rest/core/hooks';
+import AuthzDynamic from '@ldap-rest/authz-dynamic';
+import { ssha } from '@ldap-rest/authz-dynamic/hash';
 
-import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../helpers/dm';
-import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
 
 describe('authzDynamic (integration)', function () {
   let server: DM;

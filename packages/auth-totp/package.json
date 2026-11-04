@@ -1,0 +1,38 @@
+{
+  "name": "@ldap-rest/auth-totp",
+  "version": "3.0.0",
+  "description": "LDAP-Rest TOTP authentication plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/auth-totp"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/totp.ts",
+      "types": "./dist/totp.d.ts",
+      "import": "./dist/totp.js"
+    },
+    "./options": {
+      "development": "./src/totp.options.ts",
+      "types": "./dist/totp.options.d.ts",
+      "import": "./dist/totp.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "@ldap-rest/authz-perroute",
+  "version": "3.0.0",
+  "description": "LDAP-Rest per-route authorization plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/authz-perroute"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/authzPerRoute.ts",
+      "types": "./dist/authzPerRoute.d.ts",
+      "import": "./dist/authzPerRoute.js"
+    },
+    "./options": {
+      "development": "./src/authzPerRoute.options.ts",
+      "types": "./dist/authzPerRoute.options.d.ts",
+      "import": "./dist/authzPerRoute.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0"
+  }
+}

@@ -22,7 +22,7 @@ export const crowdsecOptions: {
     crowdsec_cache_ttl: NumberOption;
 };
 
-// @public (undocumented)
+// @public
 export function crowdsecOptionsOf(config: Config): CrowdsecOptions;
 
 // @public (undocumented)
@@ -39,7 +39,7 @@ export const dynamicOptions: {
     authz_dynamic_reload_endpoint: BooleanOption;
 };
 
-// @public (undocumented)
+// @public
 export function dynamicOptionsOf(config: Config): DynamicOptions;
 
 // @public (undocumented)
@@ -59,7 +59,7 @@ export const hmacOptions: {
     auth_hmac_window: NumberOption;
 };
 
-// @public (undocumented)
+// @public
 export function hmacOptionsOf(config: Config): HmacOptions;
 
 // @public (undocumented)
@@ -104,7 +104,7 @@ export const perBranchOptions: {
     ldap_group_member_attribute: StringOption;
 };
 
-// @public (undocumented)
+// @public
 export function perBranchOptionsOf(config: Config): PerBranchOptions;
 
 // @public (undocumented)
@@ -124,7 +124,7 @@ export const rateLimitOptions: {
     rate_limit_max: NumberOption;
 };
 
-// @public (undocumented)
+// @public
 export function rateLimitOptionsOf(config: Config): RateLimitOptions;
 
 // @public (undocumented)

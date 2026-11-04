@@ -26,9 +26,9 @@ import type {
 } from '@ldap-rest/core/lib/ldapActions';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
+import AuthzPerBranch from '@ldap-rest/authz-perbranch';
 
 import { DM, optionsFor } from '../../helpers/dm';
-import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapDepartmentSync from '../../../src/plugins/ldap/departmentSync';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';

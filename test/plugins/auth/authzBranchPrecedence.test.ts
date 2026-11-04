@@ -12,9 +12,9 @@ import type { SearchResult } from 'ldapts';
 import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 import { isAuthzRefusal } from '@ldap-rest/core/lib/errors';
 import { mostSpecificBranchRule } from '@ldap-rest/core/lib/authz/base';
+import AuthzPerBranch from '@ldap-rest/authz-perbranch';
 
 import { DM } from '../../helpers/dm';
-import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Branch rule precedence', function () {
