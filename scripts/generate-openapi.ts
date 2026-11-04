@@ -160,16 +160,11 @@ export class OpenAPIGenerator {
 
   /**
    * Analyze all plugin files. Walks `src/plugins/` for concrete plugins
-   * plus `src/abstract/` so abstract bases like LdapFlat (which carries
-   * the generic per-resource CRUD routes inherited by every flat
-   * plugin) are documented too.
+   * and every workspace package's sources, abstract bases like LdapFlat
+   * included: they carry the generic per-resource CRUD routes inherited by
+   * every flat plugin, which are documented too.
    */
-  public async analyze(
-    dirs: string[] = [
-      path.join(this.rootDir, 'src', 'plugins'),
-      path.join(this.rootDir, 'packages', 'core', 'src', 'abstract'),
-    ]
-  ): Promise<void> {
+  public async analyze(dirs: string[] = this.defaultDirs()): Promise<void> {
     for (const dir of dirs) this.analyzeDirectory(dir);
     for (const pending of this.pendingClasses)
       await this.analyzePluginClass(
@@ -177,6 +172,19 @@ export class OpenAPIGenerator {
         pending.sourceFile,
         pending.className
       );
+  }
+
+  /** `src/plugins`, then the sources of every workspace package */
+  private defaultDirs(): string[] {
+    const packages = path.join(this.rootDir, 'packages');
+    return [
+      path.join(this.rootDir, 'src', 'plugins'),
+      ...fs
+        .readdirSync(packages)
+        .sort()
+        .map(name => path.join(packages, name, 'src'))
+        .filter(dir => fs.existsSync(dir)),
+    ];
   }
 
   private analyzeDirectory(dir: string): void {

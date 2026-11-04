@@ -34,241 +34,6 @@
     }
   ],
   "paths": {
-    "/api/v1/authz-dynamic/reload": {
-      "post": {
-        "summary": "Reload the authz-dynamic token cache",
-        "description": "Forces an immediate reload of all token entries from the LDAP\nbranch configured via `--authz-dynamic-base`.\n\n**Conditional registration:** this endpoint is only added to the\nrouter when the server was started with\n`--authz-dynamic-reload-endpoint true`.  It will be absent\n(404) otherwise.\n\n**Authentication required:** the request must carry a valid\n`Authorization: Bearer <token>` header that matches an existing\nentry in the token cache.  An unauthenticated or unrecognised\ntoken receives a `401` response.\n\nOn success the response includes the number of tokens now held\nin the in-memory cache.  This count can be used to verify that\nthe expected entries are present after adding or removing tokens\nin LDAP.\n",
-        "responses": {
-          "200": {
-            "description": "Cache reloaded successfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "success",
-                    "tokens"
-                  ],
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "tokens": {
-                      "type": "integer",
-                      "description": "Number of token entries now in the cache.",
-                      "example": 3
-                    }
-                  }
-                },
-                "example": {
-                  "success": true,
-                  "tokens": 3
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request"
-          },
-          "401": {
-            "description": "Missing, invalid, or unrecognised bearer token."
-          },
-          "404": {
-            "description": "Not found"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        },
-        "tags": [
-          "Authorization (Dynamic)"
-        ],
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/authz/scope": {
-      "get": {
-        "summary": "Administration scope of the current user",
-        "description": "Returns the branches the signed-in user administers, the permissions\nheld on each, and — per entity — whether they may create a new entry.\nA client uses it to show the scope explicitly and to hide actions that\nwould be refused.\n\nWith no authorization plugin judging the caller the server grants\neverything, and the answer says so through `unrestricted: true`.\nWhen plugins judge the caller and none of them can describe a scope\n(`authzPerRoute`, `authzDynamic`), the answer is `described: false`\nwith nothing in it: no model can say what will be granted, and a\nclient should not offer what it cannot know.\n\n`sources` names the authorization plugins judging the caller, and\n`source` the one this scope comes from — the first loaded, or the one\n`--authz-scope-source` names — so a client can tell a scope from one\nmodel among several from the server's whole answer.\n\n`transit` is the transit branch (`--authz-transit-branch`) when the\ndescribing plugin judges entries by their attachment, `null`\notherwise. Every administrator may put an entry they manage there,\nand claim one from it into a branch they write.\n\n`linksAnyDomain` says whether the caller may link an organization to\nany mail domain, rather than only to those an organization above it\nlinks: with `authzLinid1`, an administrator holding write on the top\norganization or on `--authz-global-organization`. `true` when\nunrestricted, `false` when the describing plugin cannot tell, and\nwhen the scope is not described. Like the rest of the scope, it is\nthe answer of `source` alone: another authorization plugin judging\nthe same caller may still refuse the link — `authzPerBranch`\ngrants it on the top organization only.\n\n`passwordPolicies` says whether the caller may list the password\npolicies (`GET /password-policies`), so a client offers them without\nasking for them and being refused: the judgement the describing\nplugin makes of a search of `--ppolicy-base` — with `authzLinid1`\nand `--authz-global-branches` holding it, only those who read that\nbranch. `true` when unrestricted, `false` when the scope is not\ndescribed, and absent when `core/ldap/passwordPolicy` is not loaded.\nIt is the answer of `source` too: another authorization plugin\njudging the same caller (`--authz-combine`) may still refuse the\nlisting, and so may a route-level gate (`authzPerRoute`).\n",
-        "responses": {
-          "200": {
-            "description": "Scope of the current user.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "user",
-                    "unrestricted",
-                    "described",
-                    "source",
-                    "sources",
-                    "branches",
-                    "linksAnyDomain",
-                    "entities"
-                  ],
-                  "properties": {
-                    "user": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "unrestricted": {
-                      "type": "boolean"
-                    },
-                    "described": {
-                      "type": "boolean"
-                    },
-                    "source": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "sources": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "branches": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "required": [
-                          "dn"
-                        ],
-                        "properties": {
-                          "dn": {
-                            "type": "string"
-                          },
-                          "read": {
-                            "type": "boolean"
-                          },
-                          "write": {
-                            "type": "boolean"
-                          },
-                          "delete": {
-                            "type": "boolean"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "path": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    },
-                    "transit": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "linksAnyDomain": {
-                      "type": "boolean"
-                    },
-                    "passwordPolicies": {
-                      "type": "boolean"
-                    },
-                    "entities": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "required": [
-                          "name",
-                          "base",
-                          "create"
-                        ],
-                        "properties": {
-                          "name": {
-                            "type": "string"
-                          },
-                          "base": {
-                            "type": "string"
-                          },
-                          "create": {
-                            "type": "boolean"
-                          }
-                        }
-                      }
-                    }
-                  }
-                },
-                "example": {
-                  "user": "uid=alice,ou=users,dc=example,dc=com",
-                  "unrestricted": false,
-                  "described": true,
-                  "source": "authzLinid1",
-                  "sources": [
-                    "authzLinid1"
-                  ],
-                  "branches": [
-                    {
-                      "dn": "ou=Sales,ou=organization,dc=example,dc=com",
-                      "read": true,
-                      "write": true,
-                      "delete": true
-                    }
-                  ],
-                  "transit": "ou=Transit,ou=organization,dc=example,dc=com",
-                  "linksAnyDomain": false,
-                  "passwordPolicies": false,
-                  "entities": [
-                    {
-                      "name": "users",
-                      "base": "ou=users,dc=example,dc=com",
-                      "create": true
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request"
-          },
-          "401": {
-            "description": "No authenticated user.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        },
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
     "/api/v1/config": {
       "get": {
         "summary": "Get server configuration",
@@ -6851,6 +6616,241 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/authz-dynamic/reload": {
+      "post": {
+        "summary": "Reload the authz-dynamic token cache",
+        "description": "Forces an immediate reload of all token entries from the LDAP\nbranch configured via `--authz-dynamic-base`.\n\n**Conditional registration:** this endpoint is only added to the\nrouter when the server was started with\n`--authz-dynamic-reload-endpoint true`.  It will be absent\n(404) otherwise.\n\n**Authentication required:** the request must carry a valid\n`Authorization: Bearer <token>` header that matches an existing\nentry in the token cache.  An unauthenticated or unrecognised\ntoken receives a `401` response.\n\nOn success the response includes the number of tokens now held\nin the in-memory cache.  This count can be used to verify that\nthe expected entries are present after adding or removing tokens\nin LDAP.\n",
+        "responses": {
+          "200": {
+            "description": "Cache reloaded successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "tokens"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "tokens": {
+                      "type": "integer",
+                      "description": "Number of token entries now in the cache.",
+                      "example": 3
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "tokens": 3
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Missing, invalid, or unrecognised bearer token."
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "tags": [
+          "Authorization (Dynamic)"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/authz/scope": {
+      "get": {
+        "summary": "Administration scope of the current user",
+        "description": "Returns the branches the signed-in user administers, the permissions\nheld on each, and — per entity — whether they may create a new entry.\nA client uses it to show the scope explicitly and to hide actions that\nwould be refused.\n\nWith no authorization plugin judging the caller the server grants\neverything, and the answer says so through `unrestricted: true`.\nWhen plugins judge the caller and none of them can describe a scope\n(`authzPerRoute`, `authzDynamic`), the answer is `described: false`\nwith nothing in it: no model can say what will be granted, and a\nclient should not offer what it cannot know.\n\n`sources` names the authorization plugins judging the caller, and\n`source` the one this scope comes from — the first loaded, or the one\n`--authz-scope-source` names — so a client can tell a scope from one\nmodel among several from the server's whole answer.\n\n`transit` is the transit branch (`--authz-transit-branch`) when the\ndescribing plugin judges entries by their attachment, `null`\notherwise. Every administrator may put an entry they manage there,\nand claim one from it into a branch they write.\n\n`linksAnyDomain` says whether the caller may link an organization to\nany mail domain, rather than only to those an organization above it\nlinks: with `authzLinid1`, an administrator holding write on the top\norganization or on `--authz-global-organization`. `true` when\nunrestricted, `false` when the describing plugin cannot tell, and\nwhen the scope is not described. Like the rest of the scope, it is\nthe answer of `source` alone: another authorization plugin judging\nthe same caller may still refuse the link — `authzPerBranch`\ngrants it on the top organization only.\n\n`passwordPolicies` says whether the caller may list the password\npolicies (`GET /password-policies`), so a client offers them without\nasking for them and being refused: the judgement the describing\nplugin makes of a search of `--ppolicy-base` — with `authzLinid1`\nand `--authz-global-branches` holding it, only those who read that\nbranch. `true` when unrestricted, `false` when the scope is not\ndescribed, and absent when `core/ldap/passwordPolicy` is not loaded.\nIt is the answer of `source` too: another authorization plugin\njudging the same caller (`--authz-combine`) may still refuse the\nlisting, and so may a route-level gate (`authzPerRoute`).\n",
+        "responses": {
+          "200": {
+            "description": "Scope of the current user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "user",
+                    "unrestricted",
+                    "described",
+                    "source",
+                    "sources",
+                    "branches",
+                    "linksAnyDomain",
+                    "entities"
+                  ],
+                  "properties": {
+                    "user": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "unrestricted": {
+                      "type": "boolean"
+                    },
+                    "described": {
+                      "type": "boolean"
+                    },
+                    "source": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "branches": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "dn"
+                        ],
+                        "properties": {
+                          "dn": {
+                            "type": "string"
+                          },
+                          "read": {
+                            "type": "boolean"
+                          },
+                          "write": {
+                            "type": "boolean"
+                          },
+                          "delete": {
+                            "type": "boolean"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "transit": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "linksAnyDomain": {
+                      "type": "boolean"
+                    },
+                    "passwordPolicies": {
+                      "type": "boolean"
+                    },
+                    "entities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "base",
+                          "create"
+                        ],
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "base": {
+                            "type": "string"
+                          },
+                          "create": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "user": "uid=alice,ou=users,dc=example,dc=com",
+                  "unrestricted": false,
+                  "described": true,
+                  "source": "authzLinid1",
+                  "sources": [
+                    "authzLinid1"
+                  ],
+                  "branches": [
+                    {
+                      "dn": "ou=Sales,ou=organization,dc=example,dc=com",
+                      "read": true,
+                      "write": true,
+                      "delete": true
+                    }
+                  ],
+                  "transit": "ou=Transit,ou=organization,dc=example,dc=com",
+                  "linksAnyDomain": false,
+                  "passwordPolicies": false,
+                  "entities": [
+                    {
+                      "name": "users",
+                      "base": "ou=users,dc=example,dc=com",
+                      "create": true
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "No authenticated user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "tags": [
+          "Authorization"
+        ]
       }
     },
     "/api/v1/ldap/{resource}": {
