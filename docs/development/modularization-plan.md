@@ -16,11 +16,13 @@ internal split. [#593], [#594], [#595] and [#603] are done.
 
 ## What blocks #397 today
 
-`@ldap-rest/core` is a package of its own. What remains is extracting the
-plugin families and the umbrella:
+`@ldap-rest/core`, `@ldap-rest/storage` and the authentication plugins are
+packages of their own. What remains is extracting the other plugin families
+and the umbrella:
 
-- The plugin families still live in the umbrella's `src/plugins/`, and the
-  single package generates 88 `./plugin-*` exports from `rollup.config.mjs`.
+- The LDAP, SCIM and Twake families still live in the umbrella's
+  `src/plugins/`, and the umbrella still generates their `./plugin-*` exports
+  from `rollup.config.mjs`.
 - The umbrella composes the options in `src/options.ts` and passes them to the
   core `DM`; the core itself imports no family.
 
@@ -164,6 +166,11 @@ families do not import each other, and `ldapActions` is a stable façade.
    and its backends live in `packages/storage` (`@ldap-rest/storage`); the
    umbrella keeps the `./plugin-storage*` shims and bundles the package until
    phase 3 publishes it. Splitting it into one package per backend is [#651].
+   (**done**) The authentication and authorization plugins are one package
+   per plugin (`@ldap-rest/auth-token`, `@ldap-rest/authz-linid1`, …), each
+   declaring its option set next to its class; `ldap-rest/plugin-auth-*` stay
+   as shims and `ldap-rest/plugin-auth-auth.options` re-exports every option
+   set. The LDAP family comes next.
 5. Extract `browser` and `schemas`.
 6. After each step: `npm run test:dev`, `npm run check`,
    `npm run check:openapi`, `npm run check:options`, and the `contracts` job.
@@ -226,11 +233,11 @@ phase 1.
 
 ## First actions
 
-Phases 0 and 1 are done, and phase 2 has started with the workspaces and the
-core package. The next steps are:
+Phases 0 and 1 are done, and phase 2 has started with the workspaces, the
+core, the storage and the authentication packages. The next steps are:
 
-1. Extract the plugin packages in dependency order, then `browser` and
-   `schemas`.
+1. Extract the remaining plugin packages in dependency order (`ldap`, `scim`,
+   `twake`, then the standalone plugins), then `browser` and `schemas`.
 2. Finish [#549] part 2 in phase 3.
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397

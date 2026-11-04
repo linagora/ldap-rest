@@ -58,4 +58,4 @@ AND, including the filters: two filters narrow the result twice.
 
 See `packages/core/src/lib/authz/composition.ts`, the `authz_for` and `authz_combine`
 options in `packages/core/src/config/args.ts`, and `authz_scope_source` in
-`src/plugins/auth/auth.options.ts`.
+`packages/authz-scope/src/authzScope.options.ts`.
