@@ -174,14 +174,17 @@ export class OpenAPIGenerator {
       );
   }
 
-  /** `src/plugins`, then the sources of every workspace package */
+  /** `src/plugins`, the core's bases, then every plugin package's sources */
   private defaultDirs(): string[] {
     const packages = path.join(this.rootDir, 'packages');
     return [
       path.join(this.rootDir, 'src', 'plugins'),
+      // The core's plugins are its abstract bases; the rest is the server
+      path.join(packages, 'core', 'src', 'abstract'),
       ...fs
         .readdirSync(packages)
         .sort()
+        .filter(name => name !== 'core')
         .map(name => path.join(packages, name, 'src'))
         .filter(dir => fs.existsSync(dir)),
     ];
@@ -1352,6 +1355,14 @@ export class OpenAPIGenerator {
     if (Object.keys(this.components).length > 0) {
       spec.components = { schemas: this.components };
     }
+
+    // The walk order follows the file layout, so a plugin that moves to a
+    // package would move its paths in the published document: sort them.
+    spec.paths = Object.fromEntries(
+      Object.entries(spec.paths).sort(([a], [b]) =>
+        a < b ? -1 : a > b ? 1 : 0
+      )
+    );
 
     return spec;
   }
