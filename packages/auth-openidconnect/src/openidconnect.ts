@@ -9,20 +9,28 @@ import {
   unauthorized,
 } from '@ldap-rest/core/lib/expressFormatedResponses';
 import type { Express, RequestHandler, Response } from 'express';
-import oidc from 'express-openid-connect';
 import type { ConfigParams } from 'express-openid-connect';
 
 import { openidconnectOptions } from './openidconnect.options';
 
-// Taken off the default export, not imported by name. The package is
-// CommonJS, and Node detects the named exports an ESM file may import by
-// reading `module.exports` statically — `auth` is a plain property there and
-// is seen, `requiresAuth` arrives through a spread and is not. A named
-// import of it type-checks (the `.d.ts` declares it) and links under a test
-// runner's lenient interop, then fails at startup on the only path a
-// deployment uses: `Named export 'requiresAuth' not found`. `core/auth/llng`
-// is built the same way, for the same reason.
-const { auth, requiresAuth } = oidc;
+/**
+ * What this plugin uses of `express-openid-connect`, declared here rather
+ * than read from the module: the package is an optional peer, and a published
+ * declaration naming it fails to type-check wherever it is absent.
+ *
+ * The properties are read from the default export rather than imported by
+ * name. The package is CommonJS, and Node detects the named exports an ESM
+ * file may import by reading `module.exports` statically — `auth` is a plain
+ * property there and is seen, `requiresAuth` arrives through a spread and is
+ * not. A named import of it type-checks (the `.d.ts` declares it) and links
+ * under a test runner's lenient interop, then fails at startup on the only
+ * path a deployment uses: `Named export 'requiresAuth' not found`.
+ * `core/auth/llng` is built the same way, for the same reason.
+ */
+interface OidcLibrary {
+  auth(config: ConfigParams): RequestHandler;
+  requiresAuth(): RequestHandler;
+}
 
 /**
  * The routes this plugin answers itself: `/logout` in `authMethod`, the others
@@ -99,6 +107,8 @@ export default class OpenIDConnect extends AuthBase {
   roles: Role[] = ['auth', 'configurable'] as const;
   /** The library's router, built once: `auth()` returns a fresh one per call. */
   private router?: RequestHandler;
+  /** The library, loaded by `api()` before the server serves anything. */
+  private library?: OidcLibrary;
   /** Set once the missing `end_session_endpoint` has been reported. */
   private warnedNoEndSession = false;
   /** Set once a `/logout` with nothing to record it has been reported. */
@@ -309,9 +319,43 @@ export default class OpenIDConnect extends AuthBase {
    *
    * @param app the express application
    */
-  api(app: Express): void {
-    this.router = auth(this.buildConfig());
+  // AuthBase declares api() as returning void; DmPlugin's own api?() field
+  // already allows MaybePromise<void>, and the caller in bin/index.ts always
+  // awaits it — this override just uses the async result that permits.
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+  async api(app: Express): Promise<void> {
+    let oidc: OidcLibrary;
+    try {
+      oidc = await this.loadLibrary();
+    } catch (err) {
+      throw new Error(
+        `${this.name}: requires the optional dependency ` +
+          '"express-openid-connect", which is not installed. Install it ' +
+          `to use this plugin, or remove it from the configuration. (${
+            err instanceof Error ? err.message : String(err)
+          })`
+      );
+    }
+    this.library = oidc;
+    this.router = oidc.auth(this.buildConfig());
     super.api(app);
+  }
+
+  /** The library, once `api()` has loaded it: every route is served later */
+  private get oidc(): OidcLibrary {
+    if (!this.library)
+      throw new Error(`${this.name}: express-openid-connect is not loaded`);
+    return this.library;
+  }
+
+  /**
+   * Load the library. Split out so tests can override it to simulate the
+   * dependency being absent, without actually uninstalling it.
+   */
+  protected async loadLibrary(): Promise<OidcLibrary> {
+    const loaded = await import('express-openid-connect');
+    // A CommonJS package: what it exports lives on its default export
+    return (loaded.default ?? loaded) as OidcLibrary;
   }
 
   /**
@@ -361,7 +405,7 @@ export default class OpenIDConnect extends AuthBase {
       const guard = (): void =>
         // No session: a browser has already been sent to the provider, an
         // API client comes back here with the refusal as `err`.
-        void requiresAuth()(req, res, (err?: unknown) => {
+        void this.oidc.requiresAuth()(req, res, (err?: unknown) => {
           if (err) return unauthorized(res);
           const claims = (
             req as unknown as { oidc: { user: Record<string, unknown> } }

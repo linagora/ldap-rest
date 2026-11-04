@@ -109,17 +109,25 @@ describe('The two names of a caller', function () {
       const plugin = new OpenIDConnect(server);
       // The library's router is what reads the session; here it is the
       // session, so the claim handling is what the test is about.
-      (
-        plugin as unknown as {
-          router: (req: unknown, res: unknown, next: () => void) => void;
-        }
-      ).router = (req, _res, next) => {
+      const internals = plugin as unknown as {
+        router: (req: unknown, res: unknown, next: () => void) => void;
+        library: {
+          requiresAuth: () => (
+            req: unknown,
+            res: unknown,
+            next: () => void
+          ) => void;
+        };
+      };
+      internals.router = (req, _res, next) => {
         (req as { oidc: unknown }).oidc = {
           isAuthenticated: () => true,
           user: { sub: 'auth0|17', preferred_username: 'dwho' },
         };
         next();
       };
+      // `api()` loads the library, and this test serves a request instead
+      internals.library = { requiresAuth: () => (_req, _res, next) => next() };
 
       const req = { headers: {} } as unknown as DmRequest;
       let passed = false;

@@ -626,3 +626,37 @@ describe('OpenID Connect Plugin', () => {
     });
   });
 });
+
+/**
+ * The library is an optional dependency, loaded by `api()`: a deployment
+ * without it must be told so, naming both the plugin and the package,
+ * instead of Node's bare "Cannot find package" at import.
+ */
+class MissingLibraryOIDC extends OpenIDConnect {
+  protected async loadLibrary(): Promise<never> {
+    throw new Error("Cannot find package 'express-openid-connect'");
+  }
+}
+
+describe('OpenID Connect without its library', () => {
+  it('fails loudly at startup, naming the plugin and the dependency', async () => {
+    const dm = new DM();
+    await dm.ready;
+    // The plugin refuses an incomplete configuration before it loads anything
+    dm.config.oidc_server = 'http://oidc.example.test';
+    dm.config.oidc_client_id = 'client';
+    dm.config.oidc_client_secret = 'secret';
+    dm.config.base_url = 'http://localhost:8081';
+
+    let thrown: Error | undefined;
+    try {
+      await new MissingLibraryOIDC(dm).api({} as Express);
+    } catch (err) {
+      thrown = err as Error;
+    }
+
+    expect(thrown).to.be.instanceOf(Error);
+    expect(thrown?.message).to.contain('openidconnect');
+    expect(thrown?.message).to.contain('express-openid-connect');
+  });
+});
