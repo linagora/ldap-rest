@@ -8,7 +8,8 @@
   (`403`) and leaves the session alone, where a cross-site link ended it; a
   console served from another origin lists it in `--oidc-logout-origins`
   ([GHSA-7p36-74gx-462q](https://github.com/linagora/twake-directory-manager/security/advisories/GHSA-7p36-74gx-462q),
-  [details](docs/usage/plugins/auth/oidc.md#logout)).
+  [details](docs/usage/plugins/auth/oidc.md#logout),
+  [upgrading](docs/usage/upgrading.md#a-console-on-another-origin-must-be-trusted-for-logout)).
 - The organization tree is held to the caller's branches: another branch's
   description, sub-organizations and local administrators no longer come back
   from `GET /ldap/organizations/:dn`, its subnode listings or its searches

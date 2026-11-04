@@ -193,13 +193,13 @@ export default abstract class AuthzBase extends DmPlugin {
    * the judgement of `ldapsearchrequest`, for `authzScope` to ask it of a
    * branch without searching it.
    *
-   * Filtering, an administrator reads the directory whole — the
-   * organization tree, the groups, the nomenclatures — and what is held to
-   * a branch is the accounts, recognised one entry at a time by
-   * `ldapsearchfilter`; only a global branch asks for the branch itself.
-   * Otherwise the branch decides. Where a branch is a tenant rather than a
-   * department, letting a listing cross it is letting a customer read
-   * another.
+   * Filtering, a search is granted broadly — the groups, the nomenclatures,
+   * the entries attached to the caller's branches — and what is held to a
+   * branch is judged one entry at a time by `ldapsearchfilter`: an account by
+   * its link, an organization by the branch it sits in. Only a global branch
+   * asks for the branch itself. Otherwise the branch decides. Where a branch
+   * is a tenant rather than a department, letting a listing cross it is
+   * letting a customer read another.
    *
    * @param user the caller's DN
    * @param base the base of the search
@@ -1141,7 +1141,7 @@ export default abstract class AuthzBase extends DmPlugin {
         }
         // The organization classes tell an organization from an account or a
         // group carrying no link; the caller may not have asked for them.
-        if (!AuthzBase.wantsAttribute(opts, 'objectClass')) {
+        if (linkAttr && !AuthzBase.wantsAttribute(opts, 'objectClass')) {
           const asked = opts.attributes;
           const list = Array.isArray(asked)
             ? asked.map(String)
@@ -1274,30 +1274,20 @@ export default abstract class AuthzBase extends DmPlugin {
         return readable.get(key)!;
       };
 
-      // An organization is recognised by its classes, as `core/ldap/organizations`
-      // reads one: an account or a group carrying no link is not one. It is
-      // judged by `getUserPermissions` rather than by the authorized branches
-      // alone, so that a global write branch, read by every administrator,
-      // stays readable. The transit branch is the other exception: any
-      // administrator hands entries over through it, so its entry has to stay
-      // readable for a move to name it.
+      // An organization is an entry under the tree top carrying one of the
+      // configured classes, as `core/ldap/organizations` reads one: `ou=users`
+      // and `ou=nomenclature` sit outside the tree and stay reference data,
+      // and an account or a group carrying no link is not an organization.
+      const top = this.config.ldap_top_organization;
       const organizationClasses = (this.config.ldap_organization_class ?? [])
         .filter(name => name.toLowerCase() !== 'top')
         .map(name => name.toLowerCase());
-      const organization = (entry: AttributesList): boolean => {
+      const organization = (dn: string, entry: AttributesList): boolean => {
+        if (!top || !isDnInBranch(dn, top)) return false;
         const classes = ([] as unknown[])
           .concat(entry.objectClass ?? [])
           .map(name => String(name).toLowerCase());
         return organizationClasses.some(name => classes.includes(name));
-      };
-      const readsOrganisation = async (value: string): Promise<boolean> => {
-        const key = normalizeDn(value);
-        if (!readable.has(key))
-          readable.set(
-            key,
-            (await this.getUserPermissions(user, value)).read === true
-          );
-        return readable.get(key)!;
       };
 
       const attached = [];
@@ -1311,11 +1301,7 @@ export default abstract class AuthzBase extends DmPlugin {
           // An organization with no link is the branch itself: read it only
           // where the caller reads that branch, as its accounts are.
           const dn = String(entry.dn);
-          if (
-            organization(entry) &&
-            !(transitKey && normalizeDn(dn) === transitKey) &&
-            !(await readsOrganisation(dn))
-          ) {
+          if (organization(dn, entry) && !(await reads(dn))) {
             this.logger.debug(
               `${this.name}: hiding ${dn} from ${req!.user}, outside the branches they hold`
             );

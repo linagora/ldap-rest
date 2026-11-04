@@ -168,8 +168,26 @@ describe('OpenID Connect, RP-Initiated Logout', function () {
         expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
       });
 
-    it('allows an origin listed in --oidc-logout-origins', async () => {
+    it('allows a link from an origin listed in --oidc-logout-origins', async () => {
       const issuer = 'http://csrf-trusted.example.test';
+      const request = await build(issuer, true, undefined, undefined, {
+        oidc_logout_origins: ['https://console.example.test'],
+      });
+      const { cookie } = await login(request, issuer);
+
+      // A click on a link: a Referer, and no Origin
+      const res = await request
+        .get('/logout')
+        .set('Cookie', cookie)
+        .set('Sec-Fetch-Site', 'cross-site')
+        .set('Referer', 'https://console.example.test/users');
+
+      expect(res.status).to.equal(302);
+      expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
+    });
+
+    it('allows a fetch from an origin listed in --oidc-logout-origins', async () => {
+      const issuer = 'http://csrf-trusted-fetch.example.test';
       const request = await build(issuer, true, undefined, undefined, {
         oidc_logout_origins: ['https://console.example.test'],
       });
@@ -179,8 +197,7 @@ describe('OpenID Connect, RP-Initiated Logout', function () {
         .get('/logout')
         .set('Cookie', cookie)
         .set('Sec-Fetch-Site', 'cross-site')
-        .set('Origin', 'https://console.example.test')
-        .set('Referer', 'https://console.example.test/users');
+        .set('Origin', 'https://console.example.test');
 
       expect(res.status).to.equal(302);
       expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
