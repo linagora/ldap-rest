@@ -32,9 +32,10 @@ packages/<name>/
 - **`tsconfig.json`**: copy the one of `packages/storage`.
 - **Data files**: a package ships its own only. The schemas still live in the
   umbrella's `static/schemas` until they have a package: a default option that
-  names one finds the nearest ancestor holding that directory, which is the
-  repository root, the package beside its build, or the copy the umbrella
-  bundles.
+  names one searches the module's ancestors for that file, stopping at the
+  first `package.json` that is not the package's own — the repository root, the
+  package beside its build, or the copy the umbrella bundles — and stays empty
+  when it finds none.
 
 ## Adding a package
 
