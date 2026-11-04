@@ -33,7 +33,7 @@ import { localizedText } from '@ldap-rest/core/config/schema';
 // `isDnInBranch` only reads DNs; it brings in the error classes and the
 // response helpers and nothing else, so the script stays a script.
 import { isDnInBranch } from '@ldap-rest/core/lib/utils';
-import { fillsGeneratedAttribute } from '../src/plugins/ldap/enterpriseRules';
+import { fillsGeneratedAttribute } from '@ldap-rest/ldap-enterpriserules';
 
 /**
  * The plugins that fill generated attributes, and what each fills — the
