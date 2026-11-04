@@ -35,6 +35,8 @@
   "peerDependencies": {
     "@ldap-rest/core": "3.0.0",
     "csv-parse": "^7.0.2",
+    "express": "^5.1.0",
+    "ldapts": "^9.2.0",
     "multer": "^2.0.2"
   }
 }

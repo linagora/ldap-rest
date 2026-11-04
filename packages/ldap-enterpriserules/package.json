@@ -34,7 +34,8 @@
   },
   "peerDependencies": {
     "@ldap-rest/core": "3.0.0",
+    "@ldap-rest/ldap-groups": "3.0.0",
     "@ldap-rest/ldap-organizations": "3.0.0",
-    "@ldap-rest/ldap-groups": "3.0.0"
+    "express": "^5.1.0"
   }
 }
