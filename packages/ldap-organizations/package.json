@@ -1,0 +1,41 @@
+{
+  "name": "@ldap-rest/ldap-organizations",
+  "version": "3.0.0",
+  "description": "LDAP-Rest organizations plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/ldap-organizations"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/organizations.ts",
+      "types": "./dist/organizations.d.ts",
+      "import": "./dist/organizations.js"
+    },
+    "./options": {
+      "development": "./src/organizations.options.ts",
+      "types": "./dist/organizations.options.d.ts",
+      "import": "./dist/organizations.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@sinclair/typebox": "^0.34.52",
+    "express": "^5.1.0",
+    "ldapts": "^9.2.0"
+  }
+}

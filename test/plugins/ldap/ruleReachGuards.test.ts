@@ -6,12 +6,12 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

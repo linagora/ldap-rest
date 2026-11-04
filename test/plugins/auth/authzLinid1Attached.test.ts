@@ -20,10 +20,10 @@ import type DmPlugin from '@ldap-rest/core/abstract/plugin';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import AuthzLinid1 from '@ldap-rest/authz-linid1';
 import AuthzScope from '@ldap-rest/authz-scope';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapGroups from '@ldap-rest/ldap-groups';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapGroups from '../../../src/plugins/ldap/groups';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 
 class TestAuthPlugin extends AuthBase {

@@ -1,7 +1,7 @@
 import { expect } from 'chai';
+import TrashPlugin from '@ldap-rest/ldap-trash';
 
 import { DM } from '../../helpers/dm';
-import TrashPlugin from '../../../src/plugins/ldap/trash';
 
 describe('Trash Plugin - Integration Tests', function () {
   let server: DM;

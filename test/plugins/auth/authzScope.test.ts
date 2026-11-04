@@ -5,11 +5,11 @@ import AuthzScope from '@ldap-rest/authz-scope';
 import AuthzLinid1 from '@ldap-rest/authz-linid1';
 import AuthzPerRoute from '@ldap-rest/authz-perroute';
 import AuthzPerBranch from '@ldap-rest/authz-perbranch';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
+import PasswordPolicy from '@ldap-rest/ldap-passwordpolicy';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import PasswordPolicy from '../../../src/plugins/ldap/passwordPolicy';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

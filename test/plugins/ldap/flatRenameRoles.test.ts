@@ -28,10 +28,10 @@ import type {
   SearchResult,
 } from '@ldap-rest/core/lib/ldapActions';
 import type { Schema, SchemaAttribute } from '@ldap-rest/core/config/schema';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 /** The attribute the copied schema puts the member list in */

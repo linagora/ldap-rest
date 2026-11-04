@@ -16,13 +16,13 @@ internal split. [#593], [#594], [#595] and [#603] are done.
 
 ## What blocks #397 today
 
-`@ldap-rest/core`, `@ldap-rest/storage` and the authentication plugins are
-packages of their own. What remains is extracting the other plugin families
-and the umbrella:
+`@ldap-rest/core`, `@ldap-rest/storage`, the authentication plugins and the
+LDAP plugins are packages of their own. What remains is extracting the other
+plugin families and the umbrella:
 
-- The LDAP, SCIM and Twake families still live in the umbrella's
-  `src/plugins/`, and the umbrella still generates their `./plugin-*` exports
-  from `rollup.config.mjs`.
+- The SCIM and Twake families still live in the umbrella's `src/plugins/`,
+  and the umbrella still generates their `./plugin-*` exports from
+  `rollup.config.mjs`.
 - The umbrella composes the options in `src/options.ts` and passes them to the
   core `DM`; the core itself imports no family.
 
@@ -91,7 +91,11 @@ Rules:
   loads the LDAP plugins (and there is no aggregate `@ldap-rest/ldap` package).
   The loader maps `core/…` to the package that provides it: naming a plugin
   whose package is absent is an error at startup, an uninstalled optional
-  plugin in the priority list is skipped.
+  plugin in the priority list is skipped. Until that loader exists, the map is
+  the umbrella's (`src/pluginModules.json`, read by `DM.canonicalModule`): a
+  `DM` built from the core alone knows only the spellings it is handed, so an
+  embedder naming a plugin by its package gets neither its rank in the
+  priority list nor the duplicate-load guard.
 - The umbrella keeps only the main `ldap-rest` command, the loader that maps
   `core/…` to plugin packages, and the `DM` subclass that supplies the plugin
   tree.
@@ -172,7 +176,13 @@ families do not import each other, and `ldapActions` is a stable façade.
    per plugin (`@ldap-rest/auth-token`, `@ldap-rest/authz-linid1`, …), each
    declaring its option set next to its class; `ldap-rest/plugin-auth-*` stay
    as shims and `ldap-rest/plugin-auth-auth.options` re-exports every option
-   set. The LDAP family comes next.
+   set.
+   (**done**) The LDAP plugins are the same, `@ldap-rest/ldap-groups`,
+   `@ldap-rest/ldap-organizations`, …; `ldap-rest/plugin-ldap-*` stay as
+   shims, `plugin-ldap-ldap.options` re-exports every option set, and the
+   deprecated `plugin-ldap-organization` still names the organizations
+   plugin. Four of them read another one's options and depend on its package
+   (see the decisions below). The SCIM family comes next.
 5. Extract `browser` and `schemas`.
 6. After each step: `npm run test:dev`, `npm run check`,
    `npm run check:openapi`, `npm run check:options`, and the `contracts` job.
@@ -232,13 +242,25 @@ phase 1.
    generated exports?
 6. **Mandatory plugins** (**decided**): only `@ldap-rest/core`. Every plugin
    package is optional and installed by the deployment.
+7. **A plugin that names another one** (**decided**): it depends on that
+   plugin's package, as a peer, exactly as its `optionDependencies` or its
+   `dependencies` names it — `@ldap-rest/ldap-groups` and
+   `@ldap-rest/ldap-departmentsync` on `ldap-organizations`,
+   `ldap-externalusers` on `ldap-groups`, `ldap-enterpriserules` on both,
+   `ldap-flatgeneric` on `ldap-departmentsync`, `ldap-accountlifecycle` on
+   `ldap-flatgeneric`. Configuration shared by two plugins is not a service,
+   so the attributes an entry uses to name its organization stay declared
+   once, in the plugin that owns them; a plugin another one only needs
+   registered is a peer all the same, or a standalone install reports every
+   peer met and fails at startup on a module nobody installed.
 
 ## First actions
 
 Phases 0 and 1 are done, and phase 2 has started with the workspaces, the
-core, the storage and the authentication packages. The next steps are:
+core, the storage, the authentication and the LDAP packages. The next steps
+are:
 
-1. Extract the remaining plugin packages in dependency order (`ldap`, `scim`,
+1. Extract the remaining plugin packages in dependency order (`scim`,
    `twake`, then the standalone plugins), then `browser` and `schemas`.
 2. Finish [#549] part 2 in phase 3.
 

@@ -1,0 +1,36 @@
+{
+  "name": "@ldap-rest/ldap-accountlifecycle",
+  "version": "3.0.0",
+  "description": "LDAP-Rest account lifecycle plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/ldap-accountlifecycle"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/accountLifecycle.ts",
+      "types": "./dist/accountLifecycle.d.ts",
+      "import": "./dist/accountLifecycle.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@ldap-rest/ldap-flatgeneric": "3.0.0",
+    "@sinclair/typebox": "^0.34.52",
+    "express": "^5.1.0"
+  }
+}

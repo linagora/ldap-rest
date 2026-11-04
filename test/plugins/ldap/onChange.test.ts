@@ -5,12 +5,12 @@ import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
 import type DmPlugin from '@ldap-rest/core/abstract/plugin';
 import HookBus from '@ldap-rest/core/lib/hookBus';
 import type { Hooks } from '@ldap-rest/core/hooks';
-
-import { DM } from '../../helpers/dm';
 import OnLdapChange, {
   diffEntries,
   type ChangesToNotify,
-} from '../../../src/plugins/ldap/onChange';
+} from '@ldap-rest/ldap-onchange';
+
+import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 

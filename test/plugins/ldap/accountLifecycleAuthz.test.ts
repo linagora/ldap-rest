@@ -10,10 +10,10 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import AuthzPerBranch from '@ldap-rest/authz-perbranch';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapAccountLifecycle from '@ldap-rest/ldap-accountlifecycle';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapAccountLifecycle from '../../../src/plugins/ldap/accountLifecycle';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 class TestAuthPlugin extends AuthBase {

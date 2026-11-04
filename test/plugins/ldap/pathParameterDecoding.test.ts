@@ -6,13 +6,13 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import LdapAccountLifecycle from '@ldap-rest/ldap-accountlifecycle';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
+import LdapRaw from '@ldap-rest/ldap-raw';
 
 import { DM } from '../../helpers/dm';
-import LdapAccountLifecycle from '../../../src/plugins/ldap/accountLifecycle';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import LdapRaw from '../../../src/plugins/ldap/raw';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS,

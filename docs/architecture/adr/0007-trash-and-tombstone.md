@@ -66,4 +66,4 @@ any pattern and refuses too.
 
 See [tombstone](../../usage/plugins/integrations/tombstone.md), the plugin
 list in [plugins](../../usage/plugins/README.md), and
-`src/plugins/ldap/trash.ts`, `src/plugins/twake/tombstone.ts`.
+`packages/ldap-trash/src/trash.ts`, `src/plugins/twake/tombstone.ts`.

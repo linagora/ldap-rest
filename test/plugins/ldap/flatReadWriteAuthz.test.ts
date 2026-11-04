@@ -20,10 +20,10 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import AuthzPerBranch from '@ldap-rest/authz-perbranch';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 /** Authentication reduced to a header, so the test is about authorization */

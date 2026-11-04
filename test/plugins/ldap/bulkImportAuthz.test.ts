@@ -18,9 +18,9 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import { AUTHZ_REFUSED } from '@ldap-rest/core/lib/errors';
 import AuthzPerBranch from '@ldap-rest/authz-perbranch';
+import LdapBulkImport from '@ldap-rest/ldap-bulkimport';
 
 import { DM } from '../../helpers/dm';
-import LdapBulkImport from '../../../src/plugins/ldap/bulkImport';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

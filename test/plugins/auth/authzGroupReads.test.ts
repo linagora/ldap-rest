@@ -9,9 +9,9 @@ import type { Response } from 'express';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import AuthzPerBranch from '@ldap-rest/authz-perbranch';
+import LdapGroups from '@ldap-rest/ldap-groups';
 
 import { DM } from '../../helpers/dm';
-import LdapGroups from '../../../src/plugins/ldap/groups';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 class TestAuthPlugin extends AuthBase {

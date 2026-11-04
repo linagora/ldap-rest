@@ -1,11 +1,11 @@
 import nock from 'nock';
 import { expect } from 'chai';
+import OnLdapChange from '@ldap-rest/ldap-onchange';
+import LdapFlat from '@ldap-rest/ldap-flatgeneric';
 
 import { DM } from '../../helpers/dm';
 import Calendar from '../../../src/plugins/twake/calendar';
 import CalendarResources from '../../../src/plugins/twake/calendarResources';
-import OnLdapChange from '../../../src/plugins/ldap/onChange';
-import LdapFlat from '../../../src/plugins/ldap/flatGeneric';
 import { waitFor } from '../../helpers/waitFor';
 describe('Twake Calendar Plugin', function () {
   let resourceBase: string;

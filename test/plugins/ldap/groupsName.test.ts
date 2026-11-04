@@ -8,9 +8,9 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
 import { BadRequestError } from '@ldap-rest/core/lib/errors';
+import LdapGroups from '@ldap-rest/ldap-groups';
 
 import { DM } from '../../helpers/dm';
-import LdapGroups from '../../../src/plugins/ldap/groups';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 const B = String.fromCharCode(92);

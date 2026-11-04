@@ -53,10 +53,9 @@ import {
   TwakeGroupsService,
   type Page,
 } from '@ldap-rest/core/lib/services/twakeGroups';
-
 // TwakeGroups extends LdapGroups, the one documented family exception
 // eslint-disable-next-line local/no-plugin-family-import
-import LdapGroups from '../ldap/groups';
+import LdapGroups from '@ldap-rest/ldap-groups';
 
 import {
   first,

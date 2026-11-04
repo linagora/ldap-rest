@@ -2,10 +2,10 @@ import type { ParsedUrlQuery } from 'querystring';
 
 import nock from 'nock';
 import { expect } from 'chai';
+import OnLdapChange from '@ldap-rest/ldap-onchange';
 
 import { DM } from '../../helpers/dm';
 import Drive from '../../../src/plugins/twake/drive';
-import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 // Default Drive webadmin URL for tests (using nock for mocking)

@@ -12,13 +12,13 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import { parseDirectoryDate } from '@ldap-rest/core/lib/utils';
-
-import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
 import LdapEnterpriseRules, {
   startOfUtcDay,
-} from '../../../src/plugins/ldap/enterpriseRules';
+} from '@ldap-rest/ldap-enterpriserules';
+
+import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Enterprise rules: what the checks actually cover', function () {

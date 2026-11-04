@@ -4,12 +4,12 @@ import { expect } from 'chai';
 import nock from 'nock';
 import supertest from 'supertest';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import OnLdapChange from '@ldap-rest/ldap-onchange';
 
 import { DM } from '../helpers/dm';
-import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
-import LdapEnterpriseRules from '../../src/plugins/ldap/enterpriseRules';
-import LdapGroups from '../../src/plugins/ldap/groups';
-import OnLdapChange from '../../src/plugins/ldap/onChange';
 import James from '../../src/plugins/twake/james';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 import { waitFor } from '../helpers/waitFor';

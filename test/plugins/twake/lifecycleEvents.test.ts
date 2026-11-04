@@ -9,9 +9,9 @@ import type DmPlugin from '@ldap-rest/core/abstract/plugin';
 import { readOptions } from '@ldap-rest/core/config/options';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 import { ScimService } from '@ldap-rest/core/lib/services/scim';
+import OnLdapChange from '@ldap-rest/ldap-onchange';
 
 import { DM } from '../../helpers/dm';
-import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import Scim from '../../../src/plugins/scim/scim';
 import TwakeLifecycleEvents, {
   parseRules,

@@ -16,10 +16,10 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 import { expect } from 'chai';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
 
 import { DM } from '../../helpers/dm';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

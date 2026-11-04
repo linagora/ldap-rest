@@ -6,10 +6,10 @@
  */
 import { expect } from 'chai';
 import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Enterprise rules: the placeholder is not a member', function () {

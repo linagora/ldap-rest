@@ -1,6 +1,6 @@
 import { expect } from 'chai';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../helpers/dm';
 
 describe('Fixed attributes validation', function () {

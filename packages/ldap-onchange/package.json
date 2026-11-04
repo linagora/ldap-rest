@@ -1,0 +1,35 @@
+{
+  "name": "@ldap-rest/ldap-onchange",
+  "version": "3.0.0",
+  "description": "LDAP-Rest change notification plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/ldap-onchange"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/onChange.ts",
+      "types": "./dist/onChange.d.ts",
+      "import": "./dist/onChange.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "express": "^5.1.0",
+    "ldapts": "^9.2.0"
+  }
+}

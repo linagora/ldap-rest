@@ -13,12 +13,12 @@ import {
   loadSchemaFile,
   shippedSchemasPath,
 } from '@ldap-rest/core/lib/schemaFile';
+import LdapBulkImport from '@ldap-rest/ldap-bulkimport';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapGroups from '@ldap-rest/ldap-groups';
 
-import { DM } from '../helpers/dm';
 import ConfigApi from '../../src/plugins/configApi';
-import LdapBulkImport from '../../src/plugins/ldap/bulkImport';
-import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
-import LdapGroups from '../../src/plugins/ldap/groups';
+import { DM } from '../helpers/dm';
 import Static from '../../src/plugins/static';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 import { waitFor } from '../helpers/waitFor';

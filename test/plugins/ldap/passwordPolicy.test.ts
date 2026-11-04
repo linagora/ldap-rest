@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import PasswordPolicy from '@ldap-rest/ldap-passwordpolicy';
 
 import { DM } from '../../helpers/dm';
-import PasswordPolicy from '../../../src/plugins/ldap/passwordPolicy';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('PasswordPolicy Plugin', () => {

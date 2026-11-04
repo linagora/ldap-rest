@@ -18,14 +18,12 @@ import {
 } from '@ldap-rest/authz-perbranch/options';
 import { rateLimitOptionsOf } from '@ldap-rest/auth-ratelimit/options';
 import { totpOptionsOf } from '@ldap-rest/auth-totp/options';
+import { organizationOptions } from '@ldap-rest/ldap-organizations/options';
+import { passwordPolicyOptions } from '@ldap-rest/ldap-passwordpolicy/options';
+import { rawOptions } from '@ldap-rest/ldap-raw/options';
 
 import configArgs from '../../src/options.full';
 import { DM } from '../helpers/dm';
-import {
-  organizationOptions,
-  passwordPolicyOptions,
-  rawOptions,
-} from '../../src/plugins/ldap/ldap.options';
 import { jamesOptionsOf } from '../../src/plugins/twake/james.options';
 import { calendarOptionsOf } from '../../src/plugins/twake/calendar.options';
 import { clouderyOptionsOf } from '../../src/plugins/twake/cloudery.options';

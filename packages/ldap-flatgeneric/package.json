@@ -1,0 +1,40 @@
+{
+  "name": "@ldap-rest/ldap-flatgeneric",
+  "version": "3.0.0",
+  "description": "LDAP-Rest generic flat entities plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/ldap-flatgeneric"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/flatGeneric.ts",
+      "types": "./dist/flatGeneric.d.ts",
+      "import": "./dist/flatGeneric.js"
+    },
+    "./options": {
+      "development": "./src/flatGeneric.options.ts",
+      "types": "./dist/flatGeneric.options.d.ts",
+      "import": "./dist/flatGeneric.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@ldap-rest/ldap-departmentsync": "3.0.0",
+    "express": "^5.1.0"
+  }
+}
