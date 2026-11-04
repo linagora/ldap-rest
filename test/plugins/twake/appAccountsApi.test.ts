@@ -1,11 +1,11 @@
 import { expect } from 'chai';
 import request from 'supertest';
 import AuthToken from '@ldap-rest/auth-token';
+import OnChange from '@ldap-rest/ldap-onchange';
 
 import { DM } from '../../helpers/dm';
 import AppAccountsApi from '../../../src/plugins/twake/appAccountsApi';
 import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsistency';
-import OnChange from '../../../src/plugins/ldap/onChange';
 import { waitForEntry } from '../../helpers/waitFor';
 describe('App Accounts API Plugin', function () {
   const timestamp = Date.now();

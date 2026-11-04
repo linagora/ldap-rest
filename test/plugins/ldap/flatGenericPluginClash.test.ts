@@ -8,15 +8,15 @@
  * exists to prevent, between a schema and a plugin this time.
  */
 import { expect } from 'chai';
-
-import { DM } from '../../helpers/dm';
 import LdapFlatGeneric, {
   ldapPluginCollections,
-} from '../../../src/plugins/ldap/flatGeneric';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import LdapRaw from '../../../src/plugins/ldap/raw';
-import LdapBulkImport from '../../../src/plugins/ldap/bulkImport';
+} from '@ldap-rest/ldap-flatgeneric';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
+import LdapRaw from '@ldap-rest/ldap-raw';
+import LdapBulkImport from '@ldap-rest/ldap-bulkimport';
+
+import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 /**

@@ -7,9 +7,9 @@ import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import { isAuthzRefusal } from '@ldap-rest/core/lib/errors';
 import AuthzLinid1 from '@ldap-rest/authz-linid1';
 import AuthzScope from '@ldap-rest/authz-scope';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 
 /** Takes the caller from X-Test-User */

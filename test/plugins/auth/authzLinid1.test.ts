@@ -5,9 +5,9 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import { AmbiguousIdentityError } from '@ldap-rest/core/lib/errors';
 import AuthzLinid1 from '@ldap-rest/authz-linid1';
+import LdapOrganization from '@ldap-rest/ldap-organizations';
 
 import { DM } from '../../helpers/dm';
-import LdapOrganization from '../../../src/plugins/ldap/organizations';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 
 // Simple auth plugin for testing that sets user from X-Test-User header

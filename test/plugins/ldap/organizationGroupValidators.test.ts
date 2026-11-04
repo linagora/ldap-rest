@@ -7,10 +7,10 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
+import LdapGroups from '@ldap-rest/ldap-groups';
 
 import { DM } from '../../helpers/dm';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import LdapGroups from '../../../src/plugins/ldap/groups';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

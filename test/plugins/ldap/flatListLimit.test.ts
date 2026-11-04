@@ -19,9 +19,9 @@ import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
 import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 import type { Hooks } from '@ldap-rest/core/hooks';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import {
   hasExternalLdap,
   skipIfMissingEnvVars,

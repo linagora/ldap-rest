@@ -1,12 +1,12 @@
 import nock from 'nock';
 import request from 'supertest';
 import { expect } from 'chai';
+import OnLdapChange from '@ldap-rest/ldap-onchange';
+import LdapGroups from '@ldap-rest/ldap-groups';
 
 import { DM } from '../../helpers/dm';
 import James from '../../../src/plugins/twake/james';
-import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
-import LdapGroups from '../../../src/plugins/ldap/groups';
 import { waitFor } from '../../helpers/waitFor';
 describe('James Plugin', () => {
   let testDN: string;

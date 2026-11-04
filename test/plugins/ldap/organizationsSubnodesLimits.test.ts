@@ -18,9 +18,9 @@ import { expect } from 'chai';
 import type { Request } from 'express';
 import type { SearchResult } from 'ldapts';
 import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
 
 import { DM } from '../../helpers/dm';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

@@ -92,6 +92,72 @@
       "@ldap-rest/authz-scope/options": [
         "./packages/authz-scope/dist/authzScope.options.d.ts"
       ],
+      "@ldap-rest/ldap-accountlifecycle": [
+        "./packages/ldap-accountlifecycle/dist/accountLifecycle.d.ts"
+      ],
+      "@ldap-rest/ldap-accountlifecycle/options": [
+        "./packages/ldap-accountlifecycle/dist/accountLifecycle.options.d.ts"
+      ],
+      "@ldap-rest/ldap-bulkimport": [
+        "./packages/ldap-bulkimport/dist/bulkImport.d.ts"
+      ],
+      "@ldap-rest/ldap-bulkimport/options": [
+        "./packages/ldap-bulkimport/dist/bulkImport.options.d.ts"
+      ],
+      "@ldap-rest/ldap-organizations": [
+        "./packages/ldap-organizations/dist/organizations.d.ts"
+      ],
+      "@ldap-rest/ldap-organizations/options": [
+        "./packages/ldap-organizations/dist/organizations.options.d.ts"
+      ],
+      "@ldap-rest/ldap-departmentsync": [
+        "./packages/ldap-departmentsync/dist/departmentSync.d.ts"
+      ],
+      "@ldap-rest/ldap-departmentsync/options": [
+        "./packages/ldap-departmentsync/dist/departmentSync.options.d.ts"
+      ],
+      "@ldap-rest/ldap-groups": ["./packages/ldap-groups/dist/groups.d.ts"],
+      "@ldap-rest/ldap-groups/options": [
+        "./packages/ldap-groups/dist/groups.options.d.ts"
+      ],
+      "@ldap-rest/ldap-enterpriserules": [
+        "./packages/ldap-enterpriserules/dist/enterpriseRules.d.ts"
+      ],
+      "@ldap-rest/ldap-enterpriserules/options": [
+        "./packages/ldap-enterpriserules/dist/enterpriseRules.options.d.ts"
+      ],
+      "@ldap-rest/ldap-externalusers": [
+        "./packages/ldap-externalusers/dist/externalUsersInGroups.d.ts"
+      ],
+      "@ldap-rest/ldap-externalusers/options": [
+        "./packages/ldap-externalusers/dist/externalUsersInGroups.options.d.ts"
+      ],
+      "@ldap-rest/ldap-flatgeneric": [
+        "./packages/ldap-flatgeneric/dist/flatGeneric.d.ts"
+      ],
+      "@ldap-rest/ldap-flatgeneric/options": [
+        "./packages/ldap-flatgeneric/dist/flatGeneric.options.d.ts"
+      ],
+      "@ldap-rest/ldap-onchange": [
+        "./packages/ldap-onchange/dist/onChange.d.ts"
+      ],
+      "@ldap-rest/ldap-onchange/options": [
+        "./packages/ldap-onchange/dist/onChange.options.d.ts"
+      ],
+      "@ldap-rest/ldap-passwordpolicy": [
+        "./packages/ldap-passwordpolicy/dist/passwordPolicy.d.ts"
+      ],
+      "@ldap-rest/ldap-passwordpolicy/options": [
+        "./packages/ldap-passwordpolicy/dist/passwordPolicy.options.d.ts"
+      ],
+      "@ldap-rest/ldap-raw": ["./packages/ldap-raw/dist/raw.d.ts"],
+      "@ldap-rest/ldap-raw/options": [
+        "./packages/ldap-raw/dist/raw.options.d.ts"
+      ],
+      "@ldap-rest/ldap-trash": ["./packages/ldap-trash/dist/trash.d.ts"],
+      "@ldap-rest/ldap-trash/options": [
+        "./packages/ldap-trash/dist/trash.options.d.ts"
+      ],
       "@ldap-rest/storage": ["./packages/storage/dist/storage.d.ts"],
       "@ldap-rest/storage/options": [
         "./packages/storage/dist/storage.options.d.ts"

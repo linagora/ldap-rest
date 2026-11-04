@@ -5,9 +5,9 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import AuthzLinid1 from '@ldap-rest/authz-linid1';
+import PasswordPolicy from '@ldap-rest/ldap-passwordpolicy';
 
 import { DM } from '../../helpers/dm';
-import PasswordPolicy from '../../../src/plugins/ldap/passwordPolicy';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 
 /** Takes the caller from X-Test-User */

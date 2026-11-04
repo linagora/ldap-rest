@@ -4,12 +4,12 @@ import { fileURLToPath } from 'url';
 
 import { expect } from 'chai';
 import supertest from 'supertest';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import LdapOrganization from '@ldap-rest/ldap-organizations';
 
-import { DM } from '../helpers/dm';
 import ConfigApi, { configApiResponse } from '../../src/plugins/configApi';
-import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
-import LdapGroups from '../../src/plugins/ldap/groups';
-import LdapOrganization from '../../src/plugins/ldap/organizations';
+import { DM } from '../helpers/dm';
 import Static from '../../src/plugins/static';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 

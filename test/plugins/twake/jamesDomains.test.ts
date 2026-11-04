@@ -3,12 +3,12 @@ import nock from 'nock';
 import type { Schema } from '@ldap-rest/core/config/schema';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
 import { TrashService } from '@ldap-rest/core/lib/services/trash';
+import OnLdapChange from '@ldap-rest/ldap-onchange';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import TrashPlugin from '@ldap-rest/ldap-trash';
 
-import { DM } from '../../helpers/dm';
 import James from '../../../src/plugins/twake/james';
-import OnLdapChange from '../../../src/plugins/ldap/onChange';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import TrashPlugin from '../../../src/plugins/ldap/trash';
+import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 

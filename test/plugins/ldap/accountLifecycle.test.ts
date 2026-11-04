@@ -1,11 +1,11 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
-
-import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 import LdapAccountLifecycle, {
   generatePassword,
-} from '../../../src/plugins/ldap/accountLifecycle';
+} from '@ldap-rest/ldap-accountlifecycle';
+
+import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Account lifecycle', () => {

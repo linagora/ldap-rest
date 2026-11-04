@@ -6,10 +6,10 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapGroups from '@ldap-rest/ldap-groups';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapGroups from '../../../src/plugins/ldap/groups';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('A creation body naming the entry', function () {

@@ -14,9 +14,9 @@ import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import AuthzPerBranch from '@ldap-rest/authz-perbranch';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 
 class TestAuthPlugin extends AuthBase {

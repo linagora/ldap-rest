@@ -5,9 +5,9 @@ import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 import type { ModifyRequest } from '@ldap-rest/core/lib/ldapActions';
 import AuthzPerBranch from '@ldap-rest/authz-perbranch';
+import LdapOrganization from '@ldap-rest/ldap-organizations';
 
 import { DM } from '../../helpers/dm';
-import LdapOrganization from '../../../src/plugins/ldap/organizations';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

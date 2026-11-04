@@ -11,10 +11,10 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
+import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
 
 import { DM } from '../../helpers/dm';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

@@ -55,7 +55,7 @@ export const groupsOptions: {
     group_schema: StringOption;
 };
 
-// @public (undocumented)
+// @public
 export function groupsOptionsOf(config: Config): GroupsOptions;
 
 // @public (undocumented)
@@ -72,7 +72,7 @@ export const organizationOptions: {
     organization_schema: StringOption;
 };
 
-// @public (undocumented)
+// @public
 export function organizationOptionsOf(config: Config): OrganizationOptions;
 
 // @public (undocumented)
@@ -115,7 +115,7 @@ export const trashOptions: {
     trash_auto_create: StringOption;
 };
 
-// @public (undocumented)
+// @public
 export function trashOptionsOf(config: Config): TrashOptions;
 
 // (No @packageDocumentation comment for this package)

@@ -16,9 +16,9 @@
  */
 import { expect } from 'chai';
 import { rdnValue } from '@ldap-rest/core/lib/utils';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
 
 import { DM } from '../../helpers/dm';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

@@ -6,15 +6,15 @@ import { expect } from 'chai';
 import { Attribute, Change, Client } from 'ldapts';
 import supertest from 'supertest';
 import { BadRequestError } from '@ldap-rest/core/lib/errors';
-
-import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
 import LdapEnterpriseRules, {
   mailInDomains,
   parseByteSize,
-} from '../../../src/plugins/ldap/enterpriseRules';
+} from '@ldap-rest/ldap-enterpriserules';
+
+import { DM } from '../../helpers/dm';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,

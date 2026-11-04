@@ -3,8 +3,8 @@ import supertest from 'supertest';
 import type { Hooks } from '@ldap-rest/core/hooks';
 import AuthzDynamic from '@ldap-rest/authz-dynamic';
 import { ssha } from '@ldap-rest/authz-dynamic/hash';
+import LdapGroups from '@ldap-rest/ldap-groups';
 
-import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../helpers/dm';
 
 describe('authzDynamic (integration)', function () {

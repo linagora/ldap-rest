@@ -11,11 +11,11 @@ import { providedService } from '@ldap-rest/core/lib/services';
 import { TombstoneService } from '@ldap-rest/core/lib/services/tombstone';
 import { TrashService } from '@ldap-rest/core/lib/services/trash';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import OnLdapChange from '@ldap-rest/ldap-onchange';
+import TrashPlugin from '@ldap-rest/ldap-trash';
 
 import { DM } from '../../helpers/dm';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import OnLdapChange from '../../../src/plugins/ldap/onChange';
-import TrashPlugin from '../../../src/plugins/ldap/trash';
 import Scim from '../../../src/plugins/scim/scim';
 import TwakeLifecycleEvents from '../../../src/plugins/twake/lifecycleEvents';
 import TwakeInstances from '../../../src/plugins/twake/instances';

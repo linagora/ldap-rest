@@ -2,11 +2,11 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import { SearchResult } from 'ldapts';
 import { ConflictError } from '@ldap-rest/core/lib/errors';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import ExternalUsersInGroups from '@ldap-rest/ldap-externalusers';
 
 import ConfigApi from '../../../src/plugins/configApi';
-import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../helpers/dm';
-import ExternalUsersInGroups from '../../../src/plugins/ldap/externalUsersInGroups';
 import { waitFor } from '../../helpers/waitFor';
 
 const { DM_LDAP_GROUP_BASE } = process.env;

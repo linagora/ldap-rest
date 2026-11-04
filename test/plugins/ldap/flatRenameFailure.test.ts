@@ -29,9 +29,9 @@ import type {
   SearchResult,
 } from '@ldap-rest/core/lib/ldapActions';
 import { normalizeDn } from '@ldap-rest/core/lib/utils';
+import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 

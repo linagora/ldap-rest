@@ -1,0 +1,40 @@
+{
+  "name": "@ldap-rest/ldap-bulkimport",
+  "version": "3.0.0",
+  "description": "LDAP-Rest bulk import plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/ldap-bulkimport"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/bulkImport.ts",
+      "types": "./dist/bulkImport.d.ts",
+      "import": "./dist/bulkImport.js"
+    },
+    "./options": {
+      "development": "./src/bulkImport.options.ts",
+      "types": "./dist/bulkImport.options.d.ts",
+      "import": "./dist/bulkImport.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "csv-parse": "^7.0.2",
+    "multer": "^2.0.2"
+  }
+}

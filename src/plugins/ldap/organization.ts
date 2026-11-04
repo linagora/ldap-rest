@@ -4,7 +4,7 @@
  * the historical (singular) filename. It will be removed in a future major
  * release.
  */
-import LdapOrganizations from './organizations';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
 
 console.warn(
   '[ldap-rest] Plugin `core/ldap/organization` is deprecated; use `core/ldap/organizations` instead.'

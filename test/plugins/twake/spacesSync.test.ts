@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import { TrashService } from '@ldap-rest/core/lib/services/trash';
+import OnLdapChange from '@ldap-rest/ldap-onchange';
+import TrashPlugin from '@ldap-rest/ldap-trash';
 
 import { DM } from '../../helpers/dm';
-import OnLdapChange from '../../../src/plugins/ldap/onChange';
-import TrashPlugin from '../../../src/plugins/ldap/trash';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
 import { waitFor } from '../../helpers/waitFor';

@@ -13,15 +13,15 @@ import {
   type RegisteredRoute,
 } from '@ldap-rest/core/lib/route';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+import LdapAccountLifecycle from '@ldap-rest/ldap-accountlifecycle';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
+import OnLdapChange from '@ldap-rest/ldap-onchange';
+import LdapPasswordPolicy from '@ldap-rest/ldap-passwordpolicy';
+import LdapRaw from '@ldap-rest/ldap-raw';
 
 import { DM } from '../helpers/dm';
-import LdapAccountLifecycle from '../../src/plugins/ldap/accountLifecycle';
-import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
-import LdapGroups from '../../src/plugins/ldap/groups';
-import LdapOrganizations from '../../src/plugins/ldap/organizations';
-import OnLdapChange from '../../src/plugins/ldap/onChange';
-import LdapPasswordPolicy from '../../src/plugins/ldap/passwordPolicy';
-import LdapRaw from '../../src/plugins/ldap/raw';
 import AppAccountsConsistency from '../../src/plugins/twake/appAccountsConsistency';
 import AppAccountsApi from '../../src/plugins/twake/appAccountsApi';
 import TwakeInstances from '../../src/plugins/twake/instances';

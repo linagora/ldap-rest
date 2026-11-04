@@ -1,0 +1,40 @@
+{
+  "name": "@ldap-rest/ldap-groups",
+  "version": "3.0.0",
+  "description": "LDAP-Rest groups plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/ldap-groups"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/groups.ts",
+      "types": "./dist/groups.d.ts",
+      "import": "./dist/groups.js"
+    },
+    "./options": {
+      "development": "./src/groups.options.ts",
+      "types": "./dist/groups.options.d.ts",
+      "import": "./dist/groups.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@ldap-rest/ldap-organizations": "3.0.0",
+    "@sinclair/typebox": "^0.34.52"
+  }
+}

@@ -3,9 +3,9 @@ import supertest from 'supertest';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
 import type { Hooks } from '@ldap-rest/core/hooks';
 import { AuthzRefusedError, ForbiddenError } from '@ldap-rest/core/lib/errors';
+import OnLdapChange from '@ldap-rest/ldap-onchange';
 
 import { DM } from '../../helpers/dm';
-import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
 

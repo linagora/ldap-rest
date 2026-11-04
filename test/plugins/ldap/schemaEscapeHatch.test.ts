@@ -12,10 +12,10 @@ import path from 'path';
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
+import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
 
 import { DM } from '../../helpers/dm';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Schema copy without the generated markers', function () {

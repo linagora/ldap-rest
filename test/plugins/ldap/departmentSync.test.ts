@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import type { SearchResult } from 'ldapts';
+import LdapDepartmentSync from '@ldap-rest/ldap-departmentsync';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 
-import LdapDepartmentSync from '../../../src/plugins/ldap/departmentSync';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../helpers/dm';
 import {
   skipIfMissingEnvVars,

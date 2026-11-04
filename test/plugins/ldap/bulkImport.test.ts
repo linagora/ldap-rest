@@ -3,11 +3,11 @@ import path from 'path';
 
 import { expect } from 'chai';
 import supertest from 'supertest';
+import LdapBulkImport from '@ldap-rest/ldap-bulkimport';
+import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 
 import { DM } from '../../helpers/dm';
-import LdapBulkImport from '../../../src/plugins/ldap/bulkImport';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
