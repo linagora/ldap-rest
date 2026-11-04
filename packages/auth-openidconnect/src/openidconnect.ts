@@ -28,8 +28,36 @@ import { openidconnectOptions } from './openidconnect.options';
  * `core/auth/llng` is built the same way, for the same reason.
  */
 interface OidcLibrary {
-  auth(config: ConfigParams): RequestHandler;
+  auth(config: OidcConfig): RequestHandler;
   requiresAuth(): RequestHandler;
+}
+
+/**
+ * What `buildConfig()` hands the library, declared here for the same reason:
+ * the fields this plugin sets, and nothing of the package's own types.
+ * `buildConfig` still checks the object against `ConfigParams` before
+ * returning it, so the two cannot drift apart unnoticed.
+ */
+export interface OidcConfig {
+  authRequired: boolean;
+  issuerBaseURL: string;
+  clientID: string;
+  secret: string;
+  baseURL: string;
+  clientSecret: string;
+  authorizationParams: { response_type: string; scope: string };
+  idpLogout: boolean;
+  routes: { logout: boolean };
+  afterCallback: (
+    req: Request,
+    res: Response,
+    session: Record<string, unknown>
+  ) => Promise<Record<string, unknown>>;
+  backchannelLogout: {
+    onLogoutToken: (token: object) => Promise<void>;
+    onLogin: (req: DmRequest) => Promise<void>;
+    isLoggedOut: (req: DmRequest) => Promise<boolean>;
+  };
 }
 
 /**
@@ -136,7 +164,7 @@ export default class OpenIDConnect extends AuthBase {
    * store nothing configured here and threw on every callback — a 500 on
    * every login, with the session cookie already set.
    */
-  buildConfig(): ConfigParams {
+  buildConfig(): OidcConfig {
     const settings = this.options(openidconnectOptions);
     const config: ConfigParams = {
       // The router reads the session and stops there. Whether a request
@@ -253,7 +281,7 @@ export default class OpenIDConnect extends AuthBase {
         isLoggedOut: (req: DmRequest): Promise<boolean> => this.loggedOut(req),
       },
     };
-    return config;
+    return config as unknown as OidcConfig;
   }
 
   protected identitySource(): string {
@@ -355,7 +383,7 @@ export default class OpenIDConnect extends AuthBase {
   protected async loadLibrary(): Promise<OidcLibrary> {
     const loaded = await import('express-openid-connect');
     // A CommonJS package: what it exports lives on its default export
-    return (loaded.default ?? loaded) as OidcLibrary;
+    return (loaded.default ?? loaded) as unknown as OidcLibrary;
   }
 
   /**

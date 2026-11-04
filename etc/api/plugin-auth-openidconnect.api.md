@@ -4,7 +4,6 @@
 
 ```ts
 
-import type { ConfigParams } from 'express-openid-connect';
 import type { Entry } from 'ldapts';
 import express from 'express';
 import type { Express as Express_2 } from 'express';
@@ -18,9 +17,44 @@ import { Server } from 'http';
 import type winston from 'winston';
 
 // @public
+interface OidcConfig {
+    // (undocumented)
+    afterCallback: (req: Request, res: Response_2, session: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    // (undocumented)
+    authorizationParams: {
+        response_type: string;
+        scope: string;
+    };
+    // (undocumented)
+    authRequired: boolean;
+    // (undocumented)
+    backchannelLogout: {
+        onLogoutToken: (token: object) => Promise<void>;
+        onLogin: (req: DmRequest) => Promise<void>;
+        isLoggedOut: (req: DmRequest) => Promise<boolean>;
+    };
+    // (undocumented)
+    baseURL: string;
+    // (undocumented)
+    clientID: string;
+    // (undocumented)
+    clientSecret: string;
+    // (undocumented)
+    idpLogout: boolean;
+    // (undocumented)
+    issuerBaseURL: string;
+    // (undocumented)
+    routes: {
+        logout: boolean;
+    };
+    // (undocumented)
+    secret: string;
+}
+
+// @public
 interface OidcLibrary {
     // (undocumented)
-    auth(config: ConfigParams): RequestHandler;
+    auth(config: OidcConfig): RequestHandler;
     // (undocumented)
     requiresAuth(): RequestHandler;
 }
@@ -30,7 +64,7 @@ class OpenIDConnect extends AuthBase {
     constructor(server: DM);
     api(app: Express_2): Promise<void>;
     authMethod(req: DmRequest, res: Response_2, next: () => void): void;
-    buildConfig(): ConfigParams;
+    buildConfig(): OidcConfig;
     // (undocumented)
     configApiKey: string;
     getConfigApiData(): Record<string, unknown>;

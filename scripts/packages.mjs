@@ -170,14 +170,18 @@ function pluginModules() {
   for (const file of entriesUnder(pluginRoot)) {
     if (!file.endsWith('.ts')) continue;
     const text = readFileSync(file, 'utf8');
-    // A shim re-exports: it declares no class, no function and no constant
-    const pkg = /from '@ldap-rest\/([a-z0-9-]+)(?:'|\/)/.exec(text)?.[1];
-    if (!pkg || pkg === 'core' || !names.has(`@ldap-rest/${pkg}`)) continue;
-    if (
-      !/\bdefault\b/.test(text) ||
-      /\b(class|function|const|let)\b/.test(text)
-    )
-      continue;
+    // A shim re-exports one package's default export: either through
+    // `export { default } from '…'`, or — the deprecated alias — by importing
+    // it and exporting it as the default of this file.
+    const exported =
+      /export\s*\{[^}]*\bdefault\b[^}]*\}\s*from\s*'@ldap-rest\/([a-z0-9-]+)/.exec(
+        text
+      ) ??
+      /import\s+\w+\s+from\s*'@ldap-rest\/([a-z0-9-]+)'[\s\S]*\bexport\s+default\s+\w+/.exec(
+        text
+      );
+    const pkg = exported?.[1];
+    if (!pkg || !names.has(`@ldap-rest/${pkg}`)) continue;
     const name = path
       .relative(pluginRoot, file)
       .replace(/\.ts$/, '')
@@ -202,9 +206,9 @@ function importsOf(dir) {
   ]);
   const files = entriesUnder(path.join(root, dir, 'src'));
   const patterns = [
-    /^\s*(?:import|export)\b[^;]*?\bfrom\s*['"]([^'"]+)['"]/gm,
-    /^\s*import\s*\(\s*['"]([^'"]+)['"]/gm,
-    /^\s*import\s+['"]([^'"]+)['"]/gm,
+    /(?:^|\n)\s*(?:import|export)\b[^;]*?\bfrom\s*['"]([^'"]+)['"]/g,
+    /\bimport\s*\(\s*['"]([^'"]+)['"]/g,
+    /(?:^|\n)\s*import\s+['"]([^'"]+)['"]/g,
   ];
   const names = new Set();
   for (const file of files) {

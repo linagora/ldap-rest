@@ -221,8 +221,9 @@ describe('OpenID Connect, the Back-Channel Logout configuration', function () {
     expect(bcl.store, 'a store here would mean storing sessions').to.equal(
       undefined
     );
-    expect((config.session as Record<string, unknown>)?.store).to.equal(
-      undefined
-    );
+    expect(
+      (config as unknown as Record<string, unknown>).session,
+      'a store here would mean storing sessions'
+    ).to.equal(undefined);
   });
 });

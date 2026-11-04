@@ -461,6 +461,9 @@ export class DM {
       const logger = this.logger;
       const priorityPromise = (async (): Promise<void> => {
         for (const p of pluginPriority) {
+          // `canonicalModule` names a plugin the same way whichever of its
+          // two spellings an entry used; an entry written by path — an
+          // absolute one, or a test's — is compared on where it resolves.
           const target = this.canonicalModule(p);
           const place = this.resolveModule(DM.moduleOf(p));
           const matching = regularPlugins.filter(
