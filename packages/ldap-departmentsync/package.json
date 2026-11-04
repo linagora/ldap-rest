@@ -19,11 +19,6 @@
       "development": "./src/departmentSync.ts",
       "types": "./dist/departmentSync.d.ts",
       "import": "./dist/departmentSync.js"
-    },
-    "./options": {
-      "development": "./src/departmentSync.options.ts",
-      "types": "./dist/departmentSync.options.d.ts",
-      "import": "./dist/departmentSync.options.js"
     }
   },
   "files": [

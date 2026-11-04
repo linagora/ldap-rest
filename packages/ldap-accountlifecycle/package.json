@@ -19,11 +19,6 @@
       "development": "./src/accountLifecycle.ts",
       "types": "./dist/accountLifecycle.d.ts",
       "import": "./dist/accountLifecycle.js"
-    },
-    "./options": {
-      "development": "./src/accountLifecycle.options.ts",
-      "types": "./dist/accountLifecycle.options.d.ts",
-      "import": "./dist/accountLifecycle.options.js"
     }
   },
   "files": [

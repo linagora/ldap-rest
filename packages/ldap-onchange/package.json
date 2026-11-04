@@ -19,11 +19,6 @@
       "development": "./src/onChange.ts",
       "types": "./dist/onChange.d.ts",
       "import": "./dist/onChange.js"
-    },
-    "./options": {
-      "development": "./src/onChange.options.ts",
-      "types": "./dist/onChange.options.d.ts",
-      "import": "./dist/onChange.options.js"
     }
   },
   "files": [

@@ -88,9 +88,6 @@
       "@ldap-rest/ldap-accountlifecycle": [
         "./packages/ldap-accountlifecycle/src/accountLifecycle.ts"
       ],
-      "@ldap-rest/ldap-accountlifecycle/options": [
-        "./packages/ldap-accountlifecycle/src/accountLifecycle.options.ts"
-      ],
       "@ldap-rest/ldap-bulkimport": [
         "./packages/ldap-bulkimport/src/bulkImport.ts"
       ],
@@ -105,9 +102,6 @@
       ],
       "@ldap-rest/ldap-departmentsync": [
         "./packages/ldap-departmentsync/src/departmentSync.ts"
-      ],
-      "@ldap-rest/ldap-departmentsync/options": [
-        "./packages/ldap-departmentsync/src/departmentSync.options.ts"
       ],
       "@ldap-rest/ldap-groups": ["./packages/ldap-groups/src/groups.ts"],
       "@ldap-rest/ldap-groups/options": [
@@ -132,9 +126,6 @@
         "./packages/ldap-flatgeneric/src/flatGeneric.options.ts"
       ],
       "@ldap-rest/ldap-onchange": ["./packages/ldap-onchange/src/onChange.ts"],
-      "@ldap-rest/ldap-onchange/options": [
-        "./packages/ldap-onchange/src/onChange.options.ts"
-      ],
       "@ldap-rest/ldap-passwordpolicy": [
         "./packages/ldap-passwordpolicy/src/passwordPolicy.ts"
       ],
