@@ -96,6 +96,19 @@ describe('flatGeneric against the plugins serving their own collection', functio
     expect(errors.join('\n')).to.contain('already served by plugin ldapGroups');
   });
 
+  it('should read a plugin named by its package too', async () => {
+    const server = new DM();
+    await server.ready;
+    server.config.plugin = ['@ldap-rest/ldap-groups', 'core/ldap/flatGeneric'];
+    server.config.ldap_flat_schema = ['./static/schemas/twake/groups.json'];
+
+    const { flat, errors } = buildCollectingErrors(server);
+    expect(flat.instances.map(instance => instance.pluralName)).to.deep.equal(
+      []
+    );
+    expect(errors.join('\n')).to.contain('already served by plugin ldapGroups');
+  });
+
   it('should read a plugin named by its built module too', async () => {
     const server = new DM();
     await server.ready;

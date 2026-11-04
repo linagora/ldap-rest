@@ -156,12 +156,22 @@ export default class LdapFlatGeneric extends DmPlugin {
     // loaded in parallel and this constructor may well run first, so the
     // configuration is read too: it names what will be served whatever the
     // order.
-    const declared = (this.config.plugin || []).map(pluginModule);
+    // A plugin is named `core/ldap/groups`, `@ldap-rest/ldap-groups`, or by
+    // path from a build: `DM.canonicalModule` gives one name for the first
+    // two, and the last two path elements cover the third.
+    const declared = (this.config.plugin || []).flatMap(entry => [
+      pluginModule(entry),
+      this.server.canonicalModule(entry),
+    ]);
     const claimedByPlugins = new Map<string, string>();
     for (const { plugin, modules, collection } of ldapPluginCollections) {
+      const named = modules.flatMap(module => [
+        module,
+        this.server.canonicalModule(`core/${module}`),
+      ]);
       if (
         this.server.pluginInfo.has(plugin) ||
-        modules.some(module => declared.includes(module))
+        named.some(name => declared.includes(name))
       )
         claimedByPlugins.set(collection, `plugin ${plugin}`);
     }
