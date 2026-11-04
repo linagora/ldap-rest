@@ -18,8 +18,7 @@ import type winston from 'winston';
 
 // @public
 interface OidcConfig {
-    // (undocumented)
-    afterCallback: (req: Request, res: Response_2, session: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    afterCallback: (req: Request_2, res: Response_2, session: any) => Promise<any>;
     // (undocumented)
     authorizationParams: {
         response_type: string;

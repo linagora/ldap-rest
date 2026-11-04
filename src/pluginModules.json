@@ -13,9 +13,5 @@
   "core/auth/token": "@ldap-rest/auth-token",
   "core/auth/totp": "@ldap-rest/auth-totp",
   "core/auth/trustedProxy": "@ldap-rest/auth-trustedproxy",
-  "core/storage": "@ldap-rest/storage",
-  "core/storage/file": "@ldap-rest/storage",
-  "core/storage/ldap": "@ldap-rest/storage",
-  "core/storage/postgres": "@ldap-rest/storage",
-  "core/storage/valkey": "@ldap-rest/storage"
+  "core/storage": "@ldap-rest/storage"
 }

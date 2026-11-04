@@ -8,7 +8,7 @@ import {
   serverError,
   unauthorized,
 } from '@ldap-rest/core/lib/expressFormatedResponses';
-import type { Express, RequestHandler, Response } from 'express';
+import type { Express, Request, RequestHandler, Response } from 'express';
 import type { ConfigParams } from 'express-openid-connect';
 
 import { openidconnectOptions } from './openidconnect.options';
@@ -48,11 +48,12 @@ export interface OidcConfig {
   authorizationParams: { response_type: string; scope: string };
   idpLogout: boolean;
   routes: { logout: boolean };
-  afterCallback: (
-    req: Request,
-    res: Response,
-    session: Record<string, unknown>
-  ) => Promise<Record<string, unknown>>;
+  /**
+   * The session is the library's own type, which this declaration does not
+   * name; `buildConfig` checks the object it builds against `ConfigParams`.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  afterCallback: (req: Request, res: Response, session: any) => Promise<any>;
   backchannelLogout: {
     onLogoutToken: (token: object) => Promise<void>;
     onLogin: (req: DmRequest) => Promise<void>;
@@ -166,7 +167,7 @@ export default class OpenIDConnect extends AuthBase {
    */
   buildConfig(): OidcConfig {
     const settings = this.options(openidconnectOptions);
-    const config: ConfigParams = {
+    const config = {
       // The router reads the session and stops there. Whether a request
       // needs one is asked after it, by `requiresAuth()` in `authMethod`:
       // with `authRequired` here, a request reaching this plugin before the
@@ -280,8 +281,8 @@ export default class OpenIDConnect extends AuthBase {
 
         isLoggedOut: (req: DmRequest): Promise<boolean> => this.loggedOut(req),
       },
-    };
-    return config as unknown as OidcConfig;
+    } satisfies ConfigParams;
+    return config;
   }
 
   protected identitySource(): string {

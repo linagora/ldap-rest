@@ -172,23 +172,25 @@ function pluginModules() {
     const text = readFileSync(file, 'utf8');
     // A shim re-exports one package's default export: either through
     // `export { default } from '…'`, or — the deprecated alias — by importing
-    // it and exporting it as the default of this file.
+    // it and exporting it as the default of this file. The specifier has to be
+    // the package itself: a sub-path such as `@ldap-rest/storage/file` names a
+    // backend, not the plugin, and must keep its own name.
     const reexport =
-      /export\s*\{[^}]*\bdefault\b[^}]*\}\s*from\s*'@ldap-rest\/([a-z0-9-]+)/.exec(
+      /export\s*\{[^}]*\bdefault\b[^}]*\}\s*from\s*'(@ldap-rest\/[^']+)'/.exec(
         text
       );
     const alias =
-      /import\s+(\w+)\s+from\s*'@ldap-rest\/([a-z0-9-]+)'[\s\S]*\bexport\s+default\s+\1\s*;/.exec(
+      /import\s+(\w+)\s+from\s*'(@ldap-rest\/[^']+)'[\s\S]*\bexport\s+default\s+\1\s*;/.exec(
         text
       );
-    const pkg = reexport?.[1] ?? alias?.[2];
-    if (!pkg || !names.has(`@ldap-rest/${pkg}`)) continue;
+    const specifier = reexport?.[1] ?? alias?.[2];
+    if (!specifier || !names.has(specifier)) continue;
     const name = path
       .relative(pluginRoot, file)
       .replace(/\.ts$/, '')
       .split(path.sep)
       .join('/');
-    modules[`core/${name}`] = `@ldap-rest/${pkg}`;
+    modules[`core/${name}`] = specifier;
   }
   return Object.fromEntries(
     Object.entries(modules).sort(([a], [b]) => a.localeCompare(b))
