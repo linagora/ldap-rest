@@ -120,7 +120,9 @@ a link reaches and asks for no token, so without that check any page could end
 an administrator's session. A console served from another origin than
 `--base-url` names that origin in `--oidc-logout-origins`
 (`DM_OIDC_LOGOUT_ORIGINS`, comma-separated), and is then the only other origin
-a logout is accepted from.
+a logout is accepted from. A link from such a console is recognized by its
+`Referer`: a page setting `Referrer-Policy: no-referrer`, or a link marked
+`noreferrer`, sends neither `Referer` nor `Origin`, and its logout is refused.
 
 Ending the cookie alone would not log anyone out: every guarded path goes
 through the provider, which still holds its session and logs the caller back
