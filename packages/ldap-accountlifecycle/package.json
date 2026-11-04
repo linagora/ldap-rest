@@ -29,6 +29,7 @@
   },
   "peerDependencies": {
     "@ldap-rest/core": "3.0.0",
+    "@ldap-rest/ldap-flatgeneric": "3.0.0",
     "@sinclair/typebox": "^0.34.52"
   }
 }

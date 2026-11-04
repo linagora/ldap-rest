@@ -85,15 +85,6 @@
       "@ldap-rest/authz-scope/options": [
         "./packages/authz-scope/src/authzScope.options.ts"
       ],
-      "@ldap-rest/ldap-accountlifecycle": [
-        "./packages/ldap-accountlifecycle/src/accountLifecycle.ts"
-      ],
-      "@ldap-rest/ldap-bulkimport": [
-        "./packages/ldap-bulkimport/src/bulkImport.ts"
-      ],
-      "@ldap-rest/ldap-bulkimport/options": [
-        "./packages/ldap-bulkimport/src/bulkImport.options.ts"
-      ],
       "@ldap-rest/ldap-organizations": [
         "./packages/ldap-organizations/src/organizations.ts"
       ],
@@ -102,6 +93,21 @@
       ],
       "@ldap-rest/ldap-departmentsync": [
         "./packages/ldap-departmentsync/src/departmentSync.ts"
+      ],
+      "@ldap-rest/ldap-flatgeneric": [
+        "./packages/ldap-flatgeneric/src/flatGeneric.ts"
+      ],
+      "@ldap-rest/ldap-flatgeneric/options": [
+        "./packages/ldap-flatgeneric/src/flatGeneric.options.ts"
+      ],
+      "@ldap-rest/ldap-accountlifecycle": [
+        "./packages/ldap-accountlifecycle/src/accountLifecycle.ts"
+      ],
+      "@ldap-rest/ldap-bulkimport": [
+        "./packages/ldap-bulkimport/src/bulkImport.ts"
+      ],
+      "@ldap-rest/ldap-bulkimport/options": [
+        "./packages/ldap-bulkimport/src/bulkImport.options.ts"
       ],
       "@ldap-rest/ldap-groups": ["./packages/ldap-groups/src/groups.ts"],
       "@ldap-rest/ldap-groups/options": [
@@ -118,12 +124,6 @@
       ],
       "@ldap-rest/ldap-externalusers/options": [
         "./packages/ldap-externalusers/src/externalUsersInGroups.options.ts"
-      ],
-      "@ldap-rest/ldap-flatgeneric": [
-        "./packages/ldap-flatgeneric/src/flatGeneric.ts"
-      ],
-      "@ldap-rest/ldap-flatgeneric/options": [
-        "./packages/ldap-flatgeneric/src/flatGeneric.options.ts"
       ],
       "@ldap-rest/ldap-onchange": ["./packages/ldap-onchange/src/onChange.ts"],
       "@ldap-rest/ldap-passwordpolicy": [

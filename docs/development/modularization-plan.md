@@ -238,13 +238,17 @@ phase 1.
    generated exports?
 6. **Mandatory plugins** (**decided**): only `@ldap-rest/core`. Every plugin
    package is optional and installed by the deployment.
-7. **A plugin that reads another one's options** (**decided**): it depends on
-   that plugin's package, as a peer, exactly as its `optionDependencies` names
-   it — `@ldap-rest/ldap-groups` and `@ldap-rest/ldap-departmentsync` on
-   `ldap-organizations`, `ldap-externalusers` on `ldap-groups`,
-   `ldap-enterpriserules` on both. Configuration shared by two plugins is not
-   a service, so the attributes an entry uses to name its organization stay
-   declared once, in the plugin that owns them.
+7. **A plugin that names another one** (**decided**): it depends on that
+   plugin's package, as a peer, exactly as its `optionDependencies` or its
+   `dependencies` names it — `@ldap-rest/ldap-groups` and
+   `@ldap-rest/ldap-departmentsync` on `ldap-organizations`,
+   `ldap-externalusers` on `ldap-groups`, `ldap-enterpriserules` on both,
+   `ldap-flatgeneric` on `ldap-departmentsync`, `ldap-accountlifecycle` on
+   `ldap-flatgeneric`. Configuration shared by two plugins is not a service,
+   so the attributes an entry uses to name its organization stay declared
+   once, in the plugin that owns them; a plugin another one only needs
+   registered is a peer all the same, or a standalone install reports every
+   peer met and fails at startup on a module nobody installed.
 
 ## First actions
 
