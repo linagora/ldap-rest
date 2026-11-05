@@ -184,7 +184,8 @@ export default class TrustedProxy extends DmPlugin {
    * interface, not the address, and is dropped before the match.
    */
   private parseIP(ip: string): { ip: bigint; isIPv6: boolean } {
-    const address = ip.includes(':') ? ip.replace(/%.*$/, '') : ip;
+    const zone = ip.indexOf('%');
+    const address = ip.includes(':') && zone !== -1 ? ip.slice(0, zone) : ip;
     const family = isIP(address);
     if (family === 6) return { ip: this.parseIPv6(address), isIPv6: true };
     if (family === 4) return { ip: this.parseIPv4(address), isIPv6: false };
