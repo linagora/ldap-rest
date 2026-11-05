@@ -2,7 +2,7 @@
  * API Client for LDAP Unit operations
  */
 
-import type { Config, LdapUnit } from '../types';
+import type { Config, LdapUnit } from '../types.js';
 
 export class UnitApiClient {
   private baseUrl: string;

@@ -3,7 +3,7 @@
  * Modal dialog for selecting target organization when moving a unit
  */
 
-import type { UnitApiClient } from '../api/UnitApiClient';
+import type { UnitApiClient } from '../api/UnitApiClient.js';
 
 export class MoveUnitModal {
   private modal: HTMLElement | null = null;

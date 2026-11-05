@@ -3,11 +3,11 @@
  * @author Xavier Guimard
  */
 
-import type { EditorOptions, Config, LdapUser } from './types';
-import { UserApiClient } from './api/UserApiClient';
-import { UserTree } from './components/UserTree';
-import { UserEditor } from './components/UserEditor';
-import { UserList } from './components/UserList';
+import type { EditorOptions, Config, LdapUser } from './types.js';
+import { UserApiClient } from './api/UserApiClient.js';
+import { UserTree } from './components/UserTree.js';
+import { UserEditor } from './components/UserEditor.js';
+import { UserList } from './components/UserList.js';
 
 export class LdapUserEditor {
   private options: EditorOptions;

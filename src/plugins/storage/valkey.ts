@@ -17,9 +17,9 @@ import { AsyncResource } from 'node:async_hooks';
 
 import type winston from 'winston';
 
-import Store, { type StoredRecord } from '../../lib/storage/store';
-import type { HealthStatus } from '../../lib/health';
-import { outsideAnyRequest } from '../../lib/requestContext';
+import Store, { type StoredRecord } from '../../lib/storage/store.js';
+import type { HealthStatus } from '../../lib/health.js';
+import { outsideAnyRequest } from '../../lib/requestContext.js';
 
 type IoValkey = typeof import('iovalkey');
 type Client = InstanceType<IoValkey['Valkey']>;

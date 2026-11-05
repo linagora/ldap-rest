@@ -3,9 +3,9 @@
  * Shows only LDAP organization tree (filters out users/groups)
  */
 
-import type { LdapUser } from '../types';
-import { CacheManager } from '../cache/CacheManager';
-import { DisposableComponent } from '../../shared/components/DisposableComponent';
+import type { LdapUser } from '../types.js';
+import { CacheManager } from '../cache/CacheManager.js';
+import { DisposableComponent } from '../../shared/components/DisposableComponent.js';
 
 export class UserTree extends DisposableComponent {
   private container: HTMLElement;

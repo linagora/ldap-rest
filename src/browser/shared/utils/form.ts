@@ -3,9 +3,9 @@
  * @module browser/shared/utils/form
  */
 
-import { escapeHtml, toTitleCase } from './dom';
-import type { SchemaAttribute, PointerOption } from '../types';
-import { localizedText } from './schema';
+import { escapeHtml, toTitleCase } from './dom.js';
+import type { SchemaAttribute, PointerOption } from '../types/index.js';
+import { localizedText } from './schema.js';
 
 /**
  * Get user-friendly field label from field name

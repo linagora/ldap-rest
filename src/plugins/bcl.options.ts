@@ -1,11 +1,11 @@
 /** Back-Channel Logout plugin options. */
-import type { Config } from '../config/args';
+import type { Config } from '../config/args.js';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../config/options';
+} from '../config/options.js';
 
 export const bclOptions = defineOptions({
   bcl_retention: opt.number({

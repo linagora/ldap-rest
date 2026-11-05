@@ -12,19 +12,19 @@
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import TwakePlugin from '../../abstract/twakePlugin';
-import { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
-import type { HealthStatus } from '../../lib/health';
-import type { AttributesList } from '../../lib/ldapActions';
-import { wantJson } from '../../lib/expressFormatedResponses';
-import { isDnInBranch, normalizeDn } from '../../lib/utils';
+import TwakePlugin from '../../abstract/twakePlugin.js';
+import { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { Hooks } from '../../hooks.js';
+import type { HealthStatus } from '../../lib/health.js';
+import type { AttributesList } from '../../lib/ldapActions.js';
+import { wantJson } from '../../lib/expressFormatedResponses.js';
+import { isDnInBranch, normalizeDn } from '../../lib/utils.js';
 
 import {
   migrationProxyOptions,
   migrationProxyOptionsOf,
-} from './migrationProxy.options';
+} from './migrationProxy.options.js';
 
 /** What the proxy answers while its storage does not */
 const PROXY_UNAVAILABLE: readonly number[] = [500, 502, 503, 504];

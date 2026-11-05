@@ -2,10 +2,10 @@
  * TreeRoot component - renders the root container and tree
  */
 
-import type { TreeState } from '../types';
-import type { Store } from '../store/Store';
+import type { TreeState } from '../types.js';
+import type { Store } from '../store/Store.js';
 
-import { TreeNodeComponent } from './TreeNode';
+import { TreeNodeComponent } from './TreeNode.js';
 
 export class TreeRoot {
   constructor(

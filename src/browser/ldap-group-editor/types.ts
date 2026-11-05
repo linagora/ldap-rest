@@ -2,7 +2,7 @@
  * TypeScript types for LDAP Group Editor
  */
 
-import type { LocalizedText } from '../shared/types';
+import type { LocalizedText } from '../shared/types/index.js';
 
 export interface GroupEditorOptions {
   containerId: string;

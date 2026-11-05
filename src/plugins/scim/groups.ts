@@ -6,15 +6,15 @@
  */
 import type winston from 'winston';
 
-import type ldapActions from '../../lib/ldapActions';
+import type ldapActions from '../../lib/ldapActions.js';
 import type {
   AttributesList,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import type { Config } from '../../config/args';
-import type { DmRequest } from '../../lib/auth/base';
-import type HookBus from '../../lib/hookBus';
+} from '../../lib/ldapActions.js';
+import type { Config } from '../../config/args.js';
+import type { DmRequest } from '../../lib/auth/base.js';
+import type HookBus from '../../lib/hookBus.js';
 import {
   escapeDnValue,
   escapeLdapFilter,
@@ -23,9 +23,9 @@ import {
   parseDn,
   rdnValue,
   validateDnValue,
-} from '../../lib/utils';
+} from '../../lib/utils.js';
 
-import { BaseResolver } from './baseResolver';
+import { BaseResolver } from './baseResolver.js';
 import {
   type ResourceMapping,
   type ScimGroup,
@@ -33,7 +33,7 @@ import {
   type PatchRequest,
   type MultiValued,
   SCHEMA_LIST_RESPONSE,
-} from './types';
+} from './types.js';
 import {
   DEFAULT_GROUP_MAPPING,
   loadMappingFile,
@@ -43,10 +43,10 @@ import {
   scimGroupToLdap,
   requiredLdapAttributes,
   type MappingContext,
-} from './mapping';
-import { scimFilterToLdap } from './filter';
-import { pagedSearch } from './list';
-import { patchToModifyRequest, writePatch } from './patch';
+} from './mapping.js';
+import { scimFilterToLdap } from './filter.js';
+import { pagedSearch } from './list.js';
+import { patchToModifyRequest, writePatch } from './patch.js';
 import {
   extractLdapCode,
   kindOf,
@@ -54,9 +54,9 @@ import {
   scimInvalidValue,
   scimNotFound,
   scimUniqueness,
-} from './errors';
-import type { ScimUsers } from './users';
-import type { ScimOptions } from './scim.options';
+} from './errors.js';
+import type { ScimUsers } from './users.js';
+import type { ScimOptions } from './scim.options.js';
 
 export interface GroupListQuery {
   filter?: string;

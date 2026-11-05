@@ -3,8 +3,8 @@
  * @module browser/shared/components/Modal
  */
 
-import { escapeHtml, getElementByIdSafe } from '../utils/dom';
-import { DisposableComponent } from './DisposableComponent';
+import { escapeHtml, getElementByIdSafe } from '../utils/dom.js';
+import { DisposableComponent } from './DisposableComponent.js';
 
 export interface ModalOptions {
   id: string;

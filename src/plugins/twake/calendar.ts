@@ -1,11 +1,11 @@
-import TwakePlugin from '../../abstract/twakePlugin';
-import { type Role } from '../../abstract/plugin';
-import type { AttributesList, ModifyRequest } from '../../lib/ldapActions';
-import type { ChangesToNotify } from '../ldap/onChange';
-import { Hooks, MaybePromise } from '../../hooks';
-import { isDnInBranch, rdnValue } from '../../lib/utils';
+import TwakePlugin from '../../abstract/twakePlugin.js';
+import { type Role } from '../../abstract/plugin.js';
+import type { AttributesList, ModifyRequest } from '../../lib/ldapActions.js';
+import type { ChangesToNotify } from '../ldap/onChange.js';
+import { Hooks, MaybePromise } from '../../hooks.js';
+import { isDnInBranch, rdnValue } from '../../lib/utils.js';
 
-import { calendarOptions, calendarOptionsOf } from './calendar.options';
+import { calendarOptions, calendarOptionsOf } from './calendar.options.js';
 
 /** A Twake Calendar registered user, as the WebAdmin API returns it */
 interface RegisteredUser {
@@ -68,7 +68,7 @@ export default class Calendar extends TwakePlugin {
   private firstnameAttr: string;
   private lastnameAttr: string;
 
-  constructor(server: import('../../bin').DM) {
+  constructor(server: import('../../bin/index.js').DM) {
     const settings = calendarOptionsOf(server.config);
     super(server, {
       url: settings.calendar_webadmin_url,

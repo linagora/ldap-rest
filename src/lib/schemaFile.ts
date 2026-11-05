@@ -9,10 +9,10 @@ import fs from 'fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
-import type { Config } from '../bin';
-import configArgs from '../config/args';
+import type { Config } from '../bin/index.js';
+import configArgs from '../config/args.js';
 
-import { transformSchemas } from './utils';
+import { transformSchemas } from './utils.js';
 
 /** Directory of the schemas shipped with LDAP-Rest, whatever --schemas-path says */
 export const shippedSchemasPath = join(

@@ -16,13 +16,13 @@
  *
  * @group Plugins
  */
-import DmPlugin from '../abstract/plugin';
-import type { DM } from '../bin';
-import type { OidcLogoutToken, OidcSessionClaims } from '../hooks';
-import type Store from '../lib/storage/store';
+import DmPlugin from '../abstract/plugin.js';
+import type { DM } from '../bin/index.js';
+import type { OidcLogoutToken, OidcSessionClaims } from '../hooks.js';
+import type Store from '../lib/storage/store.js';
 
-import type Storage from './storage';
-import { bclOptions } from './bcl.options';
+import type Storage from './storage.js';
+import { bclOptions } from './bcl.options.js';
 
 /** One namespace, so nothing else in the store can answer for a logout. */
 const NAMESPACE = 'bcl';

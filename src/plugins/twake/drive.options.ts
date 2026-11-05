@@ -1,13 +1,13 @@
 /**
  * Twake Drive plugin options, see `docs/plugin-development/options.md`.
  */
-import type { Config } from '../../config/args';
+import type { Config } from '../../config/args.js';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../../config/options';
+} from '../../config/options.js';
 
 export const driveOptions = defineOptions({
   twake_drive_webadmin_url: opt.string({

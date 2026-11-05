@@ -26,18 +26,18 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 import type { Request } from 'express';
 
-import DmPlugin, { type Role, escapeDnValue } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import { Hooks } from '../../hooks';
-import { instanceSlug } from '../../lib/instanceProviders';
-import { isChildOf } from '../../lib/utils';
-import type RabbitMq from '../rabbitmq';
-import { BaseResolver } from '../scim/baseResolver';
-import { scimOptionsOf } from '../scim/scim.options';
-import type { ScimUser } from '../scim/types';
+import DmPlugin, { type Role, escapeDnValue } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import { Hooks } from '../../hooks.js';
+import { instanceSlug } from '../../lib/instanceProviders.js';
+import { isChildOf } from '../../lib/utils.js';
+import type RabbitMq from '../rabbitmq.js';
+import { BaseResolver } from '../scim/baseResolver.js';
+import { scimOptionsOf } from '../scim/scim.options.js';
+import type { ScimUser } from '../scim/types.js';
 
-import { clouderyOptions, clouderyOptionsOf } from './cloudery.options';
-import { cozyOptionsOf } from './cozy.options';
+import { clouderyOptions, clouderyOptionsOf } from './cloudery.options.js';
+import { cozyOptionsOf } from './cozy.options.js';
 
 type ReqWithUser = Request & { user?: string };
 

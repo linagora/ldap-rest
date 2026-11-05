@@ -14,17 +14,17 @@ import type { ConfigParams } from 'express-openid-connect';
 // is built the same way, for the same reason.
 const { auth, requiresAuth } = oidc;
 
-import AuthBase, { DmRequest } from '../../lib/auth/base';
-import { type Role } from '../../abstract/plugin';
+import AuthBase, { DmRequest } from '../../lib/auth/base.js';
+import { type Role } from '../../abstract/plugin.js';
 import {
   forbidden,
   serverError,
   unauthorized,
-} from '../../lib/expressFormatedResponses';
-import { DM } from '../../bin';
-import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
+} from '../../lib/expressFormatedResponses.js';
+import { DM } from '../../bin/index.js';
+import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks.js';
 
-import { openidconnectOptions } from './auth.options';
+import { openidconnectOptions } from './auth.options.js';
 
 /**
  * The routes this plugin answers itself: `/logout` in `authMethod`, the others

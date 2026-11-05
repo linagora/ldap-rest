@@ -809,6 +809,7 @@
     "check": "npm run check:ts && npm run lint && npm run format:check && npm run check:hooks && npm run check:comments && npm run check:no-client-values && npm run check:api && npm run check:openapi && npm run check:options",
     "check:api": "tsx scripts/api-snapshot.ts --check",
     "check:comments": "sh scripts/check-comments.sh",
+    "check:declarations": "tsx scripts/check-declarations.ts",
     "check:hooks": "tsx scripts/hooks-doc.ts",
     "check:no-client-values": "sh scripts/check-no-client-values.sh",
     "check:openapi": "tsx scripts/check-openapi.ts",

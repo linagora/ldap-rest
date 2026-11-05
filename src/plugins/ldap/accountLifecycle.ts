@@ -31,11 +31,11 @@ import { randomBytes } from 'crypto';
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { Schema } from '../../config/schema';
-import { roleAttribute } from '../../config/schema';
-import type { AttributesList, ModifyRequest } from '../../lib/ldapActions';
-import { BadRequestError, NotFoundError } from '../../lib/errors';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { Schema } from '../../config/schema.js';
+import { roleAttribute } from '../../config/schema.js';
+import type { AttributesList, ModifyRequest } from '../../lib/ldapActions.js';
+import { BadRequestError, NotFoundError } from '../../lib/errors.js';
 
 export const StatusBody = Type.Object({ state: Type.String() });
 

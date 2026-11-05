@@ -6,8 +6,8 @@
 import { Client } from 'ldapts';
 import type { ClientOptions } from 'ldapts';
 
-import { outsideAnyRequest } from '../requestContext';
-import { ldapPoolWait, secondsSince, timedLdap } from '../metrics';
+import { outsideAnyRequest } from '../requestContext.js';
+import { ldapPoolWait, secondsSince, timedLdap } from '../metrics.js';
 
 export interface PoolLogger {
   debug(message: string): void;

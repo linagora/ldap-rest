@@ -3,7 +3,7 @@
  * @author Xavier Guimard
  */
 
-export { ResourceApiClient } from './api/ResourceApiClient';
+export { ResourceApiClient } from './api/ResourceApiClient.js';
 export type {
   EditorOptions,
   LdapResource,
@@ -14,4 +14,4 @@ export type {
   ResourceType,
   NavigationType,
   ResourceTypeConfig,
-} from './types';
+} from './types.js';

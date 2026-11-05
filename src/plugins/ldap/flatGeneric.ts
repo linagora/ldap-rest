@@ -7,15 +7,15 @@
  */
 import type { Express } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import LdapFlat from '../../abstract/ldapFlat';
-import type { DM } from '../../bin';
-import { loadSchemaFile } from '../../lib/schemaFile';
-import { staticSchemaUrl } from '../../lib/staticFiles';
-import type { LocalizedText, Schema } from '../../config/schema';
-import type { AttributesList } from '../../lib/ldapActions';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
+import LdapFlat from '../../abstract/ldapFlat.js';
+import type { DM } from '../../bin/index.js';
+import { loadSchemaFile } from '../../lib/schemaFile.js';
+import { staticSchemaUrl } from '../../lib/staticFiles.js';
+import type { LocalizedText, Schema } from '../../config/schema.js';
+import type { AttributesList } from '../../lib/ldapActions.js';
 
-import { flatGenericOptions } from './ldap.options';
+import { flatGenericOptions } from './ldap.options.js';
 
 interface EnrichedSchema extends Schema {
   entity: {

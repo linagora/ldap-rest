@@ -25,22 +25,22 @@
  */
 import fs from 'fs';
 
-import type { Config } from '../../config/args';
-import { readOptions } from '../../config/options';
+import type { Config } from '../../config/args.js';
+import { readOptions } from '../../config/options.js';
 import {
   assertIdentityMode,
   identityFor,
   type DmRequest,
-} from '../../lib/auth/base';
+} from '../../lib/auth/base.js';
 import {
   escapeDnValue,
   fillPattern,
   isChildOf,
   isDnSyntax,
   normalizeDn,
-} from '../../lib/utils';
+} from '../../lib/utils.js';
 
-import { scimOptions, type ScimOptions } from './scim.options';
+import { scimOptions, type ScimOptions } from './scim.options.js';
 
 export interface BaseMapEntry {
   userBase?: string;

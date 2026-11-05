@@ -27,16 +27,16 @@
  *
  * @group Plugins
  */
-import DmPlugin from '../abstract/plugin';
-import type { DM } from '../bin';
-import type { HealthStatus } from '../lib/health';
-import type Store from '../lib/storage/store';
+import DmPlugin from '../abstract/plugin.js';
+import type { DM } from '../bin/index.js';
+import type { HealthStatus } from '../lib/health.js';
+import type Store from '../lib/storage/store.js';
 
-import FileStore from './storage/file';
-import LdapStore from './storage/ldap';
-import PostgresStore from './storage/postgres';
-import ValkeyStore from './storage/valkey';
-import { storageOptions } from './storage.options';
+import FileStore from './storage/file.js';
+import LdapStore from './storage/ldap.js';
+import PostgresStore from './storage/postgres.js';
+import ValkeyStore from './storage/valkey.js';
+import { storageOptions } from './storage.options.js';
 
 /**
  * The one instance, if there is one.

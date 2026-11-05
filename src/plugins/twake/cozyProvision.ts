@@ -19,13 +19,13 @@
  */
 import { Buffer } from 'buffer';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import { Hooks } from '../../hooks';
-import type RabbitMq from '../rabbitmq';
-import type { ScimUser } from '../scim/types';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import { Hooks } from '../../hooks.js';
+import type RabbitMq from '../rabbitmq.js';
+import type { ScimUser } from '../scim/types.js';
 
-import { cozyOptions, cozyOptionsOf } from './cozy.options';
+import { cozyOptions, cozyOptionsOf } from './cozy.options.js';
 
 export default class CozyProvision extends DmPlugin {
   static optionDefinitions = cozyOptions;

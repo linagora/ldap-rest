@@ -10,29 +10,29 @@
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { OptionSet } from '../../config/options';
-import type { Hooks } from '../../hooks';
-import type ldapActions from '../../lib/ldapActions';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { OptionSet } from '../../config/options.js';
+import type { Hooks } from '../../hooks.js';
+import type ldapActions from '../../lib/ldapActions.js';
 import type {
   AttributesList,
   AttributeValue,
   LdapList,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import { assertModifyRequest } from '../../lib/ldapActions';
+} from '../../lib/ldapActions.js';
+import { assertModifyRequest } from '../../lib/ldapActions.js';
 import {
   jsonBody,
   ok,
   tryMethod,
   wantJson,
   WriteResponse,
-} from '../../lib/expressFormatedResponses';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { loadSchemaFileAsync } from '../../lib/schemaFile';
-import { staticSchemaUrl } from '../../lib/staticFiles';
+} from '../../lib/expressFormatedResponses.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
+import { loadSchemaFileAsync } from '../../lib/schemaFile.js';
+import { staticSchemaUrl } from '../../lib/staticFiles.js';
 import {
   assertedRdnValue,
   escapeDnValue,
@@ -49,24 +49,24 @@ import {
   parseDn,
   substringSearchFilter,
   validateDnValue,
-} from '../../lib/utils';
+} from '../../lib/utils.js';
 import {
   BadRequestError,
   ConflictError,
   HttpError,
   isAuthzRefusal,
   NotFoundError,
-} from '../../lib/errors';
-import type { Schema } from '../../config/schema';
+} from '../../lib/errors.js';
+import type { Schema } from '../../config/schema.js';
 import {
   assertClientMaySet,
   modifiedAttributeNames,
   toDirectoryEntry,
-} from '../../config/schema';
+} from '../../config/schema.js';
 import {
   applyFixedDefaults,
   EntityValidator,
-} from '../../lib/entitySchema/validator';
+} from '../../lib/entitySchema/validator.js';
 
 export interface postAdd {
   cn?: string;
@@ -192,7 +192,7 @@ import {
   organizationOptionsOf,
   type GroupsOptions,
   type OrganizationOptions,
-} from './ldap.options';
+} from './ldap.options.js';
 
 export default class LdapGroups extends DmPlugin {
   static optionDefinitions: OptionSet = groupsOptions;

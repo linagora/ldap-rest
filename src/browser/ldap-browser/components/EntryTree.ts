@@ -3,10 +3,10 @@
  * @module browser/ldap-browser/components/EntryTree
  */
 
-import { DisposableComponent } from '../../shared/components/DisposableComponent';
-import { escapeHtml } from '../../shared/utils/dom';
-import type { RawApiClient } from '../api/RawApiClient';
-import type { RawChildren } from '../types';
+import { DisposableComponent } from '../../shared/components/DisposableComponent.js';
+import { escapeHtml } from '../../shared/utils/dom.js';
+import type { RawApiClient } from '../api/RawApiClient.js';
+import type { RawChildren } from '../types.js';
 
 /** Icon picked from the object classes of an entry */
 function iconFor(objectClass: string[]): string {

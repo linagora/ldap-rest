@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import type { SearchOptions, SearchResult } from 'ldapts';
 import { LRUCache } from 'lru-cache';
 
-import { normalizeDn } from '../utils';
+import { normalizeDn } from '../utils.js';
 
 export interface CacheLogger {
   info(message: string): void;

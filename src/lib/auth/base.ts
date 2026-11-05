@@ -1,8 +1,8 @@
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin from '../../abstract/plugin';
-import type { Config } from '../../config/args';
-import { serverError } from '../../lib/expressFormatedResponses';
+import DmPlugin from '../../abstract/plugin.js';
+import type { Config } from '../../config/args.js';
+import { serverError } from '../expressFormatedResponses.js';
 
 /**
  * A request as the authentication plugins leave it.

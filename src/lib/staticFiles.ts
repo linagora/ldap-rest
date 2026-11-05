@@ -3,7 +3,7 @@
  * announce it
  * @module lib/staticFiles
  */
-import type { DM } from '../bin';
+import type { DM } from '../bin/index.js';
 
 /** A static plugin, as another plugin asks it where it serves a file */
 export interface StaticFiles {

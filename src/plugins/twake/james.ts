@@ -1,37 +1,37 @@
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import TwakePlugin from '../../abstract/twakePlugin';
-import type { HealthStatus } from '../../lib/health';
-import { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
+import TwakePlugin from '../../abstract/twakePlugin.js';
+import type { HealthStatus } from '../../lib/health.js';
+import { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
 import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import { ConflictError } from '../../lib/errors';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { currentOperation } from '../../lib/operation';
-import { Hooks } from '../../hooks';
-import type { ChangesToNotify } from '../ldap/onChange';
-import { wantJson } from '../../lib/expressFormatedResponses';
-import { type Schema, roleAttribute } from '../../config/schema';
-import { domainBranches, mailDomains } from '../../lib/mailDomains';
+} from '../../lib/ldapActions.js';
+import { ConflictError } from '../../lib/errors.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
+import { currentOperation } from '../../lib/operation.js';
+import { Hooks } from '../../hooks.js';
+import type { ChangesToNotify } from '../ldap/onChange.js';
+import { wantJson } from '../../lib/expressFormatedResponses.js';
+import { type Schema, roleAttribute } from '../../config/schema.js';
+import { domainBranches, mailDomains } from '../../lib/mailDomains.js';
 import {
   escapeLdapFilter,
   isDnInBranch,
   isDummyMemberDn,
   normalizeDn,
   parseDn,
-} from '../../lib/utils';
+} from '../../lib/utils.js';
 
 import {
   jamesOptions,
   jamesOptionsOf,
   type JamesOptions,
-} from './james.options';
+} from './james.options.js';
 
 /**
  * What James WebAdmin answers about a user missing from its users
@@ -1444,7 +1444,7 @@ export default class James extends TwakePlugin {
    * Fallback logic: displayName → cn → givenName+sn → mail
    */
   private getDisplayNameFromAttributes(
-    attributes: import('../../lib/ldapActions').AttributesList
+    attributes: import('../../lib/ldapActions.js').AttributesList
   ): string | null {
     // 1. Try displayName first
     const displayName = this.attributeToString(

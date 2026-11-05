@@ -5,13 +5,13 @@
  * Creates on-the-fly missing group users into a branch
  * This permits to add external users into mailing lists
  */
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import { Hooks } from '../../hooks';
-import { HttpError } from '../../lib/errors';
-import ldapActions, { AttributesList } from '../../lib/ldapActions';
-import { declaredMailDomains } from '../../lib/mailDomains';
-import { normalizeDn, parseDn, unescapeDnValue } from '../../lib/utils';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import { Hooks } from '../../hooks.js';
+import { HttpError } from '../../lib/errors.js';
+import ldapActions, { AttributesList } from '../../lib/ldapActions.js';
+import { declaredMailDomains } from '../../lib/mailDomains.js';
+import { normalizeDn, parseDn, unescapeDnValue } from '../../lib/utils.js';
 
 /**
  * The domain of an address, as the managed domains are compared: after its
@@ -29,7 +29,7 @@ export const mailDomainOf = (mail: string): string => {
         .replace(/\.$/, '');
 };
 
-import { externalUsersOptions, groupsOptionsOf } from './ldap.options';
+import { externalUsersOptions, groupsOptionsOf } from './ldap.options.js';
 
 export default class ExternalUsersInGroups extends DmPlugin {
   static optionDefinitions = externalUsersOptions;

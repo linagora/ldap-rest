@@ -15,19 +15,23 @@
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { Hooks } from '../../hooks.js';
 import {
   BadRequestError,
   ConflictError,
   NotFoundError,
-} from '../../lib/errors';
-import { changeContext } from '../../lib/changeContext';
-import type { AttributesList, SearchResult } from '../../lib/ldapActions';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { escapeLdapFilter, isDnInBranch, normalizeDn } from '../../lib/utils';
-import { scimOptionsOf } from '../scim/scim.options';
+} from '../../lib/errors.js';
+import { changeContext } from '../../lib/changeContext.js';
+import type { AttributesList, SearchResult } from '../../lib/ldapActions.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
+import {
+  escapeLdapFilter,
+  isDnInBranch,
+  normalizeDn,
+} from '../../lib/utils.js';
+import { scimOptionsOf } from '../scim/scim.options.js';
 
 import {
   first,
@@ -37,11 +41,11 @@ import {
   parseDeletedAt,
   valueOf,
   type LifecycleAttributes,
-} from './lifecycleAttributes';
+} from './lifecycleAttributes.js';
 import {
   twakeTombstoneOptions,
   twakeTombstoneOptionsOf,
-} from './twakeTombstone.options';
+} from './twakeTombstone.options.js';
 
 const REASON = /^[A-Za-z0-9_.-]{1,64}$/;
 

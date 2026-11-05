@@ -8,23 +8,27 @@
  */
 import type { SearchOptions } from 'ldapts';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { BranchPermissions } from '../../config/args';
-import { roleAttribute, type Schema } from '../../config/schema';
-import type { Hooks } from '../../hooks';
-import { assertIdentityMode, identityFor, type DmRequest } from '../auth/base';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { BranchPermissions } from '../../config/args.js';
+import { roleAttribute, type Schema } from '../../config/schema.js';
+import type { Hooks } from '../../hooks.js';
+import {
+  assertIdentityMode,
+  identityFor,
+  type DmRequest,
+} from '../auth/base.js';
 import type {
   AttributesList,
   ModifyRequest,
   SearchResult,
-} from '../ldapActions';
+} from '../ldapActions.js';
 import {
   AmbiguousIdentityError,
   AuthzRefusedError,
   BadRequestError,
   ServiceUnavailableError,
-} from '../errors';
+} from '../errors.js';
 import {
   escapeLdapFilter,
   getParentDn,
@@ -33,9 +37,9 @@ import {
   normalizeDn,
   organizationLink,
   parseDn,
-} from '../utils';
+} from '../utils.js';
 
-import { authzFor, servesRequest } from './composition';
+import { authzFor, servesRequest } from './composition.js';
 
 /**
  * The rule of the most specific configured branch holding `target`.

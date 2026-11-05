@@ -8,29 +8,29 @@ import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 import type winston from 'winston';
 import pLimit from 'p-limit';
 
-import { type Config } from '../config/args';
-import { type DM } from '../bin';
-import type { Hooks } from '../hooks';
+import { type Config } from '../config/args.js';
+import { type DM } from '../bin/index.js';
+import type { Hooks } from '../hooks.js';
 
-import { escapeDnValue, getParentDn, hookOwner, rdnTypes } from './utils';
-import { changeContext, type ChangeContext } from './changeContext';
-import HookBus from './hookBus';
-import { outsideOperation, runOperation } from './operation';
-import { currentRequest, outsideRequest } from './requestContext';
+import { escapeDnValue, getParentDn, hookOwner, rdnTypes } from './utils.js';
+import { changeContext, type ChangeContext } from './changeContext.js';
+import HookBus from './hookBus.js';
+import { outsideOperation, runOperation } from './operation.js';
+import { currentRequest, outsideRequest } from './requestContext.js';
 import {
   ldapOperationDuration,
   ldapResult,
   ldapSearchCache,
   secondsSince,
   timedLdap,
-} from './metrics';
-import LdapPool from './ldap/pool';
-import SearchCache, { digestKey, membersNamed } from './ldap/searchCache';
-import DirectorySchema from './ldap/schema';
-import CallerView from './ldap/callerView';
-import { BadRequestError, ConflictError, NotFoundError } from './errors';
-import { extractLdapCode, isSchemaRefusal } from './ldapCodes';
-import type { SchemaIndex } from './ldapSchema';
+} from './metrics.js';
+import LdapPool from './ldap/pool.js';
+import SearchCache, { digestKey, membersNamed } from './ldap/searchCache.js';
+import DirectorySchema from './ldap/schema.js';
+import CallerView from './ldap/callerView.js';
+import { BadRequestError, ConflictError, NotFoundError } from './errors.js';
+import { extractLdapCode, isSchemaRefusal } from './ldapCodes.js';
+import type { SchemaIndex } from './ldapSchema.js';
 
 // Typescript interface
 

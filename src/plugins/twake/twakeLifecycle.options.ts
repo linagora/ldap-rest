@@ -2,13 +2,13 @@
  * Account lifecycle options, shared by the Twake lifecycle plugins. See
  * `docs/plugin-development/options.md`.
  */
-import type { Config } from '../../config/args';
+import type { Config } from '../../config/args.js';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../../config/options';
+} from '../../config/options.js';
 
 export const twakeLifecycleOptions = defineOptions({
   twake_lifecycle_role_attribute: opt.string({

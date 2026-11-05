@@ -2,10 +2,10 @@ import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
-} from '../ldapActions';
-import { BadRequestError } from '../errors';
-import { knownAttributeName } from '../utils';
-import type { Schema, SchemaAttribute } from '../../config/schema';
+} from '../ldapActions.js';
+import { BadRequestError } from '../errors.js';
+import { knownAttributeName } from '../utils.js';
+import type { Schema, SchemaAttribute } from '../../config/schema.js';
 import {
   checkDnValues,
   invalidValueMessage,
@@ -17,7 +17,7 @@ import {
   toDirectoryEntry,
   tooLongMessage,
   tooLongValue,
-} from '../../config/schema';
+} from '../../config/schema.js';
 
 export interface EntityValidatorDeps {
   /**

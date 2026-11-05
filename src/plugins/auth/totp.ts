@@ -9,11 +9,11 @@ import { createHmac } from 'crypto';
 
 import type { Response } from 'express';
 
-import { unauthorized } from '../../lib/expressFormatedResponses';
-import AuthBase, { type DmRequest } from '../../lib/auth/base';
-import type { Role } from '../../abstract/plugin';
+import { unauthorized } from '../../lib/expressFormatedResponses.js';
+import AuthBase, { type DmRequest } from '../../lib/auth/base.js';
+import type { Role } from '../../abstract/plugin.js';
 
-import { totpOptions } from './auth.options';
+import { totpOptions } from './auth.options.js';
 
 interface TotpUser {
   name: string;

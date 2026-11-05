@@ -13,23 +13,23 @@ import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
 
-import type { DM } from '../../bin';
-import type { Schema, SchemaAttribute } from '../../config/schema';
-import type { Hooks } from '../../hooks';
+import type { DM } from '../../bin/index.js';
+import type { Schema, SchemaAttribute } from '../../config/schema.js';
+import type { Hooks } from '../../hooks.js';
 import {
   AUTHZ_REFUSED,
   BadRequestError,
   HttpError,
   isAuthzRefusal,
-} from '../../lib/errors';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { defineRoute } from '../../lib/route';
+} from '../../lib/errors.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
+import { defineRoute } from '../../lib/route.js';
 import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
+} from '../../lib/ldapActions.js';
 import {
   escapeDnValue,
   escapeLdapFilter,
@@ -39,25 +39,25 @@ import {
   parseDn,
   rdnValue,
   unescapeDnValue,
-} from '../../lib/utils';
-import LdapGroups from '../ldap/groups';
-import { BaseResolver } from '../scim/baseResolver';
+} from '../../lib/utils.js';
+import LdapGroups from '../ldap/groups.js';
+import { BaseResolver } from '../scim/baseResolver.js';
 import {
   DEFAULT_GROUP_MAPPING,
   loadMappingFile,
   mergeMapping,
-} from '../scim/mapping';
-import { scimOptionsOf } from '../scim/scim.options';
-import type { ScimGroup } from '../scim/types';
-import { outsideRequest } from '../../lib/requestContext';
+} from '../scim/mapping.js';
+import { scimOptionsOf } from '../scim/scim.options.js';
+import type { ScimGroup } from '../scim/types.js';
+import { outsideRequest } from '../../lib/requestContext.js';
 
 import {
   first,
   lifecycleAttributes,
   valueOf,
   type LifecycleAttributes,
-} from './lifecycleAttributes';
-import { twakeGroupsOptions } from './twakeGroups.options';
+} from './lifecycleAttributes.js';
+import { twakeGroupsOptions } from './twakeGroups.options.js';
 
 /**
  * An attribute's first value, whatever case its name is configured in: the

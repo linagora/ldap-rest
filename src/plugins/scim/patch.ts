@@ -23,8 +23,8 @@ import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
-} from '../../lib/ldapActions';
-import { extractLdapCode } from '../../lib/ldapCodes';
+} from '../../lib/ldapActions.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
 
 import {
   ScimError,
@@ -32,12 +32,12 @@ import {
   scimInvalidPath,
   scimNoTarget,
   scimInvalidValue,
-} from './errors';
+} from './errors.js';
 import {
   type ResourceMapping,
   type PatchOperation,
   type PatchRequest,
-} from './types';
+} from './types.js';
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
@@ -46,7 +46,7 @@ import {
   isDnSubAttribute,
   readActive,
   scimPathToLdapAttribute,
-} from './mapping';
+} from './mapping.js';
 
 export interface PatchContext {
   mapping: ResourceMapping;

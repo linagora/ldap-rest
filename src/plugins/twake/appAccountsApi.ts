@@ -9,21 +9,25 @@ import { randomInt } from 'crypto';
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { SearchResult } from '../../lib/ldapActions';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { SearchResult } from '../../lib/ldapActions.js';
 import {
   AUTHZ_REFUSED,
   HttpError,
   errorBody,
   isAuthzRefusal,
-} from '../../lib/errors';
-import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+} from '../../lib/errors.js';
+import {
+  escapeDnValue,
+  escapeLdapFilter,
+  isDnInBranch,
+} from '../../lib/utils.js';
 
 import {
   appAccountsOptions,
   type AppAccountsOptions,
-} from './appAccounts.options';
+} from './appAccounts.options.js';
 
 export const AppAccountsParams = Type.Object({
   user: Type.String({ minLength: 1 }),

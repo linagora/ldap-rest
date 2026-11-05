@@ -2,7 +2,7 @@
  * LDAP Resource Editor - Generic Type Definitions
  */
 
-import type { LocalizedText } from '../shared/types';
+import type { LocalizedText } from '../shared/types/index.js';
 
 export type ResourceType = 'users' | 'groups' | 'organizations';
 export type NavigationType = 'flat' | 'tree';

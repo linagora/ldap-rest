@@ -9,10 +9,10 @@
 
 import type { SearchResult } from 'ldapts';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
-import { roleAttribute, type Schema } from '../../config/schema';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { Hooks } from '../../hooks.js';
+import { roleAttribute, type Schema } from '../../config/schema.js';
 import {
   getParentDn,
   escapeLdapFilter,
@@ -21,7 +21,7 @@ import {
   parseDn,
   rdnTypes,
   rdnValue,
-} from '../../lib/utils';
+} from '../../lib/utils.js';
 
 /** The attributes an entry uses to name its organization and copy its path */
 interface LinkedAttributes {
@@ -32,7 +32,7 @@ interface LinkedAttributes {
 import {
   organizationOptionsOf,
   type OrganizationOptions,
-} from './ldap.options';
+} from './ldap.options.js';
 
 /**
  * Whether a DN names an organization: its first RDN holds an `ou`, whatever

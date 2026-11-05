@@ -7,13 +7,13 @@
  * @module browser/ldap-browser/LdapBrowser
  */
 
-import { escapeHtml } from '../shared/utils/dom';
+import { escapeHtml } from '../shared/utils/dom.js';
 
-import { RawApiClient } from './api/RawApiClient';
-import { EntryTree } from './components/EntryTree';
-import { EntryView } from './components/EntryView';
-import { SchemaView } from './schema';
-import type { BrowserOptions, RawSearchResult } from './types';
+import { RawApiClient } from './api/RawApiClient.js';
+import { EntryTree } from './components/EntryTree.js';
+import { EntryView } from './components/EntryView.js';
+import { SchemaView } from './schema.js';
+import type { BrowserOptions, RawSearchResult } from './types.js';
 
 export class LdapBrowser {
   private options: BrowserOptions;

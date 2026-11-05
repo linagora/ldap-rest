@@ -20,9 +20,9 @@ import type {
   AttributesList,
   RequestBoundLdap,
   SearchResult,
-} from '../../lib/ldapActions';
+} from '../../lib/ldapActions.js';
 
-import { ScimError, scimTooMany, extractLdapCode } from './errors';
+import { ScimError, scimTooMany, extractLdapCode } from './errors.js';
 
 export interface PagedSearch {
   /** The directory bound to the request, so authorization always applies. */

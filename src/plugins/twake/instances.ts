@@ -11,10 +11,10 @@
 import { Type } from '@sinclair/typebox';
 import type { Express, Request } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
-import { BadRequestError, NotFoundError } from '../../lib/errors';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { Hooks } from '../../hooks.js';
+import { BadRequestError, NotFoundError } from '../../lib/errors.js';
 import {
   ClouderyProvider,
   CozyStackProvider,
@@ -22,9 +22,9 @@ import {
   instanceSlug,
   type InstanceRequest,
   matrixId,
-} from '../../lib/instanceProviders';
-import type { AttributesList, SearchResult } from '../../lib/ldapActions';
-import { extractLdapCode } from '../../lib/ldapCodes';
+} from '../../lib/instanceProviders.js';
+import type { AttributesList, SearchResult } from '../../lib/ldapActions.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
 import {
   canonicalDn,
   escapeLdapFilter,
@@ -34,18 +34,18 @@ import {
   rdnTypes,
   rdnValue,
   unescapeDnValue,
-} from '../../lib/utils';
-import type RabbitMq from '../rabbitmq';
+} from '../../lib/utils.js';
+import type RabbitMq from '../rabbitmq.js';
 
 import {
   isTombstone,
   lifecycleAttributes,
   type LifecycleAttributes,
-} from './lifecycleAttributes';
+} from './lifecycleAttributes.js';
 import {
   twakeInstancesOptions,
   type TwakeInstancesOptions,
-} from './twakeInstances.options';
+} from './twakeInstances.options.js';
 
 export interface WorkplaceCreated {
   twakeId?: string;

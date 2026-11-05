@@ -2,12 +2,12 @@
  * LDAP User Editor - User Editor Component
  */
 
-import type { LdapUser, Schema, SchemaAttribute } from '../types';
-import type { UserApiClient } from '../api/UserApiClient';
-import { PointerField } from './PointerField';
-import { MoveUserModal } from './MoveUserModal';
-import { hasRole, localizedText } from '../../shared/utils/schema';
-import { changedAttributes, listValues } from '../../shared/utils/form';
+import type { LdapUser, Schema, SchemaAttribute } from '../types.js';
+import type { UserApiClient } from '../api/UserApiClient.js';
+import { PointerField } from './PointerField.js';
+import { MoveUserModal } from './MoveUserModal.js';
+import { hasRole, localizedText } from '../../shared/utils/schema.js';
+import { changedAttributes, listValues } from '../../shared/utils/form.js';
 
 export class UserEditor {
   private container: HTMLElement;

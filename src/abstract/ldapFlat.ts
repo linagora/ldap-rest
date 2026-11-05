@@ -10,8 +10,8 @@
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import type { DM } from '../bin';
-import type ldapActions from '../lib/ldapActions';
+import type { DM } from '../bin/index.js';
+import type ldapActions from '../lib/ldapActions.js';
 import type {
   AttributesList,
   AttributeValue,
@@ -19,15 +19,15 @@ import type {
   ModifyRequest,
   SearchOptions,
   SearchResult,
-} from '../lib/ldapActions';
-import { assertModifyRequest } from '../lib/ldapActions';
+} from '../lib/ldapActions.js';
+import { assertModifyRequest } from '../lib/ldapActions.js';
 import {
   created,
   jsonBody,
   multiStatus,
   tryMethod,
   WriteResponse,
-} from '../lib/expressFormatedResponses';
+} from '../lib/expressFormatedResponses.js';
 import {
   assertRfc4514Escapes,
   escapeDnValue,
@@ -42,18 +42,18 @@ import {
   namesByDn,
   substringSearchFilter,
   validateDnValue,
-} from '../lib/utils';
-import type { Schema } from '../config/schema';
+} from '../lib/utils.js';
+import type { Schema } from '../config/schema.js';
 import {
   modifiedAttributeNames,
   toDirectoryEntry,
   neverReturnAttributes,
   assertClientMaySet,
-} from '../config/schema';
+} from '../config/schema.js';
 import {
   applyFixedDefaults,
   EntityValidator,
-} from '../lib/entitySchema/validator';
+} from '../lib/entitySchema/validator.js';
 import {
   BadRequestError,
   ConflictError,
@@ -61,12 +61,12 @@ import {
   isAuthzRefusal,
   NotFoundError,
   UnprocessableEntityError,
-} from '../lib/errors';
-import { extractLdapCode } from '../lib/ldapCodes';
-import type { FlatHookBus } from '../lib/hookBus';
-import { loadSchemaFile } from '../lib/schemaFile';
+} from '../lib/errors.js';
+import { extractLdapCode } from '../lib/ldapCodes.js';
+import type { FlatHookBus } from '../lib/hookBus.js';
+import { loadSchemaFile } from '../lib/schemaFile.js';
 
-import DmPlugin, { defineRoute } from './plugin';
+import DmPlugin, { defineRoute } from './plugin.js';
 
 /** RFC 4511 `maxInt`: the most a search request's size limit can say. */
 const LDAP_MAX_INT = 2147483647;

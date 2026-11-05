@@ -8,7 +8,7 @@ import type {
   RawChildren,
   RawEntry,
   RawSearchResult,
-} from '../types';
+} from '../types.js';
 
 export class RawApiClient {
   private baseUrl: string;

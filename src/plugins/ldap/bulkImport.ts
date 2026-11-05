@@ -9,19 +9,19 @@ import type { SearchResult } from 'ldapts';
 import multer from 'multer';
 import { parse as csvParse } from 'csv-parse/sync';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
-import { badRequest, serverError } from '../../lib/expressFormatedResponses';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { AttributesList, AttributeValue } from '../../lib/ldapActions.js';
+import { badRequest, serverError } from '../../lib/expressFormatedResponses.js';
 import {
   AUTHZ_REFUSED,
   HttpError,
   errorBody,
   isAuthzRefusal,
   type Refusal,
-} from '../../lib/errors';
-import { loadSchemaFile } from '../../lib/schemaFile';
-import { escapeDnValue, validateDnValue } from '../../lib/utils';
+} from '../../lib/errors.js';
+import { loadSchemaFile } from '../../lib/schemaFile.js';
+import { escapeDnValue, validateDnValue } from '../../lib/utils.js';
 
 interface BulkImportSchema {
   base?: string;
@@ -155,7 +155,7 @@ interface BulkImportResult {
  *           description: Total data rows attempted.
  *           example: 42
  */
-import { bulkImportOptions, type BulkImportOptions } from './ldap.options';
+import { bulkImportOptions, type BulkImportOptions } from './ldap.options.js';
 
 export default class LdapBulkImport extends DmPlugin {
   static optionDefinitions = bulkImportOptions;

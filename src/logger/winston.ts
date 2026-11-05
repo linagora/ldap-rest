@@ -2,8 +2,8 @@ import { inspect } from 'util';
 
 import winston from 'winston';
 
-import { Config } from '../bin';
-import { currentLogContext } from '../lib/requestContext';
+import { Config } from '../bin/index.js';
+import { currentLogContext } from '../lib/requestContext.js';
 
 // Define custom log levels with notice between info and warn (like syslog)
 const customLevels = {
