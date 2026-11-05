@@ -245,9 +245,9 @@ export default class AuthzDynamic extends AuthBase {
                 .filter(b => b && typeof b.dn === 'string' && b.dn.length > 0)
                 .map(b => ({
                   dn: b.dn,
-                  read: Boolean(b.read),
-                  write: Boolean(b.write),
-                  delete: Boolean(b.delete),
+                  read: this.aclFlag(b.read, 'read', b.dn, dn),
+                  write: this.aclFlag(b.write, 'write', b.dn, dn),
+                  delete: this.aclFlag(b.delete, 'delete', b.dn, dn),
                 }));
             }
           } catch (err) {
@@ -278,6 +278,34 @@ export default class AuthzDynamic extends AuthBase {
         `authzDynamic: failed to load tokens from ${this.base}: ${String(err)}`
       );
     }
+  }
+
+  /**
+   * Read one ACL flag of a token's JSON.
+   *
+   * Only the boolean `true` grants the permission: every string is truthy,
+   * `"false"`, `"no"` and `"0"` included.
+   *
+   * @param value flag as the token's JSON holds it
+   * @param flag flag name, for the warning
+   * @param branch branch the flag applies to
+   * @param tokenDn DN of the token entry
+   * @returns whether the permission is granted
+   */
+  private aclFlag(
+    value: unknown,
+    flag: string,
+    branch: string,
+    tokenDn: string
+  ): boolean {
+    if (typeof value === 'boolean') return value;
+    if (value !== undefined)
+      this.logger.warn(
+        `authzDynamic: ${flag} flag of ${branch} in ${tokenDn} is ${String(
+          JSON.stringify(value)
+        )}, not a boolean: permission refused`
+      );
+    return false;
   }
 
   /**

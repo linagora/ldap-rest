@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- An `authzDynamic` ACL flag grants a permission only when the token's JSON
+  holds the boolean `true`: any other value is refused, `"true"`, `"yes"` and
+  `1` included, and the refusal is logged
+  ([#657](https://github.com/linagora/ldap-rest/issues/657),
+  [upgrading](docs/usage/upgrading.md#an-authzdynamic-flag-must-be-a-json-boolean)).
+
 ## v2.0.3 (2026-11-04)
 
 ### Security
