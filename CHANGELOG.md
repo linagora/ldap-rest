@@ -43,6 +43,10 @@
   as text, with the renamed one (`x,ou=Sales`), and a link to a
   sub-organization written in another case is rewritten
   ([#658](https://github.com/linagora/ldap-rest/issues/658)).
+- A SCIM request header naming a base with a lone `#` in a value (`ou=#,…`)
+  is ignored, as the directory refuses that DN, instead of failing every
+  operation of the request
+  ([#662](https://github.com/linagora/ldap-rest/issues/662)).
 
 ## v2.0.3 (2026-11-04)
 

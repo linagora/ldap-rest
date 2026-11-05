@@ -432,7 +432,12 @@ export function isDnSyntax(dn: string): boolean {
       current += char;
     }
     parts.push(current);
-    return parts.every(part => type.test(part));
+    return parts.every(part => {
+      if (!type.test(part)) return false;
+      // A value starting with `#` is a BER hexstring; a literal `#` is `\#`
+      const value = trimUnescaped(part.slice(part.indexOf('=') + 1));
+      return !value.startsWith('#') || /^#(?:[0-9a-fA-F]{2})+$/.test(value);
+    });
   });
 }
 
