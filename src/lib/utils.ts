@@ -432,7 +432,13 @@ export function isDnSyntax(dn: string): boolean {
       current += char;
     }
     parts.push(current);
-    return parts.every(part => type.test(part));
+    return parts.every(part => {
+      if (!type.test(part)) return false;
+      // OpenLDAP refuses a value starting with `#`, the BER hexstring form
+      // included; a literal `#` is written `\#`
+      const value = trimUnescaped(part.slice(part.indexOf('=') + 1));
+      return !value.startsWith('#');
+    });
   });
 }
 

@@ -17,9 +17,11 @@
  *
  * A header-supplied base is only honored when `scim_base_header_root` is
  * explicitly configured AND the value sits at or under that root AND contains
- * no control characters, so a header cannot redirect operations to an arbitrary
- * DN or inject into the DN. An explicit per-user map entry still wins over the
- * header, so identity-based pinning is never silently overridden.
+ * no control characters AND is spelled as the directory reads a DN (a value
+ * starting with `#` is refused, a literal `#` is written `\#`), so a header
+ * cannot redirect operations to an arbitrary DN, inject into the DN, or name
+ * a DN the directory refuses. An explicit per-user map entry still wins over
+ * the header, so identity-based pinning is never silently overridden.
  */
 import fs from 'fs';
 
@@ -30,7 +32,13 @@ import {
   identityFor,
   type DmRequest,
 } from '../../lib/auth/base';
-import { escapeDnValue, fillPattern, isChildOf } from '../../lib/utils';
+import {
+  escapeDnValue,
+  fillPattern,
+  isChildOf,
+  isDnSyntax,
+  normalizeDn,
+} from '../../lib/utils';
 
 import { scimOptions, type ScimOptions } from './scim.options';
 
@@ -139,12 +147,15 @@ export class BaseResolver {
       const fromHeader = this.readHeader(req, headerName)?.trim();
       if (
         fromHeader &&
+        isDnSyntax(fromHeader) &&
         // eslint-disable-next-line no-control-regex
         !/[\u0000-\u001f\u007f]/.test(fromHeader) &&
         (fromHeader.toLowerCase() === this.headerRoot.toLowerCase() ||
           isChildOf(fromHeader, this.headerRoot))
       ) {
-        return fromHeader;
+        // The normalized form is what was checked: the directory reads the
+        // two as one DN
+        return normalizeDn(fromHeader);
       }
       // No root, outside the root, or unsafe value: ignore, fall through.
     }

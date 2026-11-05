@@ -153,6 +153,41 @@ describe('SCIM baseResolver', () => {
       expect(br.userBase(req)).to.equal('ou=users,dc=example,dc=com');
     });
 
+    it('ignores a header whose value starts with a `#`', () => {
+      const br = new BaseResolver(
+        cfg({
+          scim_user_base: 'ou=users,dc=example,dc=com',
+          scim_user_base_header: 'x-org-base',
+          scim_base_header_root: 'ou=tenants,dc=example,dc=com',
+        })
+      );
+      for (const value of [
+        'ou=#,ou=tenants,dc=example,dc=com',
+        'ou=#zz,ou=tenants,dc=example,dc=com',
+        'ou=#abc,ou=tenants,dc=example,dc=com',
+        'ou=#0c0b,ou=tenants,dc=example,dc=com',
+        'ou=#0c03616263,ou=tenants,dc=example,dc=com',
+      ])
+        expect(br.userBase(reqWithHeader('x-org-base', value))).to.equal(
+          'ou=users,dc=example,dc=com'
+        );
+    });
+
+    it('honors an escaped `#`', () => {
+      const br = new BaseResolver(
+        cfg({
+          scim_user_base: 'ou=users,dc=example,dc=com',
+          scim_user_base_header: 'x-org-base',
+          scim_base_header_root: 'ou=tenants,dc=example,dc=com',
+        })
+      );
+      expect(
+        br.userBase(
+          reqWithHeader('x-org-base', 'ou=\\#,ou=tenants,dc=example,dc=com')
+        )
+      ).to.equal('ou=\\#,ou=tenants,dc=example,dc=com');
+    });
+
     it('an explicit map entry wins over the header', () => {
       const mapFile = path.join(
         os.tmpdir(),
