@@ -60,6 +60,7 @@ export class EntityValidator {
       return candidate;
     }
     // Checked at the default, not at what was sent
+    this.refuseFixedOptions(candidate);
     applyFixedDefaults(this.schema, candidate);
 
     await this.checkValues(candidate);
@@ -197,6 +198,25 @@ export class EntityValidator {
     const named = schemaAttribute(this.schema, base)?.[0];
     if (named === undefined) return field;
     return option ? `${named};${option}` : named;
+  }
+
+  /**
+   * Refuse a fixed attribute a creation carries under an option. The schema
+   * forces its value under the attribute's own name, which leaves a subtype
+   * such as `l;lang-fr` as a second value of an attribute that cannot be
+   * changed. A change refuses a fixed attribute under any spelling already.
+   *
+   * @param values entry about to be created
+   * @throws BadRequestError for a fixed attribute under an option
+   */
+  private refuseFixedOptions(values: AttributesList): void {
+    for (const field of Object.keys(values)) {
+      const [, option] = split(field);
+      if (option && this.attribute(field)?.fixed)
+        throw new BadRequestError(
+          `Attribute "${field}" is fixed and cannot be modified`
+        );
+    }
   }
 
   /**

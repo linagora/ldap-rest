@@ -772,7 +772,10 @@ Attribute values must have the shape of their declared type, see
 
 ### Fixed Attributes
 
-Attributes with `"fixed": true` cannot be modified after creation.
+Attributes with `"fixed": true` cannot be modified after creation. A creation
+that sends one under an option (`l;lang-fr`) is refused with `400`, as a
+change is: the value the schema forces is written under the attribute's own
+name, and the option would add a second value beside it.
 
 ```json
 {

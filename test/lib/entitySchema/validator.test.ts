@@ -209,10 +209,25 @@ describe('EntityValidator', () => {
       expect(
         await refusal(
           v.validateNew(
-            entry({ BUSINESS_PLACE: 'd', Cn: 'Alice', 'l;binary': 'lyon' })
+            entry({
+              BUSINESS_PLACE: 'd',
+              Cn: 'Alice',
+              'businessCategory;binary': 'lyon',
+            })
           )
         )
       ).to.be.undefined;
+    });
+
+    describe('a fixed attribute under an option', () => {
+      for (const key of ['L;lang-fr', 'l;binary'])
+        it(`refuses ${key} next to the default`, async () => {
+          expect(
+            await refusal(validator().validateNew(entry({ [key]: 'lyon' })))
+          ).to.equal(
+            `Attribute "${key.toLowerCase()}" is fixed and cannot be modified`
+          );
+        });
     });
 
     it('writes a declared attribute under the schema spelling, keeping ;binary', async () => {
