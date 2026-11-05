@@ -173,4 +173,15 @@ describe('LdapDepartmentSync: DN matching after a rename', function () {
       `uid=u2,${base}`
     );
   });
+
+  it('ignores a rename whose ancestor RDN holds an ou', async () => {
+    const dn = `uid=bob,cn=g+ou=h,${top}`;
+    const entries: Record<string, Attrs> = {
+      [dn]: { twakeDepartmentPath: 'Sales' },
+    };
+
+    await rename(entries, dn, `uid=bob2,cn=g+ou=h,${top}`);
+
+    expect(entries[dn].twakeDepartmentPath).to.equal('Sales');
+  });
 });

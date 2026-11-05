@@ -19,6 +19,7 @@ import {
   isDnInBranch,
   normalizeDn,
   parseDn,
+  rdnTypes,
   rdnValue,
 } from '../../lib/utils';
 
@@ -40,7 +41,7 @@ import {
  */
 function isOrganizationDn(dn: string): boolean {
   try {
-    return /(?:^|\+)ou=/.test(normalizeDn(dn));
+    return rdnTypes(dn).includes('ou');
   } catch {
     return false;
   }
