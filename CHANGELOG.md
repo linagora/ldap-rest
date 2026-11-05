@@ -33,6 +33,16 @@
   `400` instead of storing a second value of the attribute the schema fixes
   ([#661](https://github.com/linagora/ldap-rest/issues/661),
   [details](docs/client-development/schemas/README.md#fixed-attributes)).
+- An organization renamed or moved through a DN written with another
+  spelling of the type (`OU=`, `2.5.4.11=`, `OID.2.5.4.11=`,
+  `organizationalUnitName=`) is synchronised: its path, the links and the
+  paths of the entries attached to it are updated
+  ([#659](https://github.com/linagora/ldap-rest/issues/659),
+  [details](docs/usage/plugins/ldap/organizations.md#move-organization)).
+- A rename no longer rewrites a link to another organization whose name ends,
+  as text, with the renamed one (`x,ou=Sales`), and a link to a
+  sub-organization written in another case is rewritten
+  ([#658](https://github.com/linagora/ldap-rest/issues/658)).
 
 ## v2.0.3 (2026-11-04)
 

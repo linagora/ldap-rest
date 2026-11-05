@@ -19,6 +19,7 @@ import {
   isDnInBranch,
   normalizeDn,
   parseDn,
+  rdnTypes,
   rdnValue,
 } from '../../lib/utils';
 
@@ -32,6 +33,19 @@ import {
   organizationOptionsOf,
   type OrganizationOptions,
 } from './ldap.options';
+
+/**
+ * Whether a DN names an organization: its first RDN holds an `ou`, whatever
+ * the spelling of the type (`OU`, `2.5.4.11`, `OID.2.5.4.11`,
+ * `organizationalUnitName`, spaces around the `=`).
+ */
+function isOrganizationDn(dn: string): boolean {
+  try {
+    return rdnTypes(dn).includes('ou');
+  } catch {
+    return false;
+  }
+}
 
 export default class LdapDepartmentSync extends DmPlugin {
   name = 'ldapDepartmentSync';
@@ -111,18 +125,17 @@ export default class LdapDepartmentSync extends DmPlugin {
      * via twakeDepartmentLink
      */
     ldaprenamedone: async (oldDn, newDn) => {
-      // Only process organization renames (ou=...)
-      if (!/^ou=/.test(oldDn)) return;
+      const top = this.settings.ldap_top_organization;
+      // Only process organization renames: a user or a group renamed under
+      // the tree is no organization
+      if (!top || !isDnInBranch(oldDn, top) || !isOrganizationDn(oldDn)) return;
 
       this.logger.info(
         `Organization renamed from ${oldDn} to ${newDn}, synchronizing linked resources...`
       );
 
       try {
-        const baseDn = this.settings.ldap_top_organization.replace(
-          /^ou=[^,]+,/,
-          ''
-        );
+        const baseDn = getParentDn(top);
 
         // The tree first: the linked entries copy their path from it
         await this.updateOrganizationPaths(newDn);
@@ -180,7 +193,7 @@ export default class LdapDepartmentSync extends DmPlugin {
     for await (const result of results as AsyncGenerator<SearchResult>) {
       for (const entry of result.searchEntries) {
         const dn = String(entry.dn);
-        if (!/^ou=/i.test(dn)) continue;
+        if (!isOrganizationDn(dn)) continue;
         const value = entry[pathAttr];
         organizations.push({
           dn,
@@ -353,17 +366,20 @@ export default class LdapDepartmentSync extends DmPlugin {
           : String(oldLink);
 
         // Skip if this is the direct link (already handled above)
-        if (oldLinkStr === oldParentDn) continue;
+        if (normalizeDn(oldLinkStr) === normalizeDn(oldParentDn)) continue;
 
-        // Only process if this link is a descendant of the renamed organization
-        if (!oldLinkStr.endsWith(`,${oldParentDn}`)) continue;
+        // Only process links to the renamed organization or below it, as
+        // the directory compares DNs
+        if (!isDnInBranch(oldLinkStr, oldParentDn)) continue;
 
         try {
-          // Replace the old parent DN with the new parent DN in the link
+          // Keep the descendant RDNs as written and place them under the
+          // new DN
           // Example: "ou=Dev,ou=IT,ou=Departments" -> "ou=Dev,ou=IT,ou=Tech"
-          const newLink = oldLinkStr.replace(
-            `,${oldParentDn}`,
-            () => `,${newParentDn}`
+          const newLink = this.replaceDnTail(
+            oldLinkStr,
+            oldParentDn,
+            newParentDn
           );
 
           // Get the new department path from the new organization
@@ -394,6 +410,22 @@ export default class LdapDepartmentSync extends DmPlugin {
     this.logger.info(
       `Updated ${updatedCount} resources linked to descendants of the renamed organization`
     );
+  }
+
+  /**
+   * Put the descendant RDNs of `dn` under `newDn`: the last RDNs of `dn`
+   * are those of `oldDn`. The RDNs kept are spelled as `dn` spells them, and
+   * compared as DNs, so an escaped comma in a value is never a separator.
+   *
+   * @param dn link naming `oldDn` or one of its descendants
+   * @param oldDn the organization's DN before the rename
+   * @param newDn the organization's DN after it
+   * @returns the link naming the same descendant under `newDn`
+   */
+  private replaceDnTail(dn: string, oldDn: string, newDn: string): string {
+    const parts = parseDn(dn);
+    const oldLength = parseDn(oldDn).length;
+    return [...parts.slice(0, parts.length - oldLength), newDn].join(',');
   }
 
   /**
