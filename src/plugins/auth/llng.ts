@@ -13,11 +13,19 @@ import type { Role } from '../../abstract/plugin.js';
 
 import { llngOptions } from './auth.options.js';
 
-// The ambient declaration for `lemonldap-ng-handler` lives in
-// src/types/lemonldap-ng-handler.d.ts. Written here, in a module, it would be
-// an augmentation of the package instead: conflicting with its types when it
-// is installed, rejected when it is absent.
-type LlngHandler = typeof import('lemonldap-ng-handler');
+/**
+ * The part of `lemonldap-ng-handler` this plugin uses. The ambient
+ * declaration in src/types/lemonldap-ng-handler.d.ts gives the module the
+ * same shape for the build; this interface is what the published declaration
+ * names, so a consumer without the package still sees it.
+ */
+interface LlngHandler {
+  init(args: {
+    configStorage?: { confFile?: string; [key: string]: unknown };
+    type?: string;
+  }): Promise<unknown>;
+  run(req: DmRequest, res: Response, next: () => void): void;
+}
 
 /**
  * `lemonldap-ng-handler` keeps its state at the module level — `init()`
