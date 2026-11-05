@@ -773,9 +773,11 @@ Attribute values must have the shape of their declared type, see
 ### Fixed Attributes
 
 Attributes with `"fixed": true` cannot be modified after creation. A creation
-that sends one under an option (`l;lang-fr`) is refused with `400`, as a
-change is: the value the schema forces is written under the attribute's own
-name, and the option would add a second value beside it.
+that sends one **with a default** under an option (`l;lang-fr`, or an alias
+such as `localityName;lang-fr`) is refused with `400`: the default is written
+under the attribute's own name, and the option would add a second value beside
+it. A fixed attribute without a default is set at creation and keeps its
+options.
 
 ```json
 {

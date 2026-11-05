@@ -220,14 +220,34 @@ describe('EntityValidator', () => {
     });
 
     describe('a fixed attribute under an option', () => {
-      for (const key of ['L;lang-fr', 'l;binary'])
+      for (const [key, written] of [
+        ['L;lang-fr', 'l;lang-fr'],
+        ['l;binary', 'l;binary'],
+        ['localityName;lang-fr', 'localityName;lang-fr'],
+        ['2.5.4.7;lang-fr', '2.5.4.7;lang-fr'],
+      ])
         it(`refuses ${key} next to the default`, async () => {
           expect(
             await refusal(validator().validateNew(entry({ [key]: 'lyon' })))
-          ).to.equal(
-            `Attribute "${key.toLowerCase()}" is fixed and cannot be modified`
-          );
+          ).to.equal(`Attribute "${written}" is fixed and cannot be modified`);
         });
+
+      it('keeps the option on a fixed attribute without a default', async () => {
+        const noDefault = {
+          attributes: {
+            ...schema.attributes,
+            l: { type: 'string', fixed: true },
+          },
+        } as unknown as Schema;
+        const v = new EntityValidator(noDefault, {
+          entryExists: async (dn): Promise<boolean> => dn === bob,
+          loadedPlugins: {},
+          singularName: 'person',
+        });
+        const written = await v.validateNew(entry({ 'l;binary': 'lyon' }));
+        expect(written['l;binary']).to.equal('lyon');
+        expect(written).to.not.have.property('l');
+      });
     });
 
     it('writes a declared attribute under the schema spelling, keeping ;binary', async () => {

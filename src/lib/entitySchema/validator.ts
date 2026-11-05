@@ -204,19 +204,37 @@ export class EntityValidator {
    * Refuse a fixed attribute a creation carries under an option. The schema
    * forces its value under the attribute's own name, which leaves a subtype
    * such as `l;lang-fr` as a second value of an attribute that cannot be
-   * changed. A change refuses a fixed attribute under any spelling already.
+   * changed. An alias or an OID (`localityName`, `2.5.4.7`) names the same
+   * attribute. A fixed attribute without a default is set at creation, so it
+   * keeps its options.
    *
    * @param values entry about to be created
-   * @throws BadRequestError for a fixed attribute under an option
+   * @throws BadRequestError for a fixed attribute with a default under an
+   *   option
    */
   private refuseFixedOptions(values: AttributesList): void {
     for (const field of Object.keys(values)) {
       const [, option] = split(field);
-      if (option && this.attribute(field)?.fixed)
+      const attr = option ? this.declaredAttribute(field) : undefined;
+      if (attr?.fixed && attr.default !== undefined)
         throw new BadRequestError(
           `Attribute "${field}" is fixed and cannot be modified`
         );
     }
+  }
+
+  /**
+   * The schema's definition of the attribute a name holds, through the
+   * schema's own key, an alias or an OID.
+   *
+   * @param field attribute name, option included
+   * @returns the definition, or undefined when the schema does not declare it
+   */
+  private declaredAttribute(field: string): SchemaAttribute | undefined {
+    const id = this.attributeIdentity(field);
+    for (const [name, attr] of Object.entries(this.schema?.attributes ?? {}))
+      if (name.toLowerCase() === id) return attr;
+    return undefined;
   }
 
   /**
