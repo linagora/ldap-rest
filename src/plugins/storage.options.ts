@@ -1,11 +1,11 @@
 /** Keyed storage plugin options. */
-import type { Config } from '../config/args';
+import type { Config } from '../config/args.js';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../config/options';
+} from '../config/options.js';
 
 export const storageOptions = defineOptions({
   storage_backend: opt.string({ env: 'DM_STORAGE_BACKEND', default: '' }),

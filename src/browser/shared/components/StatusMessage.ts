@@ -3,7 +3,7 @@
  * @module browser/shared/components/StatusMessage
  */
 
-import { escapeHtml, getElementByIdSafe } from '../utils/dom';
+import { escapeHtml, getElementByIdSafe } from '../utils/dom.js';
 
 export type StatusType = 'error' | 'success' | 'info' | 'warning';
 

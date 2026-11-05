@@ -24,8 +24,8 @@ import { join } from 'node:path';
 
 import type winston from 'winston';
 
-import Store, { type StoredRecord } from '../../lib/storage/store';
-import type { HealthStatus } from '../../lib/health';
+import Store, { type StoredRecord } from '../../lib/storage/store.js';
+import type { HealthStatus } from '../../lib/health.js';
 
 const errorText = (err: unknown): string =>
   err instanceof Error ? err.message : JSON.stringify(err);

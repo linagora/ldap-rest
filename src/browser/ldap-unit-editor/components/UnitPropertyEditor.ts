@@ -2,10 +2,10 @@
  * Unit Property Editor Component - Edits properties of a selected organizational unit
  */
 
-import type { UnitApiClient } from '../api/UnitApiClient';
-import type { LdapUnit, SchemaDefinition } from '../types';
-import { MoveUnitModal } from './MoveUnitModal';
-import { changedAttributes, listValues } from '../../shared/utils/form';
+import type { UnitApiClient } from '../api/UnitApiClient.js';
+import type { LdapUnit, SchemaDefinition } from '../types.js';
+import { MoveUnitModal } from './MoveUnitModal.js';
+import { changedAttributes, listValues } from '../../shared/utils/form.js';
 
 export class UnitPropertyEditor {
   private container: HTMLElement;

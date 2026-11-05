@@ -12,7 +12,7 @@ import type {
   AttributeTypeDefinition,
   LdapSchema,
   ObjectClassDefinition,
-} from './types';
+} from './types.js';
 
 /** Syntaxes whose values are octets rather than text */
 const BINARY_SYNTAXES = new Set([

@@ -1,9 +1,9 @@
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { type Role } from '../abstract/plugin';
-import { DmRequest } from '../lib/auth/base';
-import { requestId } from '../lib/changeContext';
-import { runWithLogContext } from '../lib/requestContext';
+import DmPlugin, { type Role } from '../abstract/plugin.js';
+import { DmRequest } from '../lib/auth/base.js';
+import { requestId } from '../lib/changeContext.js';
+import { runWithLogContext } from '../lib/requestContext.js';
 
 // Extend Express Request so any plugin can enrich the access log line.
 // A handler sets `req.logDetails = { … }` (usually the parameters it received)

@@ -25,21 +25,25 @@
  * new address anyway.
  */
 
-import DmPlugin from '../../abstract/plugin';
-import type { Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
+import DmPlugin from '../../abstract/plugin.js';
+import type { Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
 import type {
   AttributesList,
   AttributeValue,
   SearchResult,
-} from '../../lib/ldapActions';
-import { Hooks } from '../../hooks';
-import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+} from '../../lib/ldapActions.js';
+import { Hooks } from '../../hooks.js';
+import {
+  escapeDnValue,
+  escapeLdapFilter,
+  isDnInBranch,
+} from '../../lib/utils.js';
 
 import {
   appAccountsOptions,
   type AppAccountsOptions,
-} from './appAccounts.options';
+} from './appAccounts.options.js';
 
 /**
  * Whether an error is the directory saying "that entry is not there".

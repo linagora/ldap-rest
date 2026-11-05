@@ -1,13 +1,13 @@
 /**
  * Twake instances options, see `docs/plugin-development/options.md`.
  */
-import type { Config } from '../../config/args';
+import type { Config } from '../../config/args.js';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../../config/options';
+} from '../../config/options.js';
 
 export const twakeInstancesOptions = defineOptions({
   twake_instance_dn: opt.array({

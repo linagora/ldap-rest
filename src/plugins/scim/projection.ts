@@ -15,8 +15,8 @@
  * schema URN as a prefix, which is stripped; an extension URN is a key of the
  * resource in its own right and is matched as-is.
  */
-import { scimInvalidValue } from './errors';
-import { SCHEMA_USER, SCHEMA_GROUP } from './types';
+import { scimInvalidValue } from './errors.js';
+import { SCHEMA_USER, SCHEMA_GROUP } from './types.js';
 
 /** Attributes RFC 7643 §7 marks `returned: always`. */
 const ALWAYS_RETURNED = ['schemas', 'id'];

@@ -10,10 +10,10 @@ import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
-} from '../ldapActions';
-import { BadRequestError, NotFoundError } from '../errors';
-import { parseSchema, SchemaIndex } from '../ldapSchema';
-import { isDnInBranch, knownAttributeName, normalizeDn } from '../utils';
+} from '../ldapActions.js';
+import { BadRequestError, NotFoundError } from '../errors.js';
+import { parseSchema, SchemaIndex } from '../ldapSchema.js';
+import { isDnInBranch, knownAttributeName, normalizeDn } from '../utils.js';
 
 export interface SchemaLogger {
   info(message: string): void;

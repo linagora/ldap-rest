@@ -6,12 +6,12 @@
  * each naming its domain in an attribute.
  * @group Libraries
  */
-import type { DM } from '../bin';
-import { type Schema, roleAttribute } from '../config/schema';
+import type { DM } from '../bin/index.js';
+import { type Schema, roleAttribute } from '../config/schema.js';
 
-import { getLogger } from './expressFormatedResponses';
-import { extractLdapCode } from './ldapCodes';
-import type { SearchResult } from './ldapActions';
+import { getLogger } from './expressFormatedResponses.js';
+import { extractLdapCode } from './ldapCodes.js';
+import type { SearchResult } from './ldapActions.js';
 
 /** Where mail domain entries live, and the attribute naming their domain */
 export interface DomainBranch {

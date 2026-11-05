@@ -12,38 +12,38 @@ import { dirname, join } from 'path';
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, RequestHandler } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type ldapActions from '../../lib/ldapActions';
-import type { DmRequest } from '../../lib/auth/base';
-import { setChangeSource } from '../../lib/changeContext';
-import { jsonBodyParser } from '../../lib/rawBody';
-import { staticPlugins } from '../../lib/staticFiles';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type ldapActions from '../../lib/ldapActions.js';
+import type { DmRequest } from '../../lib/auth/base.js';
+import { setChangeSource } from '../../lib/changeContext.js';
+import { jsonBodyParser } from '../../lib/rawBody.js';
+import { staticPlugins } from '../../lib/staticFiles.js';
 
-import { scimOptions, type ScimOptions } from './scim.options';
-import { BaseResolver } from './baseResolver';
-import { ScimUsers } from './users';
-import { ScimGroups } from './groups';
-import { ScimBulk } from './bulk';
-import { ScimDiscovery } from './discovery';
+import { scimOptions, type ScimOptions } from './scim.options.js';
+import { BaseResolver } from './baseResolver.js';
+import { ScimUsers } from './users.js';
+import { ScimGroups } from './groups.js';
+import { ScimBulk } from './bulk.js';
+import { ScimDiscovery } from './discovery.js';
 import {
   scimAsyncHandler,
   writeScimError,
   writeScimErrorFromException,
   SCIM_CONTENT_TYPE,
-} from './errors';
+} from './errors.js';
 import {
   type BulkRequest,
   type PatchRequest,
   type ScimGroup,
   type ScimUser,
-} from './types';
+} from './types.js';
 import {
   type ProjectionQuery,
   assertProjection,
   projectList,
   projectResource,
-} from './projection';
+} from './projection.js';
 
 /**
  * Reusable SCIM 2.0 schemas surfaced by this plugin.

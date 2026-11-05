@@ -9,12 +9,12 @@
  *
  * @see docs/plugin-development/hooks.md
  */
-import type { Hooks } from '../hooks';
+import type { Hooks } from '../hooks.js';
 
-import { isAuthzRefusal, statusCodeOf } from './errors';
-import { getLogger } from './expressFormatedResponses';
-import { hookFailures } from './metrics';
-import { outsideRequest, runAsPlugin } from './requestContext';
+import { isAuthzRefusal, statusCodeOf } from './errors.js';
+import { getLogger } from './expressFormatedResponses.js';
+import { hookFailures } from './metrics.js';
+import { outsideRequest, runAsPlugin } from './requestContext.js';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 export type HookFn = Function;

@@ -11,30 +11,30 @@ import { randomUUID } from 'node:crypto';
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
-import type { ChangeContext } from '../../lib/changeContext';
-import { BadRequestError } from '../../lib/errors';
-import { extractLdapCode } from '../../lib/ldapCodes';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { Hooks } from '../../hooks.js';
+import type { ChangeContext } from '../../lib/changeContext.js';
+import { BadRequestError } from '../../lib/errors.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
 import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import { currentOperation } from '../../lib/operation';
+} from '../../lib/ldapActions.js';
+import { currentOperation } from '../../lib/operation.js';
 import {
   escapeDnValue,
   escapeLdapFilter,
   parseDn,
   rdnValue,
   unescapeDnValue,
-} from '../../lib/utils';
-import type RabbitMq from '../rabbitmq';
+} from '../../lib/utils.js';
+import type RabbitMq from '../rabbitmq.js';
 
-import type TwakeGroups from './groups';
-import type TwakeTombstone from './tombstone';
+import type TwakeGroups from './groups.js';
+import type TwakeTombstone from './tombstone.js';
 import {
   bodyOf,
   branchPattern,
@@ -51,22 +51,22 @@ import {
   RouteError,
   values,
   withOrg,
-} from './groups';
+} from './groups.js';
 import {
   isTombstone,
   lifecycleAttributes,
   type LifecycleAttributes,
   valueOf,
-} from './lifecycleAttributes';
+} from './lifecycleAttributes.js';
 import {
   twakeGroupsOptionsOf,
   type TwakeGroupsOptions,
-} from './twakeGroups.options';
+} from './twakeGroups.options.js';
 import {
   twakeInstancesOptionsOf,
   type TwakeInstancesOptions,
-} from './twakeInstances.options';
-import { twakeSpacesOptions } from './twakeSpaces.options';
+} from './twakeInstances.options.js';
+import { twakeSpacesOptions } from './twakeSpaces.options.js';
 
 /** From the weakest to the strongest. */
 export const SPACE_ROLES = ['viewer', 'editor', 'admin'] as const;

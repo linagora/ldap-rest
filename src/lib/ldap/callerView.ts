@@ -5,9 +5,9 @@
 import type { Request } from 'express';
 import type { SearchOptions, SearchResult } from 'ldapts';
 
-import { isAuthzRefusal } from '../errors';
-import { extractLdapCode } from '../ldapCodes';
-import { currentRequest } from '../requestContext';
+import { isAuthzRefusal } from '../errors.js';
+import { extractLdapCode } from '../ldapCodes.js';
+import { currentRequest } from '../requestContext.js';
 
 export interface CallerViewOptions {
   /** Run a search for the caller who asks. */

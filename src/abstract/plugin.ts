@@ -5,23 +5,27 @@
 import type { Express } from 'express';
 import type winston from 'winston';
 
-import type { Config, DM } from '../bin';
-import type { Hooks, MaybePromise } from '../hooks';
-import type HookBus from '../lib/hookBus';
-import type { HealthStatus } from '../lib/health';
+import type { Config, DM } from '../bin/index.js';
+import type { Hooks, MaybePromise } from '../hooks.js';
+import type HookBus from '../lib/hookBus.js';
+import type { HealthStatus } from '../lib/health.js';
 import {
   providedService,
   type ServiceProvider,
   type ServiceToken,
-} from '../lib/services';
-import { timedOutbound } from '../lib/metrics';
+} from '../lib/services/index.js';
+import { timedOutbound } from '../lib/metrics.js';
 import {
   neverReturnAttributes,
   withoutAttributes,
   type Schema,
-} from '../config/schema';
-import { readOptions, type OptionsOf, type OptionSet } from '../config/options';
-import configArgs from '../config/args';
+} from '../config/schema.js';
+import {
+  readOptions,
+  type OptionsOf,
+  type OptionSet,
+} from '../config/options.js';
+import configArgs from '../config/args.js';
 
 const parsedOptionKeys = new Set(
   configArgs.map(entry => entry[0].replace(/^--?/, '').replace(/-/g, '_'))
@@ -33,10 +37,10 @@ export {
   unescapeDnValue,
   escapeLdapFilter,
   validateDnValue,
-} from '../lib/utils';
-export { defineRoute, registeredRoutes } from '../lib/route';
-export { serviceToken } from '../lib/services';
-export type { ServiceProvider, ServiceToken } from '../lib/services';
+} from '../lib/utils.js';
+export { defineRoute, registeredRoutes } from '../lib/route.js';
+export { serviceToken } from '../lib/services/index.js';
+export type { ServiceProvider, ServiceToken } from '../lib/services/index.js';
 export {
   HttpError,
   BadRequestError,
@@ -49,7 +53,7 @@ export {
   BadGatewayError,
   ServiceUnavailableError,
   GatewayTimeoutError,
-} from '../lib/errors';
+} from '../lib/errors.js';
 
 export type { HealthStatus };
 

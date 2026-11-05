@@ -2,22 +2,22 @@ import type { SearchResult } from 'ldapts';
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import { DM } from '../../bin';
-import { Hooks } from '../../hooks';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import { DM } from '../../bin/index.js';
+import { Hooks } from '../../hooks.js';
 import {
   AttributesList,
   AttributeValue,
   assertModifyRequest,
   ModifyRequest,
-} from '../../lib/ldapActions';
+} from '../../lib/ldapActions.js';
 import {
   tryMethodData,
   tryMethod,
   jsonBody,
   wantJson,
   WriteResponse,
-} from '../../lib/expressFormatedResponses';
+} from '../../lib/expressFormatedResponses.js';
 import {
   assertRfc4514Escapes,
   escapeDnValue,
@@ -30,26 +30,26 @@ import {
   rdnValue,
   substringSearchFilter,
   validateDnValue,
-} from '../../lib/utils';
+} from '../../lib/utils.js';
 import {
   BadRequestError,
   NotFoundError,
   ConflictError,
   HttpError,
   isAuthzRefusal,
-} from '../../lib/errors';
-import { extractLdapCode } from '../../lib/ldapCodes';
-import { loadSchemaFileAsync } from '../../lib/schemaFile';
-import { staticSchemaUrl } from '../../lib/staticFiles';
-import type { Schema } from '../../config/schema';
+} from '../../lib/errors.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
+import { loadSchemaFileAsync } from '../../lib/schemaFile.js';
+import { staticSchemaUrl } from '../../lib/staticFiles.js';
+import type { Schema } from '../../config/schema.js';
 import {
   assertClientMaySet,
   modifiedAttributeNames,
-} from '../../config/schema';
+} from '../../config/schema.js';
 import {
   applyFixedDefaults,
   EntityValidator,
-} from '../../lib/entitySchema/validator';
+} from '../../lib/entitySchema/validator.js';
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by
@@ -149,7 +149,10 @@ export const OrganizationSearchQuery = Type.Object({
   q: Type.String({ minLength: 1 }),
 });
 
-import { organizationOptions, type OrganizationOptions } from './ldap.options';
+import {
+  organizationOptions,
+  type OrganizationOptions,
+} from './ldap.options.js';
 
 export default class LdapOrganizations extends DmPlugin {
   static optionDefinitions = organizationOptions;

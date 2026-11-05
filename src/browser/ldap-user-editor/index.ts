@@ -5,7 +5,7 @@
 
 import './styles.css';
 
-export { LdapUserEditor } from './LdapUserEditor';
+export { LdapUserEditor } from './LdapUserEditor.js';
 export type {
   EditorOptions,
   LdapUser,
@@ -13,4 +13,4 @@ export type {
   SchemaAttribute,
   PointerOption,
   Config,
-} from './types';
+} from './types.js';

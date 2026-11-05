@@ -14,13 +14,13 @@
 
 import type { Request } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { Hooks } from '../../hooks';
-import type { SearchResult } from '../../lib/ldapActions';
-import { BadRequestError } from '../../lib/errors';
-import { isDnInBranch, normalizeDn, parseDn } from '../../lib/utils';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
+import type { Hooks } from '../../hooks.js';
+import type { SearchResult } from '../../lib/ldapActions.js';
+import { BadRequestError } from '../../lib/errors.js';
+import { isDnInBranch, normalizeDn, parseDn } from '../../lib/utils.js';
 
-import { trashOptions } from './ldap.options';
+import { trashOptions } from './ldap.options.js';
 
 class TrashPlugin extends DmPlugin {
   static optionDefinitions = trashOptions;

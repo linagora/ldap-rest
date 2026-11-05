@@ -21,7 +21,7 @@
 declare module 'lemonldap-ng-handler' {
   import type { Response } from 'express';
 
-  import type { DmRequest } from '../lib/auth/base';
+  import type { DmRequest } from '../lib/auth/base.js';
 
   export function init(args: {
     configStorage?: { confFile?: string; [key: string]: unknown };

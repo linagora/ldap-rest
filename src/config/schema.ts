@@ -2,13 +2,13 @@ import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
-} from '../lib/ldapActions';
-import { BadRequestError } from '../lib/errors';
+} from '../lib/ldapActions.js';
+import { BadRequestError } from '../lib/errors.js';
 import {
   assertRfc4514Escapes,
   getCompiledRegex,
   isDnInBranch,
-} from '../lib/utils';
+} from '../lib/utils.js';
 
 /**
  * Scalar and container types an entity schema may declare.

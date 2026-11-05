@@ -8,10 +8,10 @@
  */
 import type { Express, Response } from 'express';
 
-import AuthBase, { DmRequest } from '../../lib/auth/base';
-import type { Role } from '../../abstract/plugin';
+import AuthBase, { DmRequest } from '../../lib/auth/base.js';
+import type { Role } from '../../abstract/plugin.js';
 
-import { llngOptions } from './auth.options';
+import { llngOptions } from './auth.options.js';
 
 // The ambient declaration for `lemonldap-ng-handler` lives in
 // src/types/lemonldap-ng-handler.d.ts. Written here, in a module, it would be

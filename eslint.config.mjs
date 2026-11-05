@@ -126,6 +126,19 @@ export default [
     },
   },
 
+  // See docs/development/contracts.md
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: { 'import-x': importX },
+    rules: {
+      'import-x/extensions': [
+        'error',
+        'ignorePackages',
+        { checkTypeImports: true },
+      ],
+    },
+  },
+
   // Reported as a warning: the rule treats assertions that other rules need
   // as unnecessary, so failing the build on it blocks correct changes.
   {

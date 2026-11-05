@@ -15,18 +15,18 @@
 import { Type } from '@sinclair/typebox';
 import type { Express, Response } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import { identityFor, type DmRequest } from '../../lib/auth/base';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import { identityFor, type DmRequest } from '../../lib/auth/base.js';
 import {
   authzFor,
   EVERYONE,
   overlap,
   servesRequest,
-} from '../../lib/authz/composition';
-import type { BranchPermissions } from '../../config/args';
-import type { AttributesList, SearchResult } from '../../lib/ldapActions';
-import { UnauthorizedError } from '../../lib/errors';
-import { roleAttribute, type Schema } from '../../config/schema';
+} from '../../lib/authz/composition.js';
+import type { BranchPermissions } from '../../config/args.js';
+import type { AttributesList, SearchResult } from '../../lib/ldapActions.js';
+import { UnauthorizedError } from '../../lib/errors.js';
+import { roleAttribute, type Schema } from '../../config/schema.js';
 
 /** The part of an authorization plugin this endpoint needs. */
 interface AuthzLike extends DmPlugin {

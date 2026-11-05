@@ -5,11 +5,11 @@
 
 import './styles.css';
 
-export { LdapTreeViewer } from './LdapTreeViewer';
+export { LdapTreeViewer } from './LdapTreeViewer.js';
 export type {
   ViewerOptions,
   TreeNode,
   TreeState,
   NodeType,
   FilterType,
-} from './types';
+} from './types.js';

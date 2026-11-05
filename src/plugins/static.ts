@@ -25,18 +25,18 @@ import { validateHeaderValue } from 'http';
 import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../abstract/plugin';
-import type { DM } from '../bin';
-import { STATIC_CSP, STATIC_FRAME_OPTIONS } from '../config/args';
-import { notFound, serverError } from '../lib/expressFormatedResponses';
+import DmPlugin, { defineRoute, type Role } from '../abstract/plugin.js';
+import type { DM } from '../bin/index.js';
+import { STATIC_CSP, STATIC_FRAME_OPTIONS } from '../config/args.js';
+import { notFound, serverError } from '../lib/expressFormatedResponses.js';
 import {
   configuredSchemaFiles,
   loadSchemaFileAsync,
   schemaUrl,
   staticName,
-} from '../lib/schemaFile';
+} from '../lib/schemaFile.js';
 
-import { staticOptions, type StaticOptions } from './static.options';
+import { staticOptions, type StaticOptions } from './static.options.js';
 
 /**
  * The path of a request as the configuration writes it: `schemaUrl` puts

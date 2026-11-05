@@ -9,17 +9,17 @@
  */
 import type { Express, Request, Response, NextFunction } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import { forbidden } from '../../lib/expressFormatedResponses';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
+import { forbidden } from '../../lib/expressFormatedResponses.js';
 import {
   assertIdentityMode,
   identityFor,
   warnUnmatchedRuleKeys,
   type DmRequest,
-} from '../../lib/auth/base';
-import { authzFor, servesRequest } from '../../lib/authz/composition';
+} from '../../lib/auth/base.js';
+import { authzFor, servesRequest } from '../../lib/authz/composition.js';
 
-import { perRouteOptions } from './auth.options';
+import { perRouteOptions } from './auth.options.js';
 
 // Whitelist of characters permitted in a glob pattern.
 // Covers all characters needed for typical REST paths: alphanumerics, slash,

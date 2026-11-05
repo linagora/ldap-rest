@@ -15,9 +15,9 @@
  */
 import type { Express, Request, Response, NextFunction } from 'express';
 
-import DmPlugin, { Role } from '../../abstract/plugin';
+import DmPlugin, { Role } from '../../abstract/plugin.js';
 
-import { crowdsecOptions } from './auth.options';
+import { crowdsecOptions } from './auth.options.js';
 
 interface CrowdSecDecision {
   duration: string;

@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 
 import type { Request } from 'express';
 
-import type { DmRequest } from './auth/base';
+import type { DmRequest } from './auth/base.js';
 
 export interface ChangeContext {
   /** The caller, under the name a person would use when there is one */

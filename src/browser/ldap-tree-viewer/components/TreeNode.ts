@@ -2,8 +2,8 @@
  * TreeNode component - renders individual tree nodes
  */
 
-import type { TreeNode as TreeNodeData, TreeState } from '../types';
-import type { Store } from '../store/Store';
+import type { TreeNode as TreeNodeData, TreeState } from '../types.js';
+import type { Store } from '../store/Store.js';
 
 export class TreeNodeComponent {
   constructor(

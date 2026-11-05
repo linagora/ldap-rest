@@ -21,17 +21,17 @@ import DmPlugin, {
   BadRequestError,
   ConflictError,
   NotFoundError,
-} from '../../abstract/plugin';
-import type { ModifyRequest, SearchResult } from '../../lib/ldapActions';
+} from '../../abstract/plugin.js';
+import type { ModifyRequest, SearchResult } from '../../lib/ldapActions.js';
 import {
   escapeDnValue,
   escapeLdapFilter,
   normalizeDn,
   parseDirectoryDate,
   validateDnValue,
-} from '../../lib/utils';
-import { jsonBody } from '../../lib/expressFormatedResponses';
-import { extractLdapCode } from '../../lib/ldapCodes';
+} from '../../lib/utils.js';
+import { jsonBody } from '../../lib/expressFormatedResponses.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
 
 // ppolicy operational attributes to read
 const PPOLICY_ATTRS = [
@@ -504,7 +504,7 @@ export const ValidatePasswordBody = Type.Object({
 import {
   passwordPolicyOptions,
   type PasswordPolicyOptions,
-} from './ldap.options';
+} from './ldap.options.js';
 
 export default class PasswordPolicy extends DmPlugin {
   static optionDefinitions = passwordPolicyOptions;

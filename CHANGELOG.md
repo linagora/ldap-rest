@@ -17,6 +17,11 @@
 
 ### Fixed
 
+- The declarations published with each sub-path resolve for a plugin compiled
+  with `moduleResolution: nodenext`: relative specifiers carry the `.js`
+  extension Node resolves, so a plugin keeps the types of `DmPlugin`, the
+  error classes and the exported helpers instead of reading them as `any`
+  ([#638](https://github.com/linagora/ldap-rest/issues/638)).
 - An IPv6 network written with a dotted IPv4 tail (`64:ff9b::10.0.0.0/120`,
   `::ffff:10.0.0.0/104`) is read as written instead of as another network
   ([#660](https://github.com/linagora/ldap-rest/issues/660),

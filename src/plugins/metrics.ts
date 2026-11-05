@@ -12,11 +12,11 @@ import {
 import type { Express } from 'express';
 import { Gauge, Registry, collectDefaultMetrics } from 'prom-client';
 
-import DmPlugin from '../abstract/plugin';
-import type { DM } from '../bin';
-import { registry } from '../lib/metrics';
+import DmPlugin from '../abstract/plugin.js';
+import type { DM } from '../bin/index.js';
+import { registry } from '../lib/metrics.js';
 
-import { metricsOptions } from './metrics.options';
+import { metricsOptions } from './metrics.options.js';
 
 export default class Metrics extends DmPlugin {
   static optionDefinitions = metricsOptions;

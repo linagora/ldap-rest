@@ -3,7 +3,11 @@
  * @module browser/shared/utils/schema
  */
 
-import type { LocalizedText, PointerOption, SchemaAttribute } from '../types';
+import type {
+  LocalizedText,
+  PointerOption,
+  SchemaAttribute,
+} from '../types/index.js';
 
 /**
  * Cache for pointer options to avoid repeated API calls

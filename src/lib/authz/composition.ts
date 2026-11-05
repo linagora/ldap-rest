@@ -16,10 +16,10 @@
  * the same ones without `--authz-combine`.
  * @group Libraries
  */
-import type DmPlugin from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Config } from '../../config/args';
-import type { DmRequest } from '../auth/base';
+import type DmPlugin from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { Config } from '../../config/args.js';
+import type { DmRequest } from '../auth/base.js';
 
 /**
  * The hooks an LDAP operation is judged in: refused from, or — for

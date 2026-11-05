@@ -3,9 +3,9 @@
  * Shows users in a selected organization
  */
 
-import type { LdapUser, Schema, Config } from '../types';
-import type { UserApiClient } from '../api/UserApiClient';
-import { hasRole } from '../../shared/utils/schema';
+import type { LdapUser, Schema, Config } from '../types.js';
+import type { UserApiClient } from '../api/UserApiClient.js';
+import { hasRole } from '../../shared/utils/schema.js';
 
 export class UserList {
   private container: HTMLElement;

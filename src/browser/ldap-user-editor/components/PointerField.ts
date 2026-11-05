@@ -2,8 +2,8 @@
  * LDAP User Editor - Pointer Field Component
  */
 
-import type { PointerOption, SchemaAttribute } from '../types';
-import type { UserApiClient } from '../api/UserApiClient';
+import type { PointerOption, SchemaAttribute } from '../types.js';
+import type { UserApiClient } from '../api/UserApiClient.js';
 
 export class PointerField {
   private api: UserApiClient;

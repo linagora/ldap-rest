@@ -3,11 +3,11 @@
  * @author Xavier Guimard
  */
 
-import type { GroupEditorOptions, Config } from './types';
-import { GroupApiClient } from './api/GroupApiClient';
-import { GroupTree } from './components/GroupTree';
-import { GroupPropertyEditor } from './components/GroupPropertyEditor';
-import { CreateGroupModal } from './components/CreateGroupModal';
+import type { GroupEditorOptions, Config } from './types.js';
+import { GroupApiClient } from './api/GroupApiClient.js';
+import { GroupTree } from './components/GroupTree.js';
+import { GroupPropertyEditor } from './components/GroupPropertyEditor.js';
+import { CreateGroupModal } from './components/CreateGroupModal.js';
 
 export class LdapGroupEditor {
   private options: GroupEditorOptions;

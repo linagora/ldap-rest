@@ -13,24 +13,24 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
-import type { ChangeContext } from '../../lib/changeContext';
-import { extractLdapCode } from '../../lib/ldapCodes';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { Hooks } from '../../hooks.js';
+import type { ChangeContext } from '../../lib/changeContext.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
 import type {
   AttributesList,
   AttributeValue,
   SearchResult,
-} from '../../lib/ldapActions';
+} from '../../lib/ldapActions.js';
 import {
   isDummyMemberDn,
   normalizeDn,
   parseDn,
   unescapeDnValue,
-} from '../../lib/utils';
-import type RabbitMq from '../rabbitmq';
-import { DEFAULT_LOCK_ATTRIBUTE, DEFAULT_LOCK_VALUE } from '../scim/mapping';
+} from '../../lib/utils.js';
+import type RabbitMq from '../rabbitmq.js';
+import { DEFAULT_LOCK_ATTRIBUTE, DEFAULT_LOCK_VALUE } from '../scim/mapping.js';
 
 import {
   first,
@@ -40,8 +40,8 @@ import {
   parseDeletedAt,
   valueOf,
   type LifecycleAttributes,
-} from './lifecycleAttributes';
-import { twakeLifecycleOptions } from './twakeLifecycle.options';
+} from './lifecycleAttributes.js';
+import { twakeLifecycleOptions } from './twakeLifecycle.options.js';
 
 export const LIFECYCLE_EVENTS = [
   'created',

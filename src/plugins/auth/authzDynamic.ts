@@ -28,23 +28,23 @@
 import type { Express, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
 
-import { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import AuthBase, { type DmRequest } from '../../lib/auth/base';
-import { runTogether } from '../../lib/authz/composition';
-import { AuthzRefusedError } from '../../lib/errors';
+import { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import AuthBase, { type DmRequest } from '../../lib/auth/base.js';
+import { runTogether } from '../../lib/authz/composition.js';
+import { AuthzRefusedError } from '../../lib/errors.js';
 import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import type { Hooks } from '../../hooks';
-import { ok, unauthorized } from '../../lib/expressFormatedResponses';
-import { getParentDn, isDnInBranch } from '../../lib/utils';
+} from '../../lib/ldapActions.js';
+import type { Hooks } from '../../hooks.js';
+import { ok, unauthorized } from '../../lib/expressFormatedResponses.js';
+import { getParentDn, isDnInBranch } from '../../lib/utils.js';
 
-import { dynamicOptions } from './auth.options';
-import { verifyLdapPassword } from './authzDynamicHash';
+import { dynamicOptions } from './auth.options.js';
+import { verifyLdapPassword } from './authzDynamicHash.js';
 
 export interface BranchAcl {
   dn: string;

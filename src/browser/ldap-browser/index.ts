@@ -5,9 +5,9 @@
 
 import './styles.css';
 
-export { LdapBrowser } from './LdapBrowser';
-export { RawApiClient } from './api/RawApiClient';
-export { SchemaView } from './schema';
+export { LdapBrowser } from './LdapBrowser.js';
+export { RawApiClient } from './api/RawApiClient.js';
+export { SchemaView } from './schema.js';
 export type {
   BrowserOptions,
   LdapSchema,
@@ -17,4 +17,4 @@ export type {
   RawSearchResult,
   ObjectClassDefinition,
   AttributeTypeDefinition,
-} from './types';
+} from './types.js';

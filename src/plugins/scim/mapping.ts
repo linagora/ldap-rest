@@ -11,10 +11,10 @@
  */
 import fs from 'fs';
 
-import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
-import { hasOnlyRfc4514Escapes, parseDirectoryDate } from '../../lib/utils';
+import type { AttributesList, AttributeValue } from '../../lib/ldapActions.js';
+import { hasOnlyRfc4514Escapes, parseDirectoryDate } from '../../lib/utils.js';
 
-import { kindOf, scimInvalidValue } from './errors';
+import { kindOf, scimInvalidValue } from './errors.js';
 import {
   type ScimUser,
   type ScimGroup,
@@ -23,7 +23,7 @@ import {
   type MultiValued,
   SCHEMA_USER,
   SCHEMA_GROUP,
-} from './types';
+} from './types.js';
 
 const OPERATIONAL_ATTRIBUTES = [
   'createTimestamp',

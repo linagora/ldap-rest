@@ -12,12 +12,12 @@
  */
 import type winston from 'winston';
 
-import type { DmRequest } from '../../lib/auth/base';
-import type HookBus from '../../lib/hookBus';
+import type { DmRequest } from '../../lib/auth/base.js';
+import type HookBus from '../../lib/hookBus.js';
 
-import type { ScimUsers } from './users';
-import type { ScimOptions } from './scim.options';
-import type { ScimGroups } from './groups';
+import type { ScimUsers } from './users.js';
+import type { ScimOptions } from './scim.options.js';
+import type { ScimGroups } from './groups.js';
 import {
   type BulkRequest,
   type BulkResponse,
@@ -27,13 +27,13 @@ import {
   type ScimGroup,
   type PatchRequest,
   SCHEMA_BULK_RESPONSE,
-} from './types';
+} from './types.js';
 import {
   kindOf,
   scimErrorFromException,
   scimInvalidValue,
   writeScimErrorFromException,
-} from './errors';
+} from './errors.js';
 
 export interface ScimBulkOptions {
   options: ScimOptions;

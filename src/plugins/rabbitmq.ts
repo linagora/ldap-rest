@@ -18,12 +18,12 @@
  *   await rmq.publish('auth', 'user.created', message);
  */
 
-import DmPlugin from '../abstract/plugin';
-import type { DM } from '../bin';
-import { outsideAnyRequest } from '../lib/requestContext';
-import type { HealthStatus } from '../lib/health';
+import DmPlugin from '../abstract/plugin.js';
+import type { DM } from '../bin/index.js';
+import { outsideAnyRequest } from '../lib/requestContext.js';
+import type { HealthStatus } from '../lib/health.js';
 
-import { rabbitmqOptions } from './rabbitmq.options';
+import { rabbitmqOptions } from './rabbitmq.options.js';
 
 /** JSON-serialisable message payload. */
 export type RabbitMessage = Record<string, unknown>;

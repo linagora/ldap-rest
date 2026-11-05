@@ -27,9 +27,9 @@ import { isIP } from 'node:net';
 
 import type { Express, Request, Response, NextFunction } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
 
-import { trustedProxyOptions } from './auth.options';
+import { trustedProxyOptions } from './auth.options.js';
 
 // Extend Express Request to include trusted proxy info
 declare global {

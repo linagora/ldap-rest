@@ -5,7 +5,7 @@
 import { UnitTree } from './components/UnitTree.js';
 import { UnitPropertyEditor } from './components/UnitPropertyEditor.js';
 import { UnitApiClient } from './api/UnitApiClient.js';
-import type { UnitEditorOptions, Config } from './types';
+import type { UnitEditorOptions, Config } from './types.js';
 
 export class LdapUnitEditor {
   private container: HTMLElement | null = null;

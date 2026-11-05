@@ -5,17 +5,17 @@
  * deletion), read from the `--twake-lifecycle-*` options: the ones
  * `core/twake/lifecycleEvents` reads, and `core/twake/tombstone` writes.
  */
-import type { Config } from '../../bin';
-import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
-import { parseDirectoryDate } from '../../lib/utils';
+import type { Config } from '../../bin/index.js';
+import type { AttributesList, AttributeValue } from '../../lib/ldapActions.js';
+import { parseDirectoryDate } from '../../lib/utils.js';
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   holdsValue,
   resolveLockConfig,
-} from '../scim/mapping';
-import { scimOptionsOf } from '../scim/scim.options';
+} from '../scim/mapping.js';
+import { scimOptionsOf } from '../scim/scim.options.js';
 
-import { twakeLifecycleOptionsOf } from './twakeLifecycle.options';
+import { twakeLifecycleOptionsOf } from './twakeLifecycle.options.js';
 
 export type DeletedAtFormat = 'iso8601' | 'generalizedTime';
 

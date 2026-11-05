@@ -5,8 +5,12 @@
  * answers at once and builds the instance afterwards, and the cozy-stack
  * admin API, which builds it before answering.
  */
-import { BadGatewayError, ConflictError, GatewayTimeoutError } from './errors';
-import { timedOutbound } from './metrics';
+import {
+  BadGatewayError,
+  ConflictError,
+  GatewayTimeoutError,
+} from './errors.js';
+import { timedOutbound } from './metrics.js';
 
 /**
  * Reduce a name to what the Cloudery takes in a slug; it refused `_` or `@`

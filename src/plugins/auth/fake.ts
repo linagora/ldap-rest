@@ -8,10 +8,10 @@
  */
 import type { Response } from 'express';
 
-import AuthBase, { type DmRequest } from '../../lib/auth/base';
-import type { Role } from '../../abstract/plugin';
+import AuthBase, { type DmRequest } from '../../lib/auth/base.js';
+import type { Role } from '../../abstract/plugin.js';
 
-import { fakeOptions } from './auth.options';
+import { fakeOptions } from './auth.options.js';
 
 export default class AuthFake extends AuthBase {
   static optionDefinitions = fakeOptions;

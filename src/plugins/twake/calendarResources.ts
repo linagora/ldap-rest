@@ -8,7 +8,7 @@
  * The instance keeps registering as `calendarResources`, so code looking it
  * up by that name keeps finding it.
  */
-import Calendar from './calendar';
+import Calendar from './calendar.js';
 
 console.warn(
   '[ldap-rest] Plugin `core/twake/calendarResources` is deprecated; replace it with `core/twake/calendar` — do not load both, each would sync Calendar.'

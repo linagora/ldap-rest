@@ -20,19 +20,19 @@ import type { Express, Request } from 'express';
 import { FilterParser } from 'ldapts';
 import type { SearchOptions, SearchResult } from 'ldapts';
 
-import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import { tryMethodData } from '../../lib/expressFormatedResponses';
-import { isDnInBranch, getParentDn, getRdn } from '../../lib/utils';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import { tryMethodData } from '../../lib/expressFormatedResponses.js';
+import { isDnInBranch, getParentDn, getRdn } from '../../lib/utils.js';
 import {
   BadRequestError,
   ForbiddenError,
   isAuthzRefusal,
   NotFoundError,
   ServiceUnavailableError,
-} from '../../lib/errors';
-import type { LdapSchema, SchemaIndex } from '../../lib/ldapSchema';
-import { outsideRequest } from '../../lib/requestContext';
+} from '../../lib/errors.js';
+import type { LdapSchema, SchemaIndex } from '../../lib/ldapSchema.js';
+import { outsideRequest } from '../../lib/requestContext.js';
 
 /**
  * The attribute names a parsed filter tests, at any depth. An extensible
@@ -190,7 +190,7 @@ export const RawChildrenQuery = Type.Object({
   children: Type.Optional(Type.String()),
 });
 
-import { rawOptions } from './ldap.options';
+import { rawOptions } from './ldap.options.js';
 
 export default class LdapRaw extends DmPlugin {
   static optionDefinitions = rawOptions;

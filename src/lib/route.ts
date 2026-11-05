@@ -16,9 +16,9 @@ import type {
   Response,
 } from 'express';
 
-import { BadRequestError } from './errors';
-import { wantJson } from './expressFormatedResponses';
-import { asyncHandler } from './utils';
+import { BadRequestError } from './errors.js';
+import { wantJson } from './expressFormatedResponses.js';
+import { asyncHandler } from './utils.js';
 
 export type RouteMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 

@@ -19,15 +19,15 @@
  * All string values are escaped via escapeLdapFilter() before emission.
  * Unknown SCIM attribute paths cause a ScimError(invalidFilter, 400).
  */
-import { escapeLdapFilter } from '../../lib/utils';
+import { escapeLdapFilter } from '../../lib/utils.js';
 
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
   scimPathToLdapAttribute,
-} from './mapping';
-import type { ResourceMapping } from './types';
-import { scimInvalidFilter } from './errors';
+} from './mapping.js';
+import type { ResourceMapping } from './types.js';
+import { scimInvalidFilter } from './errors.js';
 
 type TokenKind =
   | 'LPAREN'

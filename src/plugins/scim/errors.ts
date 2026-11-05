@@ -11,12 +11,12 @@ import {
   HttpError,
   errorChain,
   isAuthzRefusal,
-} from '../../lib/errors';
-import { messageOf } from '../../lib/expressFormatedResponses';
+} from '../../lib/errors.js';
+import { messageOf } from '../../lib/expressFormatedResponses.js';
 // Moved to `lib`: nothing in it is SCIM's business, and an LDAP plugin needs
 // it too. Imported and re-exported, so this module stays the one SCIM reads
 // it from.
-import { extractLdapCode, isSchemaRefusal } from '../../lib/ldapCodes';
+import { extractLdapCode, isSchemaRefusal } from '../../lib/ldapCodes.js';
 
 export { extractLdapCode };
 
@@ -24,7 +24,7 @@ import {
   type ScimErrorResponse,
   type ScimErrorType,
   SCHEMA_ERROR,
-} from './types';
+} from './types.js';
 
 export const SCIM_CONTENT_TYPE = 'application/scim+json';
 

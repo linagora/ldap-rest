@@ -8,12 +8,12 @@
 import { Entry } from 'ldapts';
 import type { Request } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { Hooks } from '../../hooks';
-import type { AttributeValue, SearchResult } from '../../lib/ldapActions';
-import type { Config } from '../../bin';
-import type { ChangeContext } from '../../lib/changeContext';
-import { currentOperation } from '../../lib/operation';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
+import type { Hooks } from '../../hooks.js';
+import type { AttributeValue, SearchResult } from '../../lib/ldapActions.js';
+import type { Config } from '../../bin/index.js';
+import type { ChangeContext } from '../../lib/changeContext.js';
+import { currentOperation } from '../../lib/operation.js';
 
 export type ChangesToNotify = Record<
   string,

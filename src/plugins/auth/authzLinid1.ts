@@ -6,18 +6,18 @@
  * Grants permissions to users referenced in organization's twakeLocalAdminLink
  * @group Plugins
  */
-import type { DM } from '../../bin';
-import type { SearchResult } from '../../lib/ldapActions';
-import type { BranchPermissions } from '../../config/args';
-import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base';
-import { escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+import type { DM } from '../../bin/index.js';
+import type { SearchResult } from '../../lib/ldapActions.js';
+import type { BranchPermissions } from '../../config/args.js';
+import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base.js';
+import { escapeLdapFilter, isDnInBranch } from '../../lib/utils.js';
 
 interface CachedPermissions {
   branches: Map<string, BranchPermissions>;
   timestamp: number;
 }
 
-import { linid1Options } from './auth.options';
+import { linid1Options } from './auth.options.js';
 
 export default class AuthzLinid1 extends AuthzBase {
   static optionDefinitions = linid1Options;

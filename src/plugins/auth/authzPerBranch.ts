@@ -6,15 +6,15 @@
  * Supports user and group-based permissions with configurable defaults
  * @group Plugins
  */
-import type { DM } from '../../bin';
-import type { Hooks, MaybePromise } from '../../hooks';
-import type { ModifyRequest, SearchResult } from '../../lib/ldapActions';
-import type { AuthConfig, BranchPermissions } from '../../config/args';
-import type { DmRequest } from '../../lib/auth/base';
-import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base';
-import { AmbiguousIdentityError } from '../../lib/errors';
-import { escapeLdapFilter, normalizeDn } from '../../lib/utils';
-import { warnUnmatchedRuleKeys } from '../../lib/auth/base';
+import type { DM } from '../../bin/index.js';
+import type { Hooks, MaybePromise } from '../../hooks.js';
+import type { ModifyRequest, SearchResult } from '../../lib/ldapActions.js';
+import type { AuthConfig, BranchPermissions } from '../../config/args.js';
+import type { DmRequest } from '../../lib/auth/base.js';
+import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base.js';
+import { AmbiguousIdentityError } from '../../lib/errors.js';
+import { escapeLdapFilter, normalizeDn } from '../../lib/utils.js';
+import { warnUnmatchedRuleKeys } from '../../lib/auth/base.js';
 
 interface CachedGroups {
   groups: string[];
@@ -23,7 +23,7 @@ interface CachedGroups {
 
 type GroupRules = NonNullable<AuthConfig['groups']>[string];
 
-import { perBranchOptions } from './auth.options';
+import { perBranchOptions } from './auth.options.js';
 
 export default class AuthzPerBranch extends AuthzBase {
   static optionDefinitions = perBranchOptions;

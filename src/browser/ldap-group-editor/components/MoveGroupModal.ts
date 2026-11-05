@@ -2,8 +2,8 @@
  * Move Group Modal Component - Modal for selecting target organization when moving a group
  */
 
-import type { GroupApiClient } from '../api/GroupApiClient';
-import type { Entry } from '../types';
+import type { GroupApiClient } from '../api/GroupApiClient.js';
+import type { Entry } from '../types.js';
 
 export class MoveGroupModal {
   private api: GroupApiClient;

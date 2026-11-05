@@ -43,25 +43,25 @@
  */
 import type { Request } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
+import type { Hooks } from '../../hooks.js';
 import type {
   AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
+} from '../../lib/ldapActions.js';
 import type {
   Schema,
   SchemaAttribute,
   UniqueConstraint,
-} from '../../config/schema';
+} from '../../config/schema.js';
 import {
   hasRole,
   invalidValueMessage,
   roleAttribute,
-} from '../../config/schema';
+} from '../../config/schema.js';
 import {
   escapeLdapFilter,
   getParentDn,
@@ -71,10 +71,10 @@ import {
   movedToTrash,
   normalizeDn,
   rdnValue,
-} from '../../lib/utils';
-import type { ChangeContext } from '../../lib/changeContext';
-import { BadRequestError, ConflictError } from '../../lib/errors';
-import { extractLdapCode } from '../../lib/ldapCodes';
+} from '../../lib/utils.js';
+import type { ChangeContext } from '../../lib/changeContext.js';
+import { BadRequestError, ConflictError } from '../../lib/errors.js';
+import { extractLdapCode } from '../../lib/ldapCodes.js';
 
 /** One entity the rules apply to: its branch and the schema describing it. */
 interface EntityBinding {
@@ -370,7 +370,7 @@ import {
   organizationOptionsOf,
   type EnterpriseRulesOptions,
   type OrganizationOptions,
-} from './ldap.options';
+} from './ldap.options.js';
 
 export default class LdapEnterpriseRules extends DmPlugin {
   static optionDefinitions = enterpriseRulesOptions;

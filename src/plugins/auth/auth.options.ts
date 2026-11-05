@@ -2,13 +2,13 @@
  * Authentication and authorization plugin options, see
  * `docs/plugin-development/options.md`.
  */
-import type { AuthConfig, Config } from '../../config/args';
+import type { AuthConfig, Config } from '../../config/args.js';
 import {
   defineOptions,
   opt,
   readOptions,
   type OptionsOf,
-} from '../../config/options';
+} from '../../config/options.js';
 
 export const tokenOptions = defineOptions({
   auth_token: opt.array({

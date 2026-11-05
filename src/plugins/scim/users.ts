@@ -6,30 +6,30 @@
  */
 import type winston from 'winston';
 
-import type ldapActions from '../../lib/ldapActions';
+import type ldapActions from '../../lib/ldapActions.js';
 import type {
   AttributesList,
   ModifyRequest,
   SearchResult,
-} from '../../lib/ldapActions';
-import type { DmRequest } from '../../lib/auth/base';
-import type HookBus from '../../lib/hookBus';
+} from '../../lib/ldapActions.js';
+import type { DmRequest } from '../../lib/auth/base.js';
+import type HookBus from '../../lib/hookBus.js';
 import {
   escapeDnValue,
   escapeLdapFilter,
   isChildOf,
   validateDnValue,
-} from '../../lib/utils';
+} from '../../lib/utils.js';
 
-import { BaseResolver } from './baseResolver';
-import type { ScimOptions } from './scim.options';
+import { BaseResolver } from './baseResolver.js';
+import type { ScimOptions } from './scim.options.js';
 import {
   type ResourceMapping,
   type ScimUser,
   type ListResponse,
   type PatchRequest,
   SCHEMA_LIST_RESPONSE,
-} from './types';
+} from './types.js';
 import {
   DEFAULT_USER_MAPPING,
   loadMappingFile,
@@ -40,10 +40,10 @@ import {
   resolveLockConfig,
   isLocked,
   type MappingContext,
-} from './mapping';
-import { scimFilterToLdap } from './filter';
-import { pagedSearch } from './list';
-import { patchToModifyRequest, writePatch } from './patch';
+} from './mapping.js';
+import { scimFilterToLdap } from './filter.js';
+import { pagedSearch } from './list.js';
+import { patchToModifyRequest, writePatch } from './patch.js';
 import {
   extractLdapCode,
   kindOf,
@@ -51,7 +51,7 @@ import {
   scimInvalidValue,
   scimNotFound,
   scimUniqueness,
-} from './errors';
+} from './errors.js';
 
 export interface ListQuery {
   filter?: string;

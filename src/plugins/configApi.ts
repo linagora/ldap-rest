@@ -10,9 +10,9 @@
  */
 import type { Express } from 'express';
 
-import DmPlugin, { defineRoute, type Role } from '../abstract/plugin';
-import { wantJson } from '../lib/expressFormatedResponses';
-import { SERVER_VERSION } from '../lib/version';
+import DmPlugin, { defineRoute, type Role } from '../abstract/plugin.js';
+import { wantJson } from '../lib/expressFormatedResponses.js';
+import { SERVER_VERSION } from '../lib/version.js';
 
 interface ConfigApiResponse {
   apiPrefix: string;

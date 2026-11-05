@@ -2,9 +2,9 @@
  * Action types and action creators
  */
 
-import type { TreeNode } from '../types';
+import type { TreeNode } from '../types.js';
 
-import type { Action } from './Store';
+import type { Action } from './Store.js';
 
 export const Actions = {
   SET_ROOT: 'SET_ROOT',

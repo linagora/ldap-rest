@@ -2,8 +2,8 @@
  * Create Group Modal Component - Modal for creating a new group
  */
 
-import type { GroupApiClient } from '../api/GroupApiClient';
-import type { Config } from '../types';
+import type { GroupApiClient } from '../api/GroupApiClient.js';
+import type { Config } from '../types.js';
 
 export class CreateGroupModal {
   private api: GroupApiClient;

@@ -21,12 +21,12 @@ import { createHmac, createHash, timingSafeEqual } from 'crypto';
 
 import type { Response } from 'express';
 
-import { unauthorized } from '../../lib/expressFormatedResponses';
-import { rawBodyOf } from '../../lib/rawBody';
-import AuthBase, { type DmRequest } from '../../lib/auth/base';
-import type { Role } from '../../abstract/plugin';
+import { unauthorized } from '../../lib/expressFormatedResponses.js';
+import { rawBodyOf } from '../../lib/rawBody.js';
+import AuthBase, { type DmRequest } from '../../lib/auth/base.js';
+import type { Role } from '../../abstract/plugin.js';
 
-import { hmacOptions } from './auth.options';
+import { hmacOptions } from './auth.options.js';
 
 interface HmacService {
   id: string;

@@ -6,14 +6,14 @@
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-import type { AttributesList } from '../lib/ldapActions';
-import type { ConfigTemplate } from '../lib/parseConfig';
-import { bclOptions } from '../plugins/bcl.options';
-import { rabbitmqOptions } from '../plugins/rabbitmq.options';
-import { metricsOptions } from '../plugins/metrics.options';
-import { storageOptions } from '../plugins/storage.options';
-import { staticOptions } from '../plugins/static.options';
-import { scimOptions } from '../plugins/scim/scim.options';
+import type { AttributesList } from '../lib/ldapActions.js';
+import type { ConfigTemplate } from '../lib/parseConfig.js';
+import { bclOptions } from '../plugins/bcl.options.js';
+import { rabbitmqOptions } from '../plugins/rabbitmq.options.js';
+import { metricsOptions } from '../plugins/metrics.options.js';
+import { storageOptions } from '../plugins/storage.options.js';
+import { staticOptions } from '../plugins/static.options.js';
+import { scimOptions } from '../plugins/scim/scim.options.js';
 import {
   crowdsecOptions,
   dynamicOptions,
@@ -28,7 +28,7 @@ import {
   tokenOptions,
   totpOptions,
   trustedProxyOptions,
-} from '../plugins/auth/auth.options';
+} from '../plugins/auth/auth.options.js';
 import {
   bulkImportOptions,
   enterpriseRulesOptions,
@@ -39,23 +39,23 @@ import {
   passwordPolicyOptions,
   rawOptions,
   trashOptions,
-} from '../plugins/ldap/ldap.options';
-import { appAccountsOptions } from '../plugins/twake/appAccounts.options';
-import { calendarOptions } from '../plugins/twake/calendar.options';
-import { clouderyOptions } from '../plugins/twake/cloudery.options';
-import { cozyOptions } from '../plugins/twake/cozy.options';
-import { driveOptions } from '../plugins/twake/drive.options';
-import { jamesOptions } from '../plugins/twake/james.options';
-import { migrationProxyOptions } from '../plugins/twake/migrationProxy.options';
-import { twakeGroupsOptions } from '../plugins/twake/twakeGroups.options';
-import { twakeInstancesOptions } from '../plugins/twake/twakeInstances.options';
-import { twakeLifecycleOptions } from '../plugins/twake/twakeLifecycle.options';
-import { twakeSpacesOptions } from '../plugins/twake/twakeSpaces.options';
-import { twakeTombstoneOptions } from '../plugins/twake/twakeTombstone.options';
+} from '../plugins/ldap/ldap.options.js';
+import { appAccountsOptions } from '../plugins/twake/appAccounts.options.js';
+import { calendarOptions } from '../plugins/twake/calendar.options.js';
+import { clouderyOptions } from '../plugins/twake/cloudery.options.js';
+import { cozyOptions } from '../plugins/twake/cozy.options.js';
+import { driveOptions } from '../plugins/twake/drive.options.js';
+import { jamesOptions } from '../plugins/twake/james.options.js';
+import { migrationProxyOptions } from '../plugins/twake/migrationProxy.options.js';
+import { twakeGroupsOptions } from '../plugins/twake/twakeGroups.options.js';
+import { twakeInstancesOptions } from '../plugins/twake/twakeInstances.options.js';
+import { twakeLifecycleOptions } from '../plugins/twake/twakeLifecycle.options.js';
+import { twakeSpacesOptions } from '../plugins/twake/twakeSpaces.options.js';
+import { twakeTombstoneOptions } from '../plugins/twake/twakeTombstone.options.js';
 
-import { toConfigEntries } from './options';
+import { toConfigEntries } from './options.js';
 
-export { STATIC_CSP, STATIC_FRAME_OPTIONS } from '../plugins/static.options';
+export { STATIC_CSP, STATIC_FRAME_OPTIONS } from '../plugins/static.options.js';
 
 export interface BranchPermissions {
   read?: boolean;

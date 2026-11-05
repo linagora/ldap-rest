@@ -45,6 +45,22 @@ The snapshot records what the parser reads. A narrowed `choices` list, a
 raised `min` or a lowered `max` is checked when a plugin reads its options,
 not by the snapshot, and is reviewed by hand, as is a custom error `code`.
 
+## Resolution guard
+
+The published package is `"type": "module"`, so a plugin compiled with
+`moduleResolution: nodenext` resolves the declarations as Node resolves
+JavaScript: every relative specifier needs its `.js` extension. The build
+keeps them in the sources, and the declarations inherit them. TypeScript says
+nothing about a specifier it cannot resolve in `node_modules`: it reports the
+imported type as `any`, so a plugin loses type checking on the plugin API
+without a warning.
+
+`npm run lint` refuses an extensionless relative specifier under `src/` (the
+`import-x/extensions` rule), so the mistake shows up locally. `npm run
+check:declarations` then reads the built declarations for one, and type-checks
+a small `nodenext` consumer against the package entries. It needs a build: run
+`npm run build` first. The `test` workflow runs it after the build.
+
 ## The pull request gate
 
 The `contracts` job of `.github/workflows/contracts.yml` generates the

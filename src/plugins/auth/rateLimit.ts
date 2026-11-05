@@ -14,9 +14,9 @@
  */
 import type { Express, Request, Response, NextFunction } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin.js';
 
-import { rateLimitOptions } from './auth.options';
+import { rateLimitOptions } from './auth.options.js';
 
 interface RateLimitEntry {
   count: number;

@@ -22,40 +22,43 @@ import bodyParser from 'body-parser';
 import type winston from 'winston';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
-import { ConfigParser } from '../lib/parseConfig';
-import { unknownEnvironmentOptions } from '../config/options';
-import { keepRawBody } from '../lib/rawBody';
-import configArgs, { type Config } from '../config/args';
-import type { Hooks } from '../hooks';
-import ldapActions from '../lib/ldapActions';
-import type DmPlugin from '../abstract/plugin';
-import { buildLogger } from '../logger/winston';
+import { ConfigParser } from '../lib/parseConfig.js';
+import { unknownEnvironmentOptions } from '../config/options.js';
+import { keepRawBody } from '../lib/rawBody.js';
+import configArgs, { type Config } from '../config/args.js';
+import type { Hooks } from '../hooks.js';
+import ldapActions from '../lib/ldapActions.js';
+import type DmPlugin from '../abstract/plugin.js';
+import { buildLogger } from '../logger/winston.js';
 import {
   errorResponse,
   messageOf,
   setDebug,
   setLogger,
-} from '../lib/expressFormatedResponses';
-import AuthBase, { prefixCoversPath, type DmRequest } from '../lib/auth/base';
+} from '../lib/expressFormatedResponses.js';
+import AuthBase, {
+  prefixCoversPath,
+  type DmRequest,
+} from '../lib/auth/base.js';
 import {
   assertAuthzComposition,
   assertEnforceable,
   LDAP_JUDGING_HOOKS,
-} from '../lib/authz/composition';
-import { registerAttributeTypes } from '../lib/utils';
-import { BadRequestError, errorChain } from '../lib/errors';
-import { type ServiceMap, type ServiceToken } from '../lib/services';
-import HookBus, { recordHookOwner, type HookFn } from '../lib/hookBus';
-import { runForRequest, runWithLogContext } from '../lib/requestContext';
-import { requestId } from '../lib/changeContext';
-import { HEALTH_PATHS, mountHealth } from '../lib/health';
+} from '../lib/authz/composition.js';
+import { registerAttributeTypes } from '../lib/utils.js';
+import { BadRequestError, errorChain } from '../lib/errors.js';
+import { type ServiceMap, type ServiceToken } from '../lib/services/index.js';
+import HookBus, { recordHookOwner, type HookFn } from '../lib/hookBus.js';
+import { runForRequest, runWithLogContext } from '../lib/requestContext.js';
+import { requestId } from '../lib/changeContext.js';
+import { HEALTH_PATHS, mountHealth } from '../lib/health.js';
 import {
   httpRequestDuration,
   routeTemplate,
   secondsSince,
   unhandledRejections,
-} from '../lib/metrics';
-import { registerProcessShutdown, shutdownTimeout } from '../lib/shutdown';
+} from '../lib/metrics.js';
+import { registerProcessShutdown, shutdownTimeout } from '../lib/shutdown.js';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
@@ -135,8 +138,8 @@ interface ExpressAppInternal {
   _router?: ExpressRouterStack;
 }
 
-export * from '../lib/utils';
-export { asyncHandler } from '../lib/utils';
+export * from '../lib/utils.js';
+export { asyncHandler } from '../lib/utils.js';
 export {
   HttpError,
   BadRequestError,
@@ -150,7 +153,7 @@ export {
   BadGatewayError,
   ServiceUnavailableError,
   GatewayTimeoutError,
-} from '../lib/errors';
+} from '../lib/errors.js';
 
 //export const build = () => {
 
