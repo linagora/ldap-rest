@@ -123,8 +123,8 @@ description: {
   separators and attribute-type spellings (`ou`, `2.5.4.11`, `OID.2.5.4.11`)
   do not matter; an escaped comma is part of a value, never a separator.
 - Only the JSON boolean `true` grants a permission. An absent flag, or one
-  written as anything else (a string such as `"false"`, a number), is `false`;
-  a non-boolean flag is logged as a warning.
+  written as anything else (a string such as `"false"` or `"true"`, a
+  number), is `false`; a non-boolean flag is logged as a warning.
 - `tenant` is optional; if omitted, `req.user` falls back to the value of the
   configured `tenantAttribute` (default `cn`).
 

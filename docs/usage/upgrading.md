@@ -4,6 +4,20 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## From 2.0.3
+
+### An `authzDynamic` flag must be a JSON boolean
+
+**Who is affected:** a deployment loading `core/auth/authzDynamic` whose
+token entries hold a `read`, `write` or `delete` flag in `description` as a
+string or a number (`"true"`, `"yes"`, `1`) instead of the boolean `true`.
+
+That flag grants nothing after the upgrade: the permission is refused on
+the branch, and each reload logs `… not a boolean: permission refused`,
+naming the token entry and the branch. Write the JSON boolean `true` for the
+permissions the token holds. A flag written `"false"`, `"no"` or `"0"`
+refuses too, as it was meant to.
+
 ## From 2.0.2
 
 ### A console on another origin must be trusted for logout
