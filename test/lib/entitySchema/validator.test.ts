@@ -209,10 +209,70 @@ describe('EntityValidator', () => {
       expect(
         await refusal(
           v.validateNew(
-            entry({ BUSINESS_PLACE: 'd', Cn: 'Alice', 'l;binary': 'lyon' })
+            entry({
+              BUSINESS_PLACE: 'd',
+              Cn: 'Alice',
+              'businessCategory;binary': 'lyon',
+            })
           )
         )
       ).to.be.undefined;
+    });
+
+    describe('a fixed attribute under an option', () => {
+      for (const [key, written] of [
+        ['L;lang-fr', 'l;lang-fr'],
+        ['l;binary', 'l;binary'],
+        ['localityName;lang-fr', 'localityName;lang-fr'],
+        ['2.5.4.7;lang-fr', '2.5.4.7;lang-fr'],
+      ])
+        it(`refuses ${key} next to the default`, async () => {
+          expect(
+            await refusal(validator().validateNew(entry({ [key]: 'lyon' })))
+          ).to.equal(`Attribute "${written}" is fixed and cannot be modified`);
+        });
+
+      it('keeps the option on a fixed attribute without a default', async () => {
+        const noDefault = {
+          attributes: {
+            ...schema.attributes,
+            l: { type: 'string', fixed: true },
+          },
+        } as unknown as Schema;
+        const v = new EntityValidator(noDefault, {
+          entryExists: async (dn): Promise<boolean> => dn === bob,
+          loadedPlugins: {},
+          singularName: 'person',
+        });
+        const written = await v.validateNew(entry({ 'l;binary': 'lyon' }));
+        expect(written['l;binary']).to.equal('lyon');
+        expect(written).to.not.have.property('l');
+      });
+
+      for (const schemaKey of ['localityName', '2.5.4.7'])
+        it(`finds a schema keyed ${schemaKey} from another spelling`, async () => {
+          const aliased = {
+            attributes: {
+              objectClass: {
+                type: 'array',
+                items: { type: 'string' },
+                required: true,
+                fixed: true,
+              },
+              uid: { type: 'string', required: true, test: '^[a-z]+$' },
+              description: { type: 'string', required: true },
+              [schemaKey]: { type: 'string', fixed: true, default: 'paris' },
+            },
+          } as unknown as Schema;
+          const v = new EntityValidator(aliased, {
+            entryExists: async (dn): Promise<boolean> => dn === bob,
+            loadedPlugins: {},
+            singularName: 'person',
+          });
+          expect(
+            await refusal(v.validateNew(entry({ 'l;lang-fr': 'lyon' })))
+          ).to.equal('Attribute "l;lang-fr" is fixed and cannot be modified');
+        });
     });
 
     it('writes a declared attribute under the schema spelling, keeping ;binary', async () => {
