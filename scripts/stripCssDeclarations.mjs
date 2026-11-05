@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 // See docs/development/contracts.md
 import { readdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';

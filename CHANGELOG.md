@@ -22,12 +22,9 @@
   extension Node resolves, so a plugin keeps the types of `DmPlugin`, the
   error classes and the exported helpers instead of reading them as `any`
   ([#638](https://github.com/linagora/ldap-rest/issues/638)).
-- A plugin keeps the `Express` types the published declarations name without
-  installing `@types/express` itself: it is now a runtime dependency, so
-  `DmPlugin.api`, the hooks and the routes stay typed
-  ([#674](https://github.com/linagora/ldap-rest/issues/674)).
-- The optional `pg` and `lemonldap-ng-handler` plugins keep their types too:
-  `@types/pg` is an optional dependency, `lemonldap-ng-handler` is described
+- A plugin keeps the types the published declarations name without installing
+  them itself: `@types/express` is a runtime dependency and `@types/pg` an
+  optional one, the `auth/llng` plugin describes `lemonldap-ng-handler`
   structurally, and the browser declarations no longer import CSS
   ([#674](https://github.com/linagora/ldap-rest/issues/674)).
 - An IPv6 network written with a dotted IPv4 tail (`64:ff9b::10.0.0.0/120`,
