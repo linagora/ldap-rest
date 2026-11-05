@@ -25,7 +25,9 @@
   (`::ffff:8b8b:0` is `139.139.0.0`), and a mapped network matches the peer
   Node reports ([#664](https://github.com/linagora/ldap-rest/issues/664)).
 - A peer address carrying a zone index (`fe80::1%eth0`) is matched on the
-  address alone ([#665](https://github.com/linagora/ldap-rest/issues/665)).
+  address alone; a trusted entry carrying one is refused, as it would trust
+  that address on every link
+  ([#665](https://github.com/linagora/ldap-rest/issues/665)).
 
 ## v2.0.3 (2026-11-04)
 

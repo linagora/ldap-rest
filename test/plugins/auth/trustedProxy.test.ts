@@ -533,10 +533,9 @@ describe('TrustedProxy network parsing', () => {
       expect(p.isTrustedProxy('::%1')).to.equal(false);
     });
 
-    it('accepts a configured network with a zone index', () => {
-      expect(parser.parseCIDR('fe80::1%eth0').ip).to.equal(
-        (0xfe80n << 112n) | 1n
-      );
+    it('refuses a configured network with a zone index', () => {
+      for (const cidr of ['fe80::1%eth0', 'fe80::1%', '::%1'])
+        expect(() => parser.parseCIDR(cidr), cidr).to.throw(Error);
     });
   });
 

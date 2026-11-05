@@ -27,8 +27,9 @@ refuses too, as it was meant to.
 `core/auth/trustedProxy` refuses it at startup (`Invalid trusted proxy
 address "…"`) instead of reading its leading digits and trusting another
 network: `10.0.0.0/2.` was read as `10.0.0.0/2`, a network covering
-`0.0.0.0/2`. Fix the entry; a zone index (`fe80::1%eth0`) and an IPv4-mapped
-address remain accepted.
+`0.0.0.0/2`. An IPv4-mapped address remains accepted. A trusted entry
+carrying a zone index (`fe80::1%eth0`) is refused too: the same link-local
+address names another host on another link. Fix the entry.
 
 ## From 2.0.2
 

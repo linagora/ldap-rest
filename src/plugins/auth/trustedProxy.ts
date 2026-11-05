@@ -202,6 +202,13 @@ export default class TrustedProxy extends DmPlugin {
     const addr = slash === -1 ? cidr : cidr.slice(0, slash);
     const prefixStr = slash === -1 ? undefined : cidr.slice(slash + 1);
 
+    // A zone index names the link an address is reached through: the same
+    // address is another host on another link, so a network cannot be
+    // honoured as written
+    if (addr.includes('%')) {
+      throw new Error(`Invalid network address: ${addr}`);
+    }
+
     const parsed = this.parseIP(addr);
     let { isIPv6 } = parsed;
     let { ip } = parsed;
@@ -219,18 +226,12 @@ export default class TrustedProxy extends DmPlugin {
     // A fully mapped network is an IPv4 network, its prefix minus the 96
     // bits that carry the mapping; a mapped address with no prefix is an
     // exact IPv4 address
-    if (isIPv6 && prefix !== undefined && prefix >= 96) {
+    if (isIPv6 && (prefix === undefined || prefix >= 96)) {
       const carried = this.mappedIPv4(ip);
       if (carried !== undefined) {
         isIPv6 = false;
         ip = carried;
-        prefix -= 96;
-      }
-    } else if (isIPv6 && prefix === undefined) {
-      const carried = this.mappedIPv4(ip);
-      if (carried !== undefined) {
-        isIPv6 = false;
-        ip = carried;
+        if (prefix !== undefined) prefix -= 96;
       }
     }
 
