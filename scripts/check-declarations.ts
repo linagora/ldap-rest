@@ -10,8 +10,11 @@
  */
 import { execFileSync } from 'child_process';
 import {
+  copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -19,11 +22,11 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'fs';
+import { tmpdir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const workDir = path.join(root, 'temp', 'nodenext');
 
 // The sub-paths that publish declarations; the `./schema-*` entries are JSON.
 const entries = Object.entries(
@@ -49,6 +52,9 @@ const status: number = new HttpError('x', 500);
 const escaped: number = escapeLdapFilter('a*');
 // @ts-expect-error ScimUser is not a number
 const user: ScimUser = 42;
+type ApiArgument = Parameters<NonNullable<DmPlugin['api']>>[0];
+// @ts-expect-error Express is not a number
+const apiArgument: ApiArgument = 1;
 
 export class Probe extends DmPlugin {
   name = 'probe';
@@ -60,6 +66,7 @@ export class Probe extends DmPlugin {
     void status;
     void escaped;
     void user;
+    void apiArgument;
   }
 }
 
@@ -89,6 +96,32 @@ function declarationFiles(directory: string): string[] {
   });
 }
 
+/**
+ * Link the packages a consumer that installs only the runtime dependencies
+ * gets, so a type the declarations need from a devDependency is missing here
+ * too. Nested copies are flattened: type resolution needs one version.
+ */
+function linkRuntimeDependencies(modules: string): void {
+  const lock = JSON.parse(
+    readFileSync(path.join(root, 'package-lock.json'), 'utf8')
+  ) as { packages: Record<string, { dev?: boolean }> };
+  const packages = new Map<string, string>();
+  for (const [where, meta] of Object.entries(lock.packages)) {
+    if (!where.startsWith('node_modules/') || meta.dev) continue;
+    if (!existsSync(path.join(root, where))) continue;
+    const name = where.slice(
+      where.lastIndexOf('node_modules/') + 'node_modules/'.length
+    );
+    if (!packages.has(name) || where === `node_modules/${name}`)
+      packages.set(name, where);
+  }
+  for (const [name, where] of packages) {
+    const link = path.join(modules, name);
+    mkdirSync(path.dirname(link), { recursive: true });
+    symlinkSync(path.join(root, where), link, 'dir');
+  }
+}
+
 function main(): void {
   const dist = path.join(root, 'dist');
   if (!existsSync(path.join(dist, 'src', 'bin', 'index.d.ts'))) {
@@ -111,34 +144,46 @@ function main(): void {
     return;
   }
 
-  rmSync(workDir, { recursive: true, force: true });
-  mkdirSync(path.join(workDir, 'node_modules'), { recursive: true });
-  symlinkSync(root, path.join(workDir, 'node_modules', 'ldap-rest'), 'dir');
-  writeFileSync(
-    path.join(workDir, 'package.json'),
-    JSON.stringify({ name: 'nodenext-consumer', type: 'module' }, null, 2)
-  );
-  writeFileSync(
-    path.join(workDir, 'tsconfig.json'),
-    JSON.stringify(
-      {
-        compilerOptions: {
-          target: 'ES2022',
-          module: 'nodenext',
-          moduleResolution: 'nodenext',
-          strict: true,
-          skipLibCheck: true,
-          noEmit: true,
-        },
-        files: ['consumer.ts'],
-      },
-      null,
-      2
-    )
-  );
-  writeFileSync(path.join(workDir, 'consumer.ts'), consumer);
-
+  const workDir = mkdtempSync(path.join(tmpdir(), 'ldap-rest-nodenext-'));
   try {
+    const modules = path.join(workDir, 'node_modules');
+    mkdirSync(modules, { recursive: true });
+    linkRuntimeDependencies(modules);
+    // Copy rather than link the package: its own location must not bring the
+    // repository's devDependencies back into resolution.
+    const packageDir = path.join(modules, 'ldap-rest');
+    mkdirSync(packageDir, { recursive: true });
+    cpSync(path.join(root, 'dist'), path.join(packageDir, 'dist'), {
+      recursive: true,
+    });
+    copyFileSync(
+      path.join(root, 'package.json'),
+      path.join(packageDir, 'package.json')
+    );
+    writeFileSync(
+      path.join(workDir, 'package.json'),
+      JSON.stringify({ name: 'nodenext-consumer', type: 'module' }, null, 2)
+    );
+    writeFileSync(
+      path.join(workDir, 'tsconfig.json'),
+      JSON.stringify(
+        {
+          compilerOptions: {
+            target: 'ES2022',
+            module: 'nodenext',
+            moduleResolution: 'nodenext',
+            strict: true,
+            skipLibCheck: true,
+            noEmit: true,
+          },
+          files: ['consumer.ts'],
+        },
+        null,
+        2
+      )
+    );
+    writeFileSync(path.join(workDir, 'consumer.ts'), consumer);
+
     execFileSync(
       process.execPath,
       [path.join('node_modules', 'typescript', 'bin', 'tsc'), '-p', workDir],
@@ -150,6 +195,8 @@ function main(): void {
     );
     process.exitCode = 1;
     return;
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
   }
   console.log('the published declarations resolve under nodenext');
 }

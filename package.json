@@ -844,6 +844,7 @@
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.52",
+    "@types/express": "^5.0.3",
     "body-parser": "^2.2.0",
     "csv-parse": "^7.0.2",
     "express": "^5.1.0",
@@ -863,7 +864,6 @@
     "@rollup/plugin-terser": "^1.0.2",
     "@rollup/plugin-typescript": "^12.1.4",
     "@types/chai": "^5.2.2",
-    "@types/express": "^5.0.3",
     "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.10",
     "@types/multer": "^2.0.0",

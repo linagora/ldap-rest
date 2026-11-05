@@ -58,8 +58,10 @@ without a warning.
 `npm run lint` refuses an extensionless relative specifier under `src/` (the
 `import-x/extensions` rule), so the mistake shows up locally. `npm run
 check:declarations` then reads the built declarations for one, and type-checks
-a small `nodenext` consumer against the package entries. It needs a build: run
-`npm run build` first. The `test` workflow runs it after the build.
+a small `nodenext` consumer against the package entries installed with only the
+runtime dependencies: a type the declarations take from a devDependency is
+missing there too. It needs a build: run `npm run build` first. The `test`
+workflow runs it after the build.
 
 ## The pull request gate
 
