@@ -1,61 +1,54 @@
 # Changelog
 
-## Unreleased
+## v2.0.4 (2026-11-05)
 
 ### Security
 
 - An `authzDynamic` ACL flag grants a permission only when the token's JSON
-  holds the boolean `true`: any other value is refused, `"true"`, `"yes"` and
-  `1` included, and the refusal is logged
+  holds the boolean `true`; `"true"`, `"yes"` and `1` are refused
   ([#657](https://github.com/linagora/ldap-rest/issues/657),
   [upgrading](docs/usage/upgrading.md#an-authzdynamic-flag-must-be-a-json-boolean)).
-- `--trusted-proxy` refuses a malformed address or prefix at startup instead
-  of trusting another network: `10.0.0.0/2.` used to be read as
-  `10.0.0.0/2` and trusted all of `0.0.0.0/2`
+- `--trusted-proxy` refuses a malformed address or prefix at startup, where
+  `10.0.0.0/2.` was read as `10.0.0.0/2` and trusted `0.0.0.0/2`
   ([#663](https://github.com/linagora/ldap-rest/issues/663),
   [upgrading](docs/usage/upgrading.md#a-malformed-trusted-proxy-stops-the-server)).
 
 ### Fixed
 
-- The declarations published with each sub-path resolve for a plugin compiled
-  with `moduleResolution: nodenext`: relative specifiers carry the `.js`
-  extension Node resolves, so a plugin keeps the types of `DmPlugin`, the
-  error classes and the exported helpers instead of reading them as `any`
+- The declarations of each sub-path resolve for a plugin compiled with
+  `moduleResolution: nodenext`; the types crossing a file boundary are no
+  longer read as `any`
   ([#638](https://github.com/linagora/ldap-rest/issues/638)).
 - A plugin keeps the types the published declarations name without installing
-  them itself: `@types/express` is a runtime dependency and `@types/pg` an
-  optional one, the `auth/llng` plugin describes `lemonldap-ng-handler`
-  structurally, and the browser declarations no longer import CSS
+  them: `@types/express` and `@types/pg` ship with the package,
+  `lemonldap-ng-handler` is described structurally, and the browser
+  declarations no longer import CSS
   ([#674](https://github.com/linagora/ldap-rest/issues/674)).
 - An IPv6 network written with a dotted IPv4 tail (`64:ff9b::10.0.0.0/120`,
-  `::ffff:10.0.0.0/104`) is read as written instead of as another network
+  `::ffff:10.0.0.0/104`) is read as written
   ([#660](https://github.com/linagora/ldap-rest/issues/660),
   [details](docs/usage/plugins/auth/trusted-proxy.md#supported-formats)).
-- An IPv4-mapped address is matched against an IPv4 network in any spelling
-  (`::ffff:8b8b:0` is `139.139.0.0`), and a mapped network matches the peer
-  Node reports ([#664](https://github.com/linagora/ldap-rest/issues/664)).
+- An IPv4-mapped address matches an IPv4 network in any spelling, and a mapped
+  network matches the peer Node reports
+  ([#664](https://github.com/linagora/ldap-rest/issues/664)).
 - A peer address carrying a zone index (`fe80::1%eth0`) is matched on the
-  address alone; a trusted entry carrying one is refused, as it would trust
-  that address on every link
+  address alone; a trusted entry carrying one is refused
   ([#665](https://github.com/linagora/ldap-rest/issues/665)).
-- A creation that sends a fixed attribute with a default under an option
+- A creation sending a fixed attribute with a default under an option
   (`L;lang-fr`, or an alias such as `localityName;lang-fr`) is refused with
-  `400` instead of storing a second value of the attribute the schema fixes
+  `400` instead of storing a second value
   ([#661](https://github.com/linagora/ldap-rest/issues/661),
   [details](docs/client-development/schemas/README.md#fixed-attributes)).
-- An organization renamed or moved through a DN written with another
-  spelling of the type (`OU=`, `2.5.4.11=`, `OID.2.5.4.11=`,
-  `organizationalUnitName=`) is synchronised: its path, the links and the
-  paths of the entries attached to it are updated
+- An organization renamed or moved through a DN written with another spelling
+  of its type (`OU=`, `2.5.4.11=`, `OID.2.5.4.11=`) is synchronised, its paths
+  and links included
   ([#659](https://github.com/linagora/ldap-rest/issues/659),
   [details](docs/usage/plugins/ldap/organizations.md#move-organization)).
-- A rename no longer rewrites a link to another organization whose name ends,
-  as text, with the renamed one (`x,ou=Sales`), and a link to a
-  sub-organization written in another case is rewritten
-  ([#658](https://github.com/linagora/ldap-rest/issues/658)).
-- A SCIM request header naming a base with a value starting with `#`
-  (`ou=#,…`, the BER hexstring form included) is ignored, as the directory
-  refuses that DN, instead of failing every operation of the request
+- A rename no longer rewrites a link to another organization whose name ends
+  with the renamed one (`x,ou=Sales`), and matches a sub-organization link in
+  any case ([#658](https://github.com/linagora/ldap-rest/issues/658)).
+- A SCIM base header whose value starts with `#` (`ou=#,…`, the BER hexstring
+  form included) is ignored instead of failing every operation
   ([#662](https://github.com/linagora/ldap-rest/issues/662)).
 
 ## v2.0.3 (2026-11-04)
