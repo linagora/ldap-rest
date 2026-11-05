@@ -233,7 +233,7 @@ export class EntityValidator {
   private declaredAttribute(field: string): SchemaAttribute | undefined {
     const id = this.attributeIdentity(field);
     for (const [name, attr] of Object.entries(this.schema?.attributes ?? {}))
-      if (name.toLowerCase() === id) return attr;
+      if ((knownAttributeName(name) ?? name).toLowerCase() === id) return attr;
     return undefined;
   }
 

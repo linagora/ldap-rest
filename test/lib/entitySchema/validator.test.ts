@@ -248,6 +248,31 @@ describe('EntityValidator', () => {
         expect(written['l;binary']).to.equal('lyon');
         expect(written).to.not.have.property('l');
       });
+
+      for (const schemaKey of ['localityName', '2.5.4.7'])
+        it(`finds a schema keyed ${schemaKey} from another spelling`, async () => {
+          const aliased = {
+            attributes: {
+              objectClass: {
+                type: 'array',
+                items: { type: 'string' },
+                required: true,
+                fixed: true,
+              },
+              uid: { type: 'string', required: true, test: '^[a-z]+$' },
+              description: { type: 'string', required: true },
+              [schemaKey]: { type: 'string', fixed: true, default: 'paris' },
+            },
+          } as unknown as Schema;
+          const v = new EntityValidator(aliased, {
+            entryExists: async (dn): Promise<boolean> => dn === bob,
+            loadedPlugins: {},
+            singularName: 'person',
+          });
+          expect(
+            await refusal(v.validateNew(entry({ 'l;lang-fr': 'lyon' })))
+          ).to.equal('Attribute "l;lang-fr" is fixed and cannot be modified');
+        });
     });
 
     it('writes a declared attribute under the schema spelling, keeping ;binary', async () => {
