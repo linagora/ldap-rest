@@ -9,6 +9,8 @@ import { sortPackageJson } from 'sort-package-json';
 import { writeFileSync } from 'fs';
 import { glob } from 'tinyglobby';
 
+import stripCssDeclarations from './scripts/stripCssDeclarations.mjs';
+
 const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
 
 const PLUGINS_SRC_DIR = 'src/plugins';
@@ -26,6 +28,7 @@ const commonPlugins = dir => [
     include: ['src/**/*'],
     outDir: dir,
   }),
+  stripCssDeclarations(),
   process.env.NODE_ENV === 'production' &&
     terser({
       compress: {

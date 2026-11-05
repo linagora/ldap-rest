@@ -4,6 +4,8 @@ import terser from '@rollup/plugin-terser';
 import postcss from 'rollup-plugin-postcss';
 import { glob } from 'tinyglobby';
 
+import stripCssDeclarations from './scripts/stripCssDeclarations.mjs';
+
 async function getBrowserLibraries() {
   return (
     await glob('src/browser/**/*.ts', {
@@ -43,6 +45,7 @@ export default async () => {
           declarationMap: false,
           sourceMap: true,
         }),
+        stripCssDeclarations(),
       ],
     },
     // UMD/ESM bundles for shared utilities

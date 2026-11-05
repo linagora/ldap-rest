@@ -868,7 +868,6 @@
     "@types/mocha": "^10.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^26.6.5",
-    "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
     "@typescript-eslint/eslint-plugin": "^8.44.0",
     "@typescript-eslint/parser": "^8.44.0",
@@ -896,6 +895,7 @@
   },
   "optionalDependencies": {
     "@linagora/rabbitmq-client": "^0.7.2",
+    "@types/pg": "^8.23.1",
     "express-openid-connect": "^3.4.0",
     "iovalkey": "^0.4.0",
     "lemonldap-ng-handler": "^0.9.6",

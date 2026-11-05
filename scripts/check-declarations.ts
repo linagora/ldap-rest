@@ -173,7 +173,6 @@ function main(): void {
             module: 'nodenext',
             moduleResolution: 'nodenext',
             strict: true,
-            skipLibCheck: true,
             noEmit: true,
           },
           files: ['consumer.ts'],

@@ -60,8 +60,12 @@ without a warning.
 check:declarations` then reads the built declarations for one, and type-checks
 a small `nodenext` consumer against the package entries installed with only the
 runtime dependencies: a type the declarations take from a devDependency is
-missing there too. It needs a build: run `npm run build` first. The `test`
-workflow runs it after the build.
+missing there too. The consumer checks the library declarations themselves, so
+a bare import they make must resolve even when the consumer names no type from
+it. The build drops the browser sources' side-effect CSS imports from the
+emitted declarations: they say nothing about the JavaScript API, and the
+consumer has no CSS module for them. The check needs a build: run `npm run
+build` first. The `test` workflow runs it after the build.
 
 ## The pull request gate
 
