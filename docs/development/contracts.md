@@ -55,10 +55,11 @@ nothing about a specifier it cannot resolve in `node_modules`: it reports the
 imported type as `any`, so a plugin loses type checking on the plugin API
 without a warning.
 
-`npm run check:declarations` reads the built declarations for an extensionless
-relative specifier, then type-checks a small `nodenext` consumer against the
-package entries. It needs a build: run `npm run build` first. The `test`
-workflow runs it after the build.
+`npm run lint` refuses an extensionless relative specifier under `src/` (the
+`import-x/extensions` rule), so the mistake shows up locally. `npm run
+check:declarations` then reads the built declarations for one, and type-checks
+a small `nodenext` consumer against the package entries. It needs a build: run
+`npm run build` first. The `test` workflow runs it after the build.
 
 ## The pull request gate
 

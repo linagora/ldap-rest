@@ -132,8 +132,7 @@ jobs:
         if: matrix.node-version == '24.x'
         run: npm run check:api
 
-      # See docs/development/contracts.md: a plugin compiled with nodenext
-      # resolves the declarations the build just published
+      # See docs/development/contracts.md
       - name: Check the published declarations
         if: matrix.node-version == '24.x'
         run: npm run check:declarations
