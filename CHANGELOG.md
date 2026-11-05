@@ -9,6 +9,25 @@
   `1` included, and the refusal is logged
   ([#657](https://github.com/linagora/ldap-rest/issues/657),
   [upgrading](docs/usage/upgrading.md#an-authzdynamic-flag-must-be-a-json-boolean)).
+- `--trusted-proxy` refuses a malformed address or prefix at startup instead
+  of trusting another network: `10.0.0.0/2.` used to be read as
+  `10.0.0.0/2` and trusted all of `0.0.0.0/2`
+  ([#663](https://github.com/linagora/ldap-rest/issues/663),
+  [upgrading](docs/usage/upgrading.md#a-malformed-trusted-proxy-stops-the-server)).
+
+### Fixed
+
+- An IPv6 network written with a dotted IPv4 tail (`64:ff9b::10.0.0.0/120`,
+  `::ffff:10.0.0.0/104`) is read as written instead of as another network
+  ([#660](https://github.com/linagora/ldap-rest/issues/660),
+  [details](docs/usage/plugins/auth/trusted-proxy.md#supported-formats)).
+- An IPv4-mapped address is matched against an IPv4 network in any spelling
+  (`::ffff:8b8b:0` is `139.139.0.0`), and a mapped network matches the peer
+  Node reports ([#664](https://github.com/linagora/ldap-rest/issues/664)).
+- A peer address carrying a zone index (`fe80::1%eth0`) is matched on the
+  address alone; a trusted entry carrying one is refused, as it would trust
+  that address on every link
+  ([#665](https://github.com/linagora/ldap-rest/issues/665)).
 
 ## v2.0.3 (2026-11-04)
 

@@ -39,7 +39,17 @@ DM_TRUSTED_PROXY_AUTH_HEADER="Auth-User"
 - **IPv4 addresses:** `192.168.1.1`
 - **IPv6 addresses:** `::1`, `fe80::1`
 - **CIDR ranges:** `10.0.0.0/8`, `192.168.0.0/16`, `2001:db8::/32`
-- **IPv4-mapped IPv6:** Automatically handled (e.g., `::ffff:127.0.0.1` matches `127.0.0.1`)
+- **IPv4-mapped IPv6:** accepted in any spelling, e.g. `::ffff:127.0.0.1` or
+  `::ffff:7f00:1` matches `127.0.0.1`. A network written in mapped form is
+  checked as the IPv4 network it is: `::ffff:10.0.0.0/104` is `10.0.0.0/8`.
+- **Zone index:** a peer address carrying an interface, such as
+  `fe80::1%eth0`, is matched on the address alone. A trusted entry carrying
+  one is refused: the same link-local address names another host on another
+  link.
+
+An entry that is neither an address nor an `address/prefix` network (`:::`,
+`10.0.0.0/2.`, `10.0.0.0/24x`) makes the server refuse to start: it would
+otherwise trust a network the administrator never wrote.
 
 ## Auth-User Header
 

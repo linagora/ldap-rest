@@ -18,6 +18,19 @@ naming the token entry and the branch. Write the JSON boolean `true` for the
 permissions the token holds. A flag written `"false"`, `"no"` or `"0"`
 refuses too, as it was meant to.
 
+### A malformed trusted proxy stops the server
+
+**Who is affected:** a deployment whose `--trusted-proxy` /
+`DM_TRUSTED_PROXIES` holds something that is neither an address nor an
+`address/prefix` network, such as `10.0.0.0/2.`, `10.0.0.0/24x` or `:::`.
+
+`core/auth/trustedProxy` refuses it at startup (`Invalid trusted proxy
+address "…"`) instead of reading its leading digits and trusting another
+network: `10.0.0.0/2.` was read as `10.0.0.0/2`, a network covering
+`0.0.0.0/2`. An IPv4-mapped address remains accepted. A trusted entry
+carrying a zone index (`fe80::1%eth0`) is refused too: the same link-local
+address names another host on another link. Fix the entry.
+
 ## From 2.0.2
 
 ### A console on another origin must be trusted for logout
