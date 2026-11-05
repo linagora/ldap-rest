@@ -446,3 +446,115 @@ describe('TrustedProxy Plugin', () => {
     });
   });
 });
+
+describe('TrustedProxy network parsing', () => {
+  type Parser = {
+    logger: { error: (...args: unknown[]) => void };
+    trustedNetworks: unknown[];
+    parseCIDR(cidr: string): { ip: bigint; mask: bigint; isIPv6: boolean };
+    isTrustedProxy(ip: string): boolean;
+  };
+
+  const parser = Object.create(TrustedProxy.prototype) as Parser;
+  parser.logger = { error: (): void => undefined };
+
+  const proxy = (networks: string[]): Parser => {
+    const p = Object.create(TrustedProxy.prototype) as Parser;
+    p.logger = { error: (): void => undefined };
+    p.trustedNetworks = networks.map(n => p.parseCIDR(n));
+    return p;
+  };
+
+  describe('malformed networks', () => {
+    for (const cidr of [
+      ':::',
+      '::/2.',
+      '10.0.0.0/2.',
+      '0.5.0.1\x1b',
+      '10.0.0.0/24x',
+      '1abc.0.0.1',
+      '10.0.0.0/+8',
+      '10.0.0.0/',
+      '10.0.0.0/24/25',
+    ])
+      it(`rejects ${JSON.stringify(cidr)}`, () => {
+        expect(() => parser.parseCIDR(cidr)).to.throw(Error);
+      });
+  });
+
+  describe('IPv6 with a dotted IPv4 tail', () => {
+    it('reads ::10.0.0.0 as ::a00:0', () => {
+      expect(parser.parseCIDR('::10.0.0.0').ip).to.equal(0x0a000000n);
+    });
+
+    it('reads 64:ff9b::10.0.0.0/120 as 64:ff9b::a00:0/120', () => {
+      const { ip, mask, isIPv6 } = parser.parseCIDR('64:ff9b::10.0.0.0/120');
+      expect(isIPv6).to.equal(true);
+      expect(ip & mask).to.equal((0x64ff9bn << 96n) | 0x0a000000n);
+    });
+
+    it('reads a mapped network as the IPv4 network it is', () => {
+      expect(parser.parseCIDR('::ffff:0.0.0.127/120')).to.deep.equal({
+        ip: 0x7fn,
+        mask: 0xffffff00n,
+        isIPv6: false,
+      });
+    });
+  });
+
+  describe('IPv4-mapped spellings', () => {
+    it('matches every spelling of a mapped address against an IPv4 range', () => {
+      const p = proxy(['139.0.0.0/8']);
+      for (const address of [
+        '::ffff:139.139.0.0',
+        '::ffff:8b8b:0',
+        '::FFFF:8B8B:0',
+        '0:0:0:0:0:ffff:8b8b:0',
+      ])
+        expect(p.isTrustedProxy(address), address).to.equal(true);
+    });
+
+    it('matches a mapped network against the peer Node reports', () => {
+      const p = proxy(['::ffff:10.0.0.0/104']);
+      expect(p.isTrustedProxy('::ffff:10.1.2.3')).to.equal(true);
+      expect(p.isTrustedProxy('::ffff:11.1.2.3')).to.equal(false);
+    });
+
+    it('keeps a mapped network beyond the mapping an IPv6 network', () => {
+      const parses = parser.parseCIDR('::ffff:0:0/80');
+      expect(parses.isIPv6).to.equal(true);
+    });
+  });
+
+  describe('zone index', () => {
+    it('trusts a link-local peer with a zone index', () => {
+      const p = proxy(['fe80::/10']);
+      expect(p.isTrustedProxy('fe80::1%eth0')).to.equal(true);
+      expect(p.isTrustedProxy('::%1')).to.equal(false);
+    });
+
+    it('accepts a configured network with a zone index', () => {
+      expect(parser.parseCIDR('fe80::1%eth0').ip).to.equal(
+        (0xfe80n << 112n) | 1n
+      );
+    });
+  });
+
+  describe('valid networks kept as they are', () => {
+    it('reads plain IPv4, IPv6 and prefixless networks', () => {
+      expect(parser.parseCIDR('10.0.0.0/8')).to.deep.equal({
+        ip: 0x0a000000n,
+        mask: 0xff000000n,
+        isIPv6: false,
+      });
+      expect(parser.parseCIDR('::1')).to.deep.equal({
+        ip: 1n,
+        mask: (1n << 128n) - 1n,
+        isIPv6: true,
+      });
+      expect(parser.parseCIDR('fe80::/10').mask).to.equal(
+        ((1n << 128n) - 1n) ^ ((1n << 118n) - 1n)
+      );
+    });
+  });
+});
