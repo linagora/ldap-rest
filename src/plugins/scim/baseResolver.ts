@@ -18,11 +18,10 @@
  * A header-supplied base is only honored when `scim_base_header_root` is
  * explicitly configured AND the value sits at or under that root AND contains
  * no control characters AND is spelled as the directory reads a DN (a value
- * starting with `#` is a BER hexstring, a literal `#` is written `\#`), so a
- * header cannot redirect operations to an arbitrary DN, inject into the DN,
- * or name a DN the directory refuses. An explicit per-user map entry still
- * wins over the header, so identity-based pinning is never silently
- * overridden.
+ * starting with `#` is refused, a literal `#` is written `\#`), so a header
+ * cannot redirect operations to an arbitrary DN, inject into the DN, or name
+ * a DN the directory refuses. An explicit per-user map entry still wins over
+ * the header, so identity-based pinning is never silently overridden.
  */
 import fs from 'fs';
 

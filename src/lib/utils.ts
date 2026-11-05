@@ -434,9 +434,10 @@ export function isDnSyntax(dn: string): boolean {
     parts.push(current);
     return parts.every(part => {
       if (!type.test(part)) return false;
-      // A value starting with `#` is a BER hexstring; a literal `#` is `\#`
+      // OpenLDAP refuses a value starting with `#`, the BER hexstring form
+      // included; a literal `#` is written `\#`
       const value = trimUnescaped(part.slice(part.indexOf('=') + 1));
-      return !value.startsWith('#') || /^#(?:[0-9a-fA-F]{2})+$/.test(value);
+      return !value.startsWith('#');
     });
   });
 }

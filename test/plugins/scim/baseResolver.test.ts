@@ -153,7 +153,7 @@ describe('SCIM baseResolver', () => {
       expect(br.userBase(req)).to.equal('ou=users,dc=example,dc=com');
     });
 
-    it('ignores a header whose value is a `#` with no hex pairs', () => {
+    it('ignores a header whose value starts with a `#`', () => {
       const br = new BaseResolver(
         cfg({
           scim_user_base: 'ou=users,dc=example,dc=com',
@@ -165,13 +165,15 @@ describe('SCIM baseResolver', () => {
         'ou=#,ou=tenants,dc=example,dc=com',
         'ou=#zz,ou=tenants,dc=example,dc=com',
         'ou=#abc,ou=tenants,dc=example,dc=com',
+        'ou=#0c0b,ou=tenants,dc=example,dc=com',
+        'ou=#0c03616263,ou=tenants,dc=example,dc=com',
       ])
         expect(br.userBase(reqWithHeader('x-org-base', value))).to.equal(
           'ou=users,dc=example,dc=com'
         );
     });
 
-    it('honors an escaped `#` and a BER hexstring', () => {
+    it('honors an escaped `#`', () => {
       const br = new BaseResolver(
         cfg({
           scim_user_base: 'ou=users,dc=example,dc=com',
@@ -184,11 +186,6 @@ describe('SCIM baseResolver', () => {
           reqWithHeader('x-org-base', 'ou=\\#,ou=tenants,dc=example,dc=com')
         )
       ).to.equal('ou=\\#,ou=tenants,dc=example,dc=com');
-      expect(
-        br.userBase(
-          reqWithHeader('x-org-base', 'ou=#0c0b,ou=tenants,dc=example,dc=com')
-        )
-      ).to.equal('ou=#0c0b,ou=tenants,dc=example,dc=com');
     });
 
     it('an explicit map entry wins over the header', () => {
