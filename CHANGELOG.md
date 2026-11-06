@@ -30,6 +30,8 @@
   from `ldap-rest/hooks`; the former `./plugin-scim-types` and
   `./plugin-ldap-onchange` entries are deprecated and will be removed in
   4.0.0.
+- The SCIM plugin ships as the `@ldap-rest/scim` package; the
+  `ldap-rest/plugin-scim-*` entries stay as compatibility shims.
 
 ## v2.0.5 (2026-11-06)
 

@@ -1,0 +1,559 @@
+/**
+ * @module plugins/scim/groups
+ * @author Xavier Guimard <xguimard@linagora.com>
+ *
+ * SCIM Groups resource handler — direct access via ldapActions.
+ */
+import type winston from 'winston';
+import type ldapActions from '@ldap-rest/core/lib/ldapActions';
+import type {
+  AttributesList,
+  ModifyRequest,
+  SearchResult,
+} from '@ldap-rest/core/lib/ldapActions';
+import type { Config } from '@ldap-rest/core/config/args';
+import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
+import type HookBus from '@ldap-rest/core/lib/hookBus';
+import {
+  escapeDnValue,
+  escapeLdapFilter,
+  isChildOf,
+  isDummyMemberDn,
+  parseDn,
+  rdnValue,
+  validateDnValue,
+} from '@ldap-rest/core/lib/utils';
+import {
+  type ResourceMapping,
+  type ScimGroup,
+  type ListResponse,
+  type PatchRequest,
+  type MultiValued,
+  SCHEMA_LIST_RESPONSE,
+} from '@ldap-rest/core/lib/scim/types';
+import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
+import {
+  DEFAULT_GROUP_MAPPING,
+  loadMappingFile,
+  mergeMapping,
+  withExternalId,
+  ldapToScimGroup,
+  scimGroupToLdap,
+  requiredLdapAttributes,
+  type MappingContext,
+} from '@ldap-rest/core/lib/scim/mapping';
+import {
+  extractLdapCode,
+  kindOf,
+  ScimError,
+  scimInvalidValue,
+  scimNotFound,
+  scimUniqueness,
+} from '@ldap-rest/core/lib/scim/errors';
+import type { ScimOptions } from '@ldap-rest/core/lib/scim/options';
+
+import { scimFilterToLdap } from './filter.js';
+import { pagedSearch } from './list.js';
+import { patchToModifyRequest, writePatch } from './patch.js';
+import type { ScimUsers } from './users.js';
+
+export interface GroupListQuery {
+  filter?: string;
+  startIndex?: number;
+  count?: number;
+  // sortBy / sortOrder accepted for parser compatibility but not honoured
+  // (ServiceProviderConfig advertises sort.supported = false).
+  sortBy?: string;
+  sortOrder?: 'ascending' | 'descending';
+}
+
+export interface ScimGroupsOptions {
+  ldap: ldapActions;
+  config: Config;
+  options: ScimOptions;
+  logger: winston.Logger;
+  baseResolver: BaseResolver;
+  users: ScimUsers;
+  hookBus: HookBus;
+}
+
+export class ScimGroups {
+  private readonly ldap: ldapActions;
+  private readonly config: Config;
+  private readonly options: ScimOptions;
+  private readonly logger: winston.Logger;
+  private readonly baseResolver: BaseResolver;
+  private readonly users: ScimUsers;
+  private readonly hookBus: HookBus;
+  private readonly mapping: ResourceMapping;
+  private readonly attributes: string[];
+  private readonly rdnAttribute: string;
+  private readonly objectClass: string[];
+  private readonly idAttribute: string;
+  private readonly maxResults: number;
+  private readonly maxScanned: number;
+  private readonly scimPrefix: string;
+
+  constructor(opts: ScimGroupsOptions) {
+    this.ldap = opts.ldap;
+    this.config = opts.config;
+    this.options = opts.options;
+    this.logger = opts.logger;
+    this.baseResolver = opts.baseResolver;
+    this.users = opts.users;
+    this.hookBus = opts.hookBus;
+
+    this.rdnAttribute = this.options.scim_group_rdn_attribute;
+    this.objectClass = this.options.scim_group_object_class;
+    this.idAttribute = this.options.scim_id_attribute;
+    this.maxResults = this.options.scim_max_results;
+    this.maxScanned = this.options.scim_max_scanned;
+    this.scimPrefix = this.options.scim_prefix;
+
+    const override = this.options.scim_group_mapping;
+    this.mapping = withExternalId(
+      mergeMapping(
+        DEFAULT_GROUP_MAPPING,
+        override ? loadMappingFile(override) : undefined
+      ),
+      this.options.scim_group_external_id_attribute
+    );
+    this.attributes = requiredLdapAttributes(this.mapping, [
+      this.rdnAttribute,
+      'member',
+    ]);
+  }
+
+  private ctx(req?: DmRequest): MappingContext {
+    return {
+      idAttribute: this.idAttribute,
+      rdnAttribute: this.rdnAttribute,
+      resourceType: 'Group',
+      baseUrl:
+        this.options.scim_base_url ||
+        (req?.protocol && req.get
+          ? `${req.protocol}://${String(req.get('host') || '')}`
+          : ''),
+      scimPrefix: this.scimPrefix,
+      // RFC 7643 section 4.2 gives Groups no `active`, so there is no lock
+      // attribute to name. Empty rather than the User default: an entry
+      // never holds an attribute called '', so `isLocked` reads false and
+      // nothing can be written under it by accident.
+      lockAttribute: '',
+      lockValue: '',
+    };
+  }
+
+  private dnForId(id: string, req?: DmRequest): string {
+    const base = this.baseResolver.groupBase(req);
+    return `${this.rdnAttribute}=${escapeDnValue(id)},${base}`;
+  }
+
+  /**
+   * Resolve an LDAP member DN back to a SCIM reference (for GET responses).
+   * Best-effort: extract the RDN value and a guessed type (User if in user base).
+   */
+  private buildMemberResolver(
+    req: DmRequest | undefined
+  ): (dn: string) => MultiValued | undefined {
+    const userBase = this.baseResolver.userBase(req);
+    const groupBase = this.baseResolver.groupBase(req);
+    const scimPrefix = this.scimPrefix;
+    const baseUrl =
+      this.options.scim_base_url ||
+      (req?.protocol && req.get
+        ? `${req.protocol}://${String(req.get('host') || '')}`
+        : '');
+    const userRdn = this.options.scim_user_rdn_attribute;
+    const groupRdn = this.rdnAttribute;
+
+    const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
+    return (dn: string): MultiValued | undefined => {
+      if (!dn) return undefined;
+      // Hide the schema-placeholder member from SCIM responses. Compared as
+      // a DN: the directory's own spelling of the configured placeholder is
+      // still the placeholder.
+      if (isDummyMemberDn(dn, placeholder)) return undefined;
+      const [rdn] = parseDn(dn);
+      const eq = rdn ? rdn.indexOf('=') : -1;
+      if (eq <= 0) return undefined;
+      const rdnType = rdn.slice(0, eq).trim();
+      const value = rdnValue(dn);
+      const lower = dn.toLowerCase();
+      let type: 'User' | 'Group' | undefined;
+      if (userBase && lower.endsWith(userBase.toLowerCase())) type = 'User';
+      else if (groupBase && lower.endsWith(groupBase.toLowerCase()))
+        type = 'Group';
+      else if (rdnType === userRdn) type = 'User';
+      else if (rdnType === groupRdn) type = 'Group';
+      const result: MultiValued = { value };
+      if (type) {
+        result.type = type;
+        if (baseUrl) {
+          const endpoint = type === 'User' ? 'Users' : 'Groups';
+          result.$ref = `${baseUrl.replace(/\/$/, '')}${scimPrefix}/${endpoint}/${encodeURIComponent(value)}`;
+        }
+      }
+      return result;
+    };
+  }
+
+  async get(req: DmRequest, id: string): Promise<ScimGroup> {
+    const dn = this.dnForId(id, req);
+    let result: SearchResult;
+    try {
+      result = (await this.ldap.forRequest(req).search(
+        {
+          paged: false,
+          scope: 'base',
+          attributes: this.attributes,
+        },
+        dn
+      )) as SearchResult;
+    } catch (err) {
+      if (extractLdapCode(err) === 32) {
+        throw scimNotFound(`Group ${id} not found`);
+      }
+      throw err;
+    }
+    if (!result.searchEntries || result.searchEntries.length === 0) {
+      throw scimNotFound(`Group ${id} not found`);
+    }
+    return ldapToScimGroup(
+      result.searchEntries[0],
+      this.mapping,
+      this.ctx(req),
+      this.buildMemberResolver(req)
+    );
+  }
+
+  async list(
+    req: DmRequest,
+    query: GroupListQuery
+  ): Promise<ListResponse<ScimGroup>> {
+    const base = this.baseResolver.groupBase(req);
+    const startIndex = Math.max(1, query.startIndex || 1);
+    const count = Math.min(
+      this.maxResults,
+      Math.max(0, query.count ?? this.maxResults)
+    );
+
+    let ldapFilter = `(objectClass=${this.objectClass.find(c => c !== 'top') || 'groupOfNames'})`;
+    let idEquals: string | undefined;
+    if (query.filter) {
+      const translated = scimFilterToLdap(query.filter, this.mapping);
+      if (translated.idEquals) {
+        idEquals = translated.idEquals;
+      } else {
+        ldapFilter = `(&${ldapFilter}${translated.ldapFilter})`;
+      }
+    }
+
+    if (idEquals) {
+      try {
+        const group = await this.get(req, idEquals);
+        return {
+          schemas: [SCHEMA_LIST_RESPONSE],
+          totalResults: 1,
+          startIndex: 1,
+          itemsPerPage: 1,
+          Resources: [group],
+        };
+      } catch (err) {
+        if (err instanceof ScimError && err.statusCode === 404) {
+          return {
+            schemas: [SCHEMA_LIST_RESPONSE],
+            totalResults: 0,
+            startIndex: 1,
+            itemsPerPage: 0,
+            Resources: [],
+          };
+        }
+        throw err;
+      }
+    }
+
+    const { entries, totalResults } = await pagedSearch({
+      directory: this.ldap.forRequest(req),
+      base,
+      filter: ldapFilter,
+      attributes: this.attributes,
+      startIndex,
+      count,
+      maxScanned: this.maxScanned,
+    });
+
+    const resolver = this.buildMemberResolver(req);
+    const resources = entries.map(e =>
+      ldapToScimGroup(e, this.mapping, this.ctx(req), resolver)
+    );
+    return {
+      schemas: [SCHEMA_LIST_RESPONSE],
+      totalResults,
+      startIndex,
+      itemsPerPage: resources.length,
+      Resources: resources,
+    };
+  }
+
+  async create(req: DmRequest, resource: ScimGroup): Promise<ScimGroup> {
+    if (!resource.displayName) {
+      throw scimInvalidValue('displayName is required');
+    }
+    const base = this.baseResolver.groupBase(req);
+    // RFC 7643 section 3.1: the client never chooses `id`. A
+    // `scimgroupcreate` hook may assign one to name the entry, unless the
+    // mapping already fills the RDN attribute, which the id would overwrite.
+    // The hooks read the body as a Group: refuse a malformed one before they do
+    scimGroupToLdap(
+      { ...resource, id: undefined },
+      this.mapping,
+      this.objectClass
+    );
+    const [group] = await this.hookBus.chain('scimgroupcreate', [
+      { ...resource, id: undefined },
+      req,
+      base,
+    ]);
+
+    const { rdn: named, attributes } = scimGroupToLdap(
+      group,
+      this.mapping,
+      this.objectClass
+    );
+    const rdn = (!attributes[this.rdnAttribute] && group.id) || named;
+    if (!rdn) throw scimInvalidValue('displayName is required');
+    validateDnValue(rdn, this.rdnAttribute);
+    attributes[this.rdnAttribute] = rdn;
+
+    // Resolve members (SCIM value → LDAP DN)
+    const memberDns: string[] = [];
+    if (group.members && Array.isArray(group.members)) {
+      for (const m of group.members) {
+        if (!m || m.value == null) continue;
+        if (typeof m.value !== 'string')
+          throw scimInvalidValue(
+            `Each member value must be a string, got ${kindOf(m.value)}`
+          );
+        const dn = await this.users.resolveRef(req, m.value);
+        if (dn) memberDns.push(dn);
+      }
+    }
+    // groupOfNames requires at least one member
+    if (memberDns.length === 0) {
+      // Fall back to a placeholder; mirrors --group-dummy-user convention
+      const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
+      memberDns.push(placeholder);
+    }
+    attributes.member = memberDns;
+
+    const dn = `${this.rdnAttribute}=${escapeDnValue(rdn)},${base}`;
+
+    try {
+      await this.ldap.forRequest(req).add(dn, attributes);
+    } catch (err) {
+      if (extractLdapCode(err) === 68) {
+        throw scimUniqueness(`Group ${rdn} already exists`);
+      }
+      throw err;
+    }
+
+    const created = await this.get(req, rdn);
+    this.hookBus.notify('scimgroupcreatedone', created);
+    return created;
+  }
+
+  async replace(
+    req: DmRequest,
+    id: string,
+    resource: ScimGroup
+  ): Promise<ScimGroup> {
+    await this.get(req, id); // ensure exists
+    const hookInput = await this.hookBus.chain('scimgroupupdate', [
+      id,
+      resource,
+      req,
+    ]);
+    const incoming = hookInput[1];
+
+    const { attributes } = scimGroupToLdap(
+      incoming,
+      this.mapping,
+      this.objectClass
+    );
+
+    const memberDns: string[] = [];
+    if (incoming.members && Array.isArray(incoming.members)) {
+      for (const m of incoming.members) {
+        if (!m || m.value == null) continue;
+        if (typeof m.value !== 'string')
+          throw scimInvalidValue(
+            `Each member value must be a string, got ${kindOf(m.value)}`
+          );
+        const dn = await this.users.resolveRef(req, m.value);
+        if (dn) memberDns.push(dn);
+      }
+    }
+    if (memberDns.length === 0) {
+      const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
+      memberDns.push(placeholder);
+    }
+
+    const dn = this.dnForId(id, req);
+    const changes: ModifyRequest = { replace: {} };
+    for (const [k, v] of Object.entries(attributes)) {
+      if (k === 'objectClass' || k === this.rdnAttribute) continue;
+      changes.replace![k] = v;
+    }
+    changes.replace!.member = memberDns;
+    await this.ldap.forRequest(req).modify(dn, changes);
+
+    const updated = await this.get(req, id);
+    this.hookBus.notify('scimgroupupdatedone', id, updated);
+    return updated;
+  }
+
+  async patch(
+    req: DmRequest,
+    id: string,
+    patch: PatchRequest
+  ): Promise<ScimGroup> {
+    const dn = this.dnForId(id, req);
+    await writePatch(dn, async () => {
+      const current = await this.currentEntry(req, id); // ensure exists
+      const changes = await patchToModifyRequest(patch, {
+        mapping: this.mapping,
+        memberAttribute: 'member',
+        resolveMemberRef: async value => this.users.resolveRef(req, value),
+        current,
+      });
+
+      // groupOfNames requires at least one member, so a patch that empties the
+      // attribute gets the configured placeholder instead of a schema
+      // violation. A bare remove deletes the attribute: replace it. A removal
+      // of named members leaves any the read did not show; the placeholder
+      // only joins when none the caller saw remain.
+      const removed =
+        changes.delete && !Array.isArray(changes.delete)
+          ? changes.delete.member
+          : undefined;
+      if (removed !== undefined) {
+        const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
+        if (removed === '') {
+          delete (changes.delete as Record<string, unknown>).member;
+          if (Object.keys(changes.delete!).length === 0) delete changes.delete;
+          if (!changes.replace) changes.replace = {};
+          changes.replace.member = [placeholder];
+        } else {
+          const gone = ([] as string[]).concat(removed as string | string[]);
+          const left = ([] as unknown[])
+            .concat(current.member ?? [], changes.add?.member ?? [])
+            .map(String)
+            .filter(m => !gone.includes(m));
+          if (left.length === 0) {
+            if (!changes.add) changes.add = {};
+            changes.add.member = placeholder;
+          }
+        }
+      }
+
+      // An empty change set still goes through ldapActions: `ldapmodifyrequest`
+      // is where write permission is checked, and an empty modify touches the
+      // directory not at all. Permissive: re-adding a member the read did not
+      // show is no error.
+      await this.ldap.forRequest(req).modify(dn, changes, { permissive: true });
+    });
+    const updated = await this.get(req, id);
+    this.hookBus.notify('scimgroupupdatedone', id, updated);
+    return updated;
+  }
+
+  /** Fetch the raw LDAP entry backing a SCIM id, or raise 404. */
+  private async currentEntry(
+    req: DmRequest,
+    id: string
+  ): Promise<AttributesList> {
+    const dn = this.dnForId(id, req);
+    let result: SearchResult;
+    try {
+      result = (await this.ldap.forRequest(req).search(
+        {
+          paged: false,
+          scope: 'base',
+          attributes: this.attributes,
+        },
+        dn
+      )) as SearchResult;
+    } catch (err) {
+      if (extractLdapCode(err) === 32) {
+        throw scimNotFound(`Group ${id} not found`);
+      }
+      throw err;
+    }
+    if (!result.searchEntries?.length) {
+      throw scimNotFound(`Group ${id} not found`);
+    }
+    return result.searchEntries[0];
+  }
+
+  async delete(req: DmRequest, id: string): Promise<void> {
+    await this.get(req, id); // ensure exists
+    const [finalId] = await this.hookBus.chain('scimgroupdelete', [id, req]);
+    const dn = this.dnForId(finalId, req);
+    await this.ldap.forRequest(req).delete(dn);
+    this.hookBus.notify('scimgroupdeletedone', finalId);
+  }
+
+  /** Used internally and by Bulk to resolve a Group SCIM reference to a DN. */
+  async resolveRef(req: DmRequest, value: string): Promise<string | undefined> {
+    if (!value) return undefined;
+    const base = this.baseResolver.groupBase(req);
+    // A DN under the base is looked up as a name is: as the caller
+    const given = value.includes('=') && value.includes(',');
+    if (given && !isChildOf(value, base)) return undefined;
+    const dn = given
+      ? value
+      : `${this.rdnAttribute}=${escapeDnValue(value)},${base}`;
+    try {
+      const res = (await this.ldap
+        .forRequest(req)
+        .search(
+          { paged: false, scope: 'base', attributes: ['dn'] },
+          dn
+        )) as SearchResult;
+      if (res.searchEntries && res.searchEntries.length > 0) {
+        return res.searchEntries[0].dn;
+      }
+    } catch (err) {
+      // Only "no such object" is a miss. Anything else — an authorization
+      // refusal, a broken connection — must not be read as an absent member,
+      // which would silently drop the reference from the group.
+      if (extractLdapCode(err) !== 32) throw err;
+      // Not there under that DN; try a filter.
+    }
+    // A DN names one entry: no filter finds it elsewhere
+    if (given) return undefined;
+    try {
+      const res = (await this.ldap.forRequest(req).search(
+        {
+          filter: `(${this.rdnAttribute}=${escapeLdapFilter(value)})`,
+          scope: 'sub',
+          paged: false,
+          attributes: ['dn'],
+        },
+        base
+      )) as SearchResult;
+      if (res.searchEntries && res.searchEntries.length > 0) {
+        return res.searchEntries[0].dn;
+      }
+    } catch (err) {
+      if (extractLdapCode(err) !== 32) throw err;
+      // The base itself is absent: no match, same as an empty result.
+    }
+    return undefined;
+  }
+
+  get groupMapping(): ResourceMapping {
+    return this.mapping;
+  }
+}

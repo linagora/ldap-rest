@@ -1,0 +1,76 @@
+{
+  "name": "@ldap-rest/scim",
+  "version": "3.0.0",
+  "description": "LDAP-Rest SCIM 2.0 plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/scim"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/scim.ts",
+      "types": "./dist/scim.d.ts",
+      "import": "./dist/scim.js"
+    },
+    "./bulk": {
+      "development": "./src/bulk.ts",
+      "types": "./dist/bulk.d.ts",
+      "import": "./dist/bulk.js"
+    },
+    "./discovery": {
+      "development": "./src/discovery.ts",
+      "types": "./dist/discovery.d.ts",
+      "import": "./dist/discovery.js"
+    },
+    "./filter": {
+      "development": "./src/filter.ts",
+      "types": "./dist/filter.d.ts",
+      "import": "./dist/filter.js"
+    },
+    "./groups": {
+      "development": "./src/groups.ts",
+      "types": "./dist/groups.d.ts",
+      "import": "./dist/groups.js"
+    },
+    "./list": {
+      "development": "./src/list.ts",
+      "types": "./dist/list.d.ts",
+      "import": "./dist/list.js"
+    },
+    "./patch": {
+      "development": "./src/patch.ts",
+      "types": "./dist/patch.d.ts",
+      "import": "./dist/patch.js"
+    },
+    "./projection": {
+      "development": "./src/projection.ts",
+      "types": "./dist/projection.d.ts",
+      "import": "./dist/projection.js"
+    },
+    "./users": {
+      "development": "./src/users.ts",
+      "types": "./dist/users.d.ts",
+      "import": "./dist/users.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@sinclair/typebox": "^0.34.52",
+    "express": "^5.1.0",
+    "winston": "^3.17.0"
+  }
+}

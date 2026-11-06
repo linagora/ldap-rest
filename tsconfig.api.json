@@ -149,6 +149,15 @@
       "@ldap-rest/ldap-trash/options": [
         "./packages/ldap-trash/dist/trash.options.d.ts"
       ],
+      "@ldap-rest/scim": ["./packages/scim/dist/scim.d.ts"],
+      "@ldap-rest/scim/bulk": ["./packages/scim/dist/bulk.d.ts"],
+      "@ldap-rest/scim/discovery": ["./packages/scim/dist/discovery.d.ts"],
+      "@ldap-rest/scim/filter": ["./packages/scim/dist/filter.d.ts"],
+      "@ldap-rest/scim/groups": ["./packages/scim/dist/groups.d.ts"],
+      "@ldap-rest/scim/list": ["./packages/scim/dist/list.d.ts"],
+      "@ldap-rest/scim/patch": ["./packages/scim/dist/patch.d.ts"],
+      "@ldap-rest/scim/projection": ["./packages/scim/dist/projection.d.ts"],
+      "@ldap-rest/scim/users": ["./packages/scim/dist/users.d.ts"],
       "@ldap-rest/storage": ["./packages/storage/dist/storage.d.ts"],
       "@ldap-rest/storage/options": [
         "./packages/storage/dist/storage.options.d.ts"

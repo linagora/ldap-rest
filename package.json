@@ -193,6 +193,10 @@
       "import": "./dist/plugins/rabbitmq.js",
       "types": "./dist/src/plugins/rabbitmq.d.ts"
     },
+    "./plugin-scim": {
+      "import": "./dist/plugins/scim.js",
+      "types": "./dist/src/plugins/scim.d.ts"
+    },
     "./plugin-scim-baseresolver": {
       "import": "./dist/plugins/scim/baseResolver.js",
       "types": "./dist/src/plugins/scim/baseResolver.d.ts"
@@ -847,14 +851,14 @@
     "test:one": "mocha --config .mocharc-one.json"
   },
   "overrides": {
+    "@microsoft/api-extractor": {
+      "minimatch": "^11.0.5"
+    },
     "diff": ">=8.0.3",
     "glob": ">=11.1.0",
     "minimatch": "^10.2.3",
     "postcss-selector-parser": "^7.1.6",
-    "serialize-javascript": ">=7.0.3",
-    "@microsoft/api-extractor": {
-      "minimatch": "^11.0.5"
-    }
+    "serialize-javascript": ">=7.0.3"
   },
   "dependencies": {
     "@ldap-rest/auth-crowdsec": "3.0.0",
@@ -884,6 +888,7 @@
     "@ldap-rest/ldap-passwordpolicy": "3.0.0",
     "@ldap-rest/ldap-raw": "3.0.0",
     "@ldap-rest/ldap-trash": "3.0.0",
+    "@ldap-rest/scim": "3.0.0",
     "@ldap-rest/storage": "3.0.0",
     "@sinclair/typebox": "^0.34.52",
     "@types/express": "^5.0.3",
@@ -972,6 +977,7 @@
     "@ldap-rest/ldap-passwordpolicy",
     "@ldap-rest/ldap-raw",
     "@ldap-rest/ldap-trash",
+    "@ldap-rest/scim",
     "@ldap-rest/storage"
   ],
   "engines": {

@@ -26,5 +26,7 @@
   "core/ldap/passwordPolicy": "@ldap-rest/ldap-passwordpolicy",
   "core/ldap/raw": "@ldap-rest/ldap-raw",
   "core/ldap/trash": "@ldap-rest/ldap-trash",
+  "core/scim": "@ldap-rest/scim",
+  "core/scim/scim": "@ldap-rest/scim",
   "core/storage": "@ldap-rest/storage"
 }

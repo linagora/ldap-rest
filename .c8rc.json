@@ -29,6 +29,7 @@
     "packages/ldap-passwordpolicy/src",
     "packages/ldap-raw/src",
     "packages/ldap-trash/src",
+    "packages/scim/src",
     "packages/storage/src"
   ],
   "extension": [".ts"],
