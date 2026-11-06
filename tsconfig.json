@@ -85,6 +85,8 @@
       "@ldap-rest/authz-scope/options": [
         "./packages/authz-scope/src/authzScope.options.ts"
       ],
+      "@ldap-rest/james": ["./packages/james/src/james.ts"],
+      "@ldap-rest/james/options": ["./packages/james/src/james.options.ts"],
       "@ldap-rest/ldap-organizations": [
         "./packages/ldap-organizations/src/organizations.ts"
       ],
@@ -156,7 +158,80 @@
       "@ldap-rest/storage/postgres": [
         "./packages/storage/src/storage/postgres.ts"
       ],
-      "@ldap-rest/storage/valkey": ["./packages/storage/src/storage/valkey.ts"]
+      "@ldap-rest/storage/valkey": ["./packages/storage/src/storage/valkey.ts"],
+      "@ldap-rest/twake-appaccounts": [
+        "./packages/twake-appaccounts/src/appAccountsApi.ts"
+      ],
+      "@ldap-rest/twake-appaccounts/consistency": [
+        "./packages/twake-appaccounts/src/appAccountsConsistency.ts"
+      ],
+      "@ldap-rest/twake-appaccounts/options": [
+        "./packages/twake-appaccounts/src/appAccounts.options.ts"
+      ],
+      "@ldap-rest/twake-calendar": [
+        "./packages/twake-calendar/src/calendar.ts"
+      ],
+      "@ldap-rest/twake-calendar/options": [
+        "./packages/twake-calendar/src/calendar.options.ts"
+      ],
+      "@ldap-rest/twake-calendar/resources": [
+        "./packages/twake-calendar/src/calendarResources.ts"
+      ],
+      "@ldap-rest/twake-lifecycle": [
+        "./packages/twake-lifecycle/src/lifecycleEvents.ts"
+      ],
+      "@ldap-rest/twake-lifecycle/attributes": [
+        "./packages/twake-lifecycle/src/lifecycleAttributes.ts"
+      ],
+      "@ldap-rest/twake-lifecycle/tombstone": [
+        "./packages/twake-lifecycle/src/tombstone.ts"
+      ],
+      "@ldap-rest/twake-lifecycle/options": [
+        "./packages/twake-lifecycle/src/twakeLifecycle.options.ts"
+      ],
+      "@ldap-rest/twake-lifecycle/tombstone-options": [
+        "./packages/twake-lifecycle/src/twakeTombstone.options.ts"
+      ],
+      "@ldap-rest/twake-provisioning": [
+        "./packages/twake-provisioning/src/instances.ts"
+      ],
+      "@ldap-rest/twake-provisioning/cloudery": [
+        "./packages/twake-provisioning/src/clouderyProvision.ts"
+      ],
+      "@ldap-rest/twake-provisioning/cozy": [
+        "./packages/twake-provisioning/src/cozyProvision.ts"
+      ],
+      "@ldap-rest/twake-provisioning/options": [
+        "./packages/twake-provisioning/src/twakeInstances.options.ts"
+      ],
+      "@ldap-rest/twake-provisioning/cloudery-options": [
+        "./packages/twake-provisioning/src/cloudery.options.ts"
+      ],
+      "@ldap-rest/twake-provisioning/cozy-options": [
+        "./packages/twake-provisioning/src/cozy.options.ts"
+      ],
+      "@ldap-rest/twake-collaboration": [
+        "./packages/twake-collaboration/src/groups.ts"
+      ],
+      "@ldap-rest/twake-collaboration/spaces": [
+        "./packages/twake-collaboration/src/spaces.ts"
+      ],
+      "@ldap-rest/twake-collaboration/groups-options": [
+        "./packages/twake-collaboration/src/twakeGroups.options.ts"
+      ],
+      "@ldap-rest/twake-collaboration/spaces-options": [
+        "./packages/twake-collaboration/src/twakeSpaces.options.ts"
+      ],
+      "@ldap-rest/twake-drive": ["./packages/twake-drive/src/drive.ts"],
+      "@ldap-rest/twake-drive/options": [
+        "./packages/twake-drive/src/drive.options.ts"
+      ],
+      "@ldap-rest/twake-mail-migration": [
+        "./packages/twake-mail-migration/src/migrationProxy.ts"
+      ],
+      "@ldap-rest/twake-mail-migration/options": [
+        "./packages/twake-mail-migration/src/migrationProxy.options.ts"
+      ]
     },
     "outDir": "./dist",
     "rootDir": "./",

@@ -17,6 +17,7 @@
     "packages/authz-perroute/src",
     "packages/authz-scope/src",
     "packages/core/src",
+    "packages/james/src",
     "packages/ldap-accountlifecycle/src",
     "packages/ldap-bulkimport/src",
     "packages/ldap-departmentsync/src",
@@ -30,7 +31,14 @@
     "packages/ldap-raw/src",
     "packages/ldap-trash/src",
     "packages/scim/src",
-    "packages/storage/src"
+    "packages/storage/src",
+    "packages/twake-appaccounts/src",
+    "packages/twake-calendar/src",
+    "packages/twake-collaboration/src",
+    "packages/twake-drive/src",
+    "packages/twake-lifecycle/src",
+    "packages/twake-mail-migration/src",
+    "packages/twake-provisioning/src"
   ],
   "extension": [".ts"],
   "reporter": ["text-summary", "html", "lcov"],

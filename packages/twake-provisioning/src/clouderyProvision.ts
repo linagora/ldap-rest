@@ -1,0 +1,1228 @@
+/**
+ * @module plugins/twake/clouderyProvision
+ *
+ * B2B sibling of `cozyProvision`. For SCIM users created under a configured
+ * B2B LDAP branch, it provisions a Twake/Cozy instance via the Cloudery
+ * (manager) API, writes the returned FQDN to the `twakeWorkspaceUrl` attribute
+ * (bare FQDN) and the org id to `twakeOrganizationId` (the org id arrives in a
+ * header, so the SCIM body cannot carry it), and publishes the same lifecycle
+ * messages cozyProvision does.
+ *
+ * The org id is carried per-request in a header (single shared B2B token), so
+ * onboarding a new org needs no config change; the org branch is selected by
+ * the core `BaseResolver` (also from a header). The operator supplies the email
+ * in the SCIM body, `org_domain` is its domain, and `slug` = `oidc` =
+ * instanceSlug(userName + orgId).
+ *
+ * Alongside the FQDN, the post-create write stamps two attributes the admin
+ * panel reads off the user entry: `twakeOrganizationRole` and (when present)
+ * `twakePhones`. The role is per-request via a header, so a single batch import
+ * can be all members and the next all admins; it accepts `admin`, `owner`, or
+ * `member` and falls back to `cloudery_default_org_role` (`member`) when the
+ * header is absent or unknown. `twakePhones` holds the SCIM phone numbers as the
+ * JSON the panel expects: `[{ "number": "+33...", "primary": true }]`.
+ */
+import { setTimeout as sleep } from 'node:timers/promises';
+
+import type { Request } from 'express';
+import DmPlugin, {
+  type Role,
+  escapeDnValue,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import { Hooks } from '@ldap-rest/core/hooks';
+import { instanceSlug } from '@ldap-rest/core/lib/instanceProviders';
+import { isChildOf } from '@ldap-rest/core/lib/utils';
+import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
+import { scimOptions } from '@ldap-rest/core/lib/scim/options';
+import type { ScimUser } from '@ldap-rest/core/lib/scim/types';
+
+import { clouderyOptions, clouderyOptionsOf } from './cloudery.options';
+import { cozyOptions } from './cozy.options';
+
+type ReqWithUser = Request & { user?: string };
+
+interface ClouderyInstanceResponse {
+  id: string;
+  fqdn: string;
+  workflow?: string;
+}
+
+/** An instance as the Cloudery's search lists it */
+interface ClouderyInstanceSummary {
+  _id: string;
+  internal_email?: string;
+  oidc?: string;
+}
+
+interface CreateContext {
+  orgId: string;
+  email: string;
+  role: string;
+  base: string;
+  ts: number;
+}
+
+interface DeleteContext {
+  fqdn: string;
+  domain: string;
+}
+
+// A create that fails between the pre- and post-create hooks would otherwise
+// leak its captured context; prune anything older than this.
+const STASH_TTL_MS = 5 * 60 * 1000;
+
+// Roles the admin panel recognises for the `twakeOrganizationRole` attribute;
+// anything else from the header is rejected in favour of the configured default.
+const VALID_ORG_ROLES = new Set(['admin', 'owner', 'member']);
+
+// Cap on the manager API error body we log: enough to carry the actual error
+// message, bounded so a large HTML error page (repeated across poll attempts)
+// can't bloat the logs.
+const MAX_LOG_BODY_LEN = 1000;
+
+export default class ClouderyProvision extends DmPlugin {
+  static optionDefinitions = clouderyOptions;
+
+  name = 'clouderyProvision';
+  roles: Role[] = ['consistency'] as const;
+
+  static optionDependencies = [
+    'core/rabbitmq',
+    'core/twake/cozyProvision',
+    'core/scim/scim',
+  ];
+
+  dependencies = { rabbitmq: 'core/rabbitmq' };
+
+  private readonly managerUrl: string;
+  private readonly managerToken: string;
+  private readonly offer: string;
+  private readonly clouderyDomain: string;
+  private readonly userBranch: string;
+  private readonly orgIdHeader: string;
+  private readonly orgRoleHeader: string;
+  private readonly defaultOrgRole: string;
+  private readonly fqdnAttribute: string;
+  private readonly orgIdAttribute: string;
+  private readonly orgRoleAttribute: string;
+  private readonly phonesAttribute: string;
+  private readonly invitedAttribute: string;
+  private readonly defaultLocale: string;
+  private readonly rdnAttribute: string;
+  private readonly authExchange: string;
+  private readonly b2bExchange: string;
+  private readonly userCreatedRoutingKey: string;
+  private readonly userDeletedRoutingKey: string;
+  private readonly pollIntervalMs: number;
+  private readonly maxPollAttempts: number;
+
+  private readonly baseResolver: BaseResolver;
+
+  // pre-create hook (has req) → post-create hook (no req). Keyed by the
+  // primary email (unique per user/tenant); userName alone collides across org
+  // branches, which would let one tenant's create overwrite another's context.
+  private readonly createStash = new Map<string, CreateContext>();
+  // pre-delete hook (entry still exists) → post-delete hook; keyed by id.
+  private readonly deleteStash = new Map<string, DeleteContext>();
+
+  constructor(server: DM) {
+    super(server);
+    const settings = clouderyOptionsOf(server.config);
+    const cozy = this.optionsFrom(cozyOptions);
+    const scim = this.optionsFrom(scimOptions);
+
+    this.managerUrl = settings.cloudery_manager_url.replace(/\/$/, '');
+    this.managerToken = settings.cloudery_manager_token;
+    this.offer = settings.cloudery_offer;
+    this.clouderyDomain = settings.cloudery_domain;
+    this.userBranch = settings.cloudery_user_branch;
+    this.orgIdHeader = settings.cloudery_org_id_header.toLowerCase();
+    this.orgRoleHeader = settings.cloudery_org_role_header.toLowerCase();
+    // The default is the fallback for an absent/unknown header, so it must be a
+    // valid, lower-cased role itself; otherwise a misconfigured default would
+    // bypass the same validation resolveRole() applies to header values.
+    const configuredRole = settings.cloudery_default_org_role;
+    const normalizedRole = configuredRole.trim().toLowerCase();
+    if (VALID_ORG_ROLES.has(normalizedRole)) {
+      this.defaultOrgRole = normalizedRole;
+    } else {
+      this.defaultOrgRole = 'member';
+      this.logger.warn(
+        `${this.name}: cloudery_default_org_role "${configuredRole}" is not one of ${[
+          ...VALID_ORG_ROLES,
+        ].join(', ')} — using "member"`
+      );
+    }
+    this.fqdnAttribute = settings.cloudery_fqdn_attribute;
+    this.orgIdAttribute = settings.cloudery_org_id_attribute;
+    this.orgRoleAttribute = settings.cloudery_org_role_attribute;
+    this.phonesAttribute = settings.cloudery_phones_attribute;
+    this.invitedAttribute = settings.cloudery_invited_attribute;
+    this.defaultLocale = settings.cloudery_default_locale;
+    this.rdnAttribute = scim.scim_user_rdn_attribute;
+    this.authExchange = cozy.cozy_auth_exchange;
+    this.b2bExchange = cozy.cozy_b2b_exchange;
+    this.userCreatedRoutingKey = cozy.cozy_user_created_routing_key;
+    // Empty turns the deletion event off, for a deployment that publishes it
+    // elsewhere.
+    this.userDeletedRoutingKey = cozy.cozy_user_deleted_routing_key;
+    this.pollIntervalMs = settings.cloudery_workflow_poll_interval_ms;
+    this.maxPollAttempts = settings.cloudery_workflow_max_attempts;
+
+    this.baseResolver = new BaseResolver(
+      this.config,
+      this.optionsFrom(scimOptions)
+    );
+
+    if (!this.managerUrl) {
+      this.logger.warn(
+        `${this.name}: cloudery_manager_url is empty — instance provisioning will be skipped`
+      );
+    }
+    if (!this.userBranch) {
+      this.logger.warn(
+        `${this.name}: cloudery_user_branch is empty — no users will be provisioned`
+      );
+    }
+    this.logger.info({
+      plugin: this.name,
+      event: 'init',
+      managerUrl: this.managerUrl || undefined,
+      userBranch: this.userBranch || undefined,
+      orgIdHeader: this.orgIdHeader,
+      orgRoleHeader: this.orgRoleHeader,
+      defaultOrgRole: this.defaultOrgRole,
+      fqdnAttribute: this.fqdnAttribute,
+      orgIdAttribute: this.orgIdAttribute,
+      orgRoleAttribute: this.orgRoleAttribute,
+      phonesAttribute: this.phonesAttribute,
+      invitedAttribute: this.invitedAttribute,
+      pollIntervalMs: this.pollIntervalMs,
+      maxPollAttempts: this.maxPollAttempts,
+    });
+  }
+
+  hooks: Hooks = {
+    scimusercreate: (
+      args: [ScimUser, ReqWithUser?]
+    ): [ScimUser, ReqWithUser?] => {
+      this.normalizeUserName(args[0]);
+      this.captureCreate(args[0], args[1]);
+      return args;
+    },
+    scimusercreatedone: async (user: ScimUser): Promise<void> => {
+      await this.provision(user);
+    },
+    scimuserdelete: async (
+      args: [string, ReqWithUser?]
+    ): Promise<[string, ReqWithUser?]> => {
+      args[0] = args[0].toLowerCase();
+      await this.captureDelete(args[0], args[1]);
+      return args;
+    },
+    scimuserdeletedone: async (id: string): Promise<void> => {
+      await this.deprovision(id);
+    },
+  };
+
+  /** Pre-create: stash the request-derived context for the post-create hook. */
+  private captureCreate(user: ScimUser, req?: ReqWithUser): void {
+    this.pruneStash();
+    const userName = this.extractId(user);
+    const base = this.baseResolver.userBase(req);
+    this.logger.info({
+      plugin: this.name,
+      event: 'captureCreate',
+      userName: userName || undefined,
+      base,
+      hasManagerUrl: Boolean(this.managerUrl),
+      hasUserBranch: Boolean(this.userBranch),
+    });
+    if (!this.managerUrl || !this.userBranch) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureCreate',
+        userName: userName || undefined,
+        base,
+        result: 'skipped',
+        reason: 'missing_configuration',
+      });
+      return;
+    }
+    if (!userName) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureCreate',
+        base,
+        result: 'skipped',
+        reason: 'missing_user_name',
+      });
+      return;
+    }
+
+    if (!this.isAtOrUnder(base, this.userBranch)) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureCreate',
+        userName,
+        base,
+        result: 'skipped',
+        reason: 'outside_b2b_branch',
+      });
+      return;
+    }
+
+    const orgId = this.readHeader(req, this.orgIdHeader);
+    if (!orgId) {
+      this.logger.warn({
+        plugin: this.name,
+        event: 'captureCreate',
+        userName,
+        message: `B2B branch create without ${this.orgIdHeader} — skipping provisioning`,
+      });
+      return;
+    }
+
+    // org_domain is the email domain (as in signup), so the email must be in
+    // the body; the core maps it to `mail`.
+    const email = this.extractPrimaryEmail(user);
+    if (!email) {
+      this.logger.warn({
+        plugin: this.name,
+        event: 'captureCreate',
+        userName,
+        message:
+          'B2B branch create without a primary email — skipping provisioning',
+      });
+      return;
+    }
+
+    // Trim what we stash: leading/trailing whitespace in the email or org id
+    // would otherwise leak into org_domain / internal_email / slug downstream.
+    const cleanEmail = email.trim();
+    const role = this.resolveRole(req, userName);
+    this.createStash.set(cleanEmail.toLowerCase(), {
+      orgId: orgId.trim(),
+      email: cleanEmail,
+      role,
+      base,
+      ts: Date.now(),
+    });
+    this.logger.info({
+      plugin: this.name,
+      event: 'captureCreate',
+      userName,
+      base,
+      orgId: orgId.trim(),
+      email: cleanEmail,
+      role,
+      result: 'stashed',
+    });
+  }
+
+  /**
+   * Post-create: provision via Cloudery, wait for the workflow, then write the
+   * FQDN back and publish user.created. Gated on workflow success so nothing is
+   * emitted for an instance that does not exist yet.
+   */
+  private async provision(user: ScimUser): Promise<void> {
+    const userName = this.extractId(user);
+    this.logger.info({
+      plugin: this.name,
+      event: 'provision',
+      userName: userName || undefined,
+    });
+    if (!userName) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'provision',
+        result: 'skipped',
+        reason: 'missing_user_name',
+      });
+      return;
+    }
+    const lookupEmail = this.extractPrimaryEmail(user);
+    if (!lookupEmail) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'provision',
+        userName,
+        result: 'skipped',
+        reason: 'missing_primary_email',
+      });
+      return;
+    }
+    const key = lookupEmail.trim().toLowerCase();
+    const ctx = this.createStash.get(key);
+    if (!ctx) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'provision',
+        userName,
+        email: lookupEmail.trim(),
+        result: 'skipped',
+        reason: 'no_stashed_context',
+      });
+      return;
+    }
+    this.createStash.delete(key);
+    this.logger.info({
+      plugin: this.name,
+      event: 'provision',
+      userName,
+      email: ctx.email,
+      orgId: ctx.orgId,
+      base: ctx.base,
+      role: ctx.role,
+      result: 'context_loaded',
+    });
+
+    const email = ctx.email;
+    const orgDomain = emailDomain(email);
+    const slug = instanceSlug(userName + ctx.orgId);
+    if (!slug) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'provision',
+        userName,
+        result: 'no_slug',
+      });
+      return;
+    }
+    const mobile = this.extractPrimaryPhone(user);
+    const phones = this.extractPhones(user);
+    const publicName = this.extractPublicName(user) || userName;
+
+    const log = {
+      plugin: this.name,
+      event: 'provision',
+      userName,
+      orgId: ctx.orgId,
+      slug,
+    };
+
+    // Idempotency guard. The slug is deterministic, so its FQDN is
+    // `${slug}.${domain}`. If an instance for that FQDN already exists (e.g.
+    // the user is re-imported after their LDAP entry was recreated while the
+    // Cloudery instance survived), reuse it: creating unconditionally makes
+    // Cloudery mint a numbered duplicate (slug2). Fail open: if the lookup
+    // errors, fall through to create rather than block provisioning.
+    //
+    // Reused only when its email and OIDC id, where it carries them, are the
+    // account's, as `ClouderyProvider.find` does: distinct userNames can
+    // reduce to one slug (`jane_doe`, `janedoe`), sharing the OIDC id, and
+    // the email is what tells them apart. A re-import whose mail changed
+    // since is refused too.
+    const expectedFqdn = `${slug}.${this.clouderyDomain}`.toLowerCase();
+    let existing: ClouderyInstanceSummary | null = null;
+    try {
+      existing = await this.findInstanceByFqdn(expectedFqdn);
+    } catch (err) {
+      this.logger.warn({
+        ...log,
+        result: 'existence_lookup_failed',
+        fqdn: expectedFqdn,
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        error: `${err}`,
+      });
+    }
+    if (
+      existing &&
+      ((existing.internal_email &&
+        existing.internal_email.toLowerCase() !== email.toLowerCase()) ||
+        (existing.oidc && existing.oidc.toLowerCase() !== slug))
+    ) {
+      this.logger.error({
+        ...log,
+        result: 'slug_taken',
+        fqdn: expectedFqdn,
+        uuid: existing._id,
+      });
+      return;
+    }
+    const existingUuid = existing?._id ?? null;
+
+    let fqdn: string;
+    if (existingUuid) {
+      this.logger.info({
+        ...log,
+        result: 'instance_exists',
+        fqdn: expectedFqdn,
+        uuid: existingUuid,
+      });
+      fqdn = expectedFqdn;
+    } else {
+      let instance: ClouderyInstanceResponse;
+      try {
+        this.logger.info({
+          ...log,
+          result: 'creating_instance',
+          orgDomain,
+          email,
+          mobile: mobile || undefined,
+        });
+        instance = await this.createInstance({
+          email,
+          publicName,
+          locale: this.extractLocale(user),
+          oidc: slug,
+          phone: mobile || '',
+          slug,
+          public_name: publicName,
+          offer: this.offer,
+          domain: this.clouderyDomain,
+          skip_email_validation: true,
+          internal_email: email,
+          org_domain: orgDomain,
+          org_id: ctx.orgId,
+        });
+      } catch (err) {
+        this.logger.error({
+          ...log,
+          result: 'error',
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          error: `${err}`,
+        });
+        return;
+      }
+
+      const ready = instance.workflow
+        ? await this.waitForWorkflow(instance.workflow)
+        : true;
+      if (!ready) {
+        this.logger.error({
+          ...log,
+          result: 'workflow_failed',
+          workflow: instance.workflow,
+        });
+        return;
+      }
+
+      fqdn = instance.fqdn;
+    }
+    const dn = `${this.rdnAttribute}=${escapeDnValue(userName)},${ctx.base}`;
+    // Role and phones live on the user entry for the admin panel to read; they
+    // are not part of the Cloudery create payload. Phones are stored as the JSON
+    // the panel expects ([{ number, primary }]) and only when present.
+    // twakeInvited marks the member as pending invitation (the string "TRUE",
+    // its schema is a Directory String); the registration app clears it to
+    // "FALSE" once onboarding completes.
+    const replace: Record<string, string> = {
+      [this.fqdnAttribute]: fqdn,
+      [this.orgIdAttribute]: ctx.orgId,
+      [this.orgRoleAttribute]: ctx.role,
+      [this.invitedAttribute]: 'TRUE',
+      // Force cn to the userName for B2B provisioning; the core SCIM mapping
+      // sets cn from name.formatted, which is not what we want here.
+      cn: userName,
+    };
+    if (phones.length > 0) {
+      replace[this.phonesAttribute] = JSON.stringify(phones);
+    }
+    try {
+      this.logger.info({
+        ...log,
+        result: 'writing_fqdn',
+        dn,
+        hasPhones: phones.length > 0,
+      });
+      // As the server: the provisioned instance is recorded on the account, whoever created it
+      await this.server.ldap.system.modify(dn, { replace }, undefined, {
+        declaredClasses: this.config.user_class,
+      });
+      this.logger.info({
+        ...log,
+        result: 'written_fqdn',
+        dn,
+      });
+    } catch (err) {
+      // Instance exists, so still publish; the write failure would break the
+      // later delete lookup, so surface it.
+      this.logger.error({
+        ...log,
+        event: 'writeFqdn',
+        dn,
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        error: `${err}`,
+      });
+    }
+
+    await this.publishUserCreated({
+      twakeId: userName,
+      orgDomain,
+      orgId: ctx.orgId,
+      fqdn,
+      email,
+      mobile,
+    });
+    this.logger.info({ ...log, result: 'success', fqdn });
+  }
+
+  /**
+   * Pre-delete: read the stored FQDN (and domain from mail) while the entry
+   * still exists, so the post-delete hook can tear the instance down. No stored
+   * FQDN means this user was not provisioned here.
+   */
+  private async captureDelete(id: string, req?: ReqWithUser): Promise<void> {
+    const base = this.baseResolver.userBase(req);
+    this.logger.info({
+      plugin: this.name,
+      event: 'captureDelete',
+      id,
+      base,
+      hasManagerUrl: Boolean(this.managerUrl),
+      hasUserBranch: Boolean(this.userBranch),
+    });
+    if (!this.managerUrl || !this.userBranch) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureDelete',
+        id,
+        base,
+        result: 'skipped',
+        reason: 'missing_configuration',
+      });
+      return;
+    }
+    if (!this.isAtOrUnder(base, this.userBranch)) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureDelete',
+        id,
+        base,
+        result: 'skipped',
+        reason: 'outside_b2b_branch',
+      });
+      return;
+    }
+
+    const dn = `${this.rdnAttribute}=${escapeDnValue(id)},${base}`;
+    try {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureDelete',
+        id,
+        dn,
+        result: 'searching',
+      });
+      // As the server: what a delete removes is read to release its instance, whoever deletes
+      const res = (await this.server.ldap.system.search(
+        {
+          paged: false,
+          scope: 'base',
+          attributes: [this.fqdnAttribute, 'mail'],
+        },
+        dn
+      )) as { searchEntries?: Record<string, unknown>[] };
+      const entry = res.searchEntries?.[0];
+      const stored = entry ? firstValue(entry[this.fqdnAttribute]) : undefined;
+      const fqdn = stored ? extractFqdn(stored) : undefined;
+      if (!fqdn) {
+        this.logger.info({
+          plugin: this.name,
+          event: 'captureDelete',
+          id,
+          dn,
+          result: 'skipped',
+          reason: 'missing_fqdn',
+        });
+        return;
+      }
+      const mail = entry ? firstValue(entry.mail) : undefined;
+      const domain = mail ? emailDomain(mail) : '';
+      this.deleteStash.set(id, {
+        fqdn,
+        domain,
+      });
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureDelete',
+        id,
+        dn,
+        fqdn,
+        domain,
+        result: 'stashed',
+      });
+    } catch (err) {
+      this.logger.warn({
+        plugin: this.name,
+        event: 'captureDelete',
+        id,
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        error: `${err}`,
+      });
+    }
+  }
+
+  /** Post-delete: delete the Cloudery instance by FQDN and publish the event. */
+  private async deprovision(id: string): Promise<void> {
+    this.logger.info({
+      plugin: this.name,
+      event: 'deprovision',
+      id,
+    });
+    const ctx = this.deleteStash.get(id);
+    if (!ctx) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'deprovision',
+        id,
+        result: 'skipped',
+        reason: 'no_stashed_context',
+      });
+      return;
+    }
+    this.deleteStash.delete(id);
+
+    const log = {
+      plugin: this.name,
+      event: 'deprovision',
+      id,
+      fqdn: ctx.fqdn,
+    };
+    let deleted = false;
+    try {
+      this.logger.info({ ...log, result: 'resolving_uuid' });
+      const uuid = (await this.findInstanceByFqdn(ctx.fqdn, '_id'))?._id;
+      if (uuid) {
+        this.logger.info({ ...log, result: 'deleting_instance', uuid });
+        await this.deleteInstance(uuid);
+        deleted = true;
+        this.logger.info({ ...log, result: 'deleted', uuid });
+      } else {
+        this.logger.warn({ ...log, result: 'not_found' });
+      }
+    } catch (err) {
+      this.logger.error({
+        ...log,
+        result: 'error',
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        error: `${err}`,
+      });
+    }
+
+    // Only announce the deletion once the instance is actually destroyed, so a
+    // failed lookup/delete never notifies downstream of a teardown that did not
+    // happen (matching cozyProvision).
+    if (deleted) {
+      await this.publishUserDeleted(ctx.fqdn, ctx.domain);
+    }
+  }
+
+  /* ----------------------------- Cloudery API ----------------------------- */
+
+  private async createInstance(
+    payload: Record<string, unknown>
+  ): Promise<ClouderyInstanceResponse> {
+    this.logger.info({
+      plugin: this.name,
+      event: 'createInstance',
+      url: `${this.managerUrl}/api/v1/instances`,
+    });
+    const res = await this.fetch(`${this.managerUrl}/api/v1/instances`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.managerToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const body = (await res.text().catch(() => '')).slice(
+        0,
+        MAX_LOG_BODY_LEN
+      );
+      this.logger.error({
+        plugin: this.name,
+        event: 'createInstance',
+        result: 'error',
+        http_status: res.status,
+        http_status_text: res.statusText,
+        body: body || undefined,
+      });
+      throw new Error(`Cloudery createInstance HTTP ${res.status}`);
+    }
+    const data = (await res.json()) as ClouderyInstanceResponse;
+    this.logger.info({
+      plugin: this.name,
+      event: 'createInstance',
+      result: 'success',
+      id: data.id,
+      fqdn: data.fqdn,
+      workflow: data.workflow,
+    });
+    return data;
+  }
+
+  /** Poll the workflow until it succeeds. Returns false on failure/timeout. */
+  private async waitForWorkflow(workflowId: string): Promise<boolean> {
+    this.logger.info({
+      plugin: this.name,
+      event: 'waitForWorkflow',
+      workflow: workflowId,
+      maxPollAttempts: this.maxPollAttempts,
+      pollIntervalMs: this.pollIntervalMs,
+    });
+    for (let attempt = 1; attempt <= this.maxPollAttempts; attempt++) {
+      try {
+        const res = await this.fetch(
+          `${this.managerUrl}/api/v1/workflows/${encodeURIComponent(
+            workflowId
+          )}`,
+          { headers: { Authorization: `Bearer ${this.managerToken}` } }
+        );
+        if (res.ok) {
+          const data = (await res.json()) as { status?: string };
+          this.logger.info({
+            plugin: this.name,
+            event: 'waitForWorkflow',
+            workflow: workflowId,
+            attempt,
+            status: data.status,
+          });
+          if (data.status === 'succeeded') {
+            this.logger.info({
+              plugin: this.name,
+              event: 'waitForWorkflow',
+              workflow: workflowId,
+              attempt,
+              result: 'success',
+            });
+            return true;
+          }
+          if (data.status === 'failed' || data.status === 'error') {
+            this.logger.warn({
+              plugin: this.name,
+              event: 'waitForWorkflow',
+              workflow: workflowId,
+              attempt,
+              result: 'failed',
+              status: data.status,
+            });
+            return false;
+          }
+        } else {
+          const body = (await res.text().catch(() => '')).slice(
+            0,
+            MAX_LOG_BODY_LEN
+          );
+          this.logger.info({
+            plugin: this.name,
+            event: 'waitForWorkflow',
+            workflow: workflowId,
+            attempt,
+            result: 'http_error',
+            http_status: res.status,
+            http_status_text: res.statusText,
+            body: body || undefined,
+          });
+        }
+      } catch (err) {
+        this.logger.info({
+          plugin: this.name,
+          event: 'waitForWorkflow',
+          workflow: workflowId,
+          attempt,
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          error: `${err}`,
+        });
+      }
+      if (attempt < this.maxPollAttempts) {
+        this.logger.info({
+          plugin: this.name,
+          event: 'waitForWorkflow',
+          workflow: workflowId,
+          attempt,
+          result: 'retrying',
+        });
+        await sleep(this.pollIntervalMs);
+      }
+    }
+    this.logger.info({
+      plugin: this.name,
+      event: 'waitForWorkflow',
+      workflow: workflowId,
+      result: 'timeout',
+      maxPollAttempts: this.maxPollAttempts,
+    });
+    return false;
+  }
+
+  /**
+   * The instance at this FQDN, if any.
+   *
+   * @param fqdn instance address
+   * @param only the one field to ask for, when the others are not needed
+   */
+  private async findInstanceByFqdn(
+    fqdn: string,
+    only?: string
+  ): Promise<ClouderyInstanceSummary | null> {
+    this.logger.info({
+      plugin: this.name,
+      event: 'findInstanceByFqdn',
+      fqdn,
+    });
+    const url = new URL(`${this.managerUrl}/api/v2/instances`);
+    url.searchParams.set('fqdn', fqdn);
+    if (only) url.searchParams.set('only', only);
+    url.searchParams.set('limit', '1');
+    const res = await this.fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${this.managerToken}` },
+    });
+    if (!res.ok) {
+      const body = (await res.text().catch(() => '')).slice(
+        0,
+        MAX_LOG_BODY_LEN
+      );
+      this.logger.error({
+        plugin: this.name,
+        event: 'findInstanceByFqdn',
+        fqdn,
+        result: 'error',
+        http_status: res.status,
+        http_status_text: res.statusText,
+        body: body || undefined,
+      });
+      throw new Error(`Cloudery searchInstances HTTP ${res.status}`);
+    }
+    const data = (await res.json()) as { items?: ClouderyInstanceSummary[] };
+    const found = data.items?.[0] ?? null;
+    const uuid = found?._id;
+    this.logger.info({
+      plugin: this.name,
+      event: 'findInstanceByFqdn',
+      fqdn,
+      result: uuid ? 'found' : 'not_found',
+      uuid: uuid || undefined,
+    });
+    return found;
+  }
+
+  private async deleteInstance(uuid: string): Promise<void> {
+    const url = new URL(
+      `${this.managerUrl}/api/v1/instances/${encodeURIComponent(uuid)}`
+    );
+    url.searchParams.set('user_request', 'true');
+    this.logger.info({
+      plugin: this.name,
+      event: 'deleteInstance',
+      uuid,
+      url: url.toString(),
+    });
+    const res = await this.fetch(url.toString(), {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${this.managerToken}` },
+    });
+    if (!res.ok) {
+      const body = (await res.text().catch(() => '')).slice(
+        0,
+        MAX_LOG_BODY_LEN
+      );
+      this.logger.error({
+        plugin: this.name,
+        event: 'deleteInstance',
+        uuid,
+        result: 'error',
+        http_status: res.status,
+        http_status_text: res.statusText,
+        body: body || undefined,
+      });
+      throw new Error(`Cloudery deleteInstance HTTP ${res.status}`);
+    }
+    this.logger.info({
+      plugin: this.name,
+      event: 'deleteInstance',
+      uuid,
+      result: 'success',
+      http_status: res.status,
+    });
+  }
+
+  /* ------------------------------ Publishing ------------------------------ */
+
+  private async publishUserCreated(p: {
+    twakeId: string;
+    orgDomain: string;
+    orgId: string;
+    fqdn: string;
+    email: string | null;
+    mobile: string | null;
+  }): Promise<void> {
+    const rabbitmq = this.service(RabbitMqService);
+    this.logger.info({
+      plugin: this.name,
+      event: 'publishUserCreated',
+      twakeId: p.twakeId,
+      orgId: p.orgId,
+      orgDomain: p.orgDomain,
+      hasRabbitmq: Boolean(rabbitmq),
+    });
+    if (!rabbitmq) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'publishUserCreated',
+        twakeId: p.twakeId,
+        result: 'skipped',
+        reason: 'missing_rabbitmq',
+      });
+      return;
+    }
+
+    const message: Record<string, unknown> = {
+      twakeId: p.twakeId,
+      domain: p.orgDomain,
+      organizationDomain: p.orgDomain,
+      workplaceFqdn: p.fqdn,
+      organizationId: p.orgId,
+    };
+    if (p.email) message.internalEmail = p.email;
+    if (p.mobile) message.mobile = p.mobile;
+
+    try {
+      await rabbitmq.publish(
+        this.authExchange,
+        this.userCreatedRoutingKey,
+        message
+      );
+      this.logger.info({
+        plugin: this.name,
+        event: 'publishUserCreated',
+        twakeId: p.twakeId,
+        exchange: this.authExchange,
+        routingKey: this.userCreatedRoutingKey,
+        result: 'success',
+      });
+    } catch (err) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'publishUserCreated',
+        twakeId: p.twakeId,
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        error: `${err}`,
+      });
+    }
+  }
+
+  private async publishUserDeleted(
+    fqdn: string,
+    domain: string
+  ): Promise<void> {
+    if (!this.userDeletedRoutingKey) return;
+    const rabbitmq = this.service(RabbitMqService);
+    this.logger.info({
+      plugin: this.name,
+      event: 'publishUserDeleted',
+      workplaceFqdn: fqdn,
+      domain,
+      hasRabbitmq: Boolean(rabbitmq),
+    });
+    if (!rabbitmq) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'publishUserDeleted',
+        workplaceFqdn: fqdn,
+        result: 'skipped',
+        reason: 'missing_rabbitmq',
+      });
+      return;
+    }
+    try {
+      await rabbitmq.publish(this.b2bExchange, this.userDeletedRoutingKey, {
+        workplaceFqdn: fqdn,
+        domain,
+      });
+      this.logger.info({
+        plugin: this.name,
+        event: 'publishUserDeleted',
+        workplaceFqdn: fqdn,
+        exchange: this.b2bExchange,
+        routingKey: this.userDeletedRoutingKey,
+        result: 'success',
+      });
+    } catch (err) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'publishUserDeleted',
+        workplaceFqdn: fqdn,
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        error: `${err}`,
+      });
+    }
+  }
+
+  /* ------------------------------- Helpers -------------------------------- */
+
+  /** Read a request header by name, falling back to a query parameter. */
+  private readHeader(
+    req: ReqWithUser | undefined,
+    name: string
+  ): string | undefined {
+    if (!req) return undefined;
+    const fromHeader = req.get ? req.get(name) : undefined;
+    if (typeof fromHeader === 'string' && fromHeader.length > 0) {
+      return fromHeader;
+    }
+    const q = req.query?.[name];
+    return typeof q === 'string' && q.length > 0 ? q : undefined;
+  }
+
+  /**
+   * Per-request org role from the header (so one batch import can be all admins
+   * and the next all members), validated against {@link VALID_ORG_ROLES}. An
+   * absent or unknown role falls back to the configured default rather than
+   * failing the import.
+   */
+  private resolveRole(req: ReqWithUser | undefined, userName: string): string {
+    const raw = this.readHeader(req, this.orgRoleHeader)?.trim().toLowerCase();
+    if (!raw) {
+      this.logger.debug({
+        plugin: this.name,
+        event: 'resolveRole',
+        userName,
+        result: 'default',
+        role: this.defaultOrgRole,
+      });
+      return this.defaultOrgRole;
+    }
+    if (!VALID_ORG_ROLES.has(raw)) {
+      this.logger.warn({
+        plugin: this.name,
+        event: 'captureCreate',
+        userName,
+        message: `Unknown ${this.orgRoleHeader} "${raw}" — falling back to ${this.defaultOrgRole}`,
+      });
+      this.logger.debug({
+        plugin: this.name,
+        event: 'resolveRole',
+        userName,
+        input: raw,
+        result: 'default',
+        role: this.defaultOrgRole,
+      });
+      return this.defaultOrgRole;
+    }
+    this.logger.debug({
+      plugin: this.name,
+      event: 'resolveRole',
+      userName,
+      input: raw,
+      result: 'accepted',
+      role: raw,
+    });
+    return raw;
+  }
+
+  private isAtOrUnder(dn: string, parent: string): boolean {
+    return (
+      dn.trim().toLowerCase() === parent.trim().toLowerCase() ||
+      isChildOf(dn, parent)
+    );
+  }
+
+  private pruneStash(): void {
+    const cutoff = Date.now() - STASH_TTL_MS;
+    for (const [key, ctx] of this.createStash) {
+      if (ctx.ts < cutoff) {
+        this.createStash.delete(key);
+      }
+    }
+  }
+
+  // Lowercase userName in place; the core derives the uid RDN from it after
+  // this hook. Usernames must be lowercase.
+  private normalizeUserName(user: ScimUser): void {
+    if (typeof user.userName === 'string') {
+      user.userName = user.userName.toLowerCase();
+    }
+  }
+
+  private extractId(user: ScimUser): string | null {
+    if (typeof user.userName === 'string' && user.userName.length > 0) {
+      return user.userName;
+    }
+    if (typeof user.id === 'string' && user.id.length > 0) return user.id;
+    return null;
+  }
+
+  private extractPrimaryEmail(user: ScimUser): string | null {
+    const emails = user.emails;
+    if (!emails || emails.length === 0) return null;
+    const primary = emails.find(e => e.primary);
+    const value = (primary || emails[0]).value;
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  private extractPrimaryPhone(user: ScimUser): string | null {
+    const phones = user.phoneNumbers;
+    if (!phones || phones.length === 0) return null;
+    const primary = phones.find(p => p.primary);
+    const value = (primary || phones[0]).value;
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  /** All phone numbers, shaped for the `twakePhones` attribute the panel reads. */
+  private extractPhones(
+    user: ScimUser
+  ): { number: string; primary: boolean }[] {
+    const phones = user.phoneNumbers;
+    if (!phones || phones.length === 0) return [];
+    return phones
+      .filter(p => typeof p.value === 'string' && p.value.trim().length > 0)
+      .map(p => ({ number: p.value.trim(), primary: Boolean(p.primary) }));
+  }
+
+  private extractPublicName(user: ScimUser): string | null {
+    if (
+      typeof user.displayName === 'string' &&
+      user.displayName.trim().length > 0
+    ) {
+      return user.displayName.trim();
+    }
+    const formatted = user.name?.formatted;
+    if (typeof formatted === 'string' && formatted.trim().length > 0) {
+      return formatted.trim();
+    }
+    const given = user.name?.givenName?.trim() ?? '';
+    const family = user.name?.familyName?.trim() ?? '';
+    const composed = `${given} ${family}`.trim();
+    return composed.length > 0 ? composed : null;
+  }
+
+  private extractLocale(user: ScimUser): string {
+    if (typeof user.locale === 'string' && user.locale.length > 0) {
+      return user.locale;
+    }
+    if (
+      typeof user.preferredLanguage === 'string' &&
+      user.preferredLanguage.length > 0
+    ) {
+      return user.preferredLanguage;
+    }
+    return this.defaultLocale;
+  }
+}
+
+function emailDomain(email: string): string {
+  const at = email.lastIndexOf('@');
+  return at >= 0 ? email.slice(at + 1) : '';
+}
+
+/** Reduce a stored workspace value to a bare FQDN, tolerating a protocol/path. */
+function extractFqdn(value: string): string {
+  return value
+    .trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+    .split('/')[0];
+}
+
+/** LDAP attribute values come back as a scalar or an array. */
+function firstValue(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    const v: unknown = value[0];
+    return typeof v === 'string' ? v : undefined;
+  }
+  return typeof value === 'string' ? value : undefined;
+}

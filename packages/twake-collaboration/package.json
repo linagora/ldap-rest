@@ -1,0 +1,54 @@
+{
+  "name": "@ldap-rest/twake-collaboration",
+  "version": "3.0.0",
+  "description": "LDAP-Rest Twake collaboration plugins",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/twake-collaboration"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/groups.ts",
+      "types": "./dist/groups.d.ts",
+      "import": "./dist/groups.js"
+    },
+    "./spaces": {
+      "development": "./src/spaces.ts",
+      "types": "./dist/spaces.d.ts",
+      "import": "./dist/spaces.js"
+    },
+    "./groups-options": {
+      "development": "./src/twakeGroups.options.ts",
+      "types": "./dist/twakeGroups.options.d.ts",
+      "import": "./dist/twakeGroups.options.js"
+    },
+    "./spaces-options": {
+      "development": "./src/twakeSpaces.options.ts",
+      "types": "./dist/twakeSpaces.options.d.ts",
+      "import": "./dist/twakeSpaces.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@ldap-rest/ldap-groups": "3.0.0",
+    "@ldap-rest/twake-lifecycle": "3.0.0",
+    "@ldap-rest/twake-provisioning": "3.0.0",
+    "@sinclair/typebox": "^0.34.52",
+    "express": "^5.1.0",
+    "ldapts": "^9.2.0"
+  }
+}

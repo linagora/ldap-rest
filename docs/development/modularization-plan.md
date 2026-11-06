@@ -256,6 +256,13 @@ phase 1.
    once, in the plugin that owns them; a plugin another one only needs
    registered is a peer all the same, or a standalone install reports every
    peer met and fails at startup on a module nobody installed.
+8. **Monorepo layout** (**decided, later**): the umbrella itself moves to
+   `packages/ldap-rest/`, and the repository root `package.json` becomes
+   `ldap-rest-monorepo`, private and workspace-only. This removes the split
+   between "the repository root" and "a package": every published artefact
+   lives under `packages/`. Do it once the extraction is over, before or with
+   the first published plugin package, so the root never ships as a package
+   by accident.
 
 ## First actions
 

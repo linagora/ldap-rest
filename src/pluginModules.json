@@ -28,5 +28,13 @@
   "core/ldap/trash": "@ldap-rest/ldap-trash",
   "core/scim": "@ldap-rest/scim",
   "core/scim/scim": "@ldap-rest/scim",
-  "core/storage": "@ldap-rest/storage"
+  "core/storage": "@ldap-rest/storage",
+  "core/twake/appAccountsApi": "@ldap-rest/twake-appaccounts",
+  "core/twake/calendar": "@ldap-rest/twake-calendar",
+  "core/twake/drive": "@ldap-rest/twake-drive",
+  "core/twake/groups": "@ldap-rest/twake-collaboration",
+  "core/twake/instances": "@ldap-rest/twake-provisioning",
+  "core/twake/james": "@ldap-rest/james",
+  "core/twake/lifecycleEvents": "@ldap-rest/twake-lifecycle",
+  "core/twake/migrationProxy": "@ldap-rest/twake-mail-migration"
 }

@@ -1,0 +1,56 @@
+{
+  "name": "@ldap-rest/twake-lifecycle",
+  "version": "3.0.0",
+  "description": "LDAP-Rest Twake lifecycle plugins",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/twake-lifecycle"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/lifecycleEvents.ts",
+      "types": "./dist/lifecycleEvents.d.ts",
+      "import": "./dist/lifecycleEvents.js"
+    },
+    "./attributes": {
+      "development": "./src/lifecycleAttributes.ts",
+      "types": "./dist/lifecycleAttributes.d.ts",
+      "import": "./dist/lifecycleAttributes.js"
+    },
+    "./tombstone": {
+      "development": "./src/tombstone.ts",
+      "types": "./dist/tombstone.d.ts",
+      "import": "./dist/tombstone.js"
+    },
+    "./options": {
+      "development": "./src/twakeLifecycle.options.ts",
+      "types": "./dist/twakeLifecycle.options.d.ts",
+      "import": "./dist/twakeLifecycle.options.js"
+    },
+    "./tombstone-options": {
+      "development": "./src/twakeTombstone.options.ts",
+      "types": "./dist/twakeTombstone.options.d.ts",
+      "import": "./dist/twakeTombstone.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@sinclair/typebox": "^0.34.52",
+    "express": "^5.1.0",
+    "winston": "^3.17.0"
+  }
+}

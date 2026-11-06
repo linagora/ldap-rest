@@ -1,19 +1,3 @@
-/**
- * @deprecated Use `core/twake/calendar` instead. This file is a
- * backwards-compatibility shim for setups that still load the plugin under
- * its historical name, which undersold it: besides resources, it propagates
- * user identity changes (email, first and last name) to Twake Calendar. It
- * will be removed in a future major release.
- *
- * The instance keeps registering as `calendarResources`, so code looking it
- * up by that name keeps finding it.
- */
-import Calendar from './calendar.js';
-
-console.warn(
-  '[ldap-rest] Plugin `core/twake/calendarResources` is deprecated; replace it with `core/twake/calendar` — do not load both, each would sync Calendar.'
-);
-
-export default class CalendarResources extends Calendar {
-  name = 'calendarResources';
-}
+/** The Twake Calendar Resources plugin, at its historical path. */
+export * from '@ldap-rest/twake-calendar/resources';
+export { default } from '@ldap-rest/twake-calendar/resources';
