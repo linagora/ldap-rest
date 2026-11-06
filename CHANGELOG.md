@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.0.5 (2026-11-06)
+
+Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0.
+
 ## v2.0.4 (2026-11-05)
 
 ### Security
