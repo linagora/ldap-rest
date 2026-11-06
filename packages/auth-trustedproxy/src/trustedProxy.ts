@@ -23,6 +23,8 @@
  *
  * @author Xavier Guimard <xguimard@linagora.com>
  */
+import { isIP } from 'node:net';
+
 import type { Express, Request, Response, NextFunction } from 'express';
 import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 
@@ -134,18 +136,10 @@ export default class TrustedProxy extends DmPlugin {
    */
   private isTrustedProxy(ip: string): boolean {
     try {
-      const normalizedIp = this.normalizeIP(ip);
-      const parsed = this.parseIP(normalizedIp);
+      const parsed = this.parseIP(ip);
 
       for (const network of this.trustedNetworks) {
-        // Skip if IP versions don't match (unless it's a mapped IPv4)
-        if (parsed.isIPv6 !== network.isIPv6) {
-          continue;
-        }
-
-        if ((parsed.ip & network.mask) === (network.ip & network.mask)) {
-          return true;
-        }
+        if (this.isInNetwork(parsed, network)) return true;
       }
 
       return false;
@@ -158,61 +152,99 @@ export default class TrustedProxy extends DmPlugin {
   }
 
   /**
-   * Normalize IP address (handle IPv4-mapped IPv6 addresses)
+   * Whether an address belongs to a network: same family, or an IPv4-mapped
+   * IPv6 address checked as the IPv4 address it carries.
    */
-  private normalizeIP(ip: string): string {
-    // Handle IPv4-mapped IPv6 addresses like ::ffff:127.0.0.1
-    const ipv4Mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
-    if (ipv4Mapped) {
-      return ipv4Mapped[1];
+  private isInNetwork(
+    parsed: { ip: bigint; isIPv6: boolean },
+    network: ParsedCIDR
+  ): boolean {
+    const candidates: bigint[] = [];
+    if (parsed.isIPv6 === network.isIPv6) candidates.push(parsed.ip);
+    if (parsed.isIPv6 && !network.isIPv6) {
+      const carried = this.mappedIPv4(parsed.ip);
+      if (carried !== undefined) candidates.push(carried);
     }
-    return ip;
+    return candidates.some(
+      candidate => (candidate & network.mask) === (network.ip & network.mask)
+    );
   }
 
   /**
-   * Parse an IP address into a bigint for comparison
+   * The IPv4 address an IPv4-mapped IPv6 address carries
+   * (`::ffff:a.b.c.d`), or undefined for another address.
+   */
+  private mappedIPv4(ip: bigint): bigint | undefined {
+    return ip >> 32n === 0xffffn ? ip & 0xffffffffn : undefined;
+  }
+
+  /**
+   * Parse an IP address into a bigint for comparison. A zone index names the
+   * interface, not the address, and is dropped before the match.
    */
   private parseIP(ip: string): { ip: bigint; isIPv6: boolean } {
-    if (ip.includes(':')) {
-      return { ip: this.parseIPv6(ip), isIPv6: true };
-    }
-    return { ip: this.parseIPv4(ip), isIPv6: false };
+    const zone = ip.indexOf('%');
+    const address = ip.includes(':') && zone !== -1 ? ip.slice(0, zone) : ip;
+    const family = isIP(address);
+    if (family === 6) return { ip: this.parseIPv6(address), isIPv6: true };
+    if (family === 4) return { ip: this.parseIPv4(address), isIPv6: false };
+    throw new Error(`Invalid IP address: ${ip}`);
   }
 
   /**
-   * Parse a CIDR notation string into network address and mask
+   * Parse a CIDR notation string into network address and mask. A network
+   * written as an IPv4-mapped IPv6 network is checked as the IPv4 network it
+   * is: `::ffff:10.0.0.0/104` is `10.0.0.0/8`.
    */
   private parseCIDR(cidr: string): ParsedCIDR {
-    const [addr, prefixStr] = cidr.split('/');
-    const isIPv6 = addr.includes(':');
+    const slash = cidr.indexOf('/');
+    const addr = slash === -1 ? cidr : cidr.slice(0, slash);
+    const prefixStr = slash === -1 ? undefined : cidr.slice(slash + 1);
 
-    let ip: bigint;
-    let mask: bigint;
-    const maxPrefix = isIPv6 ? 128 : 32;
-
-    if (isIPv6) {
-      ip = this.parseIPv6(addr);
-    } else {
-      ip = this.parseIPv4(addr);
+    // A zone index names the link an address is reached through: the same
+    // address is another host on another link, so a network cannot be
+    // honoured as written
+    if (addr.includes('%')) {
+      throw new Error(`Invalid network address: ${addr}`);
     }
 
+    const parsed = this.parseIP(addr);
+    let { isIPv6 } = parsed;
+    let { ip } = parsed;
+    let prefix: number | undefined;
     if (prefixStr !== undefined) {
-      const prefix = parseInt(prefixStr, 10);
-      if (isNaN(prefix) || prefix < 0 || prefix > maxPrefix) {
+      if (!/^\d{1,3}$/.test(prefixStr)) {
         throw new Error(`Invalid prefix length: ${prefixStr}`);
       }
-      // Create mask with 'prefix' number of 1s followed by 0s
-      if (prefix === 0) {
-        mask = 0n;
-      } else {
-        const totalBits = BigInt(maxPrefix);
-        mask =
-          ((1n << totalBits) - 1n) ^
-          ((1n << (totalBits - BigInt(prefix))) - 1n);
+      prefix = Number(prefixStr);
+      if (prefix > (isIPv6 ? 128 : 32)) {
+        throw new Error(`Invalid prefix length: ${prefixStr}`);
       }
-    } else {
+    }
+
+    // A fully mapped network is an IPv4 network, its prefix minus the 96
+    // bits that carry the mapping; a mapped address with no prefix is an
+    // exact IPv4 address
+    if (isIPv6 && (prefix === undefined || prefix >= 96)) {
+      const carried = this.mappedIPv4(ip);
+      if (carried !== undefined) {
+        isIPv6 = false;
+        ip = carried;
+        if (prefix !== undefined) prefix -= 96;
+      }
+    }
+
+    const maxPrefix = isIPv6 ? 128 : 32;
+    let mask: bigint;
+    if (prefix === undefined) {
       // No prefix means exact match (all bits set)
-      mask = isIPv6 ? (1n << 128n) - 1n : (1n << 32n) - 1n;
+      mask = (1n << BigInt(maxPrefix)) - 1n;
+    } else if (prefix === 0) {
+      mask = 0n;
+    } else {
+      const totalBits = BigInt(maxPrefix);
+      mask =
+        ((1n << totalBits) - 1n) ^ ((1n << (totalBits - BigInt(prefix))) - 1n);
     }
 
     return { ip, mask, isIPv6 };
@@ -222,59 +254,60 @@ export default class TrustedProxy extends DmPlugin {
    * Parse an IPv4 address into a bigint
    */
   private parseIPv4(ip: string): bigint {
-    const parts = ip.split('.');
-    if (parts.length !== 4) {
+    if (isIP(ip) !== 4) {
       throw new Error(`Invalid IPv4 address: ${ip}`);
     }
 
-    let result = 0n;
-    for (const part of parts) {
-      const num = parseInt(part, 10);
-      if (isNaN(num) || num < 0 || num > 255) {
-        throw new Error(`Invalid IPv4 address: ${ip}`);
-      }
-      result = (result << 8n) | BigInt(num);
-    }
-
-    return result;
+    return ip
+      .split('.')
+      .reduce((result, part) => (result << 8n) | BigInt(Number(part)), 0n);
   }
 
   /**
    * Parse an IPv6 address into a bigint
    */
   private parseIPv6(ip: string): bigint {
-    // Expand :: shorthand
-    let fullIp = ip;
-    if (ip.includes('::')) {
-      const parts = ip.split('::');
-      if (parts.length > 2) {
-        throw new Error(`Invalid IPv6 address: ${ip}`);
-      }
+    if (isIP(ip) !== 6) {
+      throw new Error(`Invalid IPv6 address: ${ip}`);
+    }
 
+    // A dotted tail is two groups: `::ffff:10.0.0.0` is `::ffff:a00:0`
+    const dotted = /^(.*:)(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
+    let address = ip;
+    if (dotted) {
+      const tail = this.parseIPv4(dotted[2]);
+      address = `${dotted[1]}${(tail >> 16n).toString(16)}:${(
+        tail & 0xffffn
+      ).toString(16)}`;
+    }
+
+    let groups: string[];
+    const parts = address.split('::');
+    if (parts.length > 2) {
+      throw new Error(`Invalid IPv6 address: ${ip}`);
+    }
+    if (parts.length === 2) {
       const left = parts[0] ? parts[0].split(':') : [];
       const right = parts[1] ? parts[1].split(':') : [];
       const missing = 8 - left.length - right.length;
-
       if (missing < 0) {
         throw new Error(`Invalid IPv6 address: ${ip}`);
       }
-
-      const middle: string[] = Array(missing).fill('0') as string[];
-      fullIp = [...left, ...middle, ...right].join(':');
+      groups = [...left, ...Array<string>(missing).fill('0'), ...right];
+    } else {
+      groups = address.split(':');
     }
 
-    const groups = fullIp.split(':');
     if (groups.length !== 8) {
       throw new Error(`Invalid IPv6 address: ${ip}`);
     }
 
     let result = 0n;
     for (const group of groups) {
-      const num = parseInt(group || '0', 16);
-      if (isNaN(num) || num < 0 || num > 0xffff) {
+      if (!/^[0-9a-fA-F]{1,4}$/.test(group)) {
         throw new Error(`Invalid IPv6 address: ${ip}`);
       }
-      result = (result << 16n) | BigInt(num);
+      result = (result << 16n) | BigInt(parseInt(group, 16));
     }
 
     return result;

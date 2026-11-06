@@ -14,9 +14,9 @@ import {
   type ArrayKind,
   type ConfigEntry,
   type ConfigTemplate,
-} from '../lib/parseConfig';
+} from '../lib/parseConfig.js';
 
-import type { Config } from './args';
+import type { Config } from './args.js';
 
 export type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
 

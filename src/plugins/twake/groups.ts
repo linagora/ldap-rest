@@ -62,8 +62,8 @@ import {
   lifecycleAttributes,
   valueOf,
   type LifecycleAttributes,
-} from './lifecycleAttributes';
-import { twakeGroupsOptions } from './twakeGroups.options';
+} from './lifecycleAttributes.js';
+import { twakeGroupsOptions } from './twakeGroups.options.js';
 
 /**
  * An attribute's first value, whatever case its name is configured in: the

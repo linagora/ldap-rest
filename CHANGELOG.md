@@ -31,6 +31,89 @@
   `./plugin-ldap-onchange` entries are deprecated and will be removed in
   4.0.0.
 
+## v2.0.5 (2026-11-06)
+
+Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0.
+
+## v2.0.4 (2026-11-05)
+
+### Security
+
+- An `authzDynamic` ACL flag grants a permission only when the token's JSON
+  holds the boolean `true`; `"true"`, `"yes"` and `1` are refused
+  ([#657](https://github.com/linagora/ldap-rest/issues/657),
+  [upgrading](docs/usage/upgrading.md#an-authzdynamic-flag-must-be-a-json-boolean)).
+- `--trusted-proxy` refuses a malformed address or prefix at startup, where
+  `10.0.0.0/2.` was read as `10.0.0.0/2` and trusted `0.0.0.0/2`
+  ([#663](https://github.com/linagora/ldap-rest/issues/663),
+  [upgrading](docs/usage/upgrading.md#a-malformed-trusted-proxy-stops-the-server)).
+
+### Fixed
+
+- The declarations of each sub-path resolve for a plugin compiled with
+  `moduleResolution: nodenext`; the types crossing a file boundary are no
+  longer read as `any`
+  ([#638](https://github.com/linagora/ldap-rest/issues/638)).
+- A plugin keeps the types the published declarations name without installing
+  them: `@types/express` and `@types/pg` ship with the package,
+  `lemonldap-ng-handler` is described structurally, and the browser
+  declarations no longer import CSS
+  ([#674](https://github.com/linagora/ldap-rest/issues/674)).
+- An IPv6 network written with a dotted IPv4 tail (`64:ff9b::10.0.0.0/120`,
+  `::ffff:10.0.0.0/104`) is read as written
+  ([#660](https://github.com/linagora/ldap-rest/issues/660),
+  [details](docs/usage/plugins/auth/trusted-proxy.md#supported-formats)).
+- An IPv4-mapped address matches an IPv4 network in any spelling, and a mapped
+  network matches the peer Node reports
+  ([#664](https://github.com/linagora/ldap-rest/issues/664)).
+- A peer address carrying a zone index (`fe80::1%eth0`) is matched on the
+  address alone; a trusted entry carrying one is refused
+  ([#665](https://github.com/linagora/ldap-rest/issues/665)).
+- A creation sending a fixed attribute with a default under an option
+  (`L;lang-fr`, or an alias such as `localityName;lang-fr`) is refused with
+  `400` instead of storing a second value
+  ([#661](https://github.com/linagora/ldap-rest/issues/661),
+  [details](docs/client-development/schemas/README.md#fixed-attributes)).
+- An organization renamed or moved through a DN written with another spelling
+  of its type (`OU=`, `2.5.4.11=`, `OID.2.5.4.11=`) is synchronised, its paths
+  and links included
+  ([#659](https://github.com/linagora/ldap-rest/issues/659),
+  [details](docs/usage/plugins/ldap/organizations.md#move-organization)).
+- A rename no longer rewrites a link to another organization whose name ends
+  with the renamed one (`x,ou=Sales`), and matches a sub-organization link in
+  any case ([#658](https://github.com/linagora/ldap-rest/issues/658)).
+- A SCIM base header whose value starts with `#` (`ou=#,…`, the BER hexstring
+  form included) is ignored instead of failing every operation
+  ([#662](https://github.com/linagora/ldap-rest/issues/662)).
+
+## v2.0.3 (2026-11-04)
+
+### Security
+
+- `/logout` refuses a request a browser reports as coming from another site
+  (`403`) and leaves the session alone, where a cross-site link ended it; a
+  console served from another origin lists it in `--oidc-logout-origins`
+  ([GHSA-v2cg-hch2-c7fx](https://github.com/linagora/ldap-rest/security/advisories/GHSA-v2cg-hch2-c7fx),
+  [details](docs/usage/plugins/auth/oidc.md#logout),
+  [upgrading](docs/usage/upgrading.md#a-console-on-another-origin-must-be-trusted-for-logout)).
+- The organization tree is held to the caller's branches: another branch's
+  description, sub-organizations and local administrators no longer come back
+  from `GET /ldap/organizations/:dn`, its subnode listings or its searches
+  ([GHSA-qgm2-pmv5-9g66](https://github.com/linagora/ldap-rest/security/advisories/GHSA-qgm2-pmv5-9g66),
+  [details](docs/usage/plugins/auth/authz-linid1.md#what-an-administrator-reads),
+  [upgrading](docs/usage/upgrading.md#the-organization-tree-is-held-to-branches)).
+
+## v2.0.2 (2026-11-04)
+
+### Security
+
+- An `authzDynamic` token can no longer reach entries beside its ACL branches
+  by writing the DN with an escaped comma, and a branch configured with an
+  equivalent but different spelling (spaces, escapes, `;` separators, OID
+  attribute types) is accepted again
+  ([GHSA-5732-mx58-jf5p](https://github.com/linagora/ldap-rest/security/advisories/GHSA-5732-mx58-jf5p),
+  [details](docs/usage/plugins/auth/authz-dynamic.md#acl-json)).
+
 ## v2.0.1 (2026-11-02)
 
 Security update of the published image and a fix to plugin per-instance

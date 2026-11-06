@@ -220,14 +220,16 @@ describe('Branch rule precedence', function () {
       }
     });
 
-    it('lets every caller read the top organization by itself', async () => {
+    it('refuses the top organization by itself, as any other outside branch', async () => {
       const top = process.env.DM_LDAP_TOP_ORGANIZATION as string;
-      const found = (await server.ldap.search(
-        { paged: false, scope: 'base' },
-        top,
-        { user: USER, headers: {} } as unknown as DmRequest
-      )) as SearchResult;
-      expect(found.searchEntries).to.have.length(1);
+      let refused: unknown;
+      await server.ldap
+        .search({ paged: false, scope: 'base' }, top, {
+          user: USER,
+          headers: {},
+        } as unknown as DmRequest)
+        .catch((err: unknown) => (refused = err));
+      expect(isAuthzRefusal(refused)).to.equal(true);
     });
 
     it('refuses to move, rename or modify the restricted branch', async () => {

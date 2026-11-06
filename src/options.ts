@@ -16,9 +16,9 @@ import {
 } from '@ldap-rest/core/config/pluginOptions';
 import type { ConfigTemplate } from '@ldap-rest/core/lib/parseConfig';
 
-import { coreOptions, here, withoutCoreDuplicates } from './coreOptions';
+import { coreOptions, here, withoutCoreDuplicates } from './coreOptions.js';
 
-export { coreOptions as default } from './coreOptions';
+export { coreOptions as default } from './coreOptions.js';
 
 const roots: PluginRoots = {
   pluginRoot: join(here, 'plugins'),

@@ -375,6 +375,7 @@ Development only, refused with `NODE_ENV=production` — see [Fake Authenticatio
 | `--oidc-client-id`      | `DM_OIDC_CLIENT_ID`      |         | OIDC Client ID                                                                          |
 | `--oidc-client-secret`  | `DM_OIDC_CLIENT_SECRET`  |         | OIDC Client Secret                                                                      |
 | `--oidc-username-claim` | `DM_OIDC_USERNAME_CLAIM` | `sub`   | Claim naming the caller, published as `req.userName` (see [OIDC](plugins/auth/oidc.md)) |
+| `--oidc-logout-origins` | `DM_OIDC_LOGOUT_ORIGINS` | `[]`    | Other origins a console may log out from (see [OIDC](plugins/auth/oidc.md#logout))      |
 | `--base-url`            | `DM_BASE_URL`            |         | Public URL for callbacks                                                                |
 
 #### `core/bcl`

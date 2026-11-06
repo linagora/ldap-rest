@@ -40,16 +40,16 @@ import {
   SCIM_CONTENT_TYPE,
 } from '@ldap-rest/core/lib/scim/errors';
 
-import { ScimUsers } from './users';
-import { ScimGroups } from './groups';
-import { ScimBulk } from './bulk';
-import { ScimDiscovery } from './discovery';
+import { ScimUsers } from './users.js';
+import { ScimGroups } from './groups.js';
+import { ScimBulk } from './bulk.js';
+import { ScimDiscovery } from './discovery.js';
 import {
   type ProjectionQuery,
   assertProjection,
   projectList,
   projectResource,
-} from './projection';
+} from './projection.js';
 
 /**
  * Reusable SCIM 2.0 schemas surfaced by this plugin.

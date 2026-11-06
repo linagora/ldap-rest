@@ -52,10 +52,10 @@ import {
 } from '@ldap-rest/core/lib/scim/errors';
 import type { ScimOptions } from '@ldap-rest/core/lib/scim/options';
 
-import { scimFilterToLdap } from './filter';
-import { pagedSearch } from './list';
-import { patchToModifyRequest, writePatch } from './patch';
-import type { ScimUsers } from './users';
+import { scimFilterToLdap } from './filter.js';
+import { pagedSearch } from './list.js';
+import { patchToModifyRequest, writePatch } from './patch.js';
+import type { ScimUsers } from './users.js';
 
 export interface GroupListQuery {
   filter?: string;

@@ -46,11 +46,11 @@ import {
   isTombstone,
   lifecycleAttributes,
   type LifecycleAttributes,
-} from './lifecycleAttributes';
+} from './lifecycleAttributes.js';
 import {
   twakeInstancesOptions,
   type TwakeInstancesOptions,
-} from './twakeInstances.options';
+} from './twakeInstances.options.js';
 
 export interface WorkplaceCreated {
   twakeId?: string;

@@ -2,7 +2,7 @@
  * API Client for LDAP Group operations
  */
 
-import type { Config, Entry, LdapGroup } from '../types';
+import type { Config, Entry, LdapGroup } from '../types.js';
 
 export class GroupApiClient {
   private baseUrl: string;

@@ -1,8 +1,8 @@
 import type { Express } from 'express';
 
-import type { MaybePromise } from '../hooks';
+import type { MaybePromise } from '../hooks.js';
 
-import { defineRoute } from './route';
+import { defineRoute } from './route.js';
 
 /** What a plugin answers about the resources it depends on */
 export type HealthStatus = 'ok' | 'degraded';

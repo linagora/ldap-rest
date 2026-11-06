@@ -43,7 +43,7 @@ import {
 import {
   appAccountsOptions,
   type AppAccountsOptions,
-} from './appAccounts.options';
+} from './appAccounts.options.js';
 
 /**
  * Whether an error is the directory saying "that entry is not there".

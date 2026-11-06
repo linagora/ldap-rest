@@ -79,6 +79,7 @@ class OpenIDConnect extends AuthBase {
         oidc_client_id: StringOption;
         oidc_client_secret: StringOption;
         base_url: StringOption;
+        oidc_logout_origins: ArrayOption;
     };
     get pathPrefixes(): string[];
     // (undocumented)

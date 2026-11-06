@@ -1687,7 +1687,7 @@ export default abstract class LdapFlat extends DmPlugin {
     }
 
     // Get department path from target organization
-    const departmentPath = await this.getDepartmentPath(targetOrgDn, req);
+    const departmentPath = await this.getDepartmentPath(targetOrgDn);
 
     // Launch pre-move hook (chained - can modify targetOrgDn or cancel)
     [, targetOrgDn] = await this.ownHooks.chain('move', [dn, targetOrgDn, req]);
@@ -1713,18 +1713,18 @@ export default abstract class LdapFlat extends DmPlugin {
    * Get department path from an organization DN
    * Fetches the path attribute directly from the organization entry
    */
-  private async getDepartmentPath(
-    orgDn: string,
-    req?: Request
-  ): Promise<string> {
+  private async getDepartmentPath(orgDn: string): Promise<string> {
     const pathAttr =
       this.config.ldap_organization_path_attribute || 'twakeDepartmentPath';
 
     try {
-      const result = (await this.ldap.search(
+      // As the server: the target is judged by the write that follows, and a
+      // caller is not expected to read the organization it moves an entry
+      // into. Read as the caller, an organization outside their branches is
+      // filtered out and answers "not found" instead of the refusal.
+      const result = (await this.ldap.system.search(
         { paged: false, scope: 'base', attributes: [pathAttr, 'ou', 'o'] },
-        orgDn,
-        req
+        orgDn
       )) as SearchResult;
 
       if (!result.searchEntries || result.searchEntries.length === 0) {

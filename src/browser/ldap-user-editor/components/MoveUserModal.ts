@@ -3,7 +3,7 @@
  * Modal dialog for selecting target organization when moving a user
  */
 
-import type { UserApiClient } from '../api/UserApiClient';
+import type { UserApiClient } from '../api/UserApiClient.js';
 
 export class MoveUserModal {
   private modal: HTMLElement | null = null;

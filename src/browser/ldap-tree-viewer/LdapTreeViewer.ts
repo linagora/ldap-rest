@@ -2,9 +2,9 @@
  * Main LdapTreeViewer class
  */
 
-import type { ViewerOptions, TreeNode, TreeState } from './types';
-import { Store } from './store/Store';
-import { treeReducer, initialState } from './store/reducers';
+import type { ViewerOptions, TreeNode, TreeState } from './types.js';
+import { Store } from './store/Store.js';
+import { treeReducer, initialState } from './store/reducers.js';
 import {
   setRoot,
   addNode,
@@ -13,9 +13,9 @@ import {
   setLoading,
   setError,
   selectNode,
-} from './store/actions';
-import { LdapApiClient } from './api/LdapApiClient';
-import { TreeRoot } from './components/TreeRoot';
+} from './store/actions.js';
+import { LdapApiClient } from './api/LdapApiClient.js';
+import { TreeRoot } from './components/TreeRoot.js';
 
 export class LdapTreeViewer {
   private store: Store<TreeState>;

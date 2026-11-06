@@ -44,6 +44,7 @@ npm run test:one test/foo.test.ts # a subset
 npm run check                     # types, ESLint, Prettier, hooks, OpenAPI document, options snapshot, no client values
 npm run check:ts                  # types, with the TypeScript 6 compiler
 npm run check:ts7                 # types, with TypeScript 7
+npm run check:declarations        # published declarations under nodenext, after a build
 npm run fix                       # ESLint and Prettier fixes
 ```
 

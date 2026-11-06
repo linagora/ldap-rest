@@ -45,8 +45,8 @@ import {
   parseDeletedAt,
   valueOf,
   type LifecycleAttributes,
-} from './lifecycleAttributes';
-import { twakeLifecycleOptions } from './twakeLifecycle.options';
+} from './lifecycleAttributes.js';
+import { twakeLifecycleOptions } from './twakeLifecycle.options.js';
 
 export const LIFECYCLE_EVENTS = [
   'created',

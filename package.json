@@ -1,6 +1,6 @@
 {
   "name": "ldap-rest",
-  "version": "2.0.1",
+  "version": "2.0.5",
   "description": "Light directory manager",
   "keywords": [
     "Identity-Manager"
@@ -818,6 +818,7 @@
     "check": "npm run check:ts && npm run check:packages && npm run lint && npm run format:check && npm run check:hooks && npm run check:comments && npm run check:no-client-values && npm run check:api && npm run check:openapi && npm run check:options",
     "check:api": "npm run build:packages && tsx scripts/api-snapshot.ts --check",
     "check:comments": "sh scripts/check-comments.sh",
+    "check:declarations": "tsx scripts/check-declarations.ts",
     "check:hooks": "tsx scripts/hooks-doc.ts",
     "check:no-client-values": "sh scripts/check-no-client-values.sh",
     "check:openapi": "tsx scripts/check-openapi.ts",
@@ -882,6 +883,7 @@
     "@ldap-rest/ldap-trash": "3.0.0",
     "@ldap-rest/storage": "3.0.0",
     "@sinclair/typebox": "^0.34.52",
+    "@types/express": "^5.0.3",
     "body-parser": "^2.2.0",
     "csv-parse": "^7.0.2",
     "express": "^5.1.0",
@@ -901,12 +903,10 @@
     "@rollup/plugin-terser": "^1.0.2",
     "@rollup/plugin-typescript": "^12.1.4",
     "@types/chai": "^5.2.2",
-    "@types/express": "^5.0.3",
     "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^26.6.5",
-    "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
     "@typescript-eslint/eslint-plugin": "^8.44.0",
     "@typescript-eslint/parser": "^8.44.0",
@@ -934,6 +934,7 @@
   },
   "optionalDependencies": {
     "@linagora/rabbitmq-client": "^0.7.2",
+    "@types/pg": "^8.23.1",
     "express-openid-connect": "^3.4.0",
     "iovalkey": "^0.4.0",
     "lemonldap-ng-handler": "^0.9.6",

@@ -3,9 +3,9 @@
  * @module browser/ldap-browser/components/EntryView
  */
 
-import { escapeHtml } from '../../shared/utils/dom';
-import type { SchemaView } from '../schema';
-import type { RawEntry } from '../types';
+import { escapeHtml } from '../../shared/utils/dom.js';
+import type { SchemaView } from '../schema.js';
+import type { RawEntry } from '../types.js';
 
 /** Operational attributes are shown apart from the ones the admin sets */
 const OPERATIONAL_USAGE = new Set([

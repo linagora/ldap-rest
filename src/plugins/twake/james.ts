@@ -31,7 +31,7 @@ import {
   jamesOptions,
   jamesOptionsOf,
   type JamesOptions,
-} from './james.options';
+} from './james.options.js';
 
 /**
  * What James WebAdmin answers about a user missing from its users

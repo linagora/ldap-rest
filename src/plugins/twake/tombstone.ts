@@ -48,11 +48,11 @@ import {
   parseDeletedAt,
   valueOf,
   type LifecycleAttributes,
-} from './lifecycleAttributes';
+} from './lifecycleAttributes.js';
 import {
   twakeTombstoneOptions,
   twakeTombstoneOptionsOf,
-} from './twakeTombstone.options';
+} from './twakeTombstone.options.js';
 
 const REASON = /^[A-Za-z0-9_.-]{1,64}$/;
 

@@ -8,7 +8,7 @@ import type { ChangesToNotify } from '@ldap-rest/core/lib/changes';
 import { Hooks, MaybePromise } from '@ldap-rest/core/hooks';
 import { isDnInBranch, rdnValue } from '@ldap-rest/core/lib/utils';
 
-import { calendarOptions, calendarOptionsOf } from './calendar.options';
+import { calendarOptions, calendarOptionsOf } from './calendar.options.js';
 
 /** A Twake Calendar registered user, as the WebAdmin API returns it */
 interface RegisteredUser {

@@ -40,7 +40,7 @@ import type {
 } from '@ldap-rest/core/lib/ldapActions';
 import type { Hooks } from '@ldap-rest/core/hooks';
 import { ok, unauthorized } from '@ldap-rest/core/lib/expressFormatedResponses';
-import { getParentDn } from '@ldap-rest/core/lib/utils';
+import { getParentDn, isDnInBranch } from '@ldap-rest/core/lib/utils';
 
 import { dynamicOptions } from './authzDynamic.options';
 import { verifyLdapPassword } from './authzDynamicHash';
@@ -89,15 +89,6 @@ function asString(v: AttributeValue | undefined): string | undefined {
   }
   if (Buffer.isBuffer(v)) return v.toString();
   return String(v);
-}
-
-/** Case-insensitive sub-branch membership: `dn` is at or under `branch`. */
-function isAtOrUnder(dn: string, branch: string): boolean {
-  const a = dn.toLowerCase().trim();
-  const b = branch.toLowerCase().trim();
-  if (!a || !b) return false;
-  if (a === b) return true;
-  return a.endsWith(',' + b);
 }
 
 export default class AuthzDynamic extends AuthBase {
@@ -253,9 +244,9 @@ export default class AuthzDynamic extends AuthBase {
                 .filter(b => b && typeof b.dn === 'string' && b.dn.length > 0)
                 .map(b => ({
                   dn: b.dn,
-                  read: Boolean(b.read),
-                  write: Boolean(b.write),
-                  delete: Boolean(b.delete),
+                  read: this.aclFlag(b.read, 'read', b.dn, dn),
+                  write: this.aclFlag(b.write, 'write', b.dn, dn),
+                  delete: this.aclFlag(b.delete, 'delete', b.dn, dn),
                 }));
             }
           } catch (err) {
@@ -286,6 +277,34 @@ export default class AuthzDynamic extends AuthBase {
         `authzDynamic: failed to load tokens from ${this.base}: ${String(err)}`
       );
     }
+  }
+
+  /**
+   * Read one ACL flag of a token's JSON.
+   *
+   * Only the boolean `true` grants the permission: every string is truthy,
+   * `"false"`, `"no"` and `"0"` included.
+   *
+   * @param value flag as the token's JSON holds it
+   * @param flag flag name, for the warning
+   * @param branch branch the flag applies to
+   * @param tokenDn DN of the token entry
+   * @returns whether the permission is granted
+   */
+  private aclFlag(
+    value: unknown,
+    flag: string,
+    branch: string,
+    tokenDn: string
+  ): boolean {
+    if (typeof value === 'boolean') return value;
+    if (value !== undefined)
+      this.logger.warn(
+        `authzDynamic: ${flag} flag of ${branch} in ${tokenDn} is ${String(
+          JSON.stringify(value)
+        )}, not a boolean: permission refused`
+      );
+    return false;
   }
 
   /**
@@ -671,7 +690,15 @@ export default class AuthzDynamic extends AuthBase {
     permission: 'read' | 'write' | 'delete'
   ): void {
     for (const acl of token.bases) {
-      if (!isAtOrUnder(branchOrDn, acl.dn)) continue;
+      let inside: boolean;
+      try {
+        inside = isDnInBranch(branchOrDn, acl.dn);
+      } catch {
+        // A DN the parser refuses names no branch: it grants nothing, and it
+        // must not hide the branches that follow it.
+        continue;
+      }
+      if (!inside) continue;
       if (acl[permission]) return;
     }
     this.logger.debug(

@@ -2,19 +2,19 @@
  * Group Property Editor Component - Edits properties of a selected group
  */
 
-import type { GroupApiClient } from '../api/GroupApiClient';
+import type { GroupApiClient } from '../api/GroupApiClient.js';
 import type {
   Entry,
   LdapGroup,
   SchemaAttribute,
   SchemaDefinition,
-} from '../types';
-import { MoveGroupModal } from './MoveGroupModal';
+} from '../types.js';
+import { MoveGroupModal } from './MoveGroupModal.js';
 import {
   changedAttributes,
   listChanges,
   listValues,
-} from '../../shared/utils/form';
+} from '../../shared/utils/form.js';
 
 export class GroupPropertyEditor {
   private container: HTMLElement;

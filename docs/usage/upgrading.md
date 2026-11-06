@@ -24,6 +24,67 @@ const server = new DM(await composeOptions());
 The `ldap-rest` command does this already, so a deployment started from the
 command line needs no change.
 
+## From 2.0.3
+
+### An `authzDynamic` flag must be a JSON boolean
+
+**Who is affected:** a deployment loading `core/auth/authzDynamic` whose
+token entries hold a `read`, `write` or `delete` flag in `description` as a
+string or a number (`"true"`, `"yes"`, `1`) instead of the boolean `true`.
+
+That flag grants nothing after the upgrade: the permission is refused on
+the branch, and each reload logs `… not a boolean: permission refused`,
+naming the token entry and the branch. Write the JSON boolean `true` for the
+permissions the token holds. A flag written `"false"`, `"no"` or `"0"`
+refuses too, as it was meant to.
+
+### A malformed trusted proxy stops the server
+
+**Who is affected:** a deployment whose `--trusted-proxy` /
+`DM_TRUSTED_PROXIES` holds something that is neither an address nor an
+`address/prefix` network, such as `10.0.0.0/2.`, `10.0.0.0/24x` or `:::`.
+
+`core/auth/trustedProxy` refuses it at startup (`Invalid trusted proxy
+address "…"`) instead of reading its leading digits and trusting another
+network: `10.0.0.0/2.` was read as `10.0.0.0/2`, a network covering
+`0.0.0.0/2`. An IPv4-mapped address remains accepted. A trusted entry
+carrying a zone index (`fe80::1%eth0`) is refused too: the same link-local
+address names another host on another link. Fix the entry.
+
+## From 2.0.2
+
+### A console on another origin must be trusted for logout
+
+**Who is affected:** a deployment whose console is served from an origin
+other than `--base-url`, for example a front-end calling the API with its own
+`apiBaseUrl`.
+
+`/logout` refuses a request a browser reports as coming from another site.
+List the console's origin in `--oidc-logout-origins` (or
+`DM_OIDC_LOGOUT_ORIGINS`, comma-separated); otherwise its sign-out link
+answers `403` and the session stays. A console served by ldap-rest itself,
+from `--base-url`, needs nothing.
+
+### The organization tree is held to branches
+
+**Who is affected:** a deployment using `core/auth/authzLinid1`, or
+`core/auth/authzPerBranch` with `--authz-filter-attached-entries`.
+
+An administrator no longer reads the organizations of another branch: a
+single read answers `404`, and a subnode listing or a search returns only the
+branches they hold. The tree names every branch, its description and its
+local administrators, which an administrator of one branch has no business
+reading. `organizations/top` still answers one of their branches — or the
+top organization for a caller named in no `twakeLocalAdminLink` — and the
+transit branch's own entry stays readable so that the console can open its
+card from the scope banner. Naming the tree top directly is refused like any
+organization outside their branches.
+
+A console drawing the whole tree from an administrator's session draws their
+branches only. A client that listed the tree to let one administrator choose
+another branch as a destination loses that choice; the write was refused on
+the destination branch anyway.
+
 ## From 1.3.0
 
 ### A plugin with its own `service` member

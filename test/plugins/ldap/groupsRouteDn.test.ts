@@ -220,9 +220,19 @@ describe('Group routes and the DN they are given', function () {
       'cn=a\\,b,dc=x',
       'cn=a+sn=b,dc=x',
       '2.5.4.3=a,dc=x',
+      'ou=\\#,dc=x',
     ])
       expect(isDnSyntax(dn), dn).to.equal(true);
-    for (const dn of ['a,b', 'a,b=', 'cn=a,,dc=x', '=a,dc=x', 'cn="a,dc=x'])
+    for (const dn of [
+      'a,b',
+      'a,b=',
+      'cn=a,,dc=x',
+      '=a,dc=x',
+      'cn="a,dc=x',
+      'ou=#,dc=x',
+      'ou=#zz,dc=x',
+      'ou=#0c0b,dc=x',
+    ])
       expect(isDnSyntax(dn), dn).to.equal(false);
   });
 });

@@ -104,6 +104,105 @@ describe('OpenID Connect, RP-Initiated Logout', function () {
       endpoints: { logout: '/logout' },
     });
   });
+
+  describe('from another site', () => {
+    const guarded = async (
+      issuer: string
+    ): Promise<Awaited<ReturnType<typeof build>>> =>
+      build(issuer, true, undefined, s => {
+        s.app.get('/api/admin/ping', (req, res: Response) =>
+          res.json({ user: (req as { user?: string }).user })
+        );
+      });
+
+    const ping = (
+      request: Awaited<ReturnType<typeof build>>,
+      cookie: string
+    ): Promise<{ status: number }> =>
+      request
+        .get('/api/admin/ping')
+        .set('Cookie', cookie)
+        .set('Accept', 'application/json')
+        .then(res => res);
+
+    for (const [name, headers] of [
+      ['a cross-site fetch', { 'Sec-Fetch-Site': 'cross-site' }],
+      ['a same-site subdomain', { 'Sec-Fetch-Site': 'same-site' }],
+      ['an Origin header', { Origin: 'https://evil.example.test' }],
+      ['a Referer header', { Referer: 'https://evil.example.test/page' }],
+    ] as [string, Record<string, string>][])
+      it(`refuses ${name} and keeps the session`, async () => {
+        const issuer = `http://csrf-${name.replace(/\W+/g, '-')}.example.test`;
+        const request = await guarded(issuer);
+        const { cookie } = await login(request, issuer);
+
+        const res = await request
+          .get('/logout')
+          .set('Cookie', cookie)
+          .set(headers);
+
+        expect(res.status).to.equal(403);
+        expect(clearsSession(res.headers['set-cookie'])).to.equal(false);
+        expect((await ping(request, cookie)).status).to.equal(200);
+      });
+
+    for (const [name, headers] of [
+      ['same-origin', { 'Sec-Fetch-Site': 'same-origin' }],
+      ['a direct navigation', { 'Sec-Fetch-Site': 'none' }],
+      [
+        'the same origin spelled in Origin and Referer',
+        { Origin: BASE_URL, Referer: `${BASE_URL}/users` },
+      ],
+    ] as [string, Record<string, string>][])
+      it(`allows ${name}`, async () => {
+        const issuer = `http://csrf-ok-${name.replace(/\W+/g, '-')}.example.test`;
+        const request = await guarded(issuer);
+        const { cookie } = await login(request, issuer);
+
+        const res = await request
+          .get('/logout')
+          .set('Cookie', cookie)
+          .set(headers);
+
+        expect(res.status).to.equal(302);
+        expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
+      });
+
+    it('allows a link from an origin listed in --oidc-logout-origins', async () => {
+      const issuer = 'http://csrf-trusted.example.test';
+      const request = await build(issuer, true, undefined, undefined, {
+        oidc_logout_origins: ['https://console.example.test'],
+      });
+      const { cookie } = await login(request, issuer);
+
+      // A click on a link: a Referer, and no Origin
+      const res = await request
+        .get('/logout')
+        .set('Cookie', cookie)
+        .set('Sec-Fetch-Site', 'cross-site')
+        .set('Referer', 'https://console.example.test/users');
+
+      expect(res.status).to.equal(302);
+      expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
+    });
+
+    it('allows a fetch from an origin listed in --oidc-logout-origins', async () => {
+      const issuer = 'http://csrf-trusted-fetch.example.test';
+      const request = await build(issuer, true, undefined, undefined, {
+        oidc_logout_origins: ['https://console.example.test'],
+      });
+      const { cookie } = await login(request, issuer);
+
+      const res = await request
+        .get('/logout')
+        .set('Cookie', cookie)
+        .set('Sec-Fetch-Site', 'cross-site')
+        .set('Origin', 'https://console.example.test');
+
+      expect(res.status).to.equal(302);
+      expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
+    });
+  });
 });
 
 /**

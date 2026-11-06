@@ -27,7 +27,7 @@
  */
 import type winston from 'winston';
 
-import type { HealthStatus } from '../health';
+import type { HealthStatus } from '../health.js';
 
 /** What a backend keeps: a value, and when it stops counting. */
 export interface StoredRecord {

@@ -28,7 +28,7 @@ import {
 } from '@ldap-rest/core/lib/services/rabbitmq';
 import type { ScimUser } from '@ldap-rest/core/lib/scim/types';
 
-import { cozyOptions, cozyOptionsOf } from './cozy.options';
+import { cozyOptions, cozyOptionsOf } from './cozy.options.js';
 
 export default class CozyProvision extends DmPlugin {
   static optionDefinitions = cozyOptions;

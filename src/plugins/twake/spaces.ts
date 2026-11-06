@@ -64,22 +64,22 @@ import {
   RouteError,
   values,
   withOrg,
-} from './groups';
+} from './groups.js';
 import {
   isTombstone,
   lifecycleAttributes,
   type LifecycleAttributes,
   valueOf,
-} from './lifecycleAttributes';
+} from './lifecycleAttributes.js';
 import {
   twakeGroupsOptions,
   type TwakeGroupsOptions,
-} from './twakeGroups.options';
+} from './twakeGroups.options.js';
 import {
   twakeInstancesOptions,
   type TwakeInstancesOptions,
-} from './twakeInstances.options';
-import { twakeSpacesOptions } from './twakeSpaces.options';
+} from './twakeInstances.options.js';
+import { twakeSpacesOptions } from './twakeSpaces.options.js';
 
 /** From the weakest to the strongest. */
 export const SPACE_ROLES = ['viewer', 'editor', 'admin'] as const;

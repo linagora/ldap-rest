@@ -13,7 +13,7 @@ import type { DM } from '@ldap-rest/core';
 import type { AttributeValue } from '@ldap-rest/core/lib/ldapActions';
 import { Hooks } from '@ldap-rest/core/hooks';
 
-import { driveOptions, driveOptionsOf } from './drive.options';
+import { driveOptions, driveOptionsOf } from './drive.options.js';
 
 export default class Drive extends TwakePlugin {
   static optionDefinitions = driveOptions;

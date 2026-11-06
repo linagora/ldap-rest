@@ -10,7 +10,7 @@ import { toConfigEntries } from '@ldap-rest/core/config/options';
 import type { ConfigTemplate } from '@ldap-rest/core/lib/parseConfig';
 import { scimOptions } from '@ldap-rest/core/lib/scim/options';
 
-import { coreOptions, withoutCoreDuplicates } from './coreOptions';
+import { coreOptions, withoutCoreDuplicates } from './coreOptions.js';
 import { bclOptions } from './plugins/bcl.options';
 import { metricsOptions } from './plugins/metrics.options';
 import { rabbitmqOptions } from './plugins/rabbitmq.options';

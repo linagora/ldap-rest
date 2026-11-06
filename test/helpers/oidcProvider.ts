@@ -100,7 +100,8 @@ export const build = async (
   issuer: string,
   endSession: boolean,
   name?: string,
-  routes?: (server: DM) => void
+  routes?: (server: DM) => void,
+  config: Record<string, unknown> = {}
 ): Promise<ReturnType<typeof supertest>> => {
   provider(issuer, endSession);
   const server = new DM();
@@ -109,6 +110,7 @@ export const build = async (
   server.config.oidc_client_id = 'client';
   server.config.oidc_client_secret = SECRET;
   server.config.base_url = BASE_URL;
+  Object.assign(server.config, config);
   // Scoped, so that `/v1/config` stays readable without a session.
   const scoped = server.withConfig({
     ...server.config,

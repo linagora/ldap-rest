@@ -23,7 +23,7 @@ import { isDnInBranch, normalizeDn } from '@ldap-rest/core/lib/utils';
 import {
   migrationProxyOptions,
   migrationProxyOptionsOf,
-} from './migrationProxy.options';
+} from './migrationProxy.options.js';
 
 /** What the proxy answers while its storage does not */
 const PROXY_UNAVAILABLE: readonly number[] = [500, 502, 503, 504];

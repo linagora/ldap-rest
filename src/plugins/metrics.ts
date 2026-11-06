@@ -15,7 +15,7 @@ import DmPlugin from '@ldap-rest/core/abstract/plugin';
 import type { DM } from '@ldap-rest/core';
 import { registry } from '@ldap-rest/core/lib/metrics';
 
-import { metricsOptions } from './metrics.options';
+import { metricsOptions } from './metrics.options.js';
 
 export default class Metrics extends DmPlugin {
   static optionDefinitions = metricsOptions;

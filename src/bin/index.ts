@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 
 import { DM as CoreDM, type ConfigTemplate } from '@ldap-rest/core';
 
-import configArgs from '../options';
+import configArgs from '../options.js';
 import pluginModules from '../pluginModules.json';
 
 const here = dirname(fileURLToPath(import.meta.url));

@@ -29,7 +29,7 @@ import {
 import {
   appAccountsOptions,
   type AppAccountsOptions,
-} from './appAccounts.options';
+} from './appAccounts.options.js';
 
 export const AppAccountsParams = Type.Object({
   user: Type.String({ minLength: 1 }),

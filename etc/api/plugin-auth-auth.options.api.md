@@ -92,6 +92,7 @@ export const openidconnectOptions: {
     oidc_client_id: StringOption;
     oidc_client_secret: StringOption;
     base_url: StringOption;
+    oidc_logout_origins: ArrayOption;
 };
 
 // @public (undocumented)

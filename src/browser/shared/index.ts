@@ -4,18 +4,18 @@
  */
 
 // Utility exports
-export * from './utils/dom';
-export * from './utils/form';
-export * from './utils/schema';
-export * from './utils/totp';
+export * from './utils/dom.js';
+export * from './utils/form.js';
+export * from './utils/schema.js';
+export * from './utils/totp.js';
 
 // Component exports
-export { Modal, type ModalOptions } from './components/Modal';
+export { Modal, type ModalOptions } from './components/Modal.js';
 export {
   StatusMessage,
   showStatus,
   type StatusMessageOptions,
-} from './components/StatusMessage';
+} from './components/StatusMessage.js';
 
 // Type exports
-export * from './types';
+export * from './types/index.js';

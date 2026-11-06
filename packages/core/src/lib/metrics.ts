@@ -6,7 +6,7 @@
 import type { Request } from 'express';
 import { Counter, Histogram, Registry } from 'prom-client';
 
-import { extractLdapCode } from './ldapCodes';
+import { extractLdapCode } from './ldapCodes.js';
 
 /** The instruments below register here; `core/metrics` adds its own */
 export const registry = new Registry();

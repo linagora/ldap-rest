@@ -18,13 +18,13 @@ import type {
   AttributesList,
   ModifyRequest,
   SearchResult,
-} from '../ldapActions';
+} from '../ldapActions.js';
 import {
   AmbiguousIdentityError,
   AuthzRefusedError,
   BadRequestError,
   ServiceUnavailableError,
-} from '../errors';
+} from '../errors.js';
 import {
   escapeLdapFilter,
   getParentDn,
@@ -33,9 +33,9 @@ import {
   normalizeDn,
   organizationLink,
   parseDn,
-} from '../utils';
+} from '../utils.js';
 
-import { authzFor, servesRequest } from './composition';
+import { authzFor, servesRequest } from './composition.js';
 
 /**
  * The rule of the most specific configured branch holding `target`.
@@ -85,13 +85,10 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   private static readonly widenedForLink = Symbol('widened for the link');
 
-  /**
-   * The search of the top organization by itself, which every caller may
-   * make (`getOrganisationTop`): granted by `ldapsearchrequest` whatever the
-   * rules say, it is not filtered by them either. A symbol key, for the
-   * reason given at {@link widenedForLink}.
-   */
-  private static readonly topOrganizationRead = Symbol('top organization');
+  /** Searches widened to carry `objectClass`, by the same means and for the same reason. */
+  private static readonly widenedForObjectClass = Symbol(
+    'widened for object classes'
+  );
 
   roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
@@ -196,13 +193,13 @@ export default abstract class AuthzBase extends DmPlugin {
    * the judgement of `ldapsearchrequest`, for `authzScope` to ask it of a
    * branch without searching it.
    *
-   * Filtering, an administrator reads the directory whole — the
-   * organization tree, the groups, the nomenclatures — and what is held to
-   * a branch is the accounts, recognised one entry at a time by
-   * `ldapsearchfilter`; only a global branch asks for the branch itself.
-   * Otherwise the branch decides. Where a branch is a tenant rather than a
-   * department, letting a listing cross it is letting a customer read
-   * another.
+   * Filtering, a search is granted broadly — the groups, the nomenclatures,
+   * the entries attached to the caller's branches — and what is held to a
+   * branch is judged one entry at a time by `ldapsearchfilter`: an account by
+   * its link, an organization by the branch it sits in. Only a global branch
+   * asks for the branch itself. Otherwise the branch decides. Where a branch
+   * is a tenant rather than a department, letting a listing cross it is
+   * letting a customer read another.
    *
    * @param user the caller's DN
    * @param base the base of the search
@@ -1115,15 +1112,6 @@ export default abstract class AuthzBase extends DmPlugin {
         return [base, opts, req];
       }
 
-      // Allow base scope search on top organization (for getOrganisationTop)
-      if (base === this.config.ldap_top_organization && opts.scope === 'base') {
-        return [
-          base,
-          { ...opts, [AuthzBase.topOrganizationRead]: true } as SearchOptions,
-          req,
-        ];
-      }
-
       // Filtering, the search is granted broadly and `ldapsearchfilter`
       // below holds the accounts to the caller's branches: refusing it here
       // would take the tree and the reference data with it.
@@ -1150,6 +1138,19 @@ export default abstract class AuthzBase extends DmPlugin {
             [AuthzBase.widenedForLink]: true,
           } as SearchOptions;
         }
+        // The organization classes tell an organization from an account or a
+        // group carrying no link; the caller may not have asked for them.
+        if (linkAttr && !AuthzBase.wantsAttribute(opts, 'objectClass')) {
+          const asked = opts.attributes;
+          const list = Array.isArray(asked)
+            ? asked.map(String)
+            : [String(asked)];
+          opts = {
+            ...opts,
+            attributes: [...list, 'objectClass'],
+            [AuthzBase.widenedForObjectClass]: true,
+          } as SearchOptions;
+        }
         return [base, opts, req];
       }
 
@@ -1165,9 +1166,11 @@ export default abstract class AuthzBase extends DmPlugin {
      * attached outside the branches this caller manages are dropped.
      *
      * Runs after the cache and carries the request, so what one caller may
-     * not see never reaches another. An entry with no organization link —
-     * an organization, a group, a nomenclature value — is left alone: those
-     * are the reference data every administrator reads.
+     * not see never reaches another. An organization is judged by the branch
+     * it sits in: the tree names every branch, its description and its local
+     * administrators, which an administrator of one branch has no business
+     * reading. A group or a nomenclature value carrying no link is left
+     * alone: those are the reference data every administrator reads.
      *
      * So is an entry attached to the transit branch: it is waiting for an
      * administrator to claim it.
@@ -1192,12 +1195,6 @@ export default abstract class AuthzBase extends DmPlugin {
       // narrower than the base may refuse part of what it holds: each entry
       // is read only where the caller may read it.
       if (!this.filtersAttachedEntries()) {
-        if (
-          (opts as { [key: symbol]: unknown } | undefined)?.[
-            AuthzBase.topOrganizationRead
-          ]
-        )
-          return pass;
         const keys = await this.ruleBranches(user);
         const kept = [];
         // An entry is under its parent's rule unless a rule names it
@@ -1263,7 +1260,7 @@ export default abstract class AuthzBase extends DmPlugin {
       const transitKey = this.transitKey();
 
       // Within a branch the caller holds, a narrower rule may still refuse
-      // the organization: asked once per organization
+      // the entry: asked once per DN
       const readable = new Map<string, boolean>();
       const reads = async (value: string): Promise<boolean> => {
         if (!within(value)) return false;
@@ -1276,6 +1273,37 @@ export default abstract class AuthzBase extends DmPlugin {
         return readable.get(key)!;
       };
 
+      // An organization under a global write branch is read by every
+      // administrator, and `within` would refuse it: asked of the rules.
+      const readsOrganisation = async (value: string): Promise<boolean> => {
+        const key = normalizeDn(value);
+        if (!readable.has(key))
+          readable.set(
+            key,
+            (await this.getUserPermissions(user, value)).read === true
+          );
+        return readable.get(key)!;
+      };
+
+      // An organization is an entry under the tree top carrying one of the
+      // configured classes, as `core/ldap/organizations` reads one: `ou=users`
+      // and `ou=nomenclature` sit outside the tree and stay reference data,
+      // and an account or a group carrying no link is not an organization.
+      // The transit branch is not hidden: the console opens its card from the
+      // scope banner, and it is where entries change hands.
+      const top = this.config.ldap_top_organization;
+      const organizationClasses = (this.config.ldap_organization_class ?? [])
+        .filter(name => name.toLowerCase() !== 'top')
+        .map(name => name.toLowerCase());
+      const organization = (dn: string, entry: AttributesList): boolean => {
+        if (transitKey && normalizeDn(dn) === transitKey) return false;
+        if (!top || !isDnInBranch(dn, top)) return false;
+        const classes = ([] as unknown[])
+          .concat(entry.objectClass ?? [])
+          .map(name => String(name).toLowerCase());
+        return organizationClasses.some(name => classes.includes(name));
+      };
+
       const attached = [];
       for (const entry of result.searchEntries) {
         const link = entry[linkAttr];
@@ -1284,6 +1312,15 @@ export default abstract class AuthzBase extends DmPlugin {
             ? []
             : (Array.isArray(link) ? link : [link]).map(String);
         if (values.length === 0) {
+          // An organization with no link is the branch itself: read it only
+          // where the caller reads that branch, as its accounts are.
+          const dn = String(entry.dn);
+          if (organization(dn, entry) && !(await readsOrganisation(dn))) {
+            this.logger.debug(
+              `${this.name}: hiding ${dn} from ${req!.user}, outside the branches they hold`
+            );
+            continue;
+          }
           attached.push(entry);
           continue;
         }
@@ -1316,6 +1353,15 @@ export default abstract class AuthzBase extends DmPlugin {
         ]
       ) {
         for (const entry of result.searchEntries) delete entry[linkAttr];
+      }
+
+      // The classes were added to the projection for the same reason.
+      if (
+        (opts as { [key: symbol]: unknown } | undefined)?.[
+          AuthzBase.widenedForObjectClass
+        ]
+      ) {
+        for (const entry of result.searchEntries) delete entry.objectClass;
       }
 
       return [result, req, opts];

@@ -8,9 +8,9 @@ import type {
   PointerOption,
   Schema,
   ResourceType,
-} from '../types';
-import { CacheManager } from '../cache/CacheManager';
-import { hasRole } from '../../shared/utils/schema';
+} from '../types.js';
+import { CacheManager } from '../cache/CacheManager.js';
+import { hasRole } from '../../shared/utils/schema.js';
 
 export class ResourceApiClient {
   private baseUrl: string;

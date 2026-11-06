@@ -2,9 +2,9 @@
  * LDAP User Editor - API Client
  */
 
-import type { Config, LdapUser, PointerOption, Schema } from '../types';
-import { CacheManager } from '../cache/CacheManager';
-import { hasRole } from '../../shared/utils/schema';
+import type { Config, LdapUser, PointerOption, Schema } from '../types.js';
+import { CacheManager } from '../cache/CacheManager.js';
+import { hasRole } from '../../shared/utils/schema.js';
 
 export class UserApiClient {
   private baseUrl: string;

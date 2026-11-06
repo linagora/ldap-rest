@@ -554,11 +554,11 @@ describe('AuthzLinid1 Plugin', () => {
     });
 
     describe('READ - Search outside authorized scope', () => {
-      // Organizations carry no organization link: they are the reference
-      // data every administrator reads, and the tree a console draws. What
-      // another branch holds back is its accounts and groups
-      // (authzLinid1Attached.test.ts), and every write to it.
-      it('reads another organization, which is reference data', async () => {
+      // An organization names the branch it heads: the tree of another
+      // branch carries its descriptions and its local administrators, and is
+      // no more readable than the accounts attached to it.
+      // (authzLinid1Attached.test.ts holds the accounts and groups back.)
+      it('does not read another organization', async () => {
         // Create admin user
         const adminEntry = {
           objectClass: ['top', 'inetOrgPerson'],
@@ -593,8 +593,8 @@ describe('AuthzLinid1 Plugin', () => {
           .set('X-Test-User', 'testadmin')
           .set('Accept', 'application/json');
 
-        expect(res.status).to.equal(200);
-        expect(res.body).to.have.property('dn', getTestOrg2Dn());
+        expect(res.status).to.equal(404);
+        expect(res.body).not.to.have.property('dn', getTestOrg2Dn());
       });
 
       it('should allow search in authorized branch', async () => {
@@ -630,7 +630,7 @@ describe('AuthzLinid1 Plugin', () => {
         expect(res.body).to.have.property('ou', 'TestOrg');
       });
 
-      it('lists the sub-organizations of another organization', async () => {
+      it('does not list the sub-organizations of another organization', async () => {
         // Create admin user
         const adminEntry = {
           objectClass: ['top', 'inetOrgPerson'],
@@ -672,9 +672,81 @@ describe('AuthzLinid1 Plugin', () => {
           .set('Accept', 'application/json');
 
         expect(res.status).to.equal(200);
-        expect((res.body as { dn: string }[]).map(e => e.dn)).to.include(
+        expect((res.body as { dn: string }[]).map(e => e.dn)).not.to.include(
           getTestSubOrg2Dn()
         );
+      });
+
+      it('lists only the branches it holds under the tree top', async () => {
+        await dm.ldap.add(getTestUserDn(), {
+          objectClass: ['top', 'inetOrgPerson'],
+          uid: 'testadmin',
+          sn: 'Admin',
+          cn: 'Test Admin',
+        });
+        await dm.ldap.add(getTestOrgDn(), {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'TestOrg',
+          twakeLocalAdminLink: getTestUserDn(),
+        });
+        await dm.ldap.add(getTestOrg2Dn(), {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg2',
+          twakeDepartmentPath: 'TestOrg2',
+        });
+
+        const res = await request
+          .get(
+            `/api/v1/ldap/organizations/${encodeURIComponent(
+              process.env.DM_LDAP_TOP_ORGANIZATION as string
+            )}/subnodes?objectClass=organizationalUnit`
+          )
+          .set('Authorization', `Bearer ${adminToken}`)
+          .set('X-Test-User', 'testadmin')
+          .set('Accept', 'application/json');
+
+        expect(res.status).to.equal(200);
+        expect((res.body as { dn: string }[]).map(e => e.dn)).to.include(
+          getTestOrgDn()
+        );
+        expect((res.body as { dn: string }[]).map(e => e.dn)).not.to.include(
+          getTestOrg2Dn()
+        );
+      });
+
+      it('answers organizations/top with a branch it holds, not the tree top', async () => {
+        await dm.ldap.add(getTestUserDn(), {
+          objectClass: ['top', 'inetOrgPerson'],
+          uid: 'testadmin',
+          sn: 'Admin',
+          cn: 'Test Admin',
+        });
+        await dm.ldap.add(getTestOrgDn(), {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'TestOrg',
+          twakeLocalAdminLink: getTestUserDn(),
+        });
+
+        const top = await request
+          .get('/api/v1/ldap/organizations/top')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .set('X-Test-User', 'testadmin')
+          .set('Accept', 'application/json');
+        expect(top.status).to.equal(200);
+        expect(top.body).to.have.property('dn', getTestOrgDn());
+
+        const direct = await request
+          .get(
+            `/api/v1/ldap/organizations/${encodeURIComponent(
+              process.env.DM_LDAP_TOP_ORGANIZATION as string
+            )}`
+          )
+          .set('Authorization', `Bearer ${adminToken}`)
+          .set('X-Test-User', 'testadmin')
+          .set('Accept', 'application/json');
+        expect(direct.status).to.equal(404);
       });
 
       it('refuses a caller administering no branch', async () => {

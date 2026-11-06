@@ -432,7 +432,7 @@ docker run -p 8081:8081 ldap-rest
 ## Créer un plugin personnalisé
 
 ```typescript
-import DmPlugin from 'ldap-rest/plugin-abstract';
+import DmPlugin from 'ldap-rest/plugin';
 import { Hooks } from 'ldap-rest/hooks';
 
 export default class CustomPlugin extends DmPlugin {

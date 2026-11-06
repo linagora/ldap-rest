@@ -31,8 +31,8 @@ import {
   writeScimErrorFromException,
 } from '@ldap-rest/core/lib/scim/errors';
 
-import type { ScimUsers } from './users';
-import type { ScimGroups } from './groups';
+import type { ScimUsers } from './users.js';
+import type { ScimGroups } from './groups.js';
 
 export interface ScimBulkOptions {
   options: ScimOptions;

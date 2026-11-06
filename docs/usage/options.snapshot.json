@@ -974,6 +974,13 @@
     "env": "DM_OIDC_CLIENT_SECRET"
   },
   {
+    "cli": "--oidc-logout-origins",
+    "type": "array",
+    "default": [],
+    "plural": "--oidc-logout-origins",
+    "env": "DM_OIDC_LOGOUT_ORIGINS"
+  },
+  {
     "cli": "--oidc-server",
     "type": "string",
     "default": "",

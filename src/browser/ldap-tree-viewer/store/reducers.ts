@@ -2,10 +2,10 @@
  * Reducers for tree state management
  */
 
-import type { TreeState, TreeNode } from '../types';
+import type { TreeState, TreeNode } from '../types.js';
 
-import type { Action } from './Store';
-import { Actions } from './actions';
+import type { Action } from './Store.js';
+import { Actions } from './actions.js';
 
 export const initialState: TreeState = {
   nodes: new Map(),

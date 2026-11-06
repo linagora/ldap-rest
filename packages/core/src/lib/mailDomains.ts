@@ -9,9 +9,9 @@
 import type { DM } from '../bin';
 import { roleAttribute } from '../config/schema';
 
-import { getLogger } from './expressFormatedResponses';
-import { extractLdapCode } from './ldapCodes';
-import type { SearchResult } from './ldapActions';
+import { getLogger } from './expressFormatedResponses.js';
+import { extractLdapCode } from './ldapCodes.js';
+import type { SearchResult } from './ldapActions.js';
 
 /** Where mail domain entries live, and the attribute naming their domain */
 export interface DomainBranch {

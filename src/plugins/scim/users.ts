@@ -48,9 +48,9 @@ import {
   scimUniqueness,
 } from '@ldap-rest/core/lib/scim/errors';
 
-import { scimFilterToLdap } from './filter';
-import { pagedSearch } from './list';
-import { patchToModifyRequest, writePatch } from './patch';
+import { scimFilterToLdap } from './filter.js';
+import { pagedSearch } from './list.js';
+import { patchToModifyRequest, writePatch } from './patch.js';
 
 export interface ListQuery {
   filter?: string;

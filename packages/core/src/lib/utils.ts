@@ -5,10 +5,10 @@
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
-import type { Config } from '../bin';
+import type { Config } from '../bin/index.js';
 
-import type { AttributeValue } from './ldapActions';
-import { BadRequestError } from './errors';
+import type { AttributeValue } from './ldapActions.js';
+import { BadRequestError } from './errors.js';
 
 // Regex caching utilities - shared across plugins to avoid duplication
 // NOTE: This cache is designed for static patterns from schemas, NOT for user input.
@@ -45,7 +45,7 @@ export function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export { hookOwner, recordHookOwner, runAsHookOwner } from './hookBus';
+export { hookOwner, recordHookOwner, runAsHookOwner } from './hookBus.js';
 
 export const transformSchemas = (
   schemas: string | Buffer,
@@ -432,7 +432,13 @@ export function isDnSyntax(dn: string): boolean {
       current += char;
     }
     parts.push(current);
-    return parts.every(part => type.test(part));
+    return parts.every(part => {
+      if (!type.test(part)) return false;
+      // OpenLDAP refuses a value starting with `#`, the BER hexstring form
+      // included; a literal `#` is written `\#`
+      const value = trimUnescaped(part.slice(part.indexOf('=') + 1));
+      return !value.startsWith('#');
+    });
   });
 }
 
