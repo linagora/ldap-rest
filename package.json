@@ -851,7 +851,10 @@
     "glob": ">=11.1.0",
     "minimatch": "^10.2.3",
     "postcss-selector-parser": "^7.1.6",
-    "serialize-javascript": ">=7.0.3"
+    "serialize-javascript": ">=7.0.3",
+    "@microsoft/api-extractor": {
+      "minimatch": "^11.0.5"
+    }
   },
   "dependencies": {
     "@ldap-rest/auth-crowdsec": "3.0.0",
