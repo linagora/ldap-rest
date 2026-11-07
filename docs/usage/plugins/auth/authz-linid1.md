@@ -667,6 +667,7 @@ User jdoe not found in LDAP
 --oidc-server "https://auth.example.com" \
 --oidc-client-id "ldap-rest" \
 --oidc-client-secret "secret" \
+--oidc-session-secret "a-session-key-of-32-characters-min" \
 --base-url "https://api.example.com" \
 --ldap-top-organization "ou=organization,dc=example,dc=com"
 ```

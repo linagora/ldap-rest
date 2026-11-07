@@ -101,9 +101,10 @@ OAuth 2.0 / OpenID Connect authentication for modern web applications.
 
 ```bash
 --plugin core/auth/openidconnect \
---oidc-issuer https://auth.example.com \
+--oidc-server https://auth.example.com \
 --oidc-client-id ldap-rest \
---oidc-client-secret your-secret
+--oidc-client-secret your-secret \
+--oidc-session-secret a-session-key-of-32-characters-min
 ```
 
 > **NB**: the `redirect_uri` is `https://ldap-rest-server/callback`
