@@ -9,7 +9,7 @@ OAuth 2.0 / OpenID Connect authentication for modern identity providers.
 --oidc-server "https://auth.example.com" \
 --oidc-client-id "ldap-rest-client" \
 --oidc-client-secret "client-secret-here" \
---oidc-session-secret "session-key-here" \
+--oidc-session-secret "a-session-key-of-32-characters-min" \
 --base-url "https://api.example.com"
 ```
 
@@ -19,7 +19,7 @@ OAuth 2.0 / OpenID Connect authentication for modern identity providers.
 DM_OIDC_SERVER="https://auth.example.com"
 DM_OIDC_CLIENT_ID="ldap-rest-client"
 DM_OIDC_CLIENT_SECRET="client-secret-here"
-DM_OIDC_SESSION_SECRET="session-key-here"
+DM_OIDC_SESSION_SECRET="a-session-key-of-32-characters-min"
 DM_BASE_URL="https://api.example.com"
 ```
 
@@ -38,7 +38,7 @@ Give the cookie a key of its own, at least 32 characters. `openssl rand -hex
 splits on `,` or `;` (and on newlines) into several keys. To rotate it,
 repeat the option or give a comma- or newline-separated list to
 `--oidc-session-secrets` or `DM_OIDC_SESSION_SECRET` (`;` when a key holds
-a comma): the library signs with the first key and accepts the others, so
+a comma): the library encrypts with the first key and accepts the others, so
 sessions opened before the rotation keep working until they expire.
 
 ## Prerequisites

@@ -120,9 +120,10 @@ export default class OpenIDConnect extends AuthBase {
     }
     const settings = this.options(openidconnectOptions);
     const sessionSecrets = settings.oidc_session_secret;
-    // Not `required: true` on the option: every declared option is checked
-    // before plugins load, so that would refuse to start a server that does
-    // not load this plugin.
+    // Not `required: true`: the parser refuses an environment variable that
+    // is set but empty for a required option, and the Dockerfile declares
+    // DM_OIDC_SESSION_SECRET= this way, so every container would refuse to
+    // start, whether it loads this plugin or not.
     if (sessionSecrets.length === 0)
       throw new Error('Missing config parameter oidc_session_secret');
     const clientSecret = settings.oidc_client_secret;
