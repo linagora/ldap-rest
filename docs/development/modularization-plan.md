@@ -20,8 +20,8 @@ internal split. [#593], [#594], [#595] and [#603] are done.
 LDAP plugins are packages of their own. What remains is extracting the other
 plugin families and the umbrella:
 
-- The Twake family still lives in the umbrella's `src/plugins/`, and the
-  umbrella still generates its `./plugin-*` exports from `rollup.config.mjs`.
+- The standalone plugins, `browser` and `schemas` still live in the umbrella,
+  which still generates their `./plugin-*` exports from `rollup.config.mjs`.
 - The umbrella composes the options in `src/options.ts` and passes them to the
   core `DM`; the core itself imports no family.
 
@@ -41,7 +41,7 @@ packages/
   ldap-groups/            @ldap-rest/ldap-groups
   ldap-organizations/     @ldap-rest/ldap-organizations
   auth-token/             @ldap-rest/auth-token
-  twake-james/            @ldap-rest/twake-james
+  james/                  @ldap-rest/james
   twake-appaccounts/      @ldap-rest/twake-appaccounts
   scim/                   @ldap-rest/scim
   browser/                @ldap-rest/browser
@@ -66,13 +66,13 @@ Rules:
   not move to `core` (decision 3).
 - `ldap-rest` stays the entry package: it depends on `@ldap-rest/core` only;
   every plugin package is optional. A deployment installs the plugins it needs
-  (`npm install @ldap-rest/twake-james`); the umbrella keeps the `ldap-rest`
+  (`npm install @ldap-rest/james`); the umbrella keeps the `ldap-rest`
   CLI and the `core/…` namespace, and re-exports the former sub-paths
   (`ldap-rest/plugin-auth-authzlinid1`, …). The split is therefore not breaking
   for users that installed the same plugins.
 - A plugin package ships the commands that belong to its feature:
   `@ldap-rest/ldap-externalusers` owns `cleanup-external-users`,
-  `@ldap-rest/twake-james` owns `sync-james`, and
+  `@ldap-rest/james` owns `sync-james`, and
   `@ldap-rest/twake-appaccounts` owns `sync-app-accounts`. A command is
   installed with its plugin package, not with `ldap-rest`: installing
   `ldap-rest` alone no longer provides them.
@@ -185,7 +185,13 @@ families do not import each other, and `ldapActions` is a stable façade.
    (see the decisions below).
    (**done**) The SCIM family is `@ldap-rest/scim`, exposing the plugin and
    its modules; the umbrella keeps the `./plugin-scim-*` shims and the
-   `core/scim` alias. The Twake family comes next.
+   `core/scim` alias.
+   (**done**) The Twake family is one package per feature:
+   `@ldap-rest/james`, `@ldap-rest/twake-drive`, `@ldap-rest/twake-calendar`,
+   `@ldap-rest/twake-appaccounts`, `@ldap-rest/twake-mail-migration`,
+   `@ldap-rest/twake-lifecycle`, `@ldap-rest/twake-provisioning` and
+   `@ldap-rest/twake-collaboration`; the umbrella keeps the
+   `./plugin-twake-*` shims and the `core/twake/…` names.
 5. Extract `browser` and `schemas`.
 6. After each step: `npm run test:dev`, `npm run check`,
    `npm run check:openapi`, `npm run check:options`, and the `contracts` job.
@@ -267,11 +273,11 @@ phase 1.
 ## First actions
 
 Phases 0 and 1 are done, and phase 2 has started with the workspaces, the
-core, the storage, the authentication and the LDAP packages. The next steps
-are:
+core, the storage, the authentication, the LDAP, the SCIM and the Twake
+packages. The next steps are:
 
-1. Extract the remaining plugin packages in dependency order (`twake`, then
-   the standalone plugins), then `browser` and `schemas`.
+1. Extract the remaining plugin packages (the standalone plugins), then
+   `browser` and `schemas`.
 2. Finish [#549] part 2 in phase 3.
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397

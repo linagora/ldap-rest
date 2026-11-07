@@ -174,9 +174,6 @@
       "@ldap-rest/twake-calendar/options": [
         "./packages/twake-calendar/src/calendar.options.ts"
       ],
-      "@ldap-rest/twake-calendar/resources": [
-        "./packages/twake-calendar/src/calendarResources.ts"
-      ],
       "@ldap-rest/twake-lifecycle": [
         "./packages/twake-lifecycle/src/lifecycleEvents.ts"
       ],

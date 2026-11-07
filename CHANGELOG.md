@@ -32,6 +32,18 @@
   4.0.0.
 - The SCIM plugin ships as the `@ldap-rest/scim` package; the
   `ldap-rest/plugin-scim-*` entries stay as compatibility shims.
+- The Twake plugins ship as the `@ldap-rest/james`, `@ldap-rest/twake-drive`,
+  `@ldap-rest/twake-calendar`, `@ldap-rest/twake-appaccounts`,
+  `@ldap-rest/twake-mail-migration`, `@ldap-rest/twake-lifecycle`,
+  `@ldap-rest/twake-provisioning` and `@ldap-rest/twake-collaboration`
+  packages; the `ldap-rest/plugin-twake-*` entries and the `core/twake/…`
+  names stay as compatibility shims.
+
+### Fixed
+
+- `--plugin core/scim`, the short name the SCIM documentation gives, now loads
+  the plugin. It named a module no release shipped, so the documented form
+  failed at startup; `ldap-rest/plugin-scim` names the same module.
 
 ## v2.0.5 (2026-11-06)
 

@@ -368,6 +368,14 @@ describe('Server internals', () => {
       expect(dm.canonicalModule('@ldap-rest/auth-token:second')).to.equal(
         '@ldap-rest/auth-token'
       );
+      // A package may hold more than one plugin: a sub-path is mapped too, or
+      // a configured instance and the one a dependency loads are two
+      expect(dm.canonicalModule('core/twake/spaces')).to.equal(
+        '@ldap-rest/twake-collaboration/spaces'
+      );
+      expect(dm.canonicalModule('core/twake/appAccountsConsistency')).to.equal(
+        '@ldap-rest/twake-appaccounts/consistency'
+      );
       // A plugin no package provides keeps its own name
       expect(dm.canonicalModule('core/weblogs')).to.equal('core/weblogs');
       expect(dm.canonicalModule(hello)).to.equal(hello);

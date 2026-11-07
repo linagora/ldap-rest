@@ -187,9 +187,6 @@
       "@ldap-rest/twake-calendar/options": [
         "./packages/twake-calendar/dist/calendar.options.d.ts"
       ],
-      "@ldap-rest/twake-calendar/resources": [
-        "./packages/twake-calendar/dist/calendarResources.d.ts"
-      ],
       "@ldap-rest/twake-lifecycle": [
         "./packages/twake-lifecycle/dist/lifecycleEvents.d.ts"
       ],

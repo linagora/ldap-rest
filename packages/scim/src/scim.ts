@@ -6,6 +6,7 @@
  *
  * Exposes /scim/v2/{Users,Groups,Bulk,ServiceProviderConfig,ResourceTypes,Schemas}.
  */
+import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -50,6 +51,31 @@ import {
   projectList,
   projectResource,
 } from './projection.js';
+
+/** Where this package's own manifest sits: the search stops past it */
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * The path of a schema the umbrella ships. The schemas have no package of
+ * their own yet, so `static/schemas` is searched upwards: it is found whether
+ * this module runs from its sources, from its own build, or from the copy the
+ * umbrella bundles in its tarball. The search stops at the first `package.json`
+ * that is not this package's — the umbrella's, or another install — and
+ * answers empty when the file is not there, so nothing outside the install
+ * can stand in for it.
+ */
+const schemaPath = (...parts: string[]): string => {
+  let here = dirname(fileURLToPath(import.meta.url));
+  for (;;) {
+    const candidate = join(here, 'static', 'schemas', ...parts);
+    if (existsSync(candidate)) return candidate;
+    if (existsSync(join(here, 'package.json')) && here !== packageRoot)
+      return '';
+    const parent = dirname(here);
+    if (parent === here) return '';
+    here = parent;
+  }
+};
 
 /**
  * Reusable SCIM 2.0 schemas surfaced by this plugin.
@@ -515,17 +541,8 @@ export default class Scim extends DmPlugin {
       hookBus: this.hookBus,
     });
 
-    const schemaDir =
-      this.config.schemas_path ||
-      join(
-        dirname(fileURLToPath(import.meta.url)),
-        '..',
-        '..',
-        '..',
-        'static',
-        'schemas'
-      );
-    this.scimSchemaDir = join(schemaDir, 'scim');
+    const schemaDir = this.config.schemas_path || schemaPath();
+    this.scimSchemaDir = schemaDir ? join(schemaDir, 'scim') : '';
     this.discovery = new ScimDiscovery({
       config: this.config,
       options,
