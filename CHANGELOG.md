@@ -29,6 +29,12 @@
   with `--authz-linid1-cache-ttl`
   ([GHSA-vg7q-jffp-g33c](https://github.com/linagora/ldap-rest/security/advisories/GHSA-vg7q-jffp-g33c)).
 
+### Fixed
+
+- `--plugin core/scim`, the short name the SCIM documentation gives, now loads
+  the plugin. It named a module no release shipped, so the documented form
+  failed at startup; `ldap-rest/plugin-scim` names the same module.
+
 ## v2.0.5 (2026-11-06)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0.

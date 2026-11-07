@@ -188,6 +188,10 @@
       "import": "./dist/plugins/rabbitmq.js",
       "types": "./dist/src/plugins/rabbitmq.d.ts"
     },
+    "./plugin-scim": {
+      "import": "./dist/plugins/scim.js",
+      "types": "./dist/src/plugins/scim.d.ts"
+    },
     "./plugin-scim-baseresolver": {
       "import": "./dist/plugins/scim/baseResolver.js",
       "types": "./dist/src/plugins/scim/baseResolver.d.ts"
