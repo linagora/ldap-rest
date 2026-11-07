@@ -8,6 +8,11 @@
   letter case (`/API/m/…`) escape the authenticator scoped to its prefix: the
   request is judged as the route Express serves
   ([GHSA-rgc7-fv78-p73h](https://github.com/linagora/ldap-rest/security/advisories/GHSA-rgc7-fv78-p73h)).
+- The James and Calendar plugins encode an address or a resource id as one
+  path segment in WebAdmin URLs, so a value holding `/`, `?`, `#` or `%` can
+  no longer make a call with the WebAdmin token act on another user or
+  resource
+  ([GHSA-jrmm-4w24-qqc5](https://github.com/linagora/ldap-rest/security/advisories/GHSA-jrmm-4w24-qqc5)).
 
 ## v2.0.5 (2026-11-06)
 
