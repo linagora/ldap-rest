@@ -147,6 +147,17 @@ describe('Twake WebAdmin URLs built from addresses', () => {
     expect(requested).to.deep.equal([]);
   });
 
+  it('refuses an empty segment', async () => {
+    let caught: unknown;
+    try {
+      await james.hooks.onLdapQuotaChange!(dn, '', 0, 1024);
+    } catch (err) {
+      caught = err;
+    }
+    expect((caught as Error).message).to.contain('empty segment');
+    expect(requested).to.deep.equal([]);
+  });
+
   it('refuses a dot forwarding target', async () => {
     dm.config.james_sync_forwards = true;
     let caught: unknown;

@@ -242,8 +242,7 @@ export default class MigrationProxy extends TwakePlugin {
   }
 
   private userUrl(address: string): string {
-    // This endpoint already receives a percent-encoded `@`; keep that form
-    // and apply the same segment refusal as `webadminPath`.
+    // This endpoint already receives a percent-encoded `@`; keep that form.
     assertPathSegment(address);
     return `${this.webadminUrl}/migratedUsers/${encodeURIComponent(address)}`;
   }

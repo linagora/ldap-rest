@@ -14,20 +14,14 @@ import { escapeLdapFilter } from '../lib/utils.js';
 import DmPlugin, { type Role } from './plugin.js';
 
 /**
- * Percent-encode one path segment, keeping `@`.
+ * Refuse a segment no encoding can keep literal.
  *
- * `@` is a `pchar` (RFC 3986 §3.3) and delimits nothing in a path, so an
- * ordinary mail address keeps the form WebAdmin already receives. The
- * delimiters that would let one address name another (`/`, `?`, `#`, `%`)
- * are encoded.
- *
- * A segment that is empty or made of dots is refused: the WHATWG URL parser
- * resolves `.`, `..` and every percent-encoded spelling of them (`%2E%2E`,
- * `.%2e`) away, so no encoding keeps one literal. Left through, `..` would
- * turn `/address/forwards/<mail>/targets/..` into a call on `<mail>` itself.
+ * The WHATWG URL parser resolves `.`, `..` and every percent-encoded
+ * spelling of them (`%2E%2E`, `.%2e`) away, so an empty value or one made of
+ * dots cannot name one segment: left through, `..` would turn
+ * `/address/forwards/<mail>/targets/..` into a call on `<mail>` itself.
  *
  * @param value the segment, unencoded
- * @returns the encoded segment
  * @throws Error when the value cannot name a path segment
  */
 export function assertPathSegment(value: string): void {
@@ -36,6 +30,18 @@ export function assertPathSegment(value: string): void {
   throw new Error(`Refusing to build a WebAdmin URL from the ${what}`);
 }
 
+/**
+ * Percent-encode one path segment, keeping `@`.
+ *
+ * `@` is a `pchar` (RFC 3986 §3.3) and delimits nothing in a path, so an
+ * ordinary mail address keeps the form WebAdmin already receives. The
+ * delimiters that would let one address name another (`/`, `?`, `#`, `%`)
+ * are encoded.
+ *
+ * @param value the segment, unencoded
+ * @returns the encoded segment
+ * @throws Error when the value cannot name a path segment
+ */
 function encodePathSegment(value: string): string {
   assertPathSegment(value);
   return encodeURIComponent(value).replace(/%40/g, '@');
