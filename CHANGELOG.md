@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `core/auth/openidconnect` requires a session key separate from the client
+  secret (`--oidc-session-secret`) and refuses to start without one
+  ([GHSA-qmmv-5748-px9r](https://github.com/linagora/ldap-rest/security/advisories/GHSA-qmmv-5748-px9r),
+  [upgrading](docs/usage/upgrading.md#openid-connect-requires-a-session-key-of-its-own)).
+
 ### Security
 
 - The authentication dispatcher no longer lets a request path in another

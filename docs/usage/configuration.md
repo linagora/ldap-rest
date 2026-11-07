@@ -369,14 +369,15 @@ Development only, refused with `NODE_ENV=production` — see [Fake Authenticatio
 
 #### `core/auth/openidconnect`
 
-| CLI                     | Env                      | Default | Description                                                                             |
-| ----------------------- | ------------------------ | ------- | --------------------------------------------------------------------------------------- |
-| `--oidc-server`         | `DM_OIDC_SERVER`         |         | OIDC server URL                                                                         |
-| `--oidc-client-id`      | `DM_OIDC_CLIENT_ID`      |         | OIDC Client ID                                                                          |
-| `--oidc-client-secret`  | `DM_OIDC_CLIENT_SECRET`  |         | OIDC Client Secret                                                                      |
-| `--oidc-username-claim` | `DM_OIDC_USERNAME_CLAIM` | `sub`   | Claim naming the caller, published as `req.userName` (see [OIDC](plugins/auth/oidc.md)) |
-| `--oidc-logout-origins` | `DM_OIDC_LOGOUT_ORIGINS` | `[]`    | Other origins a console may log out from (see [OIDC](plugins/auth/oidc.md#logout))      |
-| `--base-url`            | `DM_BASE_URL`            |         | Public URL for callbacks                                                                |
+| CLI                                                | Env                      | Default | Description                                                                                                                                                |
+| -------------------------------------------------- | ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--oidc-server`                                    | `DM_OIDC_SERVER`         |         | OIDC server URL                                                                                                                                            |
+| `--oidc-client-id`                                 | `DM_OIDC_CLIENT_ID`      |         | OIDC Client ID                                                                                                                                             |
+| `--oidc-client-secret`                             | `DM_OIDC_CLIENT_SECRET`  |         | OIDC Client Secret                                                                                                                                         |
+| `--oidc-session-secret` / `--oidc-session-secrets` | `DM_OIDC_SESSION_SECRET` |         | Key of the session cookie; required, and must differ from the client secret. Several values rotate sessions (see [OIDC](plugins/auth/oidc.md#session-key)) |
+| `--oidc-username-claim`                            | `DM_OIDC_USERNAME_CLAIM` | `sub`   | Claim naming the caller, published as `req.userName` (see [OIDC](plugins/auth/oidc.md))                                                                    |
+| `--oidc-logout-origins`                            | `DM_OIDC_LOGOUT_ORIGINS` | `[]`    | Other origins a console may log out from (see [OIDC](plugins/auth/oidc.md#logout))                                                                         |
+| `--base-url`                                       | `DM_BASE_URL`            |         | Public URL for callbacks                                                                                                                                   |
 
 #### `core/bcl`
 

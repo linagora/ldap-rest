@@ -987,6 +987,14 @@
     "env": "DM_OIDC_SERVER"
   },
   {
+    "cli": "--oidc-session-secret",
+    "type": "array",
+    "default": [],
+    "plural": "--oidc-session-secrets",
+    "env": "DM_OIDC_SESSION_SECRET",
+    "kind": "phrases"
+  },
+  {
     "cli": "--oidc-username-claim",
     "type": "string",
     "default": "sub",
