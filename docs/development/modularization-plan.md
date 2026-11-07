@@ -20,14 +20,13 @@ internal split. [#593], [#594], [#595] and [#603] are done.
 LDAP plugins are packages of their own. What remains is extracting the other
 plugin families and the umbrella:
 
-- The SCIM and Twake families still live in the umbrella's `src/plugins/`,
-  and the umbrella still generates their `./plugin-*` exports from
-  `rollup.config.mjs`.
+- The standalone plugins, `browser` and `schemas` still live in the umbrella,
+  which still generates their `./plugin-*` exports from `rollup.config.mjs`.
 - The umbrella composes the options in `src/options.ts` and passes them to the
   core `DM`; the core itself imports no family.
 
 Between plugin families the only coupling left is
-`TwakeGroups extends LdapGroups`.
+`TwakeGroups extends LdapGroups`, accepted as a peer dependency (decision 3).
 
 ## Target architecture
 
@@ -42,7 +41,7 @@ packages/
   ldap-groups/            @ldap-rest/ldap-groups
   ldap-organizations/     @ldap-rest/ldap-organizations
   auth-token/             @ldap-rest/auth-token
-  twake-james/            @ldap-rest/twake-james
+  james/                  @ldap-rest/james
   twake-appaccounts/      @ldap-rest/twake-appaccounts
   scim/                   @ldap-rest/scim
   browser/                @ldap-rest/browser
@@ -57,22 +56,23 @@ together, `scim` its modules).
 
 Rules:
 
-- `core` depends on no plugin. A plugin package names another one only for
-  configuration: the options it reads, or a plugin its `optionDependencies`
-  or `dependencies` ask to have loaded (decision 7). Behaviour goes through
-  services (`packages/core/src/lib/services`) or hooks, never through another
-  plugin's code.
-- `TwakeGroups extends LdapGroups` is either the one documented exception or
-  the shared base moves to `core`.
+- `core` depends on no plugin. A plugin package may depend on another plugin
+  when its behaviour needs it, as `TwakeGroups extends LdapGroups`: declare it
+  in the package's `package.json` as a peer dependency, exactly as its
+  `optionDependencies` or `dependencies` ask to have loaded (decision 7).
+  Cross-family behaviour otherwise goes through services
+  (`packages/core/src/lib/services`) or hooks.
+- `TwakeGroups extends LdapGroups` stays the inheritance it is; the base does
+  not move to `core` (decision 3).
 - `ldap-rest` stays the entry package: it depends on `@ldap-rest/core` only;
   every plugin package is optional. A deployment installs the plugins it needs
-  (`npm install @ldap-rest/twake-james`); the umbrella keeps the `ldap-rest`
+  (`npm install @ldap-rest/james`); the umbrella keeps the `ldap-rest`
   CLI and the `core/…` namespace, and re-exports the former sub-paths
   (`ldap-rest/plugin-auth-authzlinid1`, …). The split is therefore not breaking
   for users that installed the same plugins.
 - A plugin package ships the commands that belong to its feature:
   `@ldap-rest/ldap-externalusers` owns `cleanup-external-users`,
-  `@ldap-rest/twake-james` owns `sync-james`, and
+  `@ldap-rest/james` owns `sync-james`, and
   `@ldap-rest/twake-appaccounts` owns `sync-app-accounts`. A command is
   installed with its plugin package, not with `ldap-rest`: installing
   `ldap-rest` alone no longer provides them.
@@ -182,7 +182,16 @@ families do not import each other, and `ldapActions` is a stable façade.
    shims, `plugin-ldap-ldap.options` re-exports every option set, and the
    deprecated `plugin-ldap-organization` still names the organizations
    plugin. Four of them read another one's options and depend on its package
-   (see the decisions below). The SCIM family comes next.
+   (see the decisions below).
+   (**done**) The SCIM family is `@ldap-rest/scim`, exposing the plugin and
+   its modules; the umbrella keeps the `./plugin-scim-*` shims and the
+   `core/scim` alias.
+   (**done**) The Twake family is one package per feature:
+   `@ldap-rest/james`, `@ldap-rest/twake-drive`, `@ldap-rest/twake-calendar`,
+   `@ldap-rest/twake-appaccounts`, `@ldap-rest/twake-mail-migration`,
+   `@ldap-rest/twake-lifecycle`, `@ldap-rest/twake-provisioning` and
+   `@ldap-rest/twake-collaboration`; the umbrella keeps the
+   `./plugin-twake-*` shims and the `core/twake/…` names.
 5. Extract `browser` and `schemas`.
 6. After each step: `npm run test:dev`, `npm run check`,
    `npm run check:openapi`, `npm run check:options`, and the `contracts` job.
@@ -234,8 +243,8 @@ phase 1.
    `./plugin-*` entries are split.
 2. **Versioning** (**decided**): 3.0.0 with the former sub-paths removed, on
    the `v3.0` branch.
-3. **`TwakeGroups extends LdapGroups`**: documented exception, or move the
-   shared base into `core`?
+3. **`TwakeGroups extends LdapGroups`** (**decided**): keep the inheritance;
+   the Twake plugin package depends on `@ldap-rest/ldap-groups` as a peer.
 4. **`Config` type**: type-only aggregate in `core` (recommended to start), or
    split per package with declaration merging?
 5. **Build**: Rollup per package (consistent with today) or `tsc` with
@@ -253,15 +262,22 @@ phase 1.
    once, in the plugin that owns them; a plugin another one only needs
    registered is a peer all the same, or a standalone install reports every
    peer met and fails at startup on a module nobody installed.
+8. **Monorepo layout** (**decided, later**): the umbrella itself moves to
+   `packages/ldap-rest/`, and the repository root `package.json` becomes
+   `ldap-rest-monorepo`, private and workspace-only. This removes the split
+   between "the repository root" and "a package": every published artefact
+   lives under `packages/`. Do it once the extraction is over, before or with
+   the first published plugin package, so the root never ships as a package
+   by accident.
 
 ## First actions
 
 Phases 0 and 1 are done, and phase 2 has started with the workspaces, the
-core, the storage, the authentication and the LDAP packages. The next steps
-are:
+core, the storage, the authentication, the LDAP, the SCIM and the Twake
+packages. The next steps are:
 
-1. Extract the remaining plugin packages in dependency order (`scim`,
-   `twake`, then the standalone plugins), then `browser` and `schemas`.
+1. Extract the remaining plugin packages (the standalone plugins), then
+   `browser` and `schemas`.
 2. Finish [#549] part 2 in phase 3.
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397

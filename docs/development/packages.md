@@ -58,7 +58,8 @@ was forgotten, and when a package's sources import a module its
 and fails in a consumer's tree instead.
 
 `src/pluginModules.json` is the bridge between the two names a plugin has:
-it maps each `core/…` entry to the package its shim re-exports, and
+it maps each `core/…` entry to the package — or the package's sub-path — its
+shim re-exports, and
 `DM.canonicalModule` reads it wherever a plugin is recognised rather than
 loaded — the priority list, the deduplication of `--plugin` entries, and the
 plugins that look for a dependency. A configuration may therefore name either

@@ -1,0 +1,40 @@
+{
+  "name": "@ldap-rest/twake-mail-migration",
+  "version": "3.0.0",
+  "description": "LDAP-Rest Twake mail migration plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/twake-mail-migration"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/migrationProxy.ts",
+      "types": "./dist/migrationProxy.d.ts",
+      "import": "./dist/migrationProxy.js"
+    },
+    "./options": {
+      "development": "./src/migrationProxy.options.ts",
+      "types": "./dist/migrationProxy.options.d.ts",
+      "import": "./dist/migrationProxy.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@sinclair/typebox": "^0.34.52",
+    "express": "^5.1.0"
+  }
+}

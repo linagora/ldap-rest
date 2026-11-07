@@ -1,0 +1,61 @@
+{
+  "name": "@ldap-rest/twake-provisioning",
+  "version": "3.0.0",
+  "description": "LDAP-Rest Twake provisioning plugins",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/twake-provisioning"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/instances.ts",
+      "types": "./dist/instances.d.ts",
+      "import": "./dist/instances.js"
+    },
+    "./cloudery": {
+      "development": "./src/clouderyProvision.ts",
+      "types": "./dist/clouderyProvision.d.ts",
+      "import": "./dist/clouderyProvision.js"
+    },
+    "./cozy": {
+      "development": "./src/cozyProvision.ts",
+      "types": "./dist/cozyProvision.d.ts",
+      "import": "./dist/cozyProvision.js"
+    },
+    "./options": {
+      "development": "./src/twakeInstances.options.ts",
+      "types": "./dist/twakeInstances.options.d.ts",
+      "import": "./dist/twakeInstances.options.js"
+    },
+    "./cloudery-options": {
+      "development": "./src/cloudery.options.ts",
+      "types": "./dist/cloudery.options.d.ts",
+      "import": "./dist/cloudery.options.js"
+    },
+    "./cozy-options": {
+      "development": "./src/cozy.options.ts",
+      "types": "./dist/cozy.options.d.ts",
+      "import": "./dist/cozy.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@ldap-rest/twake-lifecycle": "3.0.0",
+    "@sinclair/typebox": "^0.34.52",
+    "express": "^5.1.0"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "name": "@ldap-rest/twake-appaccounts",
+  "version": "3.0.0",
+  "description": "LDAP-Rest Twake application accounts plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/twake-appaccounts"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/appAccountsApi.ts",
+      "types": "./dist/appAccountsApi.d.ts",
+      "import": "./dist/appAccountsApi.js"
+    },
+    "./consistency": {
+      "development": "./src/appAccountsConsistency.ts",
+      "types": "./dist/appAccountsConsistency.d.ts",
+      "import": "./dist/appAccountsConsistency.js"
+    },
+    "./options": {
+      "development": "./src/appAccounts.options.ts",
+      "types": "./dist/appAccounts.options.d.ts",
+      "import": "./dist/appAccounts.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@sinclair/typebox": "^0.34.52",
+    "express": "^5.1.0"
+  }
+}

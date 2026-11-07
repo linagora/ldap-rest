@@ -5,10 +5,13 @@
  * user identity changes (email, first and last name) to Twake Calendar. It
  * will be removed in a future major release.
  *
+ * Kept in the umbrella rather than in `@ldap-rest/twake-calendar`: a new
+ * package's exports would turn its removal into a breaking change there.
+ *
  * The instance keeps registering as `calendarResources`, so code looking it
  * up by that name keeps finding it.
  */
-import Calendar from './calendar.js';
+import Calendar from '@ldap-rest/twake-calendar';
 
 console.warn(
   '[ldap-rest] Plugin `core/twake/calendarResources` is deprecated; replace it with `core/twake/calendar` — do not load both, each would sync Calendar.'

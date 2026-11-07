@@ -165,16 +165,19 @@ function pathsOf(target) {
  */
 function pluginModules() {
   const pluginRoot = path.join(root, 'src', 'plugins');
-  const names = new Set(packages().map(pkg => pkg.name));
+  const packagesByName = new Map(packages().map(pkg => [pkg.name, pkg]));
   const modules = {};
   for (const file of entriesUnder(pluginRoot)) {
     if (!file.endsWith('.ts')) continue;
     const text = readFileSync(file, 'utf8');
-    // A shim re-exports one package's default export: either through
+    // A shim re-exports one module's default export: either through
     // `export { default } from '…'`, or — the deprecated alias — by importing
-    // it and exporting it as the default of this file. The specifier has to be
-    // the package itself: a sub-path such as `@ldap-rest/storage/file` names a
-    // backend, not the plugin, and must keep its own name.
+    // it and exporting it as the default of this file. The specifier is the
+    // package itself or one of its sub-paths: a package may hold more than one
+    // plugin (`@ldap-rest/twake-collaboration/spaces`), and a configuration
+    // naming either spelling must land on the same module. Only a sub-path the
+    // package exports counts; an option set has no default export and never
+    // matches here.
     const reexport =
       /export\s*\{[^}]*\bdefault\b[^}]*\}\s*from\s*'(@ldap-rest\/[^']+)'/.exec(
         text
@@ -184,7 +187,12 @@ function pluginModules() {
         text
       );
     const specifier = reexport?.[1] ?? alias?.[2];
-    if (!specifier || !names.has(specifier)) continue;
+    if (!specifier) continue;
+    const [scope, packageName, ...sub] = specifier.split('/');
+    const pkg = packagesByName.get(`${scope}/${packageName}`);
+    if (!pkg) continue;
+    if (sub.length > 0 && !pkg.manifest.exports?.[`./${sub.join('/')}`])
+      continue;
     const name = path
       .relative(pluginRoot, file)
       .replace(/\.ts$/, '')
