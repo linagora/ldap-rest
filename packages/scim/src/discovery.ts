@@ -196,6 +196,9 @@ export class ScimDiscovery {
     filename: string,
     urn: string
   ): SchemaDefinition | undefined {
+    // No directory names nothing to read: joining the empty one would name
+    // the file in the process's working directory.
+    if (!this.schemaDir) return undefined;
     const filepath = path.join(this.schemaDir, filename);
     try {
       const parsed = loadSchemaFile<Partial<SchemaDefinition>>(filepath, {

@@ -1892,27 +1892,28 @@ export default class Scim extends DmPlugin {
   getConfigApiData(): Record<string, unknown> {
     const prefix = this.scimPrefix;
 
-    // Expose SCIM core schema files via the static plugin when loaded, so
-    // clients can fetch them without going through the SCIM /Schemas endpoint:
-    // the very files SCIM reads, which --schemas-path may have moved. One
-    // plugin serves them all, asked in the order of staticPlugins().
-    const files = ['User.json', 'Group.json', 'default-mapping.json'].map(
-      file => join(this.scimSchemaDir, file)
-    );
+    // The very files SCIM reads, which --schemas-path may have moved. One
+    // plugin serves them all, asked in the order of staticPlugins(). With no
+    // directory, `join('', file)` would name them in the working directory.
     let schemaUrls:
       { user: string; group: string; defaultMapping?: string } | undefined;
-    for (const plugin of staticPlugins(this.server)) {
-      const [user, group, defaultMapping] = files.map(file =>
-        plugin.schemaUrlOf(file)
+    if (this.scimSchemaDir) {
+      const files = ['User.json', 'Group.json', 'default-mapping.json'].map(
+        file => join(this.scimSchemaDir, file)
       );
-      // The mapping is a template beside them, which SCIM does not read
-      if (user && group) {
-        schemaUrls = {
-          user,
-          group,
-          ...(defaultMapping ? { defaultMapping } : {}),
-        };
-        break;
+      for (const plugin of staticPlugins(this.server)) {
+        const [user, group, defaultMapping] = files.map(file =>
+          plugin.schemaUrlOf(file)
+        );
+        // The mapping is a template beside them, which SCIM does not read
+        if (user && group) {
+          schemaUrls = {
+            user,
+            group,
+            ...(defaultMapping ? { defaultMapping } : {}),
+          };
+          break;
+        }
       }
     }
 
