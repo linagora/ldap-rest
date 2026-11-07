@@ -205,6 +205,9 @@ export interface Config {
   auth_hmac?: string[];
   auth_hmac_window?: number;
 
+  // auth/authzLinid1
+  authz_linid1_cache_ttl?: number;
+
   // auth/openidconnect
   oidc_server?: string;
   oidc_username_claim?: string;

@@ -24,6 +24,10 @@
   names as its administrator unless the caller writes every organization
   naming it
   ([GHSA-2g53-22cj-hwfm](https://github.com/linagora/ldap-rest/security/advisories/GHSA-2g53-22cj-hwfm)).
+- `authzLinid1` drops a revoked permission as soon as the write goes through
+  this server, where it waited for the cache TTL; the TTL is configurable
+  with `--authz-linid1-cache-ttl`
+  ([GHSA-vg7q-jffp-g33c](https://github.com/linagora/ldap-rest/security/advisories/GHSA-vg7q-jffp-g33c)).
 
 ## v2.0.5 (2026-11-06)
 

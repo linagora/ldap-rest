@@ -7,7 +7,8 @@
  * @group Plugins
  */
 import type { DM } from '../../bin/index.js';
-import type { SearchResult } from '../../lib/ldapActions.js';
+import type { Hooks, MaybePromise } from '../../hooks.js';
+import type { ModifyRequest, SearchResult } from '../../lib/ldapActions.js';
 import type { BranchPermissions } from '../../config/args.js';
 import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base.js';
 import { escapeLdapFilter, isDnInBranch } from '../../lib/utils.js';
@@ -24,12 +25,24 @@ export default class AuthzLinid1 extends AuthzBase {
 
   name = 'authzLinid1';
   permissionsCache: Map<string, CachedPermissions> = new Map();
+  /**
+   * Bumped by every invalidation. A refresh that started before a write may
+   * have read the directory before it, so it must not put what it read back
+   * into the cache afterwards.
+   */
+  private permissionsGeneration = 0;
+
+  declare hooks: AuthzBase['hooks'] &
+    Pick<Hooks, 'ldapmodifydone' | 'ldapdeletedone' | 'ldaprenamedone'>;
+
+  /** What the classes above declared, read once this one is constructed */
+  private readonly declaredByBase: Hooks;
 
   constructor(server: DM) {
     super(server);
+    this.declaredByBase = { ...this.hooks };
 
-    // Cache TTL in milliseconds (default: 5 minutes)
-    this.cacheTTL = 5 * 60 * 1000;
+    this.cacheTTL = this.options(linid1Options).authz_linid1_cache_ttl * 1000;
 
     const adminAttr = this.options(linid1Options).authz_local_admin_attribute;
     this.logger.info(
@@ -66,6 +79,45 @@ export default class AuthzLinid1 extends AuthzBase {
             `branch ${write} overlap`
         );
     }
+
+    // A revoked administrator keeps the grants cached until the TTL runs
+    // out, and a write through this server says what it touched: drop the
+    // map then. A rename or delete moves the organization naming them, so
+    // it drops the map too. The base hooks run after, as they do for the
+    // other in-process writes.
+    const touched = (changes: ModifyRequest): boolean => {
+      const names = [
+        ...Object.keys(changes.add ?? {}),
+        ...Object.keys(changes.replace ?? {}),
+        ...(Array.isArray(changes.delete)
+          ? changes.delete
+          : Object.keys(changes.delete ?? {})),
+      ];
+      return names.some(
+        name => name.split(';')[0].toLowerCase() === adminAttr.toLowerCase()
+      );
+    };
+    this.hooks = {
+      ...this.declaredByBase,
+      ldapmodifydone: (dn, changes, op, context): MaybePromise<void> => {
+        if (touched(changes)) this.forgetPermissions();
+        return this.declaredByBase.ldapmodifydone?.(dn, changes, op, context);
+      },
+      ldapdeletedone: (dn, context): MaybePromise<void> => {
+        this.forgetPermissions();
+        return this.declaredByBase.ldapdeletedone?.(dn, context);
+      },
+      ldaprenamedone: (dn, newDn, context): MaybePromise<void> => {
+        this.forgetPermissions();
+        return this.declaredByBase.ldaprenamedone?.(dn, newDn, context);
+      },
+    };
+  }
+
+  /** Drop every cached permission lookup. */
+  forgetPermissions(): void {
+    this.permissionsGeneration++;
+    this.permissionsCache.clear();
   }
 
   /**
@@ -158,8 +210,6 @@ export default class AuthzLinid1 extends AuthzBase {
     return this.getUserDn(uid);
   }
 
-  // Note: hooks are inherited from AuthzBase
-
   /**
    * Get user DN from uid
    *
@@ -223,29 +273,28 @@ export default class AuthzLinid1 extends AuthzBase {
       }
     }
 
-    // Refresh permissions from LDAP
-    await this.refreshUserPermissions(userDn);
-
-    // Try again from cache
-    const updatedCache = this.permissionsCache.get(userDn);
-    if (updatedCache) {
-      const branchPerms = this.findBranchPermissions(
-        updatedCache.branches,
-        branch
-      );
-      if (branchPerms) {
-        return branchPerms;
-      }
-    }
+    // Refresh permissions from LDAP. What this read answers the caller
+    // even when a write invalidated the cache meanwhile: answering from a
+    // read that started before the write orders this request before it,
+    // which is the same ordering a check-then-act write would have.
+    const branches = await this.refreshUserPermissions(userDn);
+    const branchPerms = this.findBranchPermissions(branches, branch);
+    if (branchPerms) return branchPerms;
 
     // No permissions found - return default deny
     return { read: false, write: false, delete: false };
   }
 
   /**
-   * Refresh user permissions from LDAP
+   * Refresh user permissions from LDAP.
+   *
+   * @param userDn the administrator's DN
+   * @returns the branches this lookup read, whether or not it was cached
    */
-  async refreshUserPermissions(userDn: string): Promise<void> {
+  async refreshUserPermissions(
+    userDn: string
+  ): Promise<Map<string, BranchPermissions>> {
+    const generation = this.permissionsGeneration;
     const branches = new Map<string, BranchPermissions>();
 
     try {
@@ -280,11 +329,14 @@ export default class AuthzLinid1 extends AuthzBase {
       );
     }
 
-    // Update cache
-    this.permissionsCache.set(userDn, {
-      branches,
-      timestamp: Date.now(),
-    });
+    // A write invalidated the map while this refresh was searching: what
+    // was read may predate it, and the next call must search again.
+    if (generation === this.permissionsGeneration)
+      this.permissionsCache.set(userDn, {
+        branches,
+        timestamp: Date.now(),
+      });
+    return branches;
   }
 
   /**
@@ -296,15 +348,10 @@ export default class AuthzLinid1 extends AuthzBase {
     // Check cache
     const cached = this.permissionsCache.get(userDn);
     if (!cached || now - cached.timestamp >= this.cacheTTL) {
-      await this.refreshUserPermissions(userDn);
+      return Array.from((await this.refreshUserPermissions(userDn)).keys());
     }
 
-    const updatedCache = this.permissionsCache.get(userDn);
-    if (updatedCache) {
-      return Array.from(updatedCache.branches.keys());
-    }
-
-    return [];
+    return Array.from(cached.branches.keys());
   }
 
   /** The organizations naming the user an administrator */
