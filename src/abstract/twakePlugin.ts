@@ -17,8 +17,8 @@ import DmPlugin, { type Role } from './plugin.js';
  * Refuse a segment no encoding can keep literal.
  *
  * The WHATWG URL parser resolves `.`, `..` and every percent-encoded
- * spelling of them (`%2E%2E`, `.%2e`) away, so an empty value or one made of
- * dots cannot name one segment: left through, `..` would turn
+ * spelling of them (`%2E%2E`, `.%2e`) away, so an empty value, `.` or `..`
+ * cannot name one segment: left through, `..` would turn
  * `/address/forwards/<mail>/targets/..` into a call on `<mail>` itself.
  *
  * @param value the segment, unencoded
