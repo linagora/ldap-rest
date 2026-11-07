@@ -208,7 +208,7 @@ ldap-rest \
   --plugin 'core/ldap/raw:raw-admins:{"api_prefix":"/api/admin"}'
 ```
 
-A token presented on `/api/admin` is refused, and a session presented on `/api/m` is refused too: each authentication plugin only sees the branch it was mounted on. Prefixes match on segment boundaries, so `/api/m` guards `/api/m` and `/api/m/entry` but never `/api/machines`.
+A token presented on `/api/admin` is refused, and a session presented on `/api/m` is refused too: each authentication plugin only sees the branch it was mounted on. Prefixes match on segment boundaries and ignore letter case, as the routes do, so `/api/m` guards `/api/m` and `/api/M/entry` but never `/api/machines`.
 
 A prefix must be a string starting with `/`. Anything else — a number left in the JSON, an empty entry, a prefix without its leading slash — refuses to start rather than being skipped: a dropped entry shrinks what the plugin guards, which is the failure that leaves a branch open while the configuration still reads as if it were covered. `/` is not a prefix but the whole server, so a list containing it makes the plugin a catch-all: `["/", "/api/admin"]` guards everything, not only `/api/admin`.
 
