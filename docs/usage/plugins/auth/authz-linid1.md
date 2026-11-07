@@ -249,7 +249,9 @@ The plugin caches permissions for 5 minutes by default:
 
 A write through this server that touches the admin attribute clears the
 cache at once, so a revocation does not wait for the TTL. A change made
-directly in the directory waits for it.
+directly in the directory waits for it. With several instances, a write
+clears the cache of the instance that served it; another instance's cache
+waits for the TTL, like a change made directly in the directory.
 
 ### The identity has to be a `uid`
 

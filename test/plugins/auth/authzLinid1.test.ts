@@ -341,8 +341,55 @@ describe('AuthzLinid1 Plugin', () => {
       expect(after.write).to.be.false;
     });
 
-    it('caches permissions for the configured TTL', async () => {
-      expect(authz.cacheTTL).to.equal(300 * 1000);
+    it('answers a lookup overtaken by a write from what it read', async () => {
+      await dm.ldap.add(getTestUserDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'testadmin',
+        sn: 'Admin',
+        cn: 'Test Admin',
+      });
+      await dm.ldap.add(getTestOrgDn(), {
+        objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+        ou: 'TestOrg',
+        twakeDepartmentPath: 'TestOrg',
+        twakeLocalAdminLink: getTestUserDn(),
+      });
+      authz.permissionsCache.clear();
+
+      const pending = authz.getUserPermissions(getTestUserDn(), getTestOrgDn());
+      // An unrelated write clears the cache while the lookup is searching
+      authz.forgetPermissions();
+
+      expect((await pending).write).to.be.true;
+    });
+
+    it('drops the cache when the organization is deleted', async () => {
+      await dm.ldap.add(getTestUserDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'testadmin',
+        sn: 'Admin',
+        cn: 'Test Admin',
+      });
+      await dm.ldap.add(getTestOrgDn(), {
+        objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+        ou: 'TestOrg',
+        twakeDepartmentPath: 'TestOrg',
+        twakeLocalAdminLink: getTestUserDn(),
+      });
+      expect(
+        (await authz.getUserPermissions(getTestUserDn(), getTestOrgDn())).write
+      ).to.be.true;
+
+      await dm.ldap.delete(getTestOrgDn());
+
+      expect(
+        (await authz.getUserPermissions(getTestUserDn(), getTestOrgDn())).write
+      ).to.be.false;
+    });
+
+    it('reads the cache TTL from the option', async () => {
+      dm.config.authz_linid1_cache_ttl = 60;
+      expect(new AuthzLinid1(dm).cacheTTL).to.equal(60 * 1000);
     });
   });
 
