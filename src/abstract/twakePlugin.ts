@@ -19,15 +19,23 @@ import DmPlugin, { type Role } from './plugin.js';
  * `@` is a `pchar` (RFC 3986 §3.3) and delimits nothing in a path, so an
  * ordinary mail address keeps the form WebAdmin already receives. The
  * delimiters that would let one address name another (`/`, `?`, `#`, `%`)
- * are encoded, and so is a segment of dots: `new URL` resolves `..` away.
+ * are encoded.
+ *
+ * A segment that is empty or made of dots is refused: the WHATWG URL parser
+ * resolves `.`, `..` and every percent-encoded spelling of them (`%2E%2E`,
+ * `.%2e`) away, so no encoding keeps one literal. Left through, `..` would
+ * turn `/address/forwards/<mail>/targets/..` into a call on `<mail>` itself.
  *
  * @param value the segment, unencoded
  * @returns the encoded segment
+ * @throws Error when the value cannot name a path segment
  */
 function encodePathSegment(value: string): string {
-  const encoded = encodeURIComponent(value);
-  if (encoded === '.' || encoded === '..') return encoded.replace(/\./g, '%2E');
-  return encoded.replace(/%40/g, '@');
+  if (value === '' || value === '.' || value === '..')
+    throw new Error(
+      `Refusing to build a WebAdmin URL from the dot segment "${value}"`
+    );
+  return encodeURIComponent(value).replace(/%40/g, '@');
 }
 
 /** What a Twake plugin needs to reach its WebAdmin API */
