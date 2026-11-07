@@ -193,6 +193,57 @@ describe('Authentication path scope', () => {
     });
   });
 
+  describe('letter case', () => {
+    it('should guard a scoped branch whatever the case of the path', async () => {
+      const { app } = await build([
+        { name: 'machines', token: machineToken, prefix: ['/api/m'] },
+        { name: 'admins', token: adminToken, prefix: ['/api/admin'] },
+      ]);
+      // Express serves the /api/m route for each of these paths
+      for (const path of ['/API/m/hello', '/Api/M/hello', '/api/M/hello/']) {
+        expect((await request(app).get(path)).status, path).to.equal(401);
+        expect(
+          (
+            await request(app)
+              .get(path)
+              .set('Authorization', `Bearer ${adminToken}`)
+          ).status,
+          path
+        ).to.equal(401);
+        expect(
+          (
+            await request(app)
+              .get(path)
+              .set('Authorization', `Bearer ${machineToken}`)
+          ).status,
+          path
+        ).to.equal(200);
+      }
+    });
+
+    it('should keep the most specific prefix whatever the case of the path', async () => {
+      const { app } = await build([
+        { name: 'api', token: machineToken, prefix: ['/api'] },
+        { name: 'admins', token: adminToken, prefix: ['/api/admin'] },
+      ]);
+      // The /api/admin route is served, so the /api/admin claim must win
+      expect(
+        (
+          await request(app)
+            .get('/api/ADMIN/hello')
+            .set('Authorization', `Bearer ${machineToken}`)
+        ).status
+      ).to.equal(401);
+      expect(
+        (
+          await request(app)
+            .get('/api/ADMIN/hello')
+            .set('Authorization', `Bearer ${adminToken}`)
+        ).status
+      ).to.equal(200);
+    });
+  });
+
   describe('a single scoped plugin', () => {
     let app: Express;
     let dm: DM;
@@ -457,6 +508,22 @@ describe('Authentication path scope', () => {
         });
       });
     }
+
+    it('should not let the catch-all credential in whatever the case', async () => {
+      const { app } = await build([
+        { name: 'authRest', token: machineToken },
+        { name: 'authAdmins', token: adminToken, prefix: ['/api/admin'] },
+      ]);
+      for (const path of ['/API/admin/hello', '/api/Admin/hello']) {
+        const machine = await request(app)
+          .get(path)
+          .set('Authorization', `Bearer ${machineToken}`);
+        const admin = await request(app)
+          .get(path)
+          .set('Authorization', `Bearer ${adminToken}`);
+        expect([machine.status, admin.status], path).to.deep.equal([401, 200]);
+      }
+    });
 
     it('should subtract on segment boundaries only', async () => {
       const { app } = await build([

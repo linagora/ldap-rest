@@ -726,9 +726,7 @@ export class DM {
     const unguarded = [...paths].filter(
       path =>
         !(HEALTH_PATHS as readonly string[]).includes(path) &&
-        !prefixes.some(
-          prefix => path === prefix || path.startsWith(`${prefix}/`)
-        )
+        !prefixes.some(prefix => prefixCoversPath(prefix, path))
     );
     // No identity there, so no authorization plugin judges them either
     const judged = Object.values(this.loadedPlugins).some(p =>
