@@ -215,7 +215,7 @@ describe('AuthzLinid1 by attachment', function () {
       await server.ldap
         .delete(`cn=${cn},${groupBranch}`)
         .catch(() => undefined);
-    for (const uid of accounts)
+    for (const uid of [...accounts, ADMIN_GHOST])
       await server.ldap
         .delete(`uid=${uid},${userBranch}`)
         .catch(() => undefined);

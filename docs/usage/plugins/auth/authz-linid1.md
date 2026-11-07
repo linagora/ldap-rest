@@ -96,11 +96,12 @@ may claim it into one they manage, and the first to claim it takes it.
   judged with it: the entry lands in the organization that write is
   allowed in.
 - An account some organization names in
-  `--authz-local-admin-attribute` is not claimed, moved, changed or deleted
-  by an administrator who does not write **every** organization naming it.
-  Taking such an account over would hand over the branches it administers,
-  which is why it is judged on those branches rather than on the one it is
-  attached to.
+  `--authz-local-admin-attribute` is not created, claimed, moved, changed or
+  deleted by an administrator who does not write **every** organization
+  naming it, including when the DN is one the organization still names with
+  no entry behind it. Taking such an account over would hand over the
+  branches it administers, which is why it is judged on those branches
+  rather than on the one it is attached to.
 - **Putting** one in transit asks for write on the organization it leaves,
   and nothing on the transit branch: an administrator only lets go of what
   they manage. Handing an account over to an organization one does not manage
