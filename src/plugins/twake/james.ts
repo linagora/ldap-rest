@@ -359,7 +359,7 @@ export default class James extends TwakePlugin {
       const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
 
       // Get quota from James WebAdmin API
-      const quotaUrl = `${this.webadminUrl}/quota/users/${mailStr}`;
+      const quotaUrl = this.webadminPath('quota', 'users', mailStr);
       const quotaRes = await this.requestLimit(() =>
         this.fetch(quotaUrl, {
           method: 'GET',
@@ -485,7 +485,7 @@ export default class James extends TwakePlugin {
       // Rename the mailbox
       await this.callWebAdminApi(
         'onLdapMailChange',
-        `${this.webadminUrl}/users/${oldmailStr}/rename/${newmailStr}?action=rename&force`,
+        `${this.webadminPath('users', oldmailStr, 'rename', newmailStr)}?action=rename&force`,
         'POST',
         dn,
         null,
@@ -518,7 +518,13 @@ export default class James extends TwakePlugin {
               ...aliases.map(alias =>
                 this.callWebAdminApi(
                   'onLdapMailChange-delete',
-                  `${this.webadminUrl}/address/aliases/${oldmailStr}/sources/${alias}`,
+                  this.webadminPath(
+                    'address',
+                    'aliases',
+                    oldmailStr,
+                    'sources',
+                    alias
+                  ),
                   'DELETE',
                   dn,
                   null,
@@ -528,7 +534,13 @@ export default class James extends TwakePlugin {
               ...aliases.map(alias =>
                 this.callWebAdminApi(
                   'onLdapMailChange-create',
-                  `${this.webadminUrl}/address/aliases/${newmailStr}/sources/${alias}`,
+                  this.webadminPath(
+                    'address',
+                    'aliases',
+                    newmailStr,
+                    'sources',
+                    alias
+                  ),
                   'PUT',
                   dn,
                   null,
@@ -570,7 +582,7 @@ export default class James extends TwakePlugin {
         ...toDelete.map(alias =>
           this.callWebAdminApi(
             'onLdapAliasChange-delete',
-            `${this.webadminUrl}/address/aliases/${mail}/sources/${alias}`,
+            this.webadminPath('address', 'aliases', mail, 'sources', alias),
             'DELETE',
             dn,
             null,
@@ -581,7 +593,7 @@ export default class James extends TwakePlugin {
           await this.dropStaleForwards(dn, alias, []);
           await this.callWebAdminApi(
             'onLdapAliasChange-add',
-            `${this.webadminUrl}/address/aliases/${mail}/sources/${alias}`,
+            this.webadminPath('address', 'aliases', mail, 'sources', alias),
             'PUT',
             dn,
             null,
@@ -603,7 +615,7 @@ export default class James extends TwakePlugin {
       const set = newQuota > 0;
       await this.callWebAdminApi(
         'onLdapQuotaChange',
-        `${this.webadminUrl}/quota/users/${mail}/size`,
+        this.webadminPath('quota', 'users', mail, 'size'),
         set ? 'PUT' : 'DELETE',
         dn,
         set ? newQuota.toString() : null,
@@ -640,7 +652,7 @@ export default class James extends TwakePlugin {
         ...toDelete.map(forward =>
           this.callWebAdminApi(
             'onLdapForwardChange-delete',
-            `${this.webadminUrl}/address/forwards/${mail}/targets/${forward}`,
+            this.webadminPath('address', 'forwards', mail, 'targets', forward),
             'DELETE',
             dn,
             null,
@@ -650,7 +662,7 @@ export default class James extends TwakePlugin {
         ...toAdd.map(forward =>
           this.callWebAdminApi(
             'onLdapForwardChange-add',
-            `${this.webadminUrl}/address/forwards/${mail}/targets/${forward}`,
+            this.webadminPath('address', 'forwards', mail, 'targets', forward),
             'PUT',
             dn,
             null,
@@ -807,7 +819,7 @@ export default class James extends TwakePlugin {
     const call = (domain: string, method: 'PUT' | 'DELETE'): Promise<boolean> =>
       this.callWebAdminApi(
         method === 'PUT' ? 'domain:create' : 'domain:delete',
-        `${this.webadminUrl}/domains/${domain}`,
+        this.webadminPath('domains', domain),
         method,
         dn,
         null,
@@ -1185,7 +1197,7 @@ export default class James extends TwakePlugin {
       if (!isNaN(quotaNum) && quotaNum > 0) {
         await this.callWebAdminApi(
           'ldapadddone:quota',
-          `${this.webadminUrl}/quota/users/${mailStr}/size`,
+          this.webadminPath('quota', 'users', mailStr, 'size'),
           'PUT',
           dn,
           quotaNum.toString(),
@@ -1211,7 +1223,7 @@ export default class James extends TwakePlugin {
         aliasList.map(alias =>
           this.callWebAdminApi(
             'ldapadddone:alias',
-            `${this.webadminUrl}/address/aliases/${mailStr}/sources/${alias}`,
+            this.webadminPath('address', 'aliases', mailStr, 'sources', alias),
             'PUT',
             dn,
             null,
@@ -1410,10 +1422,16 @@ export default class James extends TwakePlugin {
    * its domain. Lower-cased, so that a change of case only, which keeps the
    * mailbox, keeps its path.
    */
-  private teamMailboxUrl(mail: string): string {
+  private teamMailboxUrl(mail: string, ...subpath: string[]): string {
     const lower = mail.toLowerCase();
     const at = lower.lastIndexOf('@');
-    return `${this.webadminUrl}/domains/${lower.slice(at + 1)}/team-mailboxes/${encodeURIComponent(lower.slice(0, at))}`;
+    return this.webadminPath(
+      'domains',
+      lower.slice(at + 1),
+      'team-mailboxes',
+      lower.slice(0, at),
+      ...subpath
+    );
   }
 
   private async teamMailboxMembers(
@@ -1423,13 +1441,12 @@ export default class James extends TwakePlugin {
     memberDns: string[]
   ): Promise<void> {
     if (!memberDns.length) return;
-    const url = this.teamMailboxUrl(mail);
     const memberMails = await this.getMemberEmails(memberDns);
     await Promise.all(
       memberMails.map(memberMail =>
         this.callWebAdminApi(
           `teamMailbox:${method === 'PUT' ? 'addMember' : 'removeMember'}`,
-          `${url}/members/${memberMail}`,
+          this.teamMailboxUrl(mail, 'members', memberMail),
           method,
           dn,
           null,
@@ -1590,7 +1607,7 @@ export default class James extends TwakePlugin {
     for (let attempt = 1; ; attempt++) {
       try {
         // Step 1: the default identity, if the user has one
-        const identitiesUrl = `${this.webadminUrl}/users/${mail}/identities`;
+        const identitiesUrl = this.webadminPath('users', mail, 'identities');
         const getRes = await this.requestLimit(() =>
           this.fetch(`${identitiesUrl}?default=true`, {
             method: 'GET',
@@ -1639,7 +1656,12 @@ export default class James extends TwakePlugin {
         const res = await this.requestLimit(() =>
           this.fetch(
             defaultIdentity?.id
-              ? `${identitiesUrl}/${defaultIdentity.id}`
+              ? this.webadminPath(
+                  'users',
+                  mail,
+                  'identities',
+                  defaultIdentity.id
+                )
               : identitiesUrl,
             {
               method: defaultIdentity?.id ? 'PUT' : 'POST',
@@ -1684,7 +1706,7 @@ export default class James extends TwakePlugin {
     try {
       const res = await this.requestLimit(() =>
         this.fetch(
-          `${this.webadminUrl}/users/${mail}/identities?default=true`,
+          `${this.webadminPath('users', mail, 'identities')}?default=true`,
           {
             method: 'GET',
             headers: this.createHeaders(),
@@ -1735,7 +1757,7 @@ export default class James extends TwakePlugin {
     let targets: string[];
     try {
       const res = await this.requestLimit(() =>
-        this.fetch(`${this.webadminUrl}/address/forwards/${address}`, {
+        this.fetch(this.webadminPath('address', 'forwards', address), {
           method: 'GET',
           headers: this.createHeaders(),
         })
@@ -1768,7 +1790,7 @@ export default class James extends TwakePlugin {
       targets.map(target =>
         this.callWebAdminApi(
           'dropStaleForward',
-          `${this.webadminUrl}/address/forwards/${address}/targets/${target}`,
+          this.webadminPath('address', 'forwards', address, 'targets', target),
           'DELETE',
           dn,
           null,
@@ -1812,7 +1834,7 @@ export default class James extends TwakePlugin {
     };
 
     try {
-      const url = new URL(`${this.webadminUrl}/users/${mail}`);
+      const url = new URL(this.webadminPath('users', mail));
       url.searchParams.set('action', 'deleteData');
       if (fromStep) {
         url.searchParams.set('fromStep', fromStep);
@@ -2027,7 +2049,12 @@ export default class James extends TwakePlugin {
         operations.push(
           this.callWebAdminApi(
             'onLdapChange:addDelegation',
-            `${this.webadminUrl}/users/${userMail}/authorizedUsers/${delegateEmail}`,
+            this.webadminPath(
+              'users',
+              userMail,
+              'authorizedUsers',
+              delegateEmail
+            ),
             'PUT',
             dn,
             null,
@@ -2043,7 +2070,12 @@ export default class James extends TwakePlugin {
         operations.push(
           this.callWebAdminApi(
             'onLdapChange:removeDelegation',
-            `${this.webadminUrl}/users/${userMail}/authorizedUsers/${delegateEmail}`,
+            this.webadminPath(
+              'users',
+              userMail,
+              'authorizedUsers',
+              delegateEmail
+            ),
             'DELETE',
             dn,
             null,

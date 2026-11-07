@@ -289,15 +289,8 @@ export default class Calendar extends TwakePlugin {
     return !this.resourceBase || isDnInBranch(dn, this.resourceBase);
   }
 
-  /**
-   * URL of one resource in the WebAdmin API.
-   *
-   * The id is a raw RDN value, so it can carry anything a directory accepts:
-   * `cn=Salle A/B` interpolated as such builds `/resources/Salle A/B`, a path
-   * naming another resource or none. Percent-encoding keeps it one segment.
-   */
   private resourceUrl(resourceId: string): string {
-    return `${this.webadminUrl}/resources/${encodeURIComponent(resourceId)}`;
+    return this.webadminPath('resources', resourceId);
   }
 
   /**
@@ -567,13 +560,7 @@ export default class Calendar extends TwakePlugin {
     };
 
     try {
-      // Left as it is written, deliberately. `@` is legal in a path segment
-      // (RFC 3986), so encoding it buys nothing for an ordinary address, and
-      // `plugins/twake/james` interpolates addresses raw into a dozen paths
-      // of this same WebAdmin: changing one of the two would have them
-      // disagree on the wire with nothing but a mock to say which is right.
-      // See issue #175, which tracks both.
-      const url = new URL(`${this.webadminUrl}/users/${mail}`);
+      const url = new URL(this.webadminPath('users', mail));
       url.searchParams.set('action', 'deleteData');
 
       const response = await this.requestLimit(() =>

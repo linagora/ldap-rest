@@ -13,6 +13,40 @@ import { escapeLdapFilter } from '../lib/utils.js';
 
 import DmPlugin, { type Role } from './plugin.js';
 
+/**
+ * Refuse a segment no encoding can keep literal.
+ *
+ * The WHATWG URL parser resolves `.`, `..` and every percent-encoded
+ * spelling of them (`%2E%2E`, `.%2e`) away, so an empty value, `.` or `..`
+ * cannot name one segment: left through, `..` would turn
+ * `/address/forwards/<mail>/targets/..` into a call on `<mail>` itself.
+ *
+ * @param value the segment, unencoded
+ * @throws Error when the value cannot name a path segment
+ */
+export function assertPathSegment(value: string): void {
+  if (value !== '' && value !== '.' && value !== '..') return;
+  const what = value === '' ? 'empty segment' : `dot segment "${value}"`;
+  throw new Error(`Refusing to build a WebAdmin URL from the ${what}`);
+}
+
+/**
+ * Percent-encode one path segment, keeping `@`.
+ *
+ * `@` is a `pchar` (RFC 3986 §3.3) and delimits nothing in a path, so an
+ * ordinary mail address keeps the form WebAdmin already receives. The
+ * delimiters that would let one address name another (`/`, `?`, `#`, `%`)
+ * are encoded.
+ *
+ * @param value the segment, unencoded
+ * @returns the encoded segment
+ * @throws Error when the value cannot name a path segment
+ */
+function encodePathSegment(value: string): string {
+  assertPathSegment(value);
+  return encodeURIComponent(value).replace(/%40/g, '@');
+}
+
 /** What a Twake plugin needs to reach its WebAdmin API */
 export interface TwakeConnection {
   url: string;
@@ -87,6 +121,22 @@ export abstract class TwakePlugin extends DmPlugin {
     // Cache common LDAP attributes
     this.mailAttr = this.config.mail_attribute || 'mail';
     this.displayNameAttr = this.config.display_name_attribute || 'displayName';
+  }
+
+  /**
+   * A WebAdmin URL under this plugin's base, each segment encoded.
+   *
+   * Addresses and RDN values come from the directory and may hold `/`, `?`,
+   * `#` or `%`: spliced raw, `fetch` resolves them as path, query or
+   * fragment delimiters, and a call made with the WebAdmin token acts on
+   * another user or resource. Each value is kept one segment, and decoding
+   * it gives the value back.
+   *
+   * @param segments path segments, unencoded
+   * @returns the absolute URL
+   */
+  protected webadminPath(...segments: string[]): string {
+    return `${this.webadminUrl}/${segments.map(encodePathSegment).join('/')}`;
   }
 
   /**

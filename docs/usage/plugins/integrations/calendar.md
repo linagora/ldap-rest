@@ -83,11 +83,11 @@ The plugin uses the following WebAdmin API endpoints:
 - `PATCH /registeredUsers?id={id}` - Update a registered user's email, first and last name
 - `POST /users/{mail}?action=deleteData` - Delete a user's data (see `deleteUserData`)
 
-The resource id goes into the path percent-encoded, so a `/` or a `#` in it
-cannot build a path naming something else. The user's address is left as it is
-written — `user@example.com`, `@` being legal in a path segment — which is what
-`plugins/twake/james` does with the same WebAdmin; whether the two should
-encode it is issue #175.
+The resource id and the user's address each go into the path as one encoded
+segment, so a `/`, `#`, `?` or `%` in either cannot build a path naming
+something else. `@` stays as written: it is legal in a path segment and does
+not delimit one, which keeps an ordinary address in the form WebAdmin already
+receives.
 
 ### Registered Users
 
