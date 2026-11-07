@@ -241,7 +241,17 @@ No configuration file needed - permissions are read from LDAP. Simply load the p
 
 **Optional Cache Configuration:**
 
-The plugin caches permissions for 5 minutes by default. This is hardcoded but can be modified in the source if needed.
+The plugin caches permissions for 5 minutes by default:
+
+```bash
+--authz-linid1-cache-ttl 60
+```
+
+A write through this server that touches the admin attribute clears the
+cache at once, so a revocation does not wait for the TTL. A change made
+directly in the directory waits for it. With several instances, a write
+clears the cache of the instance that served it; another instance's cache
+waits for the TTL, like a change made directly in the directory.
 
 ### The identity has to be a `uid`
 
@@ -264,7 +274,7 @@ An identity naming **several** entries is refused (403) whatever that
 option says, and a warning gives the number of entries. A lookup the
 directory fails fails the request and is not cached.
 
-Both answers are cached for the plugin's TTL (5 minutes), negatives
+Both answers are cached for the plugin's TTL (5 minutes by default), negatives
 included, so a mismatch does not turn every request into a directory search.
 The TTL cuts both ways: an identity added to the directory after being
 refused waits it out, and an administrator whose **own entry is renamed or
@@ -282,7 +292,7 @@ For each LDAP operation, the plugin:
 
 1. **Resolves user DN** - Converts username to LDAP DN
 2. **Searches for permissions** - Finds all organizations where user is in `twakeLocalAdminLink`
-3. **Caches results** - Stores permissions for 5 minutes
+3. **Caches results** - Stores permissions for the configured TTL (5 minutes by default)
 4. **Checks branch access** - Verifies if requested branch matches authorized organizations
 5. **Checks link attributes** - For entries with `twakeDepartmentLink`, checks if link points to authorized org
 
@@ -458,7 +468,7 @@ Response: 403 Forbidden
 
 Permissions are cached to reduce LDAP queries:
 
-- **Cache TTL**: 5 minutes (hardcoded)
+- **Cache TTL**: 5 minutes by default (`--authz-linid1-cache-ttl`)
 - **Per-user cache**: Each user's permissions cached separately
 - **Automatic refresh**: Cache expires after TTL
 - **On-demand refresh**: New permissions fetched on cache miss
@@ -538,7 +548,7 @@ member: uid=employee1,ou=users,dc=example,dc=com
 - **Centralized control** - All permissions in LDAP, no config files to sync
 - **Audit trail** - LDAP modifications can be logged/audited
 - **Consistency** - Single source of truth for permissions
-- **Real-time updates** - Changes effective after cache expiry (5 min max)
+- **Real-time updates** - A write through this server takes effect at once; a change made directly in the directory waits for the cache TTL
 
 ### Permission Model
 
@@ -559,8 +569,8 @@ This plugin only handles **authorization**. Combine with an authentication plugi
 
 ### Cache Security
 
-- **Cache delays permission revocation** - Up to 5 minutes after removing user from `twakeLocalAdminLink`
-- **Cache per user** - Removing one user doesn't invalidate others
+- **Cache delays permission revocation** - Up to the TTL after removing user from `twakeLocalAdminLink` directly in the directory; a write through this server clears it at once
+- **Cache per user** - A write touching the admin attribute clears every cached entry, since the hook does not resolve which users it affects
 - **No cache persistence** - Cache cleared on server restart
 
 ## Troubleshooting
@@ -585,7 +595,7 @@ This plugin only handles **authorization**. Combine with an authentication plugi
 
 2. Check user DN matches exactly (spaces, case, order)
 
-3. Wait up to 5 minutes for cache to expire after adding user
+3. Wait up to the cache TTL after adding the user directly in the directory
 
 4. Check user is authenticated (verify `req.user` is set)
 
@@ -621,7 +631,7 @@ Added user to `twakeLocalAdminLink` but they still get access denied.
 
 **Solutions:**
 
-1. Wait up to 5 minutes for cache to expire
+1. Wait up to the cache TTL, or empty the cache with a write through this server
 2. Restart server to clear all caches immediately
 3. Verify LDAP modification succeeded:
    ```bash
@@ -690,7 +700,7 @@ User jdoe not found in LDAP
 | Read-only access  | No (always full access)            | Yes (separate read/write/delete) |
 | Cross-branch      | Yes (via `twakeDepartmentLink`)    | Yes (if configured)              |
 | Dynamic updates   | Yes (via LDAP)                     | No (requires restart)            |
-| Cache             | 5 min (hardcoded)                  | Configurable TTL                 |
+| Cache             | 5 min (`--authz-linid1-cache-ttl`) | `--authz-per-branch-cache-ttl`   |
 | Use case          | Organization-based delegated admin | Fine-grained access control      |
 
 **When to use authzLinid1:**

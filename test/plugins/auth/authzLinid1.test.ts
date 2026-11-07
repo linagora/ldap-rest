@@ -309,6 +309,88 @@ describe('AuthzLinid1 Plugin', () => {
       expect(cached).to.exist;
       expect(cached?.branches.size).to.be.greaterThan(0);
     });
+
+    it('drops a revoked grant at once when the write goes through this server', async () => {
+      await dm.ldap.add(getTestUserDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'testadmin',
+        sn: 'Admin',
+        cn: 'Test Admin',
+      });
+      await dm.ldap.add(getTestOrgDn(), {
+        objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+        ou: 'TestOrg',
+        twakeDepartmentPath: 'TestOrg',
+        twakeLocalAdminLink: getTestUserDn(),
+      });
+
+      const before = await authz.getUserPermissions(
+        getTestUserDn(),
+        getTestOrgDn()
+      );
+      expect(before.write).to.be.true;
+
+      await dm.ldap.modify(getTestOrgDn(), {
+        delete: { twakeLocalAdminLink: getTestUserDn() },
+      });
+
+      const after = await authz.getUserPermissions(
+        getTestUserDn(),
+        getTestOrgDn()
+      );
+      expect(after.write).to.be.false;
+    });
+
+    it('answers a lookup overtaken by a write from what it read', async () => {
+      await dm.ldap.add(getTestUserDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'testadmin',
+        sn: 'Admin',
+        cn: 'Test Admin',
+      });
+      await dm.ldap.add(getTestOrgDn(), {
+        objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+        ou: 'TestOrg',
+        twakeDepartmentPath: 'TestOrg',
+        twakeLocalAdminLink: getTestUserDn(),
+      });
+      authz.permissionsCache.clear();
+
+      const pending = authz.getUserPermissions(getTestUserDn(), getTestOrgDn());
+      // An unrelated write clears the cache while the lookup is searching
+      authz.forgetPermissions();
+
+      expect((await pending).write).to.be.true;
+    });
+
+    it('drops the cache when the organization is deleted', async () => {
+      await dm.ldap.add(getTestUserDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'testadmin',
+        sn: 'Admin',
+        cn: 'Test Admin',
+      });
+      await dm.ldap.add(getTestOrgDn(), {
+        objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+        ou: 'TestOrg',
+        twakeDepartmentPath: 'TestOrg',
+        twakeLocalAdminLink: getTestUserDn(),
+      });
+      expect(
+        (await authz.getUserPermissions(getTestUserDn(), getTestOrgDn())).write
+      ).to.be.true;
+
+      await dm.ldap.delete(getTestOrgDn());
+
+      expect(
+        (await authz.getUserPermissions(getTestUserDn(), getTestOrgDn())).write
+      ).to.be.false;
+    });
+
+    it('reads the cache TTL from the option', async () => {
+      dm.config.authz_linid1_cache_ttl = 60;
+      expect(new AuthzLinid1(dm).cacheTTL).to.equal(60 * 1000);
+    });
   });
 
   describe('Integration with users branch', () => {
