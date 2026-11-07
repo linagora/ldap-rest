@@ -33,11 +33,13 @@ through the provider. The client secret is known to the provider's
 administrators and lives in the client registration, which is not the same
 set of people as the directory's administrators.
 
-Give the cookie a key of its own, at least 32 characters. To rotate it,
-repeat the option or give a space- or comma-separated list
-(`--oidc-session-secrets`): the library signs with the first key and
-accepts the others, so sessions opened before the rotation keep working
-until they expire.
+Give the cookie a key of its own, at least 32 characters. `openssl rand -hex
+32` gives one whose alphabet is safe for `DM_OIDC_SESSION_SECRET`, which
+splits on `,` or `;` (and on newlines) into several keys. To rotate it,
+repeat the option or give a comma- or newline-separated list to
+`--oidc-session-secrets` or `DM_OIDC_SESSION_SECRET` (`;` when a key holds
+a comma): the library signs with the first key and accepts the others, so
+sessions opened before the rotation keep working until they expire.
 
 ## Prerequisites
 

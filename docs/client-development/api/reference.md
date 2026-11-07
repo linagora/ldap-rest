@@ -659,9 +659,10 @@ npx ldap-rest \
   --ldap-pwd admin \
   --ldap-base dc=example,dc=com \
   --plugin core/auth/openidconnect \
-  --oidc-issuer https://auth.example.com \
+  --oidc-server https://auth.example.com \
   --oidc-client-id ldap-rest \
-  --oidc-client-secret your-secret
+  --oidc-client-secret your-secret \
+  --oidc-session-secret a-session-key-of-32-characters-min
 ```
 
 **Pros:** Standards-based, user-specific tokens, automatic expiration

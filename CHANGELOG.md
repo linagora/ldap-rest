@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-### Security
+### Breaking Changes
 
 - `core/auth/openidconnect` requires a session key separate from the client
   secret (`--oidc-session-secret`) and refuses to start without one

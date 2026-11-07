@@ -258,6 +258,35 @@ describe('OpenID Connect Plugin', () => {
       );
     });
 
+    it('should refuse a session key shorter than 32 characters', async () => {
+      const dm = new DM();
+      await dm.ready;
+
+      dm.config.oidc_server = 'https://auth.example.com';
+      dm.config.oidc_client_id = 'my-client-id';
+      dm.config.oidc_client_secret = 'my-client-secret';
+      dm.config.oidc_session_secret = ['too-short'];
+      dm.config.base_url = 'https://app.example.com';
+
+      expect(() => new OpenIDConnect(dm)).to.throw('at least 32 characters');
+    });
+
+    it('should refuse a session key cut out of the client secret', async () => {
+      const dm = new DM();
+      await dm.ready;
+
+      dm.config.oidc_server = 'https://auth.example.com';
+      dm.config.oidc_client_id = 'my-client-id';
+      dm.config.oidc_client_secret =
+        'a-very-long-client-secret-that-is-at-least-32';
+      dm.config.oidc_session_secret = ['client-secret-that-is-at-least-32'];
+      dm.config.base_url = 'https://app.example.com';
+
+      expect(() => new OpenIDConnect(dm)).to.throw(
+        'oidc_session_secret must differ from oidc_client_secret'
+      );
+    });
+
     it('should require a session key', async () => {
       const dm = new DM();
       await dm.ready;

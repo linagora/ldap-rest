@@ -120,15 +120,27 @@ export default class OpenIDConnect extends AuthBase {
     }
     const settings = this.options(openidconnectOptions);
     const sessionSecrets = settings.oidc_session_secret;
+    // Not `required: true` on the option: every declared option is checked
+    // before plugins load, so that would refuse to start a server that does
+    // not load this plugin.
     if (sessionSecrets.length === 0)
       throw new Error('Missing config parameter oidc_session_secret');
-    if (sessionSecrets.includes(settings.oidc_client_secret))
-      throw new Error(
-        'oidc_session_secret must differ from oidc_client_secret: the ' +
-          'session cookie key must not be the client secret'
-      );
-    for (const origin of this.options(openidconnectOptions)
-      .oidc_logout_origins) {
+    const clientSecret = settings.oidc_client_secret;
+    for (const secret of sessionSecrets) {
+      if (clientSecret.includes(secret))
+        throw new Error(
+          'oidc_session_secret must differ from oidc_client_secret: the ' +
+            'session cookie key must not be the client secret nor a ' +
+            'fragment of it'
+        );
+      if (secret.length < 32)
+        throw new Error(
+          'oidc_session_secret must be at least 32 characters: use ' +
+            '`openssl rand -hex 32`, which neither comma nor semicolon ' +
+            'splits when the value comes from DM_OIDC_SESSION_SECRET'
+        );
+    }
+    for (const origin of settings.oidc_logout_origins) {
       try {
         new URL(origin);
       } catch {
