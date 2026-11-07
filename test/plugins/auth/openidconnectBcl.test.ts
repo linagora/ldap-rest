@@ -28,12 +28,15 @@ describe('OpenID Connect, the Back-Channel Logout configuration', function () {
       'DM_OIDC_SERVER',
       'DM_OIDC_CLIENT_ID',
       'DM_OIDC_CLIENT_SECRET',
+      'DM_OIDC_SESSION_SECRET',
       'DM_BASE_URL',
     ])
       previous[k] = process.env[k];
     process.env.DM_OIDC_SERVER = 'https://sso.example.com';
     process.env.DM_OIDC_CLIENT_ID = 'test-client';
     process.env.DM_OIDC_CLIENT_SECRET = 'test-secret';
+    process.env.DM_OIDC_SESSION_SECRET =
+      'a-session-key-long-enough-for-the-library';
     process.env.DM_BASE_URL = 'https://console.example.com';
 
     server = new DM();

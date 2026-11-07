@@ -210,6 +210,8 @@ export interface Config {
   oidc_username_claim?: string;
   oidc_client_id?: string;
   oidc_client_secret?: string;
+  /** One or more keys for the session cookie, newest first; rotating keeps old sessions valid */
+  oidc_session_secret?: string[];
   base_url?: string;
 
   // auth/authzPerRoute

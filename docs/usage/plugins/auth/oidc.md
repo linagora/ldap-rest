@@ -9,6 +9,7 @@ OAuth 2.0 / OpenID Connect authentication for modern identity providers.
 --oidc-server "https://auth.example.com" \
 --oidc-client-id "ldap-rest-client" \
 --oidc-client-secret "client-secret-here" \
+--oidc-session-secret "session-key-here" \
 --base-url "https://api.example.com"
 ```
 
@@ -18,8 +19,25 @@ OAuth 2.0 / OpenID Connect authentication for modern identity providers.
 DM_OIDC_SERVER="https://auth.example.com"
 DM_OIDC_CLIENT_ID="ldap-rest-client"
 DM_OIDC_CLIENT_SECRET="client-secret-here"
+DM_OIDC_SESSION_SECRET="session-key-here"
 DM_BASE_URL="https://api.example.com"
 ```
+
+## Session key
+
+`--oidc-session-secret` is the key of the `appSession` cookie, and the
+plugin refuses to start without it. It must differ from
+`--oidc-client-secret`: the cookie holds the whole session, so whoever
+knows its key can forge an administrator's, offline and without going
+through the provider. The client secret is known to the provider's
+administrators and lives in the client registration, which is not the same
+set of people as the directory's administrators.
+
+Give the cookie a key of its own, at least 32 characters. To rotate it,
+repeat the option or give a space- or comma-separated list
+(`--oidc-session-secrets`): the library signs with the first key and
+accepts the others, so sessions opened before the rotation keep working
+until they expire.
 
 ## Prerequisites
 

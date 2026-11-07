@@ -118,6 +118,15 @@ export default class OpenIDConnect extends AuthBase {
     ] as const) {
       if (!this.config[p]) throw new Error(`Missing config parameter ${p}`);
     }
+    const settings = this.options(openidconnectOptions);
+    const sessionSecrets = settings.oidc_session_secret;
+    if (sessionSecrets.length === 0)
+      throw new Error('Missing config parameter oidc_session_secret');
+    if (sessionSecrets.includes(settings.oidc_client_secret))
+      throw new Error(
+        'oidc_session_secret must differ from oidc_client_secret: the ' +
+          'session cookie key must not be the client secret'
+      );
     for (const origin of this.options(openidconnectOptions)
       .oidc_logout_origins) {
       try {
@@ -140,6 +149,7 @@ export default class OpenIDConnect extends AuthBase {
    */
   buildConfig(): ConfigParams {
     const settings = this.options(openidconnectOptions);
+    const sessionSecrets = settings.oidc_session_secret;
     const config: ConfigParams = {
       // The router reads the session and stops there. Whether a request
       // needs one is asked after it, by `requiresAuth()` in `authMethod`:
@@ -150,7 +160,7 @@ export default class OpenIDConnect extends AuthBase {
       authRequired: false,
       issuerBaseURL: settings.oidc_server,
       clientID: settings.oidc_client_id,
-      secret: settings.oidc_client_secret,
+      secret: sessionSecrets.length === 1 ? sessionSecrets[0] : sessionSecrets,
       baseURL: settings.base_url,
       clientSecret: settings.oidc_client_secret,
       authorizationParams: {

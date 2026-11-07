@@ -4,6 +4,20 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### OpenID Connect requires a session key of its own
+
+**Who is affected:** every deployment loading `core/auth/openidconnect`.
+
+`--oidc-session-secret` / `DM_OIDC_SESSION_SECRET` is now required, and the
+plugin refuses to start without it or with a value equal to
+`DM_OIDC_CLIENT_SECRET`. The cookie holds the whole session, so its key must
+not be the client secret known to the provider's administrators. Set a key
+of its own, at least 32 characters; see
+[OIDC](plugins/auth/oidc.md#session-key). Give it to every replica, and keep
+the previous value in the list while sessions opened with it expire.
+
 ## From 2.0.3
 
 ### An `authzDynamic` flag must be a JSON boolean

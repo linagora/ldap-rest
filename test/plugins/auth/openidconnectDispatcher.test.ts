@@ -86,6 +86,9 @@ describe('OpenID Connect through the dispatcher', function () {
     server.config.oidc_server = OIDC_SERVER;
     server.config.oidc_client_id = 'client';
     server.config.oidc_client_secret = 'a-secret-long-enough-for-the-library';
+    server.config.oidc_session_secret = [
+      'a-session-key-long-enough-for-the-library',
+    ];
     server.config.base_url = 'http://localhost:3000';
 
     // Scoped the way the documentation recommends, which is the form that

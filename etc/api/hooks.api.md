@@ -390,6 +390,7 @@ interface Config {
     oidc_client_secret?: string;
     // (undocumented)
     oidc_server?: string;
+    oidc_session_secret?: string[];
     // (undocumented)
     oidc_username_claim?: string;
     // (undocumented)

@@ -38,6 +38,9 @@ describe('OpenID Connect Plugin', () => {
       // Missing oidc_server
       dm.config.oidc_client_id = 'test-client-id';
       dm.config.oidc_client_secret = 'test-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       expect(() => new OpenIDConnect(dm)).to.throw(
@@ -52,6 +55,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = 'http://localhost:8080';
       // Missing oidc_client_id
       dm.config.oidc_client_secret = 'test-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       expect(() => new OpenIDConnect(dm)).to.throw(
@@ -80,6 +86,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = 'http://localhost:8080';
       dm.config.oidc_client_id = 'test-client-id';
       dm.config.oidc_client_secret = 'test-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       // Missing base_url
 
       expect(() => new OpenIDConnect(dm)).to.throw(
@@ -94,6 +103,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = 'http://localhost:8080';
       dm.config.oidc_client_id = 'test-client-id';
       dm.config.oidc_client_secret = 'test-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       const plugin = new OpenIDConnect(dm);
@@ -115,6 +127,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = 'http://localhost:8080';
       dm.config.oidc_client_id = 'test-client-id';
       dm.config.oidc_client_secret = 'test-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       plugin = new OpenIDConnect(dm);
@@ -149,6 +164,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = 'http://localhost:8080';
       dm.config.oidc_client_id = 'test-client-id';
       dm.config.oidc_client_secret = 'test-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       const plugin = new OpenIDConnect(dm);
@@ -166,6 +184,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = 'http://localhost:8080';
       dm.config.oidc_client_id = 'test-client-id';
       dm.config.oidc_client_secret = 'test-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       const plugin = new OpenIDConnect(dm);
@@ -186,6 +207,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = 'https://auth.example.com';
       dm.config.oidc_client_id = 'my-client-id';
       dm.config.oidc_client_secret = 'my-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'https://app.example.com';
 
       const plugin = new OpenIDConnect(dm);
@@ -199,6 +223,56 @@ describe('OpenID Connect Plugin', () => {
     });
   });
 
+  describe('Session secret', () => {
+    it('should give the session cookie a key of its own', async () => {
+      const dm = new DM();
+      await dm.ready;
+
+      dm.config.oidc_server = 'https://auth.example.com';
+      dm.config.oidc_client_id = 'my-client-id';
+      dm.config.oidc_client_secret = 'my-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
+      dm.config.base_url = 'https://app.example.com';
+
+      const config = new OpenIDConnect(dm).buildConfig();
+      expect(config.secret).to.not.equal(config.clientSecret);
+      expect(config.secret).to.equal(
+        'a-session-secret-long-enough-for-the-library'
+      );
+    });
+
+    it('should refuse the client secret as the session key', async () => {
+      const dm = new DM();
+      await dm.ready;
+
+      dm.config.oidc_server = 'https://auth.example.com';
+      dm.config.oidc_client_id = 'my-client-id';
+      dm.config.oidc_client_secret = 'my-client-secret';
+      dm.config.oidc_session_secret = ['my-client-secret'];
+      dm.config.base_url = 'https://app.example.com';
+
+      expect(() => new OpenIDConnect(dm)).to.throw(
+        'oidc_session_secret must differ from oidc_client_secret'
+      );
+    });
+
+    it('should require a session key', async () => {
+      const dm = new DM();
+      await dm.ready;
+
+      dm.config.oidc_server = 'https://auth.example.com';
+      dm.config.oidc_client_id = 'my-client-id';
+      dm.config.oidc_client_secret = 'my-client-secret';
+      dm.config.base_url = 'https://app.example.com';
+
+      expect(() => new OpenIDConnect(dm)).to.throw(
+        'Missing config parameter oidc_session_secret'
+      );
+    });
+  });
+
   describe('Multiple Instances', () => {
     it('should allow creating multiple instances with different configs', async () => {
       const dm1 = new DM();
@@ -207,6 +281,9 @@ describe('OpenID Connect Plugin', () => {
       dm1.config.oidc_server = 'http://auth1.example.com';
       dm1.config.oidc_client_id = 'client1';
       dm1.config.oidc_client_secret = 'secret1';
+      dm1.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm1.config.base_url = 'http://app1.example.com';
 
       const plugin1 = new OpenIDConnect(dm1);
@@ -217,6 +294,9 @@ describe('OpenID Connect Plugin', () => {
       dm2.config.oidc_server = 'http://auth2.example.com';
       dm2.config.oidc_client_id = 'client2';
       dm2.config.oidc_client_secret = 'secret2';
+      dm2.config.oidc_session_secret = [
+        'another-session-secret-long-enough-for-the-library',
+      ];
       dm2.config.base_url = 'http://app2.example.com';
 
       const plugin2 = new OpenIDConnect(dm2);
@@ -242,6 +322,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = undefined;
       dm.config.oidc_client_id = undefined;
       dm.config.oidc_client_secret = undefined;
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = undefined;
 
       expect(() => new OpenIDConnect(dm)).to.throw('Missing config parameter');
@@ -254,6 +337,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = '';
       dm.config.oidc_client_id = 'client-id';
       dm.config.oidc_client_secret = 'secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       expect(() => new OpenIDConnect(dm)).to.throw(
@@ -270,6 +356,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = 'http://localhost:8080';
       dm.config.oidc_client_id = 'test-client-id';
       dm.config.oidc_client_secret = 'test-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       const oidcPlugin = new OpenIDConnect(dm);
@@ -288,6 +377,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = 'http://localhost:8080';
       dm.config.oidc_client_id = 'test-client-id';
       dm.config.oidc_client_secret = 'test-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       const oidcPlugin = new OpenIDConnect(dm);
@@ -342,6 +434,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = oidcServer;
       dm.config.oidc_client_id = 'test-client-id';
       dm.config.oidc_client_secret = 'test-client-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       const oidcPlugin = new OpenIDConnect(dm);
@@ -581,6 +676,9 @@ describe('OpenID Connect Plugin', () => {
       dm.config.oidc_server = oidcServer;
       dm.config.oidc_client_id = 'test-client';
       dm.config.oidc_client_secret = 'test-secret';
+      dm.config.oidc_session_secret = [
+        'a-session-secret-long-enough-for-the-library',
+      ];
       dm.config.base_url = 'http://localhost:3000';
 
       // Add hooks
