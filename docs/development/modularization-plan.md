@@ -16,12 +16,12 @@ internal split. [#593], [#594], [#595] and [#603] are done.
 
 ## What blocks #397 today
 
-`@ldap-rest/core`, `@ldap-rest/storage`, the authentication plugins and the
-LDAP plugins are packages of their own. What remains is extracting the other
-plugin families and the umbrella:
+`@ldap-rest/core`, `@ldap-rest/storage`, the authentication, LDAP, SCIM and
+Twake plugins and the standalone plugins are packages of their own. What
+remains is extracting `browser` and `schemas` and the umbrella:
 
-- The standalone plugins, `browser` and `schemas` still live in the umbrella,
-  which still generates their `./plugin-*` exports from `rollup.config.mjs`.
+- `browser` and `schemas` still live in the umbrella, which still generates
+  their `./browser-*` and `./schema-*` exports from `rollup.config.mjs`.
 - The umbrella composes the options in `src/options.ts` and passes them to the
   core `DM`; the core itself imports no family.
 
@@ -44,6 +44,12 @@ packages/
   james/                  @ldap-rest/james
   twake-appaccounts/      @ldap-rest/twake-appaccounts
   scim/                   @ldap-rest/scim
+  bcl/                    @ldap-rest/bcl
+  config-api/             @ldap-rest/config-api
+  metrics/                @ldap-rest/metrics
+  rabbitmq/               @ldap-rest/rabbitmq
+  static/                 @ldap-rest/static
+  weblogs/                @ldap-rest/weblogs
   browser/                @ldap-rest/browser
   schemas/                @ldap-rest/schemas
   ldap-rest/              umbrella package (main CLI and re-exports)
@@ -192,6 +198,12 @@ families do not import each other, and `ldapActions` is a stable façade.
    `@ldap-rest/twake-lifecycle`, `@ldap-rest/twake-provisioning` and
    `@ldap-rest/twake-collaboration`; the umbrella keeps the
    `./plugin-twake-*` shims and the `core/twake/…` names.
+   (**done**) The standalone plugins are one package each:
+   `@ldap-rest/bcl`, `@ldap-rest/config-api`, `@ldap-rest/metrics`,
+   `@ldap-rest/rabbitmq`, `@ldap-rest/static` and `@ldap-rest/weblogs`; the
+   umbrella keeps the former `src/plugins/*.ts` paths as shims. The static
+   plugin finds the deployment's `static` directory upwards, as the schema
+   defaults do, since that directory belongs to the umbrella.
 5. Extract `browser` and `schemas`.
 6. After each step: `npm run test:dev`, `npm run check`,
    `npm run check:openapi`, `npm run check:options`, and the `contracts` job.
@@ -273,11 +285,10 @@ phase 1.
 ## First actions
 
 Phases 0 and 1 are done, and phase 2 has started with the workspaces, the
-core, the storage, the authentication, the LDAP, the SCIM and the Twake
-packages. The next steps are:
+core, the storage, the authentication, the LDAP, the SCIM, the Twake and the
+standalone packages. The next steps are:
 
-1. Extract the remaining plugin packages (the standalone plugins), then
-   `browser` and `schemas`.
+1. Extract `browser` and `schemas`.
 2. Finish [#549] part 2 in phase 3.
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397

@@ -377,7 +377,9 @@ describe('Server internals', () => {
         '@ldap-rest/twake-appaccounts/consistency'
       );
       // A plugin no package provides keeps its own name
-      expect(dm.canonicalModule('core/weblogs')).to.equal('core/weblogs');
+      expect(dm.canonicalModule('core/demo/helloworld')).to.equal(
+        'core/demo/helloworld'
+      );
       expect(dm.canonicalModule(hello)).to.equal(hello);
     });
 

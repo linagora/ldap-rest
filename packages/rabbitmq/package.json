@@ -1,0 +1,44 @@
+{
+  "version": "3.0.0",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "name": "@ldap-rest/rabbitmq",
+  "description": "LDAP-Rest shared RabbitMQ transport plugin",
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "@linagora/rabbitmq-client": "^0.7.2"
+  },
+  "peerDependenciesMeta": {
+    "@linagora/rabbitmq-client": {
+      "optional": true
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/rabbitmq"
+  },
+  "exports": {
+    ".": {
+      "development": "./src/rabbitmq.ts",
+      "types": "./dist/rabbitmq.d.ts",
+      "import": "./dist/rabbitmq.js"
+    },
+    "./options": {
+      "development": "./src/rabbitmq.options.ts",
+      "types": "./dist/rabbitmq.options.d.ts",
+      "import": "./dist/rabbitmq.options.js"
+    }
+  }
+}

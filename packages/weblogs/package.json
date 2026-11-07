@@ -1,0 +1,34 @@
+{
+  "version": "3.0.0",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "name": "@ldap-rest/weblogs",
+  "description": "LDAP-Rest access log plugin",
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "express": "^5.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/weblogs"
+  },
+  "exports": {
+    ".": {
+      "development": "./src/weblogs.ts",
+      "types": "./dist/weblogs.d.ts",
+      "import": "./dist/weblogs.js"
+    }
+  }
+}

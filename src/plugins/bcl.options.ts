@@ -1,21 +1,2 @@
-/** Back-Channel Logout plugin options. */
-import type { Config } from '@ldap-rest/core/config/args';
-import {
-  defineOptions,
-  opt,
-  readOptions,
-  type OptionsOf,
-} from '@ldap-rest/core/config/options';
-
-export const bclOptions = defineOptions({
-  bcl_retention: opt.number({
-    env: 'DM_BCL_RETENTION',
-    default: 604800,
-    min: 1,
-  }),
-});
-export type BclOptions = OptionsOf<typeof bclOptions>;
-
-export function bclOptionsOf(config: Config): BclOptions {
-  return readOptions(bclOptions, config);
-}
+/** The Back-Channel Logout plugin options, at their historical path. */
+export * from '@ldap-rest/bcl/options';

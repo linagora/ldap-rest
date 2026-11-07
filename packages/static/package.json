@@ -1,0 +1,39 @@
+{
+  "version": "3.0.0",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "name": "@ldap-rest/static",
+  "description": "LDAP-Rest static files and JSON schema plugin",
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "express": "^5.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/static"
+  },
+  "exports": {
+    ".": {
+      "development": "./src/static.ts",
+      "types": "./dist/static.d.ts",
+      "import": "./dist/static.js"
+    },
+    "./options": {
+      "development": "./src/static.options.ts",
+      "types": "./dist/static.options.d.ts",
+      "import": "./dist/static.options.js"
+    }
+  }
+}

@@ -38,6 +38,10 @@
   `@ldap-rest/twake-provisioning` and `@ldap-rest/twake-collaboration`
   packages; the `ldap-rest/plugin-twake-*` entries and the `core/twake/…`
   names stay as compatibility shims.
+- The standalone plugins ship as the `@ldap-rest/bcl`,
+  `@ldap-rest/config-api`, `@ldap-rest/metrics`, `@ldap-rest/rabbitmq`,
+  `@ldap-rest/static` and `@ldap-rest/weblogs` packages; the former
+  `ldap-rest/plugin-*` entries stay as compatibility shims.
 
 ### Fixed
 

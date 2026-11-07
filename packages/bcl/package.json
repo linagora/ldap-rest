@@ -1,0 +1,38 @@
+{
+  "version": "3.0.0",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "name": "@ldap-rest/bcl",
+  "description": "LDAP-Rest Back-Channel Logout plugin",
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/bcl"
+  },
+  "exports": {
+    ".": {
+      "development": "./src/bcl.ts",
+      "types": "./dist/bcl.d.ts",
+      "import": "./dist/bcl.js"
+    },
+    "./options": {
+      "development": "./src/bcl.options.ts",
+      "types": "./dist/bcl.options.d.ts",
+      "import": "./dist/bcl.options.js"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "@ldap-rest/metrics",
+  "version": "3.0.0",
+  "description": "LDAP-Rest Prometheus metrics plugin",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/metrics"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/metrics.ts",
+      "types": "./dist/metrics.d.ts",
+      "import": "./dist/metrics.js"
+    },
+    "./options": {
+      "development": "./src/metrics.options.ts",
+      "types": "./dist/metrics.options.d.ts",
+      "import": "./dist/metrics.options.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "express": "^5.1.0",
+    "prom-client": "^15.1.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

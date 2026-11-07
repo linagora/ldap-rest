@@ -92,6 +92,9 @@
       "@ldap-rest/authz-scope/options": [
         "./packages/authz-scope/dist/authzScope.options.d.ts"
       ],
+      "@ldap-rest/bcl": ["./packages/bcl/dist/bcl.d.ts"],
+      "@ldap-rest/bcl/options": ["./packages/bcl/dist/bcl.options.d.ts"],
+      "@ldap-rest/config-api": ["./packages/config-api/dist/configApi.d.ts"],
       "@ldap-rest/james": ["./packages/james/dist/james.d.ts"],
       "@ldap-rest/james/options": ["./packages/james/dist/james.options.d.ts"],
       "@ldap-rest/ldap-organizations": [
@@ -151,6 +154,14 @@
       "@ldap-rest/ldap-trash/options": [
         "./packages/ldap-trash/dist/trash.options.d.ts"
       ],
+      "@ldap-rest/metrics": ["./packages/metrics/dist/metrics.d.ts"],
+      "@ldap-rest/metrics/options": [
+        "./packages/metrics/dist/metrics.options.d.ts"
+      ],
+      "@ldap-rest/rabbitmq": ["./packages/rabbitmq/dist/rabbitmq.d.ts"],
+      "@ldap-rest/rabbitmq/options": [
+        "./packages/rabbitmq/dist/rabbitmq.options.d.ts"
+      ],
       "@ldap-rest/scim": ["./packages/scim/dist/scim.d.ts"],
       "@ldap-rest/scim/bulk": ["./packages/scim/dist/bulk.d.ts"],
       "@ldap-rest/scim/discovery": ["./packages/scim/dist/discovery.d.ts"],
@@ -160,6 +171,10 @@
       "@ldap-rest/scim/patch": ["./packages/scim/dist/patch.d.ts"],
       "@ldap-rest/scim/projection": ["./packages/scim/dist/projection.d.ts"],
       "@ldap-rest/scim/users": ["./packages/scim/dist/users.d.ts"],
+      "@ldap-rest/static": ["./packages/static/dist/static.d.ts"],
+      "@ldap-rest/static/options": [
+        "./packages/static/dist/static.options.d.ts"
+      ],
       "@ldap-rest/storage": ["./packages/storage/dist/storage.d.ts"],
       "@ldap-rest/storage/options": [
         "./packages/storage/dist/storage.options.d.ts"
@@ -241,7 +256,8 @@
       ],
       "@ldap-rest/twake-mail-migration/options": [
         "./packages/twake-mail-migration/dist/migrationProxy.options.d.ts"
-      ]
+      ],
+      "@ldap-rest/weblogs": ["./packages/weblogs/dist/weblogs.d.ts"]
     }
   },
   "include": ["src/**/*", "packages/*/src/types/**/*.d.ts"],

@@ -85,6 +85,9 @@
       "@ldap-rest/authz-scope/options": [
         "./packages/authz-scope/src/authzScope.options.ts"
       ],
+      "@ldap-rest/bcl": ["./packages/bcl/src/bcl.ts"],
+      "@ldap-rest/bcl/options": ["./packages/bcl/src/bcl.options.ts"],
+      "@ldap-rest/config-api": ["./packages/config-api/src/configApi.ts"],
       "@ldap-rest/james": ["./packages/james/src/james.ts"],
       "@ldap-rest/james/options": ["./packages/james/src/james.options.ts"],
       "@ldap-rest/ldap-organizations": [
@@ -140,6 +143,14 @@
       "@ldap-rest/ldap-trash/options": [
         "./packages/ldap-trash/src/trash.options.ts"
       ],
+      "@ldap-rest/metrics": ["./packages/metrics/src/metrics.ts"],
+      "@ldap-rest/metrics/options": [
+        "./packages/metrics/src/metrics.options.ts"
+      ],
+      "@ldap-rest/rabbitmq": ["./packages/rabbitmq/src/rabbitmq.ts"],
+      "@ldap-rest/rabbitmq/options": [
+        "./packages/rabbitmq/src/rabbitmq.options.ts"
+      ],
       "@ldap-rest/scim": ["./packages/scim/src/scim.ts"],
       "@ldap-rest/scim/bulk": ["./packages/scim/src/bulk.ts"],
       "@ldap-rest/scim/discovery": ["./packages/scim/src/discovery.ts"],
@@ -149,6 +160,8 @@
       "@ldap-rest/scim/patch": ["./packages/scim/src/patch.ts"],
       "@ldap-rest/scim/projection": ["./packages/scim/src/projection.ts"],
       "@ldap-rest/scim/users": ["./packages/scim/src/users.ts"],
+      "@ldap-rest/static": ["./packages/static/src/static.ts"],
+      "@ldap-rest/static/options": ["./packages/static/src/static.options.ts"],
       "@ldap-rest/storage": ["./packages/storage/src/storage.ts"],
       "@ldap-rest/storage/options": [
         "./packages/storage/src/storage.options.ts"
@@ -228,7 +241,8 @@
       ],
       "@ldap-rest/twake-mail-migration/options": [
         "./packages/twake-mail-migration/src/migrationProxy.options.ts"
-      ]
+      ],
+      "@ldap-rest/weblogs": ["./packages/weblogs/src/weblogs.ts"]
     },
     "outDir": "./dist",
     "rootDir": "./",
