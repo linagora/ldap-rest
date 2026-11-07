@@ -1,39 +1,26 @@
 # Changelog
 
-## Unreleased
-
-### Breaking Changes
-
-- `core/auth/openidconnect` requires a session key separate from the client
-  secret (`--oidc-session-secret`) and refuses to start without one
-  ([GHSA-qmmv-5748-px9r](https://github.com/linagora/ldap-rest/security/advisories/GHSA-qmmv-5748-px9r),
-  [upgrading](docs/usage/upgrading.md#openid-connect-requires-a-session-key-of-its-own)).
+## v2.1.0 (2026-11-07)
 
 ### Security
 
-- The authentication dispatcher no longer lets a request path in another
-  letter case (`/API/m/…`) escape the authenticator scoped to its prefix: the
-  request is judged as the route Express serves
-  ([GHSA-rgc7-fv78-p73h](https://github.com/linagora/ldap-rest/security/advisories/GHSA-rgc7-fv78-p73h)).
-- The James and Calendar plugins encode an address or a resource id as one
-  path segment in WebAdmin URLs, so a value holding `/`, `?`, `#` or `%` can
-  no longer make a call with the WebAdmin token act on another user or
-  resource
-  ([GHSA-jrmm-4w24-qqc5](https://github.com/linagora/ldap-rest/security/advisories/GHSA-jrmm-4w24-qqc5)).
-- `authzLinid1` refuses to write, move or delete an account some organization
-  names as its administrator unless the caller writes every organization
-  naming it
-  ([GHSA-2g53-22cj-hwfm](https://github.com/linagora/ldap-rest/security/advisories/GHSA-2g53-22cj-hwfm)).
-- `authzLinid1` drops a revoked permission as soon as the write goes through
-  this server, where it waited for the cache TTL; the TTL is configurable
-  with `--authz-linid1-cache-ttl`
-  ([GHSA-vg7q-jffp-g33c](https://github.com/linagora/ldap-rest/security/advisories/GHSA-vg7q-jffp-g33c)).
+- `core/auth/openidconnect` requires a `--oidc-session-secret` separate from
+  the client secret and refuses to start without it
+  ([GHSA-qmmv-5748-px9r](https://github.com/linagora/ldap-rest/security/advisories/GHSA-qmmv-5748-px9r),
+  [upgrading](docs/usage/upgrading.md#openid-connect-requires-a-session-key-of-its-own)).
+- Authentication path prefixes now match the route Express serves, whatever the
+  letter case ([GHSA-rgc7-fv78-p73h](https://github.com/linagora/ldap-rest/security/advisories/GHSA-rgc7-fv78-p73h)).
+- James and Calendar encode addresses and resource ids as single WebAdmin URL
+  segments ([GHSA-jrmm-4w24-qqc5](https://github.com/linagora/ldap-rest/security/advisories/GHSA-jrmm-4w24-qqc5)).
+- `authzLinid1` checks write access to every organization naming an account's
+  administrator ([GHSA-2g53-22cj-hwfm](https://github.com/linagora/ldap-rest/security/advisories/GHSA-2g53-22cj-hwfm)).
+- `authzLinid1` drops a revoked permission as soon as a write goes through this
+  server ([GHSA-vg7q-jffp-g33c](https://github.com/linagora/ldap-rest/security/advisories/GHSA-vg7q-jffp-g33c)).
 
 ### Fixed
 
-- `--plugin core/scim`, the short name the SCIM documentation gives, now loads
-  the plugin. It named a module no release shipped, so the documented form
-  failed at startup; `ldap-rest/plugin-scim` names the same module.
+- `--plugin core/scim` now loads the plugin under the documented name
+  ([#680](https://github.com/linagora/ldap-rest/issues/680)).
 
 ## v2.0.5 (2026-11-06)
 
