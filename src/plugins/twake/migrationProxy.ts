@@ -242,6 +242,12 @@ export default class MigrationProxy extends TwakePlugin {
   }
 
   private userUrl(address: string): string {
+    // This endpoint already receives a percent-encoded `@`; keep that form
+    // and apply the same dot-segment refusal as `webadminPath`.
+    if (address === '' || address === '.' || address === '..')
+      throw new Error(
+        `Refusing to build a WebAdmin URL from the dot segment "${address}"`
+      );
     return `${this.webadminUrl}/migratedUsers/${encodeURIComponent(address)}`;
   }
 

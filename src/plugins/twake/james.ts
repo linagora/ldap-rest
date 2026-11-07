@@ -1656,7 +1656,12 @@ export default class James extends TwakePlugin {
         const res = await this.requestLimit(() =>
           this.fetch(
             defaultIdentity?.id
-              ? `${identitiesUrl}/${encodeURIComponent(defaultIdentity.id)}`
+              ? this.webadminPath(
+                  'users',
+                  mail,
+                  'identities',
+                  defaultIdentity.id
+                )
               : identitiesUrl,
             {
               method: defaultIdentity?.id ? 'PUT' : 'POST',

@@ -985,7 +985,7 @@ class CustomJames extends James {
       // Custom logic for department changes
       await this._try(
         'onLdapDepartmentChange',
-        `${this.config.james_webadmin_url}/users/${mail}/metadata/department`,
+        this.webadminPath('users', mail, 'metadata', 'department'),
         'PUT',
         dn,
         newDept,

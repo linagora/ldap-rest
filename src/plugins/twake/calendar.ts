@@ -289,15 +289,8 @@ export default class Calendar extends TwakePlugin {
     return !this.resourceBase || isDnInBranch(dn, this.resourceBase);
   }
 
-  /**
-   * URL of one resource in the WebAdmin API.
-   *
-   * The id is a raw RDN value, so it can carry anything a directory accepts:
-   * `cn=Salle A/B` interpolated as such builds `/resources/Salle A/B`, a path
-   * naming another resource or none. Percent-encoding keeps it one segment.
-   */
   private resourceUrl(resourceId: string): string {
-    return `${this.webadminUrl}/resources/${encodeURIComponent(resourceId)}`;
+    return this.webadminPath('resources', resourceId);
   }
 
   /**

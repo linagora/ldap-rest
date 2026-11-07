@@ -56,6 +56,7 @@ describe('Twake WebAdmin URLs built from addresses', () => {
     { mail: 'a#b@test.org', segment: 'a%23b@test.org' },
     { mail: 'a?b@test.org', segment: 'a%3Fb@test.org' },
     { mail: 'a%2Fb@test.org', segment: 'a%252Fb@test.org' },
+    { mail: 'user+tag@test.org', segment: 'user%2Btag@test.org' },
   ];
 
   for (const { mail, segment } of cases) {
@@ -172,5 +173,15 @@ describe('Twake WebAdmin URLs built from addresses', () => {
     await calendar.deleteUserData('a#b@test.org');
 
     expect(seen).to.deep.equal(['/users/a%23b@test.org?action=deleteData']);
+  });
+
+  it('refuses a dot resource id instead of targeting the WebAdmin root', () => {
+    dm.config.calendar_webadmin_url = 'http://calendar.url.test:8000';
+    const calendar = new Calendar(dm);
+    const resourceUrl = (
+      calendar as unknown as { resourceUrl: (id: string) => string }
+    ).resourceUrl;
+
+    expect(() => resourceUrl.call(calendar, '..')).to.throw('dot segment');
   });
 });
