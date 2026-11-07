@@ -81,18 +81,20 @@ async function getAbstractEntries() {
 }
 
 async function getSpecs() {
-  return (await glob('static/schemas/**/*.json'))
-    .map(file => file.replace(/^static\/schemas\//, ''))
+  return (await glob('packages/schemas/static/schemas/**/*.json'))
+    .map(file => file.replace(/^packages\/schemas\/static\/schemas\//, ''))
     .sort();
 }
 
 async function getBrowserLibraries() {
   return (
-    await glob('src/browser/**/*.ts', {
-      ignore: ['**/*.test.ts', '**/*.css'],
+    await glob('packages/browser/src/**/*.ts', {
+      ignore: ['**/*.test.ts', '**/*.css', '**/*.d.ts'],
     })
   )
-    .map(file => file.replace(/^src\/browser\//, '').replace(/\.ts$/, ''))
+    .map(file =>
+      file.replace(/^packages\/browser\/src\//, '').replace(/\.ts$/, '')
+    )
     .sort();
 }
 

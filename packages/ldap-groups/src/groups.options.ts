@@ -11,30 +11,28 @@ import {
   readOptions,
   type OptionsOf,
 } from '@ldap-rest/core/config/options';
+import { schemasPath } from '@ldap-rest/schemas';
 
 /** Where this package's own manifest sits: the search stops past it */
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * The path of a schema the umbrella ships. The schemas have no package of
- * their own yet, so `static/schemas` is searched upwards: it is found whether
- * this module runs from its sources, from its own build, or from the copy the
- * umbrella bundles in its tarball. The search stops at the first `package.json`
- * that is not this package's — the umbrella's, or another install — and
- * answers empty when the file is not there, so nothing outside the install
- * can stand in for it.
+ * The path of a schema this package names: the copy the deployment serves
+ * when it has one, so the static plugin recognises the file, the package's
+ * own otherwise. Empty when neither ships it.
  */
 const schemaPath = (...parts: string[]): string => {
   let here = dirname(fileURLToPath(import.meta.url));
   for (;;) {
     const candidate = join(here, 'static', 'schemas', ...parts);
     if (existsSync(candidate)) return candidate;
-    if (existsSync(join(here, 'package.json')) && here !== packageRoot)
-      return '';
+    if (existsSync(join(here, 'package.json')) && here !== packageRoot) break;
     const parent = dirname(here);
-    if (parent === here) return '';
+    if (parent === here) break;
     here = parent;
   }
+  const packaged = join(schemasPath, ...parts);
+  return existsSync(packaged) ? packaged : '';
 };
 
 export const groupsOptions = defineOptions({

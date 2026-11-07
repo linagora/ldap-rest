@@ -1,18 +1,19 @@
 #!/usr/bin/make -f
 
-SRCBROWSER:=$(shell find src/browser -name '*.ts')
 PACKAGESRCFILES:=$(shell find packages/*/src -name '*.ts')
-DSTBROWSER:=$(subst .ts,.js,$(subst src/,static/,$(SRCBROWSER)))
 SRCFILES:=$(shell find src/*/ -name '*.ts' | grep -v browser/)
 _SRCFILES:=$(shell find src/*/ -name '*.ts' | grep -v src/config/schema | grep -v browser/)
 DSTFILES:=$(subst .ts,.js,$(subst src/,dist/,$(_SRCFILES)))
 PLUGINFILES:=$(shell find dist/plugins -name '*.js' | grep -v auth/ | grep -v json.js | grep -v appAccount)
 ALLPLUGINS:=$(subst dist/plugins/,--plugin core/,$(subst .js,,$(PLUGINFILES)))
 
-LDAPFLATSCHEMAS := $(shell find static/schemas/twake -name '*.json'|grep -v organization|grep -v groups|sed -e 's/^/--ldap-flat-schema /')
+LDAPFLATSCHEMAS := $(shell find packages/schemas/static/schemas/twake -name '*.json'|grep -v organization|grep -v groups|sed -e 's/^/--ldap-flat-schema /')
 
 buildpackages:
 	node scripts/packages.mjs build --stale
+
+staticassets:
+	node scripts/composeAssets.mjs
 
 all: $(DSTFILES)
 
@@ -23,14 +24,13 @@ dist/%.js: src/%.ts
 build:
 	npm run build:prod
 
-builddev: buildpackages $(DSTFILES) $(DSTBROWSER) Dockerfile
+builddev: buildpackages staticassets $(DSTFILES) Dockerfile
 
 _builddev:
 	npx rimraf dist
 	node scripts/packages.mjs build
+	node scripts/composeAssets.mjs
 	npx rollup -c
-	npx rollup -c rollup.browser.config.mjs
-	node scripts/moveBrowserLibs.mjs
 
 builddocker: Dockerfile
 	docker build -t ldap-rest .
@@ -41,10 +41,10 @@ Dockerfile: scripts/buildDockerfile.ts $(SRCFILES) $(PACKAGESRCFILES) bin rollup
 doc: $(SRCFILES)
 	typedoc --entryPoints src/bin/index.ts $(shell find src -name '*.ts' | grep -v bin/index) --out docs
 
-start: $(DSTFILES)
+start: staticassets $(DSTFILES)
 	node bin/index.mjs --log-level debug $(ALLPLUGINS) $(LDAPFLATSCHEMAS)
 
-test: buildpackages $(DSTFILES)
+test: buildpackages staticassets $(DSTFILES)
 	npm run test
 
 .PHONY: builddev builddocker buildpackages test

@@ -1,20 +1,46 @@
+import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync } from 'fs';
+import { join } from 'path';
+
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
 import postcss from 'rollup-plugin-postcss';
 import { glob } from 'tinyglobby';
 
-import stripCssDeclarations from './scripts/stripCssDeclarations.mjs';
+import stripCssDeclarations from '../../scripts/stripCssDeclarations.mjs';
 
 async function getBrowserLibraries() {
   return (
-    await glob('src/browser/**/*.ts', {
-      ignore: ['**/*.test.ts', '**/*.css'],
+    await glob('src/**/*.ts', {
+      ignore: ['**/*.test.ts', '**/*.css', '**/*.d.ts'],
     })
   ).sort();
 }
 
+/** Copy the individual modules beside the bundles the static plugin serves */
+const copyModules = () => ({
+  name: 'copy-browser-modules',
+  writeBundle() {
+    const copy = (src, dest) => {
+      mkdirSync(dest, { recursive: true });
+      for (const entry of readdirSync(src)) {
+        const from = join(src, entry);
+        const to = join(dest, entry);
+        if (statSync(from).isDirectory()) copy(from, to);
+        else if (from.endsWith('.js') || from.endsWith('.js.map'))
+          copyFileSync(from, to);
+      }
+    };
+    copy('dist', 'static/browser');
+    copyFileSync(
+      'src/shared/styles/common-demo.css',
+      'static/browser/common-demo.css'
+    );
+  },
+});
+
 export default async () => {
+  rmSync('static/browser', { recursive: true, force: true });
   const browserFiles = await getBrowserLibraries();
 
   return [
@@ -46,11 +72,12 @@ export default async () => {
           sourceMap: true,
         }),
         stripCssDeclarations(),
+        copyModules(),
       ],
     },
     // UMD/ESM bundles for shared utilities
     {
-      input: 'src/browser/shared/index.ts',
+      input: 'src/shared/index.ts',
       output: [
         {
           file: 'static/browser/shared.js',
@@ -78,6 +105,7 @@ export default async () => {
         typescript({
           tsconfig: './tsconfig.browser.json',
           compilerOptions: {
+            outDir: 'static/browser',
             declaration: false,
             declarationDir: undefined,
           },
@@ -87,7 +115,7 @@ export default async () => {
     },
     // UMD/ESM bundles for ldap-tree-viewer
     {
-      input: 'src/browser/ldap-tree-viewer/index.ts',
+      input: 'src/ldap-tree-viewer/index.ts',
       output: [
         {
           file: 'static/browser/ldap-tree-viewer.js',
@@ -115,6 +143,7 @@ export default async () => {
         typescript({
           tsconfig: './tsconfig.browser.json',
           compilerOptions: {
+            outDir: 'static/browser',
             declaration: false, // No types for bundles
             declarationDir: undefined, // Override tsconfig.browser.json
           },
@@ -129,7 +158,7 @@ export default async () => {
     },
     // UMD/ESM bundles for ldap-user-editor
     {
-      input: 'src/browser/ldap-user-editor/index.ts',
+      input: 'src/ldap-user-editor/index.ts',
       output: [
         {
           file: 'static/browser/ldap-user-editor.js',
@@ -157,6 +186,7 @@ export default async () => {
         typescript({
           tsconfig: './tsconfig.browser.json',
           compilerOptions: {
+            outDir: 'static/browser',
             declaration: false, // No types for bundles
             declarationDir: undefined, // Override tsconfig.browser.json
           },
@@ -171,7 +201,7 @@ export default async () => {
     },
     // UMD/ESM bundles for ldap-group-editor
     {
-      input: 'src/browser/ldap-group-editor/index.ts',
+      input: 'src/ldap-group-editor/index.ts',
       output: [
         {
           file: 'static/browser/ldap-group-editor.js',
@@ -199,6 +229,7 @@ export default async () => {
         typescript({
           tsconfig: './tsconfig.browser.json',
           compilerOptions: {
+            outDir: 'static/browser',
             declaration: false, // No types for bundles
             declarationDir: undefined, // Override tsconfig.browser.json
           },
@@ -213,7 +244,7 @@ export default async () => {
     },
     // UMD/ESM bundles for ldap-unit-editor
     {
-      input: 'src/browser/ldap-unit-editor/index.ts',
+      input: 'src/ldap-unit-editor/index.ts',
       output: [
         {
           file: 'static/browser/ldap-unit-editor.js',
@@ -241,6 +272,7 @@ export default async () => {
         typescript({
           tsconfig: './tsconfig.browser.json',
           compilerOptions: {
+            outDir: 'static/browser',
             declaration: false, // No types for bundles
             declarationDir: undefined, // Override tsconfig.browser.json
           },
@@ -255,7 +287,7 @@ export default async () => {
     },
     // UMD/ESM bundles for ldap-browser
     {
-      input: 'src/browser/ldap-browser/index.ts',
+      input: 'src/ldap-browser/index.ts',
       output: [
         {
           file: 'static/browser/ldap-browser.js',
@@ -283,6 +315,7 @@ export default async () => {
         typescript({
           tsconfig: './tsconfig.browser.json',
           compilerOptions: {
+            outDir: 'static/browser',
             declaration: false, // No types for bundles
             declarationDir: undefined, // Override tsconfig.browser.json
           },

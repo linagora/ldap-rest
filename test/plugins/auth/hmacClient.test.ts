@@ -4,9 +4,9 @@ import type { AddressInfo } from 'net';
 import { expect } from 'chai';
 import type { RequestHandler } from 'express';
 import AuthHmac from '@ldap-rest/auth-hmac';
+import { HmacAuthClient } from '@ldap-rest/browser/shared/utils/hmac';
 
 import { DM } from '../../helpers/dm';
-import { HmacAuthClient } from '../../../src/browser/shared/utils/hmac';
 
 /**
  * The browser client against the server it signs for: what one sends, the

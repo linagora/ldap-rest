@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import nock from 'nock';
-
-import { LdapApiClient } from '../../src/browser/ldap-tree-viewer/api/LdapApiClient';
+import { LdapApiClient } from '@ldap-rest/browser/ldap-tree-viewer/api/LdapApiClient';
 
 describe('Browser LDAP API Client', () => {
   const baseUrl = 'http://localhost:8081';

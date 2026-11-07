@@ -1,0 +1,33 @@
+{
+  "name": "@ldap-rest/schemas",
+  "version": "3.0.0",
+  "description": "LDAP-Rest JSON schemas",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/schemas"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./*": "./static/schemas/*"
+  },
+  "files": [
+    "dist",
+    "static"
+  ],
+  "engines": {
+    "node": ">=22"
+  }
+}

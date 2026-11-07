@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import nock from 'nock';
-
-import { ResourceApiClient } from '../../src/browser/ldap-resource-editor/api/ResourceApiClient';
+import { ResourceApiClient } from '@ldap-rest/browser/ldap-resource-editor/api/ResourceApiClient';
 
 describe('Browser Resource API Client', () => {
   const baseUrl = 'http://localhost:8081';

@@ -27,15 +27,18 @@ packages/<name>/
 - **`rollup.config.mjs`**: the shared configuration,
   `scripts/rollup.package.mjs`, builds `src/` into `dist/`, one module per
   source, and leaves every declared dependency external. A package that
-  ships more than its modules passes extra Rollup plugins:
-  `packages/core` copies `priority.json`.
+  ships more than its modules passes extra Rollup plugins, or its own
+  configuration as `packages/browser` does: `packages/core` copies
+  `priority.json`.
 - **`tsconfig.json`**: copy the one of `packages/storage`.
-- **Data files**: a package ships its own only. The schemas still live in the
-  umbrella's `static/schemas` until they have a package: a default option that
-  names one searches the module's ancestors for that file, stopping at the
-  first `package.json` that is not the package's own — the repository root, the
-  package beside its build, or the copy the umbrella bundles — and stays empty
-  when it finds none.
+- **Data files**: a package ships its own only. `@ldap-rest/schemas` holds the
+  JSON schemas under `static/schemas`, and `@ldap-rest/browser` its sources and
+  the libraries it builds under `static/browser`. The umbrella composes the
+  `static` tree it serves — and the browser declarations its `./browser-*`
+  entries point at — from those packages with `scripts/composeAssets.mjs`; the
+  build and the tests run it before reading them. A default option that names
+  a schema reads the composed copy when the deployment has one, the package's
+  own otherwise.
 
 ## Adding a package
 
@@ -70,6 +73,7 @@ spelling, and a plugin may depend on either.
 | Command                          | What it does                                                     |
 | -------------------------------- | ---------------------------------------------------------------- |
 | `npm run build:packages`         | Builds every package, dependencies first                         |
+| `npm run build:assets`           | Composes the umbrella's `static` tree from the packages          |
 | `./.dev.mk buildpackages`        | The same, for the packages whose sources or dependencies changed |
 | `npm run sync:packages`          | Writes the TypeScript paths and coverage roots of every package  |
 | `npm run check:packages`         | Fails when those are stale or the umbrella misses a package      |

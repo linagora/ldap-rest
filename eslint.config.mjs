@@ -23,7 +23,7 @@ export default [
   // TypeScript config (except browser)
   {
     files: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
-    ignores: ['src/browser/**'],
+    ignores: ['src/browser/**', 'packages/browser/src/**'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -94,6 +94,7 @@ export default [
       'packages/*/src/**/*.ts',
       'packages/core/src/abstract/**/*.ts',
     ],
+    ignores: ['packages/browser/src/**'],
     plugins: {
       local: {
         rules: {
@@ -109,7 +110,7 @@ export default [
 
   {
     files: ['src/plugins/**/*.ts', 'packages/*/src/**/*.ts'],
-    ignores: ['packages/core/src/**'],
+    ignores: ['packages/core/src/**', 'packages/browser/src/**'],
     rules: {
       'local/no-raw-route': 'error',
       'local/no-config-cast': 'error',
@@ -133,7 +134,7 @@ export default [
 
   // Browser-specific config
   {
-    files: ['src/browser/**/*.{ts,tsx}'],
+    files: ['packages/browser/src/**/*.{ts,tsx}'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -271,6 +272,7 @@ export default [
     files: ['src/**/*.ts', 'packages/*/src/**/*.ts'],
     ignores: [
       'src/browser/**',
+      'packages/browser/src/**',
       'packages/core/src/lib/ldap/operations.ts',
       'packages/core/src/lib/ldap/read.ts',
     ],
@@ -377,6 +379,7 @@ export default [
     files: ['src/**/*.ts', 'packages/*/src/**/*.ts'],
     ignores: [
       'src/browser/**',
+      'packages/browser/src/**',
       'src/abstract/plugin.ts',
       'packages/core/src/abstract/plugin.ts',
       'packages/core/src/lib/instanceProviders.ts',

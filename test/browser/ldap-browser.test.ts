@@ -1,10 +1,9 @@
 import { expect } from 'chai';
 import nock from 'nock';
-
-import { RawApiClient } from '../../src/browser/ldap-browser/api/RawApiClient';
-import { SchemaView } from '../../src/browser/ldap-browser/schema';
-import { LdapBrowser } from '../../src/browser/ldap-browser/LdapBrowser';
-import type { LdapSchema } from '../../src/browser/ldap-browser/types';
+import { RawApiClient } from '@ldap-rest/browser/ldap-browser/api/RawApiClient';
+import { SchemaView } from '@ldap-rest/browser/ldap-browser/schema';
+import { LdapBrowser } from '@ldap-rest/browser/ldap-browser/LdapBrowser';
+import type { LdapSchema } from '@ldap-rest/browser/ldap-browser/types';
 
 describe('Browser LDAP Browser', () => {
   const baseUrl = 'http://localhost:8081';

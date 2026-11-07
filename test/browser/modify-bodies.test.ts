@@ -5,12 +5,11 @@
  */
 import { expect } from 'chai';
 import nock from 'nock';
-
-import { changedAttributes } from '../../src/browser/shared/utils/form';
-import { UserApiClient } from '../../src/browser/ldap-user-editor/api/UserApiClient';
-import { GroupApiClient } from '../../src/browser/ldap-group-editor/api/GroupApiClient';
-import { UnitApiClient } from '../../src/browser/ldap-unit-editor/api/UnitApiClient';
-import { ResourceApiClient } from '../../src/browser/ldap-resource-editor/api/ResourceApiClient';
+import { changedAttributes } from '@ldap-rest/browser/shared/utils/form';
+import { UserApiClient } from '@ldap-rest/browser/ldap-user-editor/api/UserApiClient';
+import { GroupApiClient } from '@ldap-rest/browser/ldap-group-editor/api/GroupApiClient';
+import { UnitApiClient } from '@ldap-rest/browser/ldap-unit-editor/api/UnitApiClient';
+import { ResourceApiClient } from '@ldap-rest/browser/ldap-resource-editor/api/ResourceApiClient';
 
 describe('Browser editors, modify bodies', () => {
   describe('changedAttributes', () => {

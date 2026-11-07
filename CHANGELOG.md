@@ -42,6 +42,11 @@
   `@ldap-rest/config-api`, `@ldap-rest/metrics`, `@ldap-rest/rabbitmq`,
   `@ldap-rest/static` and `@ldap-rest/weblogs` packages; the former
   `ldap-rest/plugin-*` entries stay as compatibility shims.
+- The browser libraries and the JSON schemas ship as the
+  `@ldap-rest/browser` and `@ldap-rest/schemas` packages. The umbrella
+  composes the `static/` tree it serves from them at build time, so the
+  `ldap-rest/browser-*` and `ldap-rest/schema-*` entries and their URLs are
+  unchanged.
 
 ### Fixed
 

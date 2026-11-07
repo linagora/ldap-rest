@@ -7,15 +7,14 @@
  */
 import { expect } from 'chai';
 import nock from 'nock';
-
-import { EntryView } from '../../src/browser/ldap-browser/components/EntryView';
-import { EntryTree } from '../../src/browser/ldap-browser/components/EntryTree';
-import { RawApiClient } from '../../src/browser/ldap-browser/api/RawApiClient';
-import { SchemaView } from '../../src/browser/ldap-browser/schema';
+import { EntryView } from '@ldap-rest/browser/ldap-browser/components/EntryView';
+import { EntryTree } from '@ldap-rest/browser/ldap-browser/components/EntryTree';
+import { RawApiClient } from '@ldap-rest/browser/ldap-browser/api/RawApiClient';
+import { SchemaView } from '@ldap-rest/browser/ldap-browser/schema';
 import type {
   LdapSchema,
   RawEntry,
-} from '../../src/browser/ldap-browser/types';
+} from '@ldap-rest/browser/ldap-browser/types';
 
 /** Minimal stand-in for the container element the components render into */
 function stubContainer(): HTMLElement & { innerHTML: string } {

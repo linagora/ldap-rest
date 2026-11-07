@@ -1,6 +1,5 @@
 import { expect } from 'chai';
-
-import { CacheManager } from '../../src/browser/ldap-user-editor/cache/CacheManager';
+import { CacheManager } from '@ldap-rest/browser/ldap-user-editor/cache/CacheManager';
 
 describe('Browser CacheManager', () => {
   let cache: CacheManager;

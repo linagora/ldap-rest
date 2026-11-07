@@ -29,7 +29,7 @@ COPY packages ./packages
 COPY scripts ./scripts
 COPY src ./src
 COPY static ./static
-RUN npm ci && npm run build:packages && NODE_ENV=production node_modules/.bin/rollup -c && npm pack && mv *.tgz /tmp/app.tgz
+RUN npm ci && npm run build:packages && node scripts/composeAssets.mjs && NODE_ENV=production node_modules/.bin/rollup -c && npm pack && mv *.tgz /tmp/app.tgz
 
 WORKDIR /app
 RUN npm install --no-package-lock /tmp/app.tgz && rm -f /tmp/app.tgz && npm cache clean --force

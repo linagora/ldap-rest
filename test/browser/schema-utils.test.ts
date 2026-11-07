@@ -4,11 +4,10 @@ import {
   localizedText as serverText,
   type SchemaAttribute,
 } from '@ldap-rest/core/config/schema';
-
 import {
   hasRole,
   localizedText as browserText,
-} from '../../src/browser/shared/utils/schema';
+} from '@ldap-rest/browser/shared/utils/schema';
 
 describe('Browser schema utils', () => {
   describe('hasRole', () => {

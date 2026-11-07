@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import nock from 'nock';
-
-import { LdapUnitEditor } from '../../src/browser/ldap-unit-editor/index.js';
+import { LdapUnitEditor } from '@ldap-rest/browser/ldap-unit-editor/index';
 
 describe('Browser LDAP Unit Editor', () => {
   const baseUrl = 'http://localhost:8081';

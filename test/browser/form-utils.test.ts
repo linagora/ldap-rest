@@ -1,11 +1,10 @@
 import { expect } from 'chai';
-
 import {
   groupSchemaFields,
   listChanges,
   listValues,
-} from '../../src/browser/shared/utils/form';
-import type { SchemaAttribute } from '../../src/browser/shared/types';
+} from '@ldap-rest/browser/shared/utils/form';
+import type { SchemaAttribute } from '@ldap-rest/browser/shared/types/index';
 
 describe('Browser form utils', () => {
   describe('groupSchemaFields', () => {

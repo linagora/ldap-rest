@@ -87,6 +87,8 @@
       ],
       "@ldap-rest/bcl": ["./packages/bcl/src/bcl.ts"],
       "@ldap-rest/bcl/options": ["./packages/bcl/src/bcl.options.ts"],
+      "@ldap-rest/browser": ["./packages/browser/src/shared/index.ts"],
+      "@ldap-rest/browser/*": ["./packages/browser/src/*.ts"],
       "@ldap-rest/config-api": ["./packages/config-api/src/configApi.ts"],
       "@ldap-rest/james": ["./packages/james/src/james.ts"],
       "@ldap-rest/james/options": ["./packages/james/src/james.options.ts"],
@@ -114,6 +116,7 @@
       "@ldap-rest/ldap-bulkimport/options": [
         "./packages/ldap-bulkimport/src/bulkImport.options.ts"
       ],
+      "@ldap-rest/schemas": ["./packages/schemas/src/index.ts"],
       "@ldap-rest/ldap-groups": ["./packages/ldap-groups/src/groups.ts"],
       "@ldap-rest/ldap-groups/options": [
         "./packages/ldap-groups/src/groups.options.ts"

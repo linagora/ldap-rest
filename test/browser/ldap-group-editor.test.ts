@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import nock from 'nock';
-
-import { LdapGroupEditor } from '../../src/browser/ldap-group-editor/index.js';
+import { LdapGroupEditor } from '@ldap-rest/browser/ldap-group-editor/index';
 
 describe('Browser LDAP Group Editor', () => {
   const baseUrl = 'http://localhost:8081';
