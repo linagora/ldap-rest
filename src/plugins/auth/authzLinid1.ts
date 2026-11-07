@@ -69,6 +69,28 @@ export default class AuthzLinid1 extends AuthzBase {
   }
 
   /**
+   * The organizations naming `dn` an administrator. Taking one of those
+   * accounts over grants its branches, so the base refuses a caller who
+   * does not hold them all.
+   */
+  protected async administeredBranches(dn: string): Promise<string[]> {
+    const adminAttr = this.options(linid1Options).authz_local_admin_attribute;
+    const orgBase =
+      this.config.ldap_top_organization || this.config.ldap_base || '';
+    if (!orgBase) return [];
+    const result = (await this.server.ldap.system.search(
+      {
+        paged: false,
+        filter: `(${adminAttr}=${escapeLdapFilter(dn)})`,
+        attributes: ['dn'],
+        scope: 'sub',
+      },
+      orgBase
+    )) as SearchResult;
+    return (result.searchEntries ?? []).map(entry => String(entry.dn));
+  }
+
+  /**
    * The administrators of the global organization link any domain too: they
    * create and delete the domains (`--authz-global-write-branches`), and the
    * top organization may be a bare container nobody administers.

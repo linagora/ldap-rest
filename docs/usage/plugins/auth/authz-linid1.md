@@ -91,10 +91,16 @@ may claim it into one they manage, and the first to claim it takes it.
 - Every administrator sees the entries in transit, but in a global branch
   (`--authz-global-branch`), which only its holders read.
 - **Claiming** one (`POST /api/v1/ldap/users/:id/move` towards an
-  organization) asks for write on that organization only. The write
-  claiming it may carry other changes to the entry — its password, say —
-  judged with it: the entry lands in the organization that write is
-  allowed in.
+  organization) asks for write on that organization only, and changes
+  nothing but the organization link and its path. A password or any other
+  attribute meant for the entry is a separate write, judged on where the
+  entry landed.
+- An account some organization names in
+  `--authz-local-admin-attribute` is not claimed, moved, changed or deleted
+  by an administrator who does not write **every** organization naming it.
+  Taking such an account over would hand over the branches it administers,
+  which is why it is judged on those branches rather than on the one it is
+  attached to.
 - **Putting** one in transit asks for write on the organization it leaves,
   and nothing on the transit branch: an administrator only lets go of what
   they manage. Handing an account over to an organization one does not manage
