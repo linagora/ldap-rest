@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `authzLinid1` refuses to write, move or delete an account some organization
+  names as its administrator unless the caller writes every organization
+  naming it
+  ([GHSA-2g53-22cj-hwfm](https://github.com/linagora/ldap-rest/security/advisories/GHSA-2g53-22cj-hwfm)).
+
 ## v2.0.5 (2026-11-06)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0.
