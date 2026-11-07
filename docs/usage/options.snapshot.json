@@ -183,6 +183,12 @@
     "env": "DM_AUTHZ_IDENTITY"
   },
   {
+    "cli": "--authz-linid1-cache-ttl",
+    "type": "number",
+    "default": 300,
+    "env": "DM_AUTHZ_LINID1_CACHE_TTL"
+  },
+  {
     "cli": "--authz-local-admin-attribute",
     "type": "string",
     "default": "twakeLocalAdminLink",

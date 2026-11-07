@@ -309,6 +309,41 @@ describe('AuthzLinid1 Plugin', () => {
       expect(cached).to.exist;
       expect(cached?.branches.size).to.be.greaterThan(0);
     });
+
+    it('drops a revoked grant at once when the write goes through this server', async () => {
+      await dm.ldap.add(getTestUserDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'testadmin',
+        sn: 'Admin',
+        cn: 'Test Admin',
+      });
+      await dm.ldap.add(getTestOrgDn(), {
+        objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+        ou: 'TestOrg',
+        twakeDepartmentPath: 'TestOrg',
+        twakeLocalAdminLink: getTestUserDn(),
+      });
+
+      const before = await authz.getUserPermissions(
+        getTestUserDn(),
+        getTestOrgDn()
+      );
+      expect(before.write).to.be.true;
+
+      await dm.ldap.modify(getTestOrgDn(), {
+        delete: { twakeLocalAdminLink: getTestUserDn() },
+      });
+
+      const after = await authz.getUserPermissions(
+        getTestUserDn(),
+        getTestOrgDn()
+      );
+      expect(after.write).to.be.false;
+    });
+
+    it('caches permissions for the configured TTL', async () => {
+      expect(authz.cacheTTL).to.equal(300 * 1000);
+    });
   });
 
   describe('Integration with users branch', () => {

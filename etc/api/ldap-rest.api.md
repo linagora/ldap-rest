@@ -237,6 +237,8 @@ export interface Config {
     // (undocumented)
     authz_identity?: string;
     // (undocumented)
+    authz_linid1_cache_ttl?: number;
+    // (undocumented)
     authz_local_admin_attribute?: string;
     // (undocumented)
     authz_per_branch_cache_ttl?: number;
