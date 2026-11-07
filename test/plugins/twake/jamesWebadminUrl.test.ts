@@ -3,6 +3,7 @@ import { expect } from 'chai';
 import { DM } from '../../../src/bin';
 import Calendar from '../../../src/plugins/twake/calendar';
 import James from '../../../src/plugins/twake/james';
+import MigrationProxy from '../../../src/plugins/twake/migrationProxy';
 
 /**
  * Addresses come from the directory, and James and Calendar WebAdmin URLs are
@@ -183,5 +184,16 @@ describe('Twake WebAdmin URLs built from addresses', () => {
     ).resourceUrl;
 
     expect(() => resourceUrl.call(calendar, '..')).to.throw('dot segment');
+  });
+
+  it('refuses a dot address in a migration-proxy URL', () => {
+    dm.config.migration_proxy_url = 'http://migration.url.test:8000';
+    dm.config.migration_proxy_branch = ['dc=example,dc=com'];
+    const proxy = new MigrationProxy(dm);
+    const userUrl = (
+      proxy as unknown as { userUrl: (address: string) => string }
+    ).userUrl;
+
+    expect(() => userUrl.call(proxy, '..')).to.throw('dot segment');
   });
 });

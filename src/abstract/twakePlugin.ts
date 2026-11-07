@@ -30,11 +30,14 @@ import DmPlugin, { type Role } from './plugin.js';
  * @returns the encoded segment
  * @throws Error when the value cannot name a path segment
  */
+export function assertPathSegment(value: string): void {
+  if (value !== '' && value !== '.' && value !== '..') return;
+  const what = value === '' ? 'empty segment' : `dot segment "${value}"`;
+  throw new Error(`Refusing to build a WebAdmin URL from the ${what}`);
+}
+
 function encodePathSegment(value: string): string {
-  if (value === '' || value === '.' || value === '..')
-    throw new Error(
-      `Refusing to build a WebAdmin URL from the dot segment "${value}"`
-    );
+  assertPathSegment(value);
   return encodeURIComponent(value).replace(/%40/g, '@');
 }
 

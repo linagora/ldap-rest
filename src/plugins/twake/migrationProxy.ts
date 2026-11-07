@@ -12,7 +12,7 @@
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import TwakePlugin from '../../abstract/twakePlugin.js';
+import TwakePlugin, { assertPathSegment } from '../../abstract/twakePlugin.js';
 import { defineRoute, type Role } from '../../abstract/plugin.js';
 import type { DM } from '../../bin/index.js';
 import type { Hooks } from '../../hooks.js';
@@ -243,11 +243,8 @@ export default class MigrationProxy extends TwakePlugin {
 
   private userUrl(address: string): string {
     // This endpoint already receives a percent-encoded `@`; keep that form
-    // and apply the same dot-segment refusal as `webadminPath`.
-    if (address === '' || address === '.' || address === '..')
-      throw new Error(
-        `Refusing to build a WebAdmin URL from the dot segment "${address}"`
-      );
+    // and apply the same segment refusal as `webadminPath`.
+    assertPathSegment(address);
     return `${this.webadminUrl}/migratedUsers/${encodeURIComponent(address)}`;
   }
 
