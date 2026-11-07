@@ -509,6 +509,22 @@ describe('Authentication path scope', () => {
       });
     }
 
+    it('should not let the catch-all credential in whatever the case', async () => {
+      const { app } = await build([
+        { name: 'authRest', token: machineToken },
+        { name: 'authAdmins', token: adminToken, prefix: ['/api/admin'] },
+      ]);
+      for (const path of ['/API/admin/hello', '/api/Admin/hello']) {
+        const machine = await request(app)
+          .get(path)
+          .set('Authorization', `Bearer ${machineToken}`);
+        const admin = await request(app)
+          .get(path)
+          .set('Authorization', `Bearer ${adminToken}`);
+        expect([machine.status, admin.status], path).to.deep.equal([401, 200]);
+      }
+    });
+
     it('should subtract on segment boundaries only', async () => {
       const { app } = await build([
         { name: 'authScoped', token: adminToken, prefix: ['/api/m'] },
