@@ -50,12 +50,17 @@ describe('AuthzLinid1 by attachment', function () {
   let orgB: string;
   let transit: string;
   const ADMIN_A = 'l1attach.admin.a';
+  const ADMIN_B = 'l1attach.admin.b';
+  const ADMIN_B_ATTACHED_A = 'l1attach.admin.b.attached.a';
+  // Named by orgB, with no entry of its own
+  const ADMIN_GHOST = 'l1attach.admin.ghost';
   const NOBODY = 'l1attach.nobody';
   const IN_A = 'l1attach.user.a';
   const IN_B = 'l1attach.user.b';
   const LOOSE = 'l1attach.user.loose';
   const T_LOOSE = 'l1attach.transit.loose';
   const T_LOOSE_B = 'l1attach.transit.loose.b';
+  const CLAIM_PASSWORD = 'l1attach.transit.password';
   const T_PARKED = 'l1attach.transit.parked';
   const T_LEAVING = 'l1attach.transit.leaving';
   const T_HELD_B = 'l1attach.transit.held.b';
@@ -64,12 +69,15 @@ describe('AuthzLinid1 by attachment', function () {
   const GROUP_LOOSE = 'l1attach-group-loose';
   const accounts = [
     ADMIN_A,
+    ADMIN_B,
+    ADMIN_B_ATTACHED_A,
     NOBODY,
     IN_A,
     IN_B,
     LOOSE,
     T_LOOSE,
     T_LOOSE_B,
+    CLAIM_PASSWORD,
     T_PARKED,
     T_LEAVING,
     T_HELD_B,
@@ -128,12 +136,15 @@ describe('AuthzLinid1 by attachment', function () {
     });
     for (const [uid, org] of [
       [ADMIN_A, orgA],
+      [ADMIN_B, null],
+      [ADMIN_B_ATTACHED_A, orgA],
       [NOBODY, orgB],
       [IN_A, orgA],
       [IN_B, orgB],
       [LOOSE, null],
       [T_LOOSE, null],
       [T_LOOSE_B, null],
+      [CLAIM_PASSWORD, null],
       [T_PARKED, transit],
       [T_LEAVING, orgA],
       [T_HELD_B, orgB],
@@ -144,17 +155,25 @@ describe('AuthzLinid1 by attachment', function () {
       await server.ldap.add(`uid=${uid},${userBranch}`, account(uid, org));
     }
 
-    for (const [dn, ou, admin] of [
-      [orgA, 'L1AttachOrgA', `uid=${ADMIN_A},${userBranch}`],
-      [orgB, 'L1AttachOrgB', null],
-      [transit, 'L1AttachTransit', null],
-    ] as [string, string, string | null][]) {
+    for (const [dn, ou, admins] of [
+      [orgA, 'L1AttachOrgA', [`uid=${ADMIN_A},${userBranch}`]],
+      [
+        orgB,
+        'L1AttachOrgB',
+        [
+          `uid=${ADMIN_B},${userBranch}`,
+          `uid=${ADMIN_B_ATTACHED_A},${userBranch}`,
+          `uid=${ADMIN_GHOST},${userBranch}`,
+        ],
+      ],
+      [transit, 'L1AttachTransit', []],
+    ] as [string, string, string[]][]) {
       await server.ldap.delete(dn).catch(() => undefined);
       await server.ldap.add(dn, {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou,
         twakeDepartmentPath: ou,
-        ...(admin ? { twakeLocalAdminLink: admin } : {}),
+        ...(admins.length ? { twakeLocalAdminLink: admins } : {}),
       });
     }
 
@@ -196,7 +215,7 @@ describe('AuthzLinid1 by attachment', function () {
       await server.ldap
         .delete(`cn=${cn},${groupBranch}`)
         .catch(() => undefined);
-    for (const uid of accounts)
+    for (const uid of [...accounts, ADMIN_GHOST])
       await server.ldap
         .delete(`uid=${uid},${userBranch}`)
         .catch(() => undefined);
@@ -247,6 +266,98 @@ describe('AuthzLinid1 by attachment', function () {
     it('refuses the listing to a caller administering no branch', async () => {
       const res = await request.get('/api/v1/ldap/users').set(as(NOBODY));
       expect(res.status).to.equal(403);
+    });
+  });
+
+  describe('administrator accounts', () => {
+    it('does not claim another branch administrator attached nowhere', async () => {
+      const res = await request
+        .put(`/api/v1/ldap/users/${ADMIN_B}`)
+        .set(as(ADMIN_A))
+        .send({ replace: { twakeDepartmentLink: orgA } });
+      expect(res.status).to.equal(403);
+    });
+
+    it('does not change an administrator of another branch', async () => {
+      // Attached to A, but named by B: its rights are B's
+      const res = await request
+        .put(`/api/v1/ldap/users/${ADMIN_B_ATTACHED_A}`)
+        .set(as(ADMIN_A))
+        .send({ replace: { displayName: 'Taken over' } });
+      expect(res.status).to.equal(403);
+    });
+
+    it('does not let a claim of an administrator carry a password', async () => {
+      const res = await request
+        .put(`/api/v1/ldap/users/${ADMIN_B}`)
+        .set(as(ADMIN_A))
+        .send({
+          replace: {
+            twakeDepartmentLink: orgA,
+            userPassword: 'a-new-password',
+          },
+        });
+      expect(res.status).to.equal(403);
+    });
+
+    it('lets a claim of an ordinary account carry other changes', async () => {
+      const res = await request
+        .put(`/api/v1/ldap/users/${CLAIM_PASSWORD}`)
+        .set(as(ADMIN_A))
+        .send({
+          replace: {
+            twakeDepartmentLink: orgA,
+            userPassword: 'a-new-password',
+          },
+        });
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    });
+
+    it('does not delete an administrator of another branch', async () => {
+      const res = await request
+        .delete(`/api/v1/ldap/users/${ADMIN_B_ATTACHED_A}`)
+        .set(as(ADMIN_A));
+      expect(res.status).to.equal(403);
+    });
+
+    it('does not create an account at a dangling administrator DN', async () => {
+      const res = await request
+        .post('/api/v1/ldap/users')
+        .set(as(ADMIN_A))
+        .send({
+          givenName: 'Ghost',
+          sn: 'Admin',
+          displayName: 'Ghost Admin',
+          employeeNumber: 'L1GHOST1',
+          mail: `${ADMIN_GHOST}@example.com`,
+          userPassword: 'a-new-password',
+          twakeDepartmentLink: orgA,
+        });
+      expect(res.status, JSON.stringify(res.body)).to.equal(403);
+    });
+
+    it('does not relink an administrator of another branch', async () => {
+      const res = await request
+        .post(`/api/v1/ldap/users/${ADMIN_B_ATTACHED_A}/move`)
+        .set(as(ADMIN_A))
+        .send({ targetOrgDn: transit });
+      expect(res.status).to.equal(403);
+    });
+
+    it('lets an administrator change their own entry', async () => {
+      const res = await request
+        .put(`/api/v1/ldap/users/${ADMIN_A}`)
+        .set(as(ADMIN_A))
+        .send({ replace: { displayName: 'Admin A' } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    });
+
+    it('claims an unlinked account that administers nothing', async () => {
+      const res = await request
+        .put(`/api/v1/ldap/users/${LOOSE}`)
+        .set(as(ADMIN_A))
+        .send({ replace: { twakeDepartmentLink: orgA } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
     });
   });
 

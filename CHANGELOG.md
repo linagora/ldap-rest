@@ -13,6 +13,10 @@
   no longer make a call with the WebAdmin token act on another user or
   resource
   ([GHSA-jrmm-4w24-qqc5](https://github.com/linagora/ldap-rest/security/advisories/GHSA-jrmm-4w24-qqc5)).
+- `authzLinid1` refuses to write, move or delete an account some organization
+  names as its administrator unless the caller writes every organization
+  naming it
+  ([GHSA-2g53-22cj-hwfm](https://github.com/linagora/ldap-rest/security/advisories/GHSA-2g53-22cj-hwfm)).
 
 ## v2.0.5 (2026-11-06)
 

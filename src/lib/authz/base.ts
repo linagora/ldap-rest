@@ -505,6 +505,46 @@ export default abstract class AuthzBase extends DmPlugin {
   abstract ruleBranches(user: string): Promise<string[]>;
 
   /**
+   * The branches that name `dn` one of their administrators.
+   *
+   * Taking over an administrator account grants everything it administers,
+   * so it is not an ordinary entry of the branch it is attached to. Empty
+   * for a model that does not name administrators in the directory.
+   *
+   * @param _dn the entry about to be written
+   * @returns the branches it administers
+   */
+  protected administeredBranches(_dn: string): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+
+  /**
+   * Refuse a write on an account some organization names as one of its
+   * administrators, unless the caller holds every such branch with write.
+   *
+   * Judged by attachment alone, the account would otherwise follow the
+   * branch it is attached to: a local administrator could claim an
+   * administrator account in transit or attached to their own branch, then
+   * reset its password and use the rights it carries.
+   *
+   * @param user the resolved caller
+   * @param dn the entry about to be written
+   * @throws AuthzRefusedError when the caller does not hold one of them
+   */
+  private async guardAdministratorAccount(
+    user: string,
+    dn: string
+  ): Promise<void> {
+    for (const branch of await this.administeredBranches(dn)) {
+      if (!(await this.getUserPermissions(user, branch)).write)
+        throw new AuthzRefusedError(
+          `User ${user} may not write administrator account ${dn}: no ` +
+            `write permission for branch ${branch}`
+        );
+    }
+  }
+
+  /**
    * Whether a write changes nothing but the organization link and the path
    * that goes with it: what moving an entry between organizations writes.
    */
@@ -896,6 +936,7 @@ export default abstract class AuthzBase extends DmPlugin {
 
       // The entry written, as the directory and the rules name it
       const judged = await this.storedDn(dn);
+      await this.guardAdministratorAccount(user, judged);
 
       // Check if this is a move operation (changing organization link)
       const linkAttr = this.config.ldap_organization_link_attribute;
@@ -1051,6 +1092,10 @@ export default abstract class AuthzBase extends DmPlugin {
       if (!user) {
         return [dn, entry, req];
       }
+
+      // A DN an organization still names may have no entry: creating one
+      // there would take over what the name administers.
+      await this.guardAdministratorAccount(user, dn);
 
       // Determine which branch to check permissions for
       let branchToCheck: string;
@@ -1443,7 +1488,9 @@ export default abstract class AuthzBase extends DmPlugin {
       // Extract source and destination branches, as the directory names
       // them
       const from = await this.storedDn(oldDn);
+      await this.guardAdministratorAccount(user, from);
       const to = await this.storedParent(newDn);
+      await this.guardAdministratorAccount(user, to);
       const sourceBranch = this.extractBranchDn(from);
       const destBranch = this.extractBranchDn(to);
 
@@ -1507,6 +1554,7 @@ export default abstract class AuthzBase extends DmPlugin {
       const targets = Array.isArray(dn) ? dn : [dn];
       for (const given of targets) {
         const target = await this.storedDn(given);
+        await this.guardAdministratorAccount(user, target);
         const branchToCheck = await this.effectiveBranch(target);
         const permissions = await this.getUserPermissions(user, branchToCheck);
         if (!permissions.delete) {
