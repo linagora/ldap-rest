@@ -284,7 +284,20 @@ describe('AuthzLinid1 by attachment', function () {
       expect(res.status).to.equal(403);
     });
 
-    it('does not let a claim carry a password', async () => {
+    it('does not let a claim of an administrator carry a password', async () => {
+      const res = await request
+        .put(`/api/v1/ldap/users/${ADMIN_B}`)
+        .set(as(ADMIN_A))
+        .send({
+          replace: {
+            twakeDepartmentLink: orgA,
+            userPassword: 'a-new-password',
+          },
+        });
+      expect(res.status).to.equal(403);
+    });
+
+    it('lets a claim of an ordinary account carry other changes', async () => {
       const res = await request
         .put(`/api/v1/ldap/users/${CLAIM_PASSWORD}`)
         .set(as(ADMIN_A))
@@ -294,7 +307,30 @@ describe('AuthzLinid1 by attachment', function () {
             userPassword: 'a-new-password',
           },
         });
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    });
+
+    it('does not delete an administrator of another branch', async () => {
+      const res = await request
+        .delete(`/api/v1/ldap/users/${ADMIN_B_ATTACHED_A}`)
+        .set(as(ADMIN_A));
       expect(res.status).to.equal(403);
+    });
+
+    it('does not move an administrator of another branch', async () => {
+      const res = await request
+        .post(`/api/v1/ldap/users/${ADMIN_B_ATTACHED_A}/move`)
+        .set(as(ADMIN_A))
+        .send({ targetOrgDn: transit });
+      expect(res.status).to.equal(403);
+    });
+
+    it('lets an administrator change their own entry', async () => {
+      const res = await request
+        .put(`/api/v1/ldap/users/${ADMIN_A}`)
+        .set(as(ADMIN_A))
+        .send({ replace: { displayName: 'Admin A' } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
     });
 
     it('claims an unlinked account that administers nothing', async () => {

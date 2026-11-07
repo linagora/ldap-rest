@@ -6,7 +6,7 @@
 
 - `authzLinid1` refuses to write, move or delete an account some organization
   names as its administrator unless the caller writes every organization
-  naming it, and a claim from transit changes the organization link alone
+  naming it
   ([GHSA-2g53-22cj-hwfm](https://github.com/linagora/ldap-rest/security/advisories/GHSA-2g53-22cj-hwfm)).
 
 ## v2.0.5 (2026-11-06)

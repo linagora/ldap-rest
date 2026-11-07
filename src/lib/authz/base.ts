@@ -1030,20 +1030,11 @@ export default abstract class AuthzBase extends DmPlugin {
             );
           }
         }
-        // A claim from transit is a move and nothing else: whatever else
-        // the write carries, a password say, would let the claimant set it
-        // without ever holding the branch the account administers.
-        if (fromTransit) {
-          if (!this.onlyRelinks(changes))
-            throw new AuthzRefusedError(
-              `User ${req!.user} may only change the organization link when ` +
-                'claiming an entry in transit'
-            );
-        } else if (!this.onlyRelinks(changes)) {
-          // What the write carries besides the link and its path, a
-          // password say, is a write on the entry where it stands: in its
-          // branch, or, judged by attachment, in the organization it
-          // leaves.
+        // What the write carries besides the link and its path, a password
+        // say, is a write on the entry where it stands: in its branch, or,
+        // judged by attachment, in the organization it leaves. Claimed from
+        // transit, it lands in the destination, already judged on write.
+        if (!fromTransit && !this.onlyRelinks(changes)) {
           const branch = byAttachment
             ? sourceBranch
             : this.extractBranchDn(judged);
