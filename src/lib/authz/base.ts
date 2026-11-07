@@ -1093,6 +1093,10 @@ export default abstract class AuthzBase extends DmPlugin {
         return [dn, entry, req];
       }
 
+      // A DN an organization still names may have no entry: creating one
+      // there would take over what the name administers.
+      await this.guardAdministratorAccount(user, dn);
+
       // Determine which branch to check permissions for
       let branchToCheck: string;
 
@@ -1486,6 +1490,7 @@ export default abstract class AuthzBase extends DmPlugin {
       const from = await this.storedDn(oldDn);
       await this.guardAdministratorAccount(user, from);
       const to = await this.storedParent(newDn);
+      await this.guardAdministratorAccount(user, to);
       const sourceBranch = this.extractBranchDn(from);
       const destBranch = this.extractBranchDn(to);
 

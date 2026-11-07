@@ -52,6 +52,8 @@ describe('AuthzLinid1 by attachment', function () {
   const ADMIN_A = 'l1attach.admin.a';
   const ADMIN_B = 'l1attach.admin.b';
   const ADMIN_B_ATTACHED_A = 'l1attach.admin.b.attached.a';
+  // Named by orgB, with no entry of its own
+  const ADMIN_GHOST = 'l1attach.admin.ghost';
   const NOBODY = 'l1attach.nobody';
   const IN_A = 'l1attach.user.a';
   const IN_B = 'l1attach.user.b';
@@ -161,6 +163,7 @@ describe('AuthzLinid1 by attachment', function () {
         [
           `uid=${ADMIN_B},${userBranch}`,
           `uid=${ADMIN_B_ATTACHED_A},${userBranch}`,
+          `uid=${ADMIN_GHOST},${userBranch}`,
         ],
       ],
       [transit, 'L1AttachTransit', []],
@@ -317,7 +320,23 @@ describe('AuthzLinid1 by attachment', function () {
       expect(res.status).to.equal(403);
     });
 
-    it('does not move an administrator of another branch', async () => {
+    it('does not create an account at a dangling administrator DN', async () => {
+      const res = await request
+        .post('/api/v1/ldap/users')
+        .set(as(ADMIN_A))
+        .send({
+          givenName: 'Ghost',
+          sn: 'Admin',
+          displayName: 'Ghost Admin',
+          employeeNumber: 'L1GHOST1',
+          mail: `${ADMIN_GHOST}@example.com`,
+          userPassword: 'a-new-password',
+          twakeDepartmentLink: orgA,
+        });
+      expect(res.status, JSON.stringify(res.body)).to.equal(403);
+    });
+
+    it('does not relink an administrator of another branch', async () => {
       const res = await request
         .post(`/api/v1/ldap/users/${ADMIN_B_ATTACHED_A}/move`)
         .set(as(ADMIN_A))
