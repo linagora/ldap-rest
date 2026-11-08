@@ -173,6 +173,36 @@ describe('TrustedProxy Plugin', () => {
       expect(response.status).to.equal(200);
       expect(response.body.clientIp).to.equal('198.51.100.7');
     });
+
+    it('reads an address carrying a port', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('X-Forwarded-For', '10.0.0.1, 203.0.113.9:4711');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.clientIp).to.equal('203.0.113.9');
+    });
+
+    it('reads a bracketed IPv6 address carrying a port', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('X-Forwarded-For', '10.0.0.2, [2001:db8::9]:4711');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.clientIp).to.equal('2001:db8::9');
+    });
+
+    it('uses the peer when the rightmost entry is not an address', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('X-Forwarded-For', '10.0.0.3, unknown');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.clientIp).to.be.oneOf([
+        '127.0.0.1',
+        '::ffff:127.0.0.1',
+      ]);
+    });
   });
 
   describe('Header Filtering - trusted proxy (localhost IPv6)', () => {

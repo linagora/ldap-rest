@@ -6,6 +6,18 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Rate limits use the TCP peer without `trustedProxy`
+
+**Who is affected:** a deployment that relied on a reverse proxy overwriting
+`X-Forwarded-For` and did not load `core/auth/trustedProxy`.
+
+`rateLimit`, `crowdsec` and `weblogs` no longer read the header themselves:
+without `trustedProxy` the TCP peer is the client, so every request through a
+proxy shares one rate-limit counter and one CrowdSec lookup. Load
+`core/auth/trustedProxy` with the proxy addresses; it now reads an appended
+chain from the right, so the proxy need not overwrite the header. See
+[trusted proxy](plugins/auth/trusted-proxy.md).
+
 ### OpenID Connect requires a session key of its own
 
 **Who is affected:** every deployment loading `core/auth/openidconnect`.

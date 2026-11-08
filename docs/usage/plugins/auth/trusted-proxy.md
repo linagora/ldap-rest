@@ -122,6 +122,9 @@ backend ldap_rest
 - **Load Balancers:** Trust headers from known load balancer IPs
 - **CDN Integration:** Trust headers from CDN edge servers
 - **Kubernetes:** Trust headers from ingress controllers
+- **Only list proxies:** `--trusted-proxy` / `DM_TRUSTED_PROXIES` must name
+  the reverse proxies, never a network that also holds clients: a trusted
+  client entry would make the walk trust an address the client wrote.
 - **Security:** Prevent attackers from spoofing `X-Forwarded-For` to bypass rate limits
 
 ## Security Considerations

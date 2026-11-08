@@ -140,8 +140,13 @@ export default class TrustedProxy extends DmPlugin {
   /**
    * The client address in a proxy chain: walk `X-Forwarded-For` from the
    * right, skip the addresses this server trusts as proxies, and take the
-   * first one it does not. An invalid entry cannot name a client and is
-   * skipped; a chain made only of trusted addresses falls back to the peer.
+   * first one it does not. A port is stripped from the entry (`ip:port`,
+   * `[v6]:port`) since some proxies write one.
+   *
+   * An entry that is not an address stops the walk and the peer is used: the
+   * entries to its left are the ones a client wrote, so continuing would let
+   * it choose the address. A chain made only of trusted addresses falls back
+   * to the peer too.
    *
    * @param xff the header as received from a trusted peer
    * @param remoteAddr the TCP peer
@@ -157,12 +162,26 @@ export default class TrustedProxy extends DmPlugin {
       .map(entry => entry.trim())
       .filter(Boolean);
     for (let index = entries.length - 1; index >= 0; index--) {
-      const candidate = entries[index].replace(/^\[|\]$/g, '');
-      if (isIP(candidate) === 0) continue;
+      const candidate = this.forwardedAddress(entries[index]);
+      if (!candidate) return remoteAddr;
       if (this.isTrustedProxy(candidate)) continue;
       return candidate;
     }
     return remoteAddr;
+  }
+
+  /**
+   * An `X-Forwarded-For` entry as an address: a plain one, a bracketed IPv6
+   * address, or either carrying a port. Anything else is undefined.
+   */
+  private forwardedAddress(entry: string): string | undefined {
+    const text = entry.trim();
+    if (!text) return undefined;
+    const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(text);
+    if (bracketed) return isIP(bracketed[1]) === 0 ? undefined : bracketed[1];
+    if (isIP(text) !== 0) return text;
+    const withPort = /^([^:]+):\d+$/.exec(text);
+    return withPort && isIP(withPort[1]) === 4 ? withPort[1] : undefined;
   }
 
   /**
