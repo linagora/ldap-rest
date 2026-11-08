@@ -11,6 +11,7 @@ import type { Response } from 'express';
 import { DM } from '../../../src/bin';
 import type { AttributesList } from '../../../src/lib/ldapActions';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
+import { isAuthzRefusal } from '../../../src/lib/errors';
 import type { Role } from '../../../src/abstract/plugin';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import AuthzScope from '../../../src/plugins/auth/authzScope';
@@ -327,6 +328,49 @@ describe('AuthzLinid1 group delegation', function () {
       expect(own.body).to.have.property(GROUP);
     });
 
+    it('does not answer a substring test on a hidden member', async () => {
+      const hidden = await request
+        .get('/api/v1/ldap/groups')
+        .query({
+          match: `(|(member=*alice*)(member=${dnOf(CAROL)}))`,
+        })
+        .set(as(SOPHIE));
+      expect(hidden.status).to.equal(200);
+      expect(hidden.body).not.to.have.property(GROUP);
+    });
+
+    it('does not let an unsupported test on another attribute restore the group', async () => {
+      const result = (await server.ldap.search(
+        {
+          paged: false,
+          scope: 'sub',
+          filter: `(|(member=${dnOf(CAROL)})(!(cn:caseIgnoreMatch:=${GROUP})))`,
+          attributes: ['cn'],
+        },
+        groupBranch,
+        { user: SOPHIE } as unknown as DmRequest
+      )) as { searchEntries: { dn: string }[] };
+      expect(
+        result.searchEntries.map(entry => String(entry.dn))
+      ).not.to.include(`cn=${GROUP},${groupBranch}`);
+    });
+
+    it('does not let an extensible match without an attribute restore the group', async () => {
+      const result = (await server.ldap.search(
+        {
+          paged: false,
+          scope: 'sub',
+          filter: `(:distinguishedNameMatch:=${dnOf(CAROL)})`,
+          attributes: ['cn'],
+        },
+        groupBranch,
+        { user: SOPHIE } as unknown as DmRequest
+      )) as { searchEntries: { dn: string }[] };
+      expect(
+        result.searchEntries.map(entry => String(entry.dn))
+      ).not.to.include(`cn=${GROUP},${groupBranch}`);
+    });
+
     it('does not return the attributes the filter only widened for', async () => {
       const res = await request
         .get('/api/v1/ldap/groups')
@@ -436,7 +480,8 @@ describe('AuthzLinid1 group delegation', function () {
           0,
           { user: SOPHIE } as unknown as DmRequest,
         ]);
-      } catch {
+      } catch (err) {
+        expect(isAuthzRefusal(err)).to.equal(true);
         refused = true;
       }
       expect(refused).to.equal(true);
