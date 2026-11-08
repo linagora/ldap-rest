@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `authzLinid1` refuses a caller whose account status is not `enabled`,
+  even when the identity provider still lets them sign in
+  ([GHSA-8hw2-g4fp-6xfx](https://github.com/linagora/ldap-rest/security/advisories/GHSA-8hw2-g4fp-6xfx)).
+
 ## v2.1.1 (2026-11-08)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0, zlib updated to 1.4-r0.

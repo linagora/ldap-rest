@@ -7,11 +7,18 @@
  * @group Plugins
  */
 import type { DM } from '../../bin/index.js';
+import { roleAttribute, type Schema } from '../../config/schema.js';
 import type { Hooks, MaybePromise } from '../../hooks.js';
 import type { ModifyRequest, SearchResult } from '../../lib/ldapActions.js';
 import type { BranchPermissions } from '../../config/args.js';
 import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base.js';
-import { escapeLdapFilter, isDnInBranch } from '../../lib/utils.js';
+import { AuthzRefusedError } from '../../lib/errors.js';
+import {
+  escapeLdapFilter,
+  isDnInBranch,
+  normalizeDn,
+  organizationLink,
+} from '../../lib/utils.js';
 
 interface CachedPermissions {
   branches: Map<string, BranchPermissions>;
@@ -85,22 +92,23 @@ export default class AuthzLinid1 extends AuthzBase {
     // map then. A rename or delete moves the organization naming them, so
     // it drops the map too. The base hooks run after, as they do for the
     // other in-process writes.
-    const touched = (changes: ModifyRequest): boolean => {
+    const touches = (changes: ModifyRequest, attrs: string[]): boolean => {
       const names = [
         ...Object.keys(changes.add ?? {}),
         ...Object.keys(changes.replace ?? {}),
         ...(Array.isArray(changes.delete)
           ? changes.delete
           : Object.keys(changes.delete ?? {})),
-      ];
-      return names.some(
-        name => name.split(';')[0].toLowerCase() === adminAttr.toLowerCase()
-      );
+      ].map(name => name.split(';')[0].toLowerCase());
+      return attrs.some(attr => names.includes(attr.toLowerCase()));
     };
     this.hooks = {
       ...this.declaredByBase,
       ldapmodifydone: (dn, changes, op, context): MaybePromise<void> => {
-        if (touched(changes)) this.forgetPermissions();
+        if (touches(changes, [adminAttr])) this.forgetPermissions();
+        // A suspension through this server takes effect on the next request
+        if (touches(changes, this.statusAttributes()))
+          this.clearResolutionCache();
         return this.declaredByBase.ldapmodifydone?.(dn, changes, op, context);
       },
       ldapdeletedone: (dn, context): MaybePromise<void> => {
@@ -205,9 +213,84 @@ export default class AuthzLinid1 extends AuthzBase {
 
   /**
    * Resolve user - for authzLinid1, convert uid to userDn via LDAP
+   *
+   * An account the schema marks with a state other than `enabled` is
+   * refused: the identity provider may still let it sign in, and the
+   * lifecycle state is the directory's way to stop it.
    */
   async resolveUser(uid: string): Promise<string | null> {
-    return this.getUserDn(uid);
+    const dn = await this.getUserDn(uid);
+    if (!dn) return null;
+    if (!(await this.enabled(dn)))
+      throw new AuthzRefusedError(`User ${uid} is not enabled`);
+    return dn;
+  }
+
+  /**
+   * The attribute carrying an account's lifecycle state, and the value that
+   * means enabled, from the flat entity schema holding `dn`.
+   */
+  private accountStatus(
+    dn: string
+  ): { attribute: string; enabled: string } | undefined {
+    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
+      { instances?: { base: string; schema?: Schema }[] } | undefined;
+    const holding = (flat?.instances ?? [])
+      .filter(
+        instance =>
+          instance.schema && instance.base && isDnInBranch(dn, instance.base)
+      )
+      .sort(
+        (left, right) =>
+          normalizeDn(right.base).length - normalizeDn(left.base).length
+      );
+    for (const instance of holding) {
+      const attribute = roleAttribute(instance.schema, 'accountStatus');
+      const value = attribute
+        ? instance.schema?.attributes[attribute]?.states?.enabled
+        : undefined;
+      const enabled = organizationLink(value);
+      if (attribute && enabled) return { attribute, enabled };
+    }
+    return undefined;
+  }
+
+  /**
+   * Whether the account carries the enabled state, or carries no status at
+   * all: an entry the schema does not manage keeps the access it had.
+   */
+  private async enabled(dn: string): Promise<boolean> {
+    const status = this.accountStatus(dn);
+    if (!status) return true;
+    try {
+      // As the server: the judgement's own read: as the caller, it would be judged by itself
+      const result = (await this.server.ldap.system.search(
+        { paged: false, scope: 'base', attributes: [status.attribute] },
+        dn
+      )) as SearchResult;
+      const value = organizationLink(
+        result.searchEntries?.[0]?.[status.attribute]
+      );
+      return (
+        value === undefined ||
+        normalizeDn(value) === normalizeDn(status.enabled)
+      );
+    } catch {
+      // An unreadable status does not prove the account disabled
+      return true;
+    }
+  }
+
+  /** The account status attributes the loaded user schemas declare. */
+  private statusAttributes(): string[] {
+    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
+      { instances?: { schema?: Schema }[] } | undefined;
+    const attributes = new Set<string>();
+    for (const instance of flat?.instances ?? []) {
+      const attribute = roleAttribute(instance.schema, 'accountStatus');
+      if (attribute) attributes.add(attribute);
+    }
+    return [...attributes];
   }
 
   /**
