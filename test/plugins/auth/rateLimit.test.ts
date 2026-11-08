@@ -146,6 +146,21 @@ describe('Rate Limit Plugin', () => {
     expect(response2.status).to.equal(401);
   });
 
+  it('keeps the counters of two clients taking turns', async () => {
+    const send = (ip: string): request.Test =>
+      request(app)
+        .get('/api/test')
+        .set('Authorization', 'Bearer invalid-token')
+        .set('X-Forwarded-For', ip);
+
+    for (let i = 0; i < 5; i++) {
+      expect((await send('192.168.1.10')).status).to.equal(401);
+      expect((await send('192.168.1.11')).status).to.equal(401);
+    }
+    expect((await send('192.168.1.10')).status).to.equal(429);
+    expect((await send('192.168.1.11')).status).to.equal(429);
+  });
+
   it('does not let a rotating leftmost chain entry evade the limit', async () => {
     const send = (leftmost: string): request.Test =>
       request(app)

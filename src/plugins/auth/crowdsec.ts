@@ -145,9 +145,10 @@ export default class CrowdSec extends DmPlugin {
       );
     }
 
-    // Cache the result
+    // Cache the result; an expired entry restarts at the end of the order
+    if (this.cache.has(ip)) this.cache.delete(ip);
     this.prune(now);
-    if (!this.cache.has(ip)) this.evictOldest();
+    if (this.cache.size >= CrowdSec.MAX_CLIENTS) this.evictOldest();
     this.cache.set(ip, {
       isBanned,
       expiresAt: now + this.cacheTtl * 1000,

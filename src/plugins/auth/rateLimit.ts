@@ -87,9 +87,11 @@ export default class RateLimit extends DmPlugin {
           const now = Date.now();
 
           if (!entry || now > entry.resetTime) {
-            // Create new entry
+            // Restarting a counter moves it to the end of the eviction order
+            if (entry) this.store.delete(ip);
             this.prune(now);
-            if (!this.store.has(ip)) this.evictOldest();
+            if (!this.store.has(ip) && this.store.size >= RateLimit.MAX_CLIENTS)
+              this.evictOldest();
             this.store.set(ip, {
               count: 1,
               resetTime: now + this.windowMs,

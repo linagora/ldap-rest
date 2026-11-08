@@ -153,6 +153,29 @@ describe('CrowdSec Plugin', () => {
     expect(nock.pendingMocks().length).to.equal(0);
   });
 
+  it('caches two clients taking turns independently', async () => {
+    const first = '192.168.1.201';
+    const second = '192.168.1.202';
+    const one = nock(crowdsecUrl)
+      .get('/v1/decisions')
+      .query({ ip: first })
+      .matchHeader('X-Api-Key', apiKey)
+      .reply(200, 'null');
+    const two = nock(crowdsecUrl)
+      .get('/v1/decisions')
+      .query({ ip: second })
+      .matchHeader('X-Api-Key', apiKey)
+      .reply(200, 'null');
+
+    for (let turn = 0; turn < 2; turn++) {
+      await request(app).get('/api/test').set('X-Forwarded-For', first);
+      await request(app).get('/api/test').set('X-Forwarded-For', second);
+    }
+
+    expect(one.isDone(), 'first client').to.be.true;
+    expect(two.isDone(), 'second client').to.be.true;
+  });
+
   it('should fail open if CrowdSec API is unavailable', async () => {
     const clientIp = '192.168.1.250';
 
