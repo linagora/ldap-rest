@@ -12,7 +12,8 @@ not a contract; update it as the work lands.
 | [#549] | Architecture pages, decision records, comment check | Part 2 remains | Medium |
 
 [#397] targets `3.0.0`, where the former sub-paths are removed after the
-internal split. [#593], [#594], [#595] and [#603] are done.
+internal split, `ldap-rest/plugin-*` included. [#593], [#594], [#595] and
+[#603] are done.
 
 ## What blocks #397 today
 
@@ -30,8 +31,8 @@ Between plugin families the only coupling left is
 ## Target architecture
 
 An npm workspaces monorepo with one package per plugin and an umbrella that
-preserves the public API. Today's `./plugin-*` entries already separate the
-plugins:
+keeps the CLI, the `core/…` namespace and the non-plugin entries. Today's
+`./plugin-*` entries already separate the plugins:
 
 ```text
 packages/
@@ -74,9 +75,10 @@ Rules:
   `@ldap-rest/schemas`; every plugin package is optional. Its build composes
   `static/` from those two. A deployment installs the plugins it needs
   (`npm install @ldap-rest/james`); the umbrella keeps the `ldap-rest`
-  CLI and the `core/…` namespace, and re-exports the former sub-paths
-  (`ldap-rest/plugin-auth-authzlinid1`, …). The split is therefore not breaking
-  for users that installed the same plugins.
+  CLI and the `core/…` namespace, but not the former
+  `ldap-rest/plugin-*` sub-paths: 3.0.0 removes them, and a deployment
+  imports each plugin from the package it installs. The split is therefore
+  breaking.
 - A plugin package ships the commands that belong to its feature:
   `@ldap-rest/ldap-externalusers` owns `cleanup-external-users`,
   `@ldap-rest/james` owns `sync-james`, and
@@ -220,16 +222,20 @@ compatible.
 
 ### Phase 3 — Contracts and finalization
 
-1. [#595], part 2: one api-extractor report per sub-path, including the
-   `./plugin-*` entries, and non-additive diffs refused by `contracts`.
+1. [#595], part 2: one api-extractor report per remaining public sub-path,
+   and non-additive diffs refused by `contracts`. The `./plugin-*` reports
+   and their entries go away with the shims.
 2. [#549], part 2: the modularization decision record, a shrinking comment
    baseline, and the `require_code_owner_review` ruleset.
-3. Publish the scoped packages and document the deprecation policy for the
-   former sub-paths. With the first published plugin package, add the
-   `3.0.0` upgrade note and the CHANGELOG breaking entry: a deployment must
-   add the plugin packages it loads to its `package.json`, and optional
-   commands move with their plugin package.
-4. Close [#397].
+3. Remove every `ldap-rest/plugin-*` entry, the `src/plugins/*.ts` shims and
+   the `./plugin-*` api-extractor reports. A plugin is imported from the
+   `@ldap-rest/*` package the deployment installs.
+4. Publish the scoped packages. With the first published plugin package, add
+   the `3.0.0` upgrade note and the CHANGELOG breaking entry: a deployment
+   must add the plugin packages it loads to its `package.json`, change every
+   `ldap-rest/plugin-*` import to its package, and expect the optional
+   commands to move with their plugin package.
+5. Close [#397].
 
 ## Branch strategy
 
@@ -259,8 +265,9 @@ phase 1.
 
 1. **Granularity** (**decided**): one package per plugin, as today's
    `./plugin-*` entries are split.
-2. **Versioning** (**decided**): 3.0.0 with the former sub-paths removed, on
-   the `v3.0` branch.
+2. **Versioning** (**decided**): 3.0.0 with the former sub-paths removed,
+   `ldap-rest/plugin-*` included, on the `v3.0` branch. No deprecation
+   window: the packages are the interface.
 3. **`TwakeGroups extends LdapGroups`** (**decided**): keep the inheritance;
    the Twake plugin package depends on `@ldap-rest/ldap-groups` as a peer.
 4. **`Config` type**: type-only aggregate in `core` (recommended to start), or
