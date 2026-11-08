@@ -262,23 +262,20 @@ export default class AuthzLinid1 extends AuthzBase {
   private async enabled(dn: string): Promise<boolean> {
     const status = this.accountStatus(dn);
     if (!status) return true;
-    try {
-      // As the server: the judgement's own read: as the caller, it would be judged by itself
-      const result = (await this.server.ldap.system.search(
-        { paged: false, scope: 'base', attributes: [status.attribute] },
-        dn
-      )) as SearchResult;
-      const value = organizationLink(
-        result.searchEntries?.[0]?.[status.attribute]
-      );
-      return (
-        value === undefined ||
-        normalizeDn(value) === normalizeDn(status.enabled)
-      );
-    } catch {
-      // An unreadable status does not prove the account disabled
-      return true;
-    }
+    // As the server: the judgement's own read: as the caller, it would be
+    // judged by itself. A failed read propagates, as it does for the
+    // identity itself: a cached "enabled" from a failed read would reopen
+    // the suspension for the whole TTL.
+    const result = (await this.server.ldap.system.search(
+      { paged: false, scope: 'base', attributes: [status.attribute] },
+      dn
+    )) as SearchResult;
+    const value = organizationLink(
+      result.searchEntries?.[0]?.[status.attribute]
+    );
+    return (
+      value === undefined || normalizeDn(value) === normalizeDn(status.enabled)
+    );
   }
 
   /** The account status attributes the loaded user schemas declare. */

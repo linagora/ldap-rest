@@ -617,6 +617,12 @@ export default abstract class AuthzBase extends DmPlugin {
     string,
     { user: string | null; at: number }
   >();
+  /**
+   * Bumped by every invalidation. A resolution that started before a write
+   * may have read the status or the identity before it, so it must not put
+   * what it read back into the cache afterwards.
+   */
+  private resolutionGeneration = 0;
   /** How many identities to remember at once. A cap, not a threshold. */
   private static readonly RESOLUTION_CACHE_MAX = 10000;
   /** Said once, when the cap is reached: a log line per request helps nobody. */
@@ -690,6 +696,7 @@ export default abstract class AuthzBase extends DmPlugin {
     if (cached && now - cached.at < this.cacheTTL) {
       user = cached.user;
     } else {
+      const generation = this.resolutionGeneration;
       user = await this.resolveUser(identity);
       if (this.resolutionCache.size >= AuthzBase.RESOLUTION_CACHE_MAX)
         for (const [key, entry] of this.resolutionCache)
@@ -698,9 +705,15 @@ export default abstract class AuthzBase extends DmPlugin {
       // make the constant a threshold rather than a cap, and the case that
       // reaches it — an identity provider where every user is a new key — is
       // exactly the one this fix is about.
-      if (this.resolutionCache.size < AuthzBase.RESOLUTION_CACHE_MAX)
+      if (
+        generation === this.resolutionGeneration &&
+        this.resolutionCache.size < AuthzBase.RESOLUTION_CACHE_MAX
+      )
         this.resolutionCache.set(identity, { user, at: now });
-      else if (!this.resolutionCacheFullWarned) {
+      else if (
+        generation === this.resolutionGeneration &&
+        !this.resolutionCacheFullWarned
+      ) {
         this.resolutionCacheFullWarned = true;
         this.logger.warn(
           `${this.name}: more than ${AuthzBase.RESOLUTION_CACHE_MAX} ` +
@@ -882,6 +895,7 @@ export default abstract class AuthzBase extends DmPlugin {
 
   /** Forget what was resolved, for a test that changes the directory. */
   protected clearResolutionCache(): void {
+    this.resolutionGeneration++;
     this.resolutionCache.clear();
   }
 

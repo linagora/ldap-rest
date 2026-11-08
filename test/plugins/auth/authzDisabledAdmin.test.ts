@@ -12,6 +12,7 @@ import type { AttributesList } from '../../../src/lib/ldapActions';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Role } from '../../../src/abstract/plugin';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
+import AuthzScope from '../../../src/plugins/auth/authzScope';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
@@ -40,7 +41,8 @@ describe('AuthzLinid1 and the account status', function () {
   const DISABLED = 'status.disabled';
   const ENABLED = 'status.enabled';
   const NO_ACCESS = 'status.noaccess';
-  const accounts = [DISABLED, ENABLED, NO_ACCESS];
+  const TO_DELETE = 'status.todelete';
+  const accounts = [DISABLED, ENABLED, NO_ACCESS, TO_DELETE];
   const dnOf = (uid: string): string => `uid=${uid},${userBranch}`;
   const status = (state: string): string =>
     `cn=${state},ou=twakeAccountStatus,ou=nomenclature,${base}`;
@@ -82,6 +84,7 @@ describe('AuthzLinid1 and the account status', function () {
       [DISABLED, 'disabled'],
       [ENABLED, 'active'],
       [NO_ACCESS, 'noaccess'],
+      [TO_DELETE, 'todelete'],
     ] as [string, string][]) {
       await server.ldap.delete(dnOf(uid)).catch(() => undefined);
       await server.ldap.add(dnOf(uid), {
@@ -102,9 +105,12 @@ describe('AuthzLinid1 and the account status', function () {
     await server.registerPlugin('authzLinid1', new AuthzLinid1(server));
     const flat = new LdapFlatGeneric(server);
     await server.registerPlugin('ldapFlatGeneric', flat);
+    const scope = new AuthzScope(server);
+    await server.registerPlugin('authzScope', scope);
     await waitFor(() => Boolean(flat.instances?.some(i => i.schema)), {
       what: 'the user schema',
     });
+    scope.afterLoad();
     server.setupErrorMiddleware();
     request = supertest(server.app);
   });
@@ -127,8 +133,43 @@ describe('AuthzLinid1 and the account status', function () {
     expect(res.status, JSON.stringify(res.body)).to.equal(403);
   });
 
+  it('refuses an administrator whose state is to delete', async () => {
+    const res = await request.get('/api/v1/ldap/users').set(as(TO_DELETE));
+    expect(res.status, JSON.stringify(res.body)).to.equal(403);
+  });
+
+  it('refuses the scope of a disabled administrator', async () => {
+    const res = await request.get('/api/v1/authz/scope').set(as(DISABLED));
+    expect(res.status, JSON.stringify(res.body)).to.equal(403);
+  });
+
   it('lets an enabled administrator through', async () => {
     const res = await request.get('/api/v1/ldap/users').set(as(ENABLED));
     expect(res.status, JSON.stringify(res.body)).to.equal(200);
+  });
+
+  it('applies a suspension at once after a resolved request', async () => {
+    const change = (state: string): Promise<boolean> =>
+      server.ldap.modify(
+        dnOf(DISABLED),
+        { replace: { twakeAccountStatus: status(state) } },
+        { user: ENABLED } as unknown as DmRequest
+      ) as Promise<boolean>;
+
+    // The account starts disabled; enable it to populate the resolution cache
+    await change('active');
+    expect(
+      (await request.get('/api/v1/ldap/users').set(as(DISABLED))).status
+    ).to.equal(200);
+
+    await change('disabled');
+    expect(
+      (await request.get('/api/v1/ldap/users').set(as(DISABLED))).status
+    ).to.equal(403);
+
+    await change('active');
+    expect(
+      (await request.get('/api/v1/ldap/users').set(as(DISABLED))).status
+    ).to.equal(200);
   });
 });
