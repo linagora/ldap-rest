@@ -14,6 +14,7 @@
   ([GHSA-9c6p-2jmp-x26h](https://github.com/linagora/ldap-rest/security/advisories/GHSA-9c6p-2jmp-x26h)).
 - `authzLinid1` refuses a caller whose account status is not `enabled`
   ([GHSA-8hw2-g4fp-6xfx](https://github.com/linagora/ldap-rest/security/advisories/GHSA-8hw2-g4fp-6xfx)).
+- The LDAP unit editor escapes the error text it renders.
 
 ### Added
 
