@@ -602,13 +602,14 @@ Semantic roles assign special meaning to attributes for UI and business logic ha
 
 ### Available Roles
 
-| Role           | Description                        | Example Attribute                        | Usage                                 |
-| -------------- | ---------------------------------- | ---------------------------------------- | ------------------------------------- |
-| `identifier`   | Primary identifier (RDN attribute) | `uid`, `cn`, `sAMAccountName`            | Used as the entry's unique identifier |
-| `displayName`  | Human-readable display name        | `cn`, `displayName`                      | Shown in lists and UI elements        |
-| `primaryEmail` | Main email address                 | `mail`, `userPrincipalName`              | Primary contact email                 |
-| `emailAliases` | Additional email addresses         | `mailAlternateAddress`, `proxyAddresses` | Alternative email addresses           |
-| `emailQuota`   | Email storage quota                | `mailQuota`, `mailQuotaSize`             | Storage limit for mailbox             |
+| Role                      | Description                                                       | Example Attribute                        | Usage                                 |
+| ------------------------- | ----------------------------------------------------------------- | ---------------------------------------- | ------------------------------------- |
+| `identifier`              | Primary identifier (RDN attribute)                                | `uid`, `cn`, `sAMAccountName`            | Used as the entry's unique identifier |
+| `displayName`             | Human-readable display name                                       | `cn`, `displayName`                      | Shown in lists and UI elements        |
+| `primaryEmail`            | Main email address                                                | `mail`, `userPrincipalName`              | Primary contact email                 |
+| `emailAliases`            | Additional email addresses                                        | `mailAlternateAddress`, `proxyAddresses` | Alternative email addresses           |
+| `emailQuota`              | Email storage quota                                               | `mailQuota`, `mailQuotaSize`             | Storage limit for mailbox             |
+| `groupAdminOrganizations` | Organizations whose administrators manage the group's own members | `twakeGroupAdminOrgLink`                 | Delegated group membership            |
 
 ### Role Usage Examples
 

@@ -6,16 +6,98 @@
  * Grants permissions to users referenced in organization's twakeLocalAdminLink
  * @group Plugins
  */
+import { FilterParser, SearchFilter } from 'ldapts';
+import type { Entry, SearchOptions } from 'ldapts';
+
 import type { DM } from '../../bin/index.js';
+import { roleAttribute, type Schema } from '../../config/schema.js';
 import type { Hooks, MaybePromise } from '../../hooks.js';
-import type { ModifyRequest, SearchResult } from '../../lib/ldapActions.js';
+import type {
+  AttributesList,
+  ModifyRequest,
+  SearchResult,
+} from '../../lib/ldapActions.js';
 import type { BranchPermissions } from '../../config/args.js';
+import type { DmRequest } from '../../lib/auth/base.js';
 import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base.js';
-import { escapeLdapFilter, isDnInBranch } from '../../lib/utils.js';
+import { AuthzRefusedError } from '../../lib/errors.js';
+import { filterAttributeKey } from '../../lib/ldapFilter.js';
+import {
+  escapeLdapFilter,
+  isDnInBranch,
+  isDummyMemberDn,
+  normalizeDn,
+  organizationLink,
+} from '../../lib/utils.js';
 
 interface CachedPermissions {
   branches: Map<string, BranchPermissions>;
   timestamp: number;
+}
+
+/** The filter names that test a group's member or owner values. */
+type ReducedFilterNames = Set<string>;
+
+/**
+ * Whether one of a caller's written branches lies in a delegated
+ * organization, or is one.
+ */
+function delegationsIntersect(
+  branches: string[],
+  delegations: string[]
+): boolean {
+  const within = (dn: string, branch: string): boolean => {
+    try {
+      return isDnInBranch(dn, branch);
+    } catch {
+      return false;
+    }
+  };
+  return delegations.some(delegation =>
+    branches.some(branch => within(branch, delegation))
+  );
+}
+
+/** The node fields the filter guard reads. */
+interface FilterNode {
+  type?: number;
+  attribute?: string;
+  matchType?: string;
+  value?: unknown;
+  initial?: unknown;
+  any?: unknown;
+  final?: unknown;
+  filters?: unknown[];
+  filter?: unknown;
+}
+
+/** Whether a leaf tests a value the group's delegation would hide. */
+function testsReduced(node: FilterNode, names: ReducedFilterNames): boolean {
+  if (typeof node.attribute === 'string' && node.attribute.length > 0)
+    return names.has(filterAttributeKey(node.attribute));
+  // An extensible match keeps its attribute in `matchType`; an empty one
+  // runs over every attribute and may test a hidden member whatever its
+  // matching rule.
+  if (typeof node.matchType === 'string' && node.matchType.length > 0)
+    return names.has(filterAttributeKey(node.matchType));
+  if (node.type === SearchFilter.extensibleMatch) return true;
+  return false;
+}
+
+/** Whether any test of a parsed filter names a reduced value. */
+function filterTouchesReduced(
+  filter: unknown,
+  names: ReducedFilterNames
+): boolean {
+  const node = filter as FilterNode | undefined;
+  if (!node) return false;
+  if (node.type === SearchFilter.and || node.type === SearchFilter.or)
+    return (node.filters ?? []).some(child =>
+      filterTouchesReduced(child, names)
+    );
+  if (node.type === SearchFilter.not)
+    return filterTouchesReduced(node.filter, names);
+  return testsReduced(node, names);
 }
 
 import { linid1Options } from './auth.options.js';
@@ -32,8 +114,29 @@ export default class AuthzLinid1 extends AuthzBase {
    */
   private permissionsGeneration = 0;
 
+  /** The delegation attribute, when the feature is on. */
+  private readonly groupAdminAttr: string;
+  private readonly adminAttr: string;
+  private reducedFilterNames?: Promise<ReducedFilterNames>;
+
+  /**
+   * Marks a search whose projection we widened for the delegation attribute.
+   * As in the base class, a symbol survives the copies another plugin makes.
+   */
+  private static readonly widenedForDelegation = Symbol(
+    'widened for the group delegation'
+  );
+
   declare hooks: AuthzBase['hooks'] &
-    Pick<Hooks, 'ldapmodifydone' | 'ldapdeletedone' | 'ldaprenamedone'>;
+    Pick<
+      Hooks,
+      | 'ldapmodifydone'
+      | 'ldapdeletedone'
+      | 'ldaprenamedone'
+      | 'ldapsearchrequest'
+      | 'ldapsearchfilter'
+      | 'ldapmodifyrequest'
+    >;
 
   /** What the classes above declared, read once this one is constructed */
   private readonly declaredByBase: Hooks;
@@ -44,10 +147,17 @@ export default class AuthzLinid1 extends AuthzBase {
 
     this.cacheTTL = this.options(linid1Options).authz_linid1_cache_ttl * 1000;
 
-    const adminAttr = this.options(linid1Options).authz_local_admin_attribute;
+    this.adminAttr = this.options(linid1Options).authz_local_admin_attribute;
+    this.groupAdminAttr =
+      this.options(linid1Options).authz_group_admin_attribute;
     this.logger.info(
-      `AuthzLinid1: Authorization based on ${adminAttr} attribute enabled`
+      `AuthzLinid1: Authorization based on ${this.adminAttr} attribute enabled`
     );
+    if (this.groupAdminAttr)
+      this.logger.info(
+        `AuthzLinid1: group membership delegated through the ` +
+          `${this.groupAdminAttr} attribute`
+      );
 
     // Its administrators would be held to it by itself: nobody would
     // administer it, nor anything under it
@@ -85,7 +195,8 @@ export default class AuthzLinid1 extends AuthzBase {
     // map then. A rename or delete moves the organization naming them, so
     // it drops the map too. The base hooks run after, as they do for the
     // other in-process writes.
-    const touched = (changes: ModifyRequest): boolean => {
+    const watched = [this.adminAttr];
+    const touches = (changes: ModifyRequest, attrs: string[]): boolean => {
       const names = [
         ...Object.keys(changes.add ?? {}),
         ...Object.keys(changes.replace ?? {}),
@@ -93,14 +204,25 @@ export default class AuthzLinid1 extends AuthzBase {
           ? changes.delete
           : Object.keys(changes.delete ?? {})),
       ];
-      return names.some(
-        name => name.split(';')[0].toLowerCase() === adminAttr.toLowerCase()
-      );
+      const lower = names.map(name => name.split(';')[0].toLowerCase());
+      return attrs.some(attr => lower.includes(attr.toLowerCase()));
     };
     this.hooks = {
       ...this.declaredByBase,
+      ldapsearchrequest: (
+        args
+      ): MaybePromise<[string, SearchOptions, DmRequest?]> =>
+        this.widenForDelegation(args),
+      ldapsearchfilter: (
+        args
+      ): MaybePromise<[SearchResult, DmRequest?, SearchOptions?]> =>
+        this.filterDelegatedGroups(args),
+      ldapmodifyrequest: (
+        args
+      ): MaybePromise<[string, ModifyRequest, number, DmRequest?]> =>
+        this.judgeDelegatedGroup(args),
       ldapmodifydone: (dn, changes, op, context): MaybePromise<void> => {
-        if (touched(changes)) this.forgetPermissions();
+        if (touches(changes, watched)) this.forgetPermissions();
         return this.declaredByBase.ldapmodifydone?.(dn, changes, op, context);
       },
       ldapdeletedone: (dn, context): MaybePromise<void> => {
@@ -121,19 +243,474 @@ export default class AuthzLinid1 extends AuthzBase {
   }
 
   /**
+   * Add the delegation attribute to a search projection the caller did not
+   * ask it in: the filter below cannot tell a delegated group from any other
+   * entry without it. It is removed again once the result is judged.
+   */
+  private async widenForDelegation([base, opts, req]: [
+    string,
+    SearchOptions,
+    DmRequest?,
+  ]): Promise<[string, SearchOptions, DmRequest?]> {
+    const [judgedBase, initialOpts, judgedReq] = (await this.declaredByBase
+      .ldapsearchrequest!([base, opts, req])) as [
+      string,
+      SearchOptions,
+      DmRequest?,
+    ];
+    const attr = this.groupAdminAttr;
+    if (!attr || this.shouldSkipAuthorization(req))
+      return [judgedBase, initialOpts, judgedReq];
+
+    let judgedOpts = initialOpts;
+    if (!AuthzBase.wantsAttribute(judgedOpts, attr)) {
+      const value = judgedOpts.attributes;
+      const asked = Array.isArray(value) ? value.map(String) : [String(value)];
+      judgedOpts = {
+        ...judgedOpts,
+        attributes: [...asked, attr],
+        [AuthzLinid1.widenedForDelegation]: true,
+      } as SearchOptions;
+    }
+    return [judgedBase, judgedOpts, judgedReq];
+  }
+
+  /**
+   * Keep a delegated group the attachment filter would hide, and show only
+   * the members of it this caller manages. A group the caller administers
+   * through its organization keeps the ordinary answer, members included:
+   * the delegation is an addition to that path, not a restriction on it.
+   */
+  private async filterDelegatedGroups([result, req, opts]: [
+    SearchResult,
+    DmRequest?,
+    SearchOptions?,
+  ]): Promise<[SearchResult, DmRequest?, SearchOptions?]> {
+    const baseFilter = this.declaredByBase.ldapsearchfilter!;
+    const passThrough = async (): Promise<
+      [SearchResult, DmRequest?, SearchOptions?]
+    > => {
+      const filtered = (await baseFilter([result, req, opts])) as [
+        SearchResult,
+        DmRequest?,
+        SearchOptions?,
+      ];
+      this.stripWidened(filtered[0], filtered[2]);
+      return filtered;
+    };
+    const attr = this.groupAdminAttr;
+    if (!attr || !result?.searchEntries?.length) return passThrough();
+    if (this.shouldSkipAuthorization(req)) return passThrough();
+    const user = await this.resolveCaller(req!);
+    if (!user) return passThrough();
+
+    // Read before the base filter: it mutates the entries it judges, and a
+    // group it drops is one we may have to put back.
+    const delegated = new Map<string, Entry>();
+    for (const entry of result.searchEntries) {
+      const dn = String(entry.dn);
+      if (this.isGlobalBranch(dn)) continue;
+      if (this.delegationsOf(entry, attr).length === 0) continue;
+      delegated.set(this.dnKey(dn), entry);
+    }
+
+    const filtered = (await baseFilter([result, req, opts])) as [
+      SearchResult,
+      DmRequest?,
+      SearchOptions?,
+    ];
+    const [kept, , keptOpts] = filtered;
+    if (delegated.size > 0) {
+      const entries = kept.searchEntries ?? [];
+      const keptDns = new Set(
+        entries.map(entry => this.dnKey(String(entry.dn)))
+      );
+      const reducedNames = await this.memberFilterNames();
+      let touchesReduced = false;
+      if (opts?.filter) {
+        try {
+          touchesReduced = filterTouchesReduced(
+            FilterParser.parseString(String(opts.filter)),
+            reducedNames
+          );
+        } catch {
+          // A filter this cannot read is not judged against the trimmed
+          // group: keeping the group out is safer than guessing.
+          touchesReduced = true;
+        }
+      }
+      const linkAttr = this.config.ldap_organization_link_attribute;
+      const widenedLink = (opts as { [key: symbol]: unknown } | undefined)?.[
+        AuthzBase.widenedForLink
+      ];
+      const widenedObjectClass = (
+        opts as { [key: symbol]: unknown } | undefined
+      )?.[AuthzBase.widenedForObjectClass];
+      const branches = await this.getAuthorizedBranches(user);
+      const memberOrganization = new Map<string, Promise<string | undefined>>();
+      const organizationOf = (dn: string): Promise<string | undefined> => {
+        const key = this.dnKey(dn);
+        let found = memberOrganization.get(key);
+        if (!found) {
+          found = this.storedOrganization(dn);
+          memberOrganization.set(key, found);
+        }
+        return found;
+      };
+      const manages = async (
+        dn: string,
+        delegations: string[]
+      ): Promise<boolean> => {
+        const organization = await organizationOf(dn);
+        if (!organization) return false;
+        if (!this.withinDelegation(organization, delegations)) return false;
+        return (
+          (await this.getUserPermissions(user, organization)).write === true
+        );
+      };
+
+      for (const [key, entry] of delegated) {
+        if (keptDns.has(key) || touchesReduced) continue;
+        const delegations = this.delegationsOf(entry, attr);
+        if (!delegationsIntersect(branches, delegations)) continue;
+        const copy = { ...entry };
+        await this.keepManagedMembers(copy, delegations, manages);
+        if (widenedLink && linkAttr) delete copy[linkAttr];
+        if (widenedObjectClass) delete copy.objectClass;
+        entries.push(copy);
+      }
+      kept.searchEntries = entries;
+    }
+
+    this.stripWidened(kept, keptOpts);
+
+    return filtered;
+  }
+
+  /** Remove the delegation attribute a search only carried for this judgement. */
+  private stripWidened(result: SearchResult, opts?: SearchOptions): void {
+    const marked = opts as { [key: symbol]: unknown } | undefined;
+    const groupAttr = marked?.[AuthzLinid1.widenedForDelegation]
+      ? this.groupAdminAttr
+      : undefined;
+    if (!groupAttr) return;
+    for (const entry of result.searchEntries ?? []) delete entry[groupAttr];
+  }
+
+  /**
+   * Judge a change to a group whose membership is delegated: a delegated
+   * administrator may add or remove members they manage, and change nothing
+   * else on the group.
+   *
+   * An ordinary administrator of the group goes through the base checks
+   * untouched, as does a caller the delegation does not reach.
+   */
+  private async judgeDelegatedGroup([dn, changes, op, req]: [
+    string,
+    ModifyRequest,
+    number,
+    DmRequest?,
+  ]): Promise<[string, ModifyRequest, number, DmRequest?]> {
+    const baseModify = this.declaredByBase.ldapmodifyrequest!;
+    const attr = this.groupAdminAttr;
+    if (!attr || this.shouldSkipAuthorization(req))
+      return (await baseModify([dn, changes, op, req])) as [
+        string,
+        ModifyRequest,
+        number,
+        DmRequest?,
+      ];
+    const user = await this.resolveCaller(req!);
+    if (!user)
+      return (await baseModify([dn, changes, op, req])) as [
+        string,
+        ModifyRequest,
+        number,
+        DmRequest?,
+      ];
+
+    const judged = await this.storedDn(dn);
+    if (this.isGlobalBranch(judged))
+      return (await baseModify([dn, changes, op, req])) as [
+        string,
+        ModifyRequest,
+        number,
+        DmRequest?,
+      ];
+    const group = await this.storedGroup(judged, attr);
+    if (!group || group.delegations.length === 0)
+      return (await baseModify([dn, changes, op, req])) as [
+        string,
+        ModifyRequest,
+        number,
+        DmRequest?,
+      ];
+
+    const linkAttr = this.config.ldap_organization_link_attribute;
+    const branch =
+      (linkAttr ? organizationLink(group.entry[linkAttr]) : undefined) ??
+      this.extractBranchDn(judged);
+    // The group's own administrators keep every right they had
+    if ((await this.getUserPermissions(user, branch)).write)
+      return (await baseModify([dn, changes, op, req])) as [
+        string,
+        ModifyRequest,
+        number,
+        DmRequest?,
+      ];
+
+    const branches = await this.getAuthorizedBranches(user);
+    if (!delegationsIntersect(branches, group.delegations))
+      return (await baseModify([dn, changes, op, req])) as [
+        string,
+        ModifyRequest,
+        number,
+        DmRequest?,
+      ];
+
+    await this.assertDelegatedChanges(user, group.delegations, changes, judged);
+    return [dn, changes, op, req];
+  }
+
+  /** The fields a group schema gives its members and owners. */
+  private groupAttributes(): { members: string; owners: string } {
+    const groups = this.server.loadedPlugins['ldapGroups'] as
+      { schema?: Schema } | undefined;
+    return {
+      members: roleAttribute(groups?.schema, 'members') || 'member',
+      owners: roleAttribute(groups?.schema, 'owners') || 'owner',
+    };
+  }
+
+  /**
+   * The filter names that test the member and owner values we reduce: their
+   * own names and OIDs, and every supertype they answer under. A filter on
+   * `distinguishedName`, which both inherit, tests both.
+   */
+  private memberFilterNames(): Promise<ReducedFilterNames> {
+    this.reducedFilterNames ??= this.resolveMemberFilterNames();
+    return this.reducedFilterNames;
+  }
+
+  private async resolveMemberFilterNames(): Promise<ReducedFilterNames> {
+    const { members, owners } = this.groupAttributes();
+    const names = new Set<string>();
+    const add = (name: string): void => {
+      const key = filterAttributeKey(name);
+      if (key) names.add(key);
+    };
+    for (const attribute of [members, owners]) add(attribute);
+    // Both are distinguishedName subtypes; the common case needs no schema
+    add('distinguishedName');
+
+    try {
+      const index = await this.server.ldap.schemaIndex();
+      for (const attribute of [members, owners]) {
+        let current = index.getAttributeType(attribute);
+        const seen = new Set<string>();
+        while (current && !seen.has(current.oid)) {
+          seen.add(current.oid);
+          add(current.oid);
+          for (const name of current.names) add(name);
+          current = current.sup
+            ? index.getAttributeType(current.sup)
+            : undefined;
+        }
+      }
+    } catch (err) {
+      // Retry on the next request rather than keep a failure for the life of
+      // the process: the configured names still answer the common case.
+      this.reducedFilterNames = undefined;
+      this.logger.debug(
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        `AuthzLinid1: could not resolve member attribute types: ${err}`
+      );
+    }
+
+    return names;
+  }
+
+  /** Whether `dn` is in a branch only its organization's administrators read. */
+  private isGlobalBranch(dn: string): boolean {
+    return this.globalBranches().some(branch => this.within(dn, branch));
+  }
+
+  /**
+   * Keep only the members and owners this caller manages, in place.
+   *
+   * @param entry group entry about to be answered
+   * @param delegations the organizations the group delegates to
+   * @param manages tells whether a member's organization is one of them
+   */
+  private async keepManagedMembers(
+    entry: AttributesList,
+    delegations: string[],
+    manages: (dn: string, delegations: string[]) => Promise<boolean>
+  ): Promise<void> {
+    const { members, owners } = this.groupAttributes();
+    for (const attr of new Set([members, owners])) {
+      const value = entry[attr];
+      if (value === undefined || value === null) continue;
+      const kept: string[] = [];
+      for (const dn of (Array.isArray(value) ? value : [value]).map(String))
+        if (await manages(dn, delegations)) kept.push(dn);
+      entry[attr] = kept;
+    }
+  }
+
+  /** The organizations a group delegates membership management to. */
+  private delegationsOf(entry: AttributesList, attr: string): string[] {
+    const value = entry[attr];
+    if (value === undefined || value === null) return [];
+    return (Array.isArray(value) ? value : [value])
+      .map(item => String(item).trim())
+      .filter(Boolean);
+  }
+
+  /** Whether a member's organization lies in one of the delegated branches. */
+  private withinDelegation(dn: string, delegations: string[]): boolean {
+    return delegations.some(branch => this.within(dn, branch));
+  }
+
+  /** The organization a member is attached to, and nothing else. */
+  private async storedOrganization(dn: string): Promise<string | undefined> {
+    const linkAttr = this.config.ldap_organization_link_attribute;
+    if (!linkAttr) return undefined;
+    try {
+      // As the server: the judgement's own read: as the caller, it would be judged by itself
+      const result = (await this.server.ldap.system.search(
+        { paged: false, scope: 'base', attributes: [linkAttr] },
+        dn
+      )) as SearchResult;
+      return organizationLink(result.searchEntries?.[0]?.[linkAttr]);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** The delegation of a group, and its stored entry. */
+  private async storedGroup(
+    dn: string,
+    attr: string
+  ): Promise<{ entry: AttributesList; delegations: string[] } | undefined> {
+    const linkAttr = this.config.ldap_organization_link_attribute;
+    const attributes = ['dn', attr, ...(linkAttr ? [linkAttr] : [])];
+    try {
+      const result = (await this.server.ldap.system.search(
+        { paged: false, scope: 'base', attributes },
+        dn
+      )) as SearchResult;
+      const entry = result.searchEntries?.[0];
+      if (!entry) return undefined;
+      return { entry, delegations: this.delegationsOf(entry, attr) };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** A DN as a key two spellings of it share. */
+  private dnKey(dn: string): string {
+    try {
+      return normalizeDn(dn);
+    } catch {
+      return dn.toLowerCase();
+    }
+  }
+
+  /** `isDnInBranch`, with a malformed DN judged as outside. */
+  private within(dn: string, branch: string): boolean {
+    try {
+      return isDnInBranch(dn, branch);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Refuse a delegated change that is not an add or delete of a member the
+   * caller manages.
+   */
+  private async assertDelegatedChanges(
+    user: string,
+    delegations: string[],
+    changes: ModifyRequest,
+    groupDn: string
+  ): Promise<void> {
+    const { members } = this.groupAttributes();
+    const same = (name: string): boolean =>
+      name.split(';')[0].toLowerCase() === members.toLowerCase();
+    const refuse = (what: string): never => {
+      throw new AuthzRefusedError(
+        `User ${user} may only add or remove members of ${groupDn}, not ${what}`
+      );
+    };
+
+    if (changes.replace && Object.keys(changes.replace).length > 0)
+      refuse('replace an attribute');
+    if (changes.add)
+      for (const name of Object.keys(changes.add))
+        if (!same(name)) refuse(name);
+    if (Array.isArray(changes.delete)) {
+      if (changes.delete.length > 0) refuse(`delete ${changes.delete[0]}`);
+    } else if (changes.delete) {
+      for (const name of Object.keys(changes.delete))
+        if (!same(name)) refuse(name);
+    }
+
+    const values = (part: AttributesList | undefined): string[] | undefined => {
+      if (!part) return undefined;
+      const key = Object.keys(part).find(name => same(name));
+      if (key === undefined) return undefined;
+      const value = part[key];
+      return (Array.isArray(value) ? value : [value]).map(item => String(item));
+    };
+    // An empty list deletes the whole attribute in LDAP: it names no value
+    // to judge, and would clear every member, not just the caller's.
+    const added = values(changes.add);
+    const deleted = Array.isArray(changes.delete)
+      ? undefined
+      : values(changes.delete);
+    if (added && added.length === 0) refuse('add no member');
+    if (deleted && deleted.length === 0) refuse('delete every member');
+    for (const value of [...(added ?? []), ...(deleted ?? [])]) {
+      if (this.isDummyMember(value)) continue;
+      if (await this.managesMember(user, delegations, value)) continue;
+      throw new AuthzRefusedError(
+        `User ${user} may not manage member ${value} of ${groupDn}`
+      );
+    }
+  }
+
+  /** Whether the caller manages a member: it is attached to one of theirs. */
+  private async managesMember(
+    user: string,
+    delegations: string[],
+    dn: string
+  ): Promise<boolean> {
+    const organization = await this.storedOrganization(dn);
+    if (!organization) return false;
+    if (!this.withinDelegation(organization, delegations)) return false;
+    return (await this.getUserPermissions(user, organization)).write === true;
+  }
+
+  /** The group plugin's placeholder, which takes the last member's place. */
+  private isDummyMember(dn: string): boolean {
+    return isDummyMemberDn(dn, this.config.group_dummy_user);
+  }
+
+  /**
    * The organizations naming `dn` an administrator. Taking one of those
    * accounts over grants its branches, so the base refuses a caller who
    * does not hold them all.
    */
   protected async administeredBranches(dn: string): Promise<string[]> {
-    const adminAttr = this.options(linid1Options).authz_local_admin_attribute;
     const orgBase =
       this.config.ldap_top_organization || this.config.ldap_base || '';
     if (!orgBase) return [];
     const result = (await this.server.ldap.system.search(
       {
         paged: false,
-        filter: `(${adminAttr}=${escapeLdapFilter(dn)})`,
+        filter: `(${this.adminAttr}=${escapeLdapFilter(dn)})`,
         attributes: ['dn'],
         scope: 'sub',
       },
@@ -299,8 +876,7 @@ export default class AuthzLinid1 extends AuthzBase {
 
     try {
       // Search for all organizations where this user is in local admin attribute
-      const adminAttr = this.options(linid1Options).authz_local_admin_attribute;
-      const filter = `(${adminAttr}=${escapeLdapFilter(userDn)})`;
+      const filter = `(${this.adminAttr}=${escapeLdapFilter(userDn)})`;
       const orgBase =
         this.config.ldap_top_organization || this.config.ldap_base || '';
 

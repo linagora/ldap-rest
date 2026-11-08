@@ -177,6 +177,12 @@
     "kind": "dns"
   },
   {
+    "cli": "--authz-group-admin-attribute",
+    "type": "string",
+    "default": "",
+    "env": "DM_AUTHZ_GROUP_ADMIN_ATTRIBUTE"
+  },
+  {
     "cli": "--authz-identity",
     "type": "string",
     "default": "req.user",

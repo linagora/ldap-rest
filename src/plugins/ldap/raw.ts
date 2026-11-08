@@ -33,31 +33,7 @@ import {
 } from '../../lib/errors.js';
 import type { LdapSchema, SchemaIndex } from '../../lib/ldapSchema.js';
 import { outsideRequest } from '../../lib/requestContext.js';
-
-/**
- * The attribute names a parsed filter tests, at any depth. An extensible
- * match carries its attribute in `matchType`.
- *
- * @param filter filter tree returned by `FilterParser.parseString`
- * @returns attribute descriptions, in no particular order
- */
-function filterAttributeNames(filter: unknown): string[] {
-  const names: string[] = [];
-  const stack: unknown[] = [filter];
-  const seen = new Set<unknown>();
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (!node || typeof node !== 'object' || seen.has(node)) continue;
-    seen.add(node);
-    const record = node as Record<string, unknown>;
-    if (typeof record.attribute === 'string') names.push(record.attribute);
-    if (typeof record.matchType === 'string') names.push(record.matchType);
-    if (Array.isArray(record.filters))
-      stack.push(...(record.filters as unknown[]));
-    if (record.filter) stack.push(record.filter);
-  }
-  return names;
-}
+import { filterAttributeNames } from '../../lib/ldapFilter.js';
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by

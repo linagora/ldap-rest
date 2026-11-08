@@ -156,6 +156,11 @@ export const linid1Options = defineOptions({
     env: 'DM_AUTHZ_GLOBAL_ORGANIZATION',
     default: '',
   }),
+  authz_group_admin_attribute: opt.string({
+    env: 'DM_AUTHZ_GROUP_ADMIN_ATTRIBUTE',
+    default: '',
+    emptyIsValue: true,
+  }),
 });
 export type Linid1Options = OptionsOf<typeof linid1Options>;
 
