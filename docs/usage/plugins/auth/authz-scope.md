@@ -93,6 +93,12 @@ GET /api/v1/authz/scope
       "delete": true
     }
   ],
+  "delegatedGroups": [
+    {
+      "dn": "cn=all-staff,ou=groups,dc=example,dc=com",
+      "manageMembers": true
+    }
+  ],
   "entities": [
     { "name": "users", "base": "ou=users,dc=example,dc=com", "create": true },
     { "name": "groups", "base": "ou=groups,dc=example,dc=com", "create": true },
@@ -104,6 +110,14 @@ GET /api/v1/authz/scope
   ]
 }
 ```
+
+### Delegated groups
+
+`delegatedGroups` lists the groups the caller reads, and whose members of
+their own organizations they may add or remove, through
+[`--authz-group-admin-attribute`](authz-linid1.md#delegated-group-membership).
+It is absent when that option is off or the caller has none. A client that
+does not know the field keeps working.
 
 `name` and `path` come from the branch entry itself, so an interface can show
 the scope in the directory's own words rather than as a raw DN.

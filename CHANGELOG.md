@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `authzLinid1` lets a group delegate membership management to the
+  administrators of other organizations, through
+  `--authz-group-admin-attribute`
+  ([#687](https://github.com/linagora/ldap-rest/issues/687),
+  [details](docs/usage/plugins/auth/authz-linid1.md#delegated-group-membership)).
+- `GET /authz/scope` lists those groups under `delegatedGroups`
+  ([details](docs/usage/plugins/auth/authz-scope.md#delegated-groups)).
+
 ## v2.1.1 (2026-11-08)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0, zlib updated to 1.4-r0.

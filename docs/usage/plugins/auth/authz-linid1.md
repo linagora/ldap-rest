@@ -11,6 +11,7 @@ The `authzLinid1` plugin provides dynamic, LDAP-driven access control by reading
 - **Full CRUD rights** - Local admins get read, write, and delete permissions
 - **Sub-branch inheritance** - Permissions apply recursively to sub-branches
 - **Cross-branch access** - Users/groups can be managed if their `twakeDepartmentLink` points to an authorized organization
+- **Delegated group membership** - A group can let other organizations' administrators manage their own members ([details](#delegated-group-membership))
 - **Permission caching** - Configurable TTL reduces LDAP queries (default: 5 minutes)
 
 ## How It Works
@@ -237,6 +238,55 @@ branch and a global write branch may not be the same, nor lie one in the
 other: the global branch would hide the write branch it holds from the
 administrators meant to read it. In either case the server refuses to
 start.
+
+### Delegated group membership
+
+A group may delegate membership management to the administrators of other
+organizations, so that a group spanning several organizations can be
+maintained by each of them without opening the others' members. Off by
+default: name the attribute to turn it on.
+
+```bash
+--authz-group-admin-attribute twakeGroupAdminOrgLink
+```
+
+The attribute is multi-valued and holds organization DNs. The Twake group
+schema declares it as `twakeGroupAdminOrgLink` (`groupAdminOrganizations`
+role, `referentialIntegrity: remove`), and `twakeGroup` and
+`twakeStaticGroup` must allow it (`MAY`).
+
+Let `D` be the organizations a group delegates to, `L` the organization a
+member is attached to (its link attribute), and `C` the caller's written
+branches. Then:
+
+- `C` reads the group when a branch of `C` intersects `D`: a written branch
+  lies in a delegated organization, or a delegated organization lies in a
+  written branch.
+- `C` reads a member or owner of the group only when it is attached to an
+  `L` inside some `D` and `C` writes `L`. A member attached to no
+  organization (in transit) is neither read nor managed through the
+  delegation.
+- `C` adds or removes a `member` under the same rule. Nothing else on the
+  group changes: not its description, delegation, name, position or
+  existence. The delegation grants no creation, rename, move or delete of a
+  group.
+- The group's own administrators keep the whole group and every right they
+  had. A group attached to no organization is already readable by every
+  administrator; the delegation only adds the member write there. A member
+  that is a group follows the same link rule.
+
+Removing the last real member keeps the group plugin's rule: the placeholder
+takes its place, or the request is refused with `409`.
+
+The groups a caller is delegated are cached for
+`--authz-linid1-cache-ttl`; the member lists are filtered on each read. A
+write through this server that changes the delegation attribute, moves a
+group, or creates, renames or deletes one drops the cache at once. A change
+made directly in the directory waits for the TTL.
+
+`GET /api/v1/authz/scope` lists the delegated groups under
+`delegatedGroups`, so a client does not duplicate the rule
+([scope](authz-scope.md#delegated-groups)).
 
 ## Configuration
 
@@ -519,6 +569,13 @@ User makes request → Check cache → (if expired) Search LDAP once → Cache f
 **Users/Groups:**
 
 - `twakeDepartmentLink` (single-valued) - DN of parent organization
+
+**Groups, when `--authz-group-admin-attribute` is set:**
+
+- `twakeGroupAdminOrgLink` (multi-valued) - DNs of the organizations whose
+  administrators manage their own members
+  ([delegated group membership](#delegated-group-membership)). The directory's
+  `twakeGroup` and `twakeStaticGroup` object classes must allow it.
 
 ### Example Schema
 
