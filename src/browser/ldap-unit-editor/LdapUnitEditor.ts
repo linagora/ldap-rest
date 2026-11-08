@@ -2,6 +2,7 @@
  * LDAP Unit Editor - Main component for editing organizational units
  */
 
+import { escapeHtml } from '../shared/utils/dom.js';
 import { UnitTree } from './components/UnitTree.js';
 import { UnitPropertyEditor } from './components/UnitPropertyEditor.js';
 import { UnitApiClient } from './api/UnitApiClient.js';
@@ -90,7 +91,7 @@ export class LdapUnitEditor {
       editorContainer.innerHTML = `
         <div class="error-state" style="padding: 24px; color: #f44336;">
           <h3>Error loading unit</h3>
-          <p>${(error as Error).message}</p>
+          <p>${escapeHtml((error as Error).message)}</p>
         </div>
       `;
       if (this.options.onError) {
