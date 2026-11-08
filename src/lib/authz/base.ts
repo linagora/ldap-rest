@@ -915,7 +915,7 @@ export default abstract class AuthzBase extends DmPlugin {
      * cheaper than working out which identity moved.
      */
     ldaprenamedone: (): void => {
-      this.resolutionCache.clear();
+      this.clearResolutionCache();
     },
 
     /**
@@ -930,7 +930,7 @@ export default abstract class AuthzBase extends DmPlugin {
      * cheaper than working out which identity the DN held.
      */
     ldapdeletedone: (): void => {
-      this.resolutionCache.clear();
+      this.clearResolutionCache();
     },
 
     ldapmodifyrequest: async ([dn, changes, opNumber, req]: [

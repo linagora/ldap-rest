@@ -270,9 +270,13 @@ export default class AuthzLinid1 extends AuthzBase {
       { paged: false, scope: 'base', attributes: [status.attribute] },
       dn
     )) as SearchResult;
-    const value = organizationLink(
-      result.searchEntries?.[0]?.[status.attribute]
+    const entry = result.searchEntries?.[0];
+    // The schema may spell the name in another case than the directory
+    const key = Object.keys(entry ?? {}).find(
+      name =>
+        name.split(';')[0].toLowerCase() === status.attribute.toLowerCase()
     );
+    const value = organizationLink(key ? entry?.[key] : undefined);
     return (
       value === undefined || normalizeDn(value) === normalizeDn(status.enabled)
     );
