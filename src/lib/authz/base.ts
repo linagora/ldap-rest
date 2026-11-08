@@ -312,6 +312,59 @@ export default abstract class AuthzBase extends DmPlugin {
   }
 
   /**
+   * The flat branches holding entries that are not branches of their own:
+   * the user, group and other schema-driven stores. An entry created there is
+   * judged on the organization it links to, not on the store it lands in.
+   */
+  private flatBases(): string[] {
+    const bases: string[] = [];
+    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
+      { instances?: { base?: string }[] } | undefined;
+    for (const instance of flat?.instances ?? [])
+      if (instance.base) bases.push(instance.base);
+    const groups = this.server.loadedPlugins['ldapGroups'] as
+      { base?: string } | undefined;
+    // Without `--ldap-group-base` the plugin falls back to `--ldap-base`:
+    // that is the directory root, not a flat store holding groups.
+    if (groups?.base && this.config.ldap_group_base) bases.push(groups.base);
+    const bulk = this.server.loadedPlugins['ldapBulkImport'] as
+      { bases?: () => string[] } | undefined;
+    if (typeof bulk?.bases === 'function') bases.push(...bulk.bases());
+    if (this.config.ldap_users_base) bases.push(this.config.ldap_users_base);
+    if (this.config.ldap_group_base) bases.push(this.config.ldap_group_base);
+    if (this.config.applicative_account_base)
+      bases.push(this.config.applicative_account_base);
+    if (this.config.external_members_branch)
+      bases.push(this.config.external_members_branch);
+    if (this.config.scim_user_base) bases.push(this.config.scim_user_base);
+    if (this.config.scim_group_base) bases.push(this.config.scim_group_base);
+    // The conventional stores when no plugin or option names them: a
+    // deployment without `ldapFlatGeneric` still keeps users and groups there.
+    if (this.config.ldap_base) {
+      bases.push(`ou=users,${this.config.ldap_base}`);
+      bases.push(`ou=groups,${this.config.ldap_base}`);
+    }
+    return bases;
+  }
+
+  /** Whether `dn` is one of the flat branches an attached entry lands in. */
+  private isFlatBase(dn: string): boolean {
+    let target: string;
+    try {
+      target = normalizeDn(dn);
+    } catch {
+      return false;
+    }
+    return this.flatBases().some(base => {
+      try {
+        return normalizeDn(base) === target;
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  /**
    * The organization entries are handed over through between
    * administrators: `--authz-transit-branch`. It only means something when
    * entries are judged by their attachment, and is `undefined` otherwise.
@@ -1097,10 +1150,11 @@ export default abstract class AuthzBase extends DmPlugin {
       // there would take over what the name administers.
       await this.guardAdministratorAccount(user, dn);
 
-      // Determine which branch to check permissions for
-      let branchToCheck: string;
-
-      // If the entry has an organization link, check permissions for that organization
+      // If the entry has an organization link, check permissions for that
+      // organization. The branch the DN lands in is judged too, unless it is
+      // a flat store holding attached entries: an organization may not be
+      // created under another tenant's tree because it links to one of the
+      // caller's own.
       const linkAttr = this.config.ldap_organization_link_attribute;
       // Whatever case the entry spells the attribute in
       const links = linkAttr
@@ -1111,21 +1165,31 @@ export default abstract class AuthzBase extends DmPlugin {
         : [];
       // The entry created, under its parent as the directory names it
       const judged = await this.storedParent(dn);
+      const location = this.extractBranchDn(judged);
+      const organizationClasses = (this.config.ldap_organization_class ?? [])
+        .filter(name => name.toLowerCase() !== 'top')
+        .map(name => name.toLowerCase());
+      const isOrganization = AuthzBase.valuesOf(entry, 'objectClass')
+        .map(name => String(name).toLowerCase())
+        .some(name => organizationClasses.includes(name));
+      const branches = new Set<string>();
       if (links.length > 0) {
-        branchToCheck = await this.storedDn(links[0]);
+        branches.add(await this.storedDn(links[0]));
+        if (isOrganization || !this.isFlatBase(location))
+          branches.add(location);
       } else {
         // For organizations (ou entries) or entries without link, check the
         // parent DN
-        branchToCheck = this.extractBranchDn(judged);
+        branches.add(location);
       }
 
-      const permissions = await this.getUserPermissions(user, branchToCheck);
-
-      // Check write permission
-      if (!permissions.write) {
-        throw new AuthzRefusedError(
-          `User ${req!.user} does not have write permission for branch ${branchToCheck}`
-        );
+      for (const branch of branches) {
+        const permissions = await this.getUserPermissions(user, branch);
+        if (!permissions.write) {
+          throw new AuthzRefusedError(
+            `User ${req!.user} does not have write permission for branch ${branch}`
+          );
+        }
       }
       // Nor where a rule refuses it, at the very DN created
       const named = await this.refusingRule(user, judged, ['write'], false);
