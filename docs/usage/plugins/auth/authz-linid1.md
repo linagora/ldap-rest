@@ -282,6 +282,10 @@ the full group, and answering from the filtered membership would tell the
 caller whether a user of another organization belongs to it. The group stays
 in the ordinary listing and can be read directly.
 
+`GET /api/v1/authz/scope` lists the delegated groups under
+`delegatedGroups`, so a client does not duplicate the rule
+([scope](authz-scope.md#delegated-groups)).
+
 The delegation is read from the group entry, so a change takes effect at
 once; the plugin does not keep a second copy of it.
 

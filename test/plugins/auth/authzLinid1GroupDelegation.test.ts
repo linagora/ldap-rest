@@ -14,6 +14,7 @@ import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import { isAuthzRefusal } from '../../../src/lib/errors';
 import type { Role } from '../../../src/abstract/plugin';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
+import AuthzScope from '../../../src/plugins/auth/authzScope';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import { skipIfMissingEnvVars } from '../../helpers/env';
@@ -203,9 +204,12 @@ describe('AuthzLinid1 group delegation', function () {
       'ldapOrganizations',
       new LdapOrganizations(server)
     );
+    const scope = new AuthzScope(server);
+    await server.registerPlugin('authzScope', scope);
     await waitFor(() => Boolean(groupsPlugin.schema), {
       what: 'the group schema',
     });
+    scope.afterLoad();
     server.setupErrorMiddleware();
     request = supertest(server.app);
 
@@ -220,6 +224,9 @@ describe('AuthzLinid1 group delegation', function () {
       'ldapOrganizations',
       new LdapOrganizations(offServer)
     );
+    const offScope = new AuthzScope(offServer);
+    await offServer.registerPlugin('authzScope', offScope);
+    offScope.afterLoad();
     offServer.setupErrorMiddleware();
     offRequest = supertest(offServer.app);
     process.env.DM_AUTHZ_GROUP_ADMIN_ATTRIBUTE = 'twakeGroupAdminOrgLink';
@@ -553,12 +560,39 @@ describe('AuthzLinid1 group delegation', function () {
     });
   });
 
+  describe('scope', () => {
+    it('lists the delegated group for each delegated administrator', async () => {
+      for (const caller of [SOPHIE, ERIC]) {
+        const res = await request.get('/api/v1/authz/scope').set(as(caller));
+        expect(res.status, caller).to.equal(200);
+        expect(res.body, caller)
+          .to.have.property('delegatedGroups')
+          .that.deep.includes({
+            dn: `cn=${GROUP},${groupBranch}`,
+            manageMembers: true,
+          });
+      }
+    });
+
+    it('omits the field for a caller the delegation does not reach', async () => {
+      const res = await request.get('/api/v1/authz/scope').set(as(HR_ADMIN));
+      expect(res.status).to.equal(200);
+      expect(res.body).not.to.have.property('delegatedGroups');
+    });
+  });
+
   describe('without the option', () => {
     it('leaves the delegated group invisible to the other organizations', async () => {
       const res = await offRequest
         .get(`/api/v1/ldap/groups/${GROUP}`)
         .set(as(SOPHIE));
       expect(res.status).to.equal(404);
+    });
+
+    it('omits delegatedGroups from the scope', async () => {
+      const res = await offRequest.get('/api/v1/authz/scope').set(as(SOPHIE));
+      expect(res.status).to.equal(200);
+      expect(res.body).not.to.have.property('delegatedGroups');
     });
   });
 });

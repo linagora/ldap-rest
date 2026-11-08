@@ -701,6 +701,52 @@ export default class AuthzLinid1 extends AuthzBase {
   }
 
   /**
+   * The groups a caller manages the members of through a delegation, for
+   * `GET /authz/scope`. Read on each call: a group's delegation is a handful
+   * of entries, and the scope is not on a request's hot path.
+   *
+   * @param user the caller's DN
+   * @returns the delegated groups, empty when the option is off
+   */
+  async delegatedGroups(
+    user: string
+  ): Promise<{ dn: string; manageMembers: boolean }[]> {
+    const attr = this.groupAdminAttr;
+    const base = (
+      this.server.loadedPlugins['ldapGroups'] as { base?: string } | undefined
+    )?.base;
+    if (!attr || !base) return [];
+    const branches = await this.getAuthorizedBranches(user);
+    if (branches.length === 0) return [];
+    try {
+      // As the server: the scope describes what the caller's own rules grant
+      const result = (await this.server.ldap.system.search(
+        {
+          paged: false,
+          scope: 'sub',
+          filter: `(${attr}=*)`,
+          attributes: ['dn', attr],
+        },
+        base
+      )) as SearchResult;
+      const groups: { dn: string; manageMembers: boolean }[] = [];
+      for (const entry of result.searchEntries ?? []) {
+        const dn = String(entry.dn);
+        if (this.isGlobalBranch(dn)) continue;
+        if (delegationsIntersect(branches, this.delegationsOf(entry, attr)))
+          groups.push({ dn, manageMembers: true });
+      }
+      return groups;
+    } catch (err) {
+      this.logger.error(
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        `AuthzLinid1: could not read delegated groups: ${err}`
+      );
+      return [];
+    }
+  }
+
+  /**
    * The organizations naming `dn` an administrator. Taking one of those
    * accounts over grants its branches, so the base refuses a caller who
    * does not hold them all.

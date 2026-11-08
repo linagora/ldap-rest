@@ -20,7 +20,8 @@
 
 - `authzLinid1` lets a group delegate membership management to the
   administrators of other organizations, through
-  `--authz-group-admin-attribute`
+  `--authz-group-admin-attribute`; `GET /authz/scope` lists those groups
+  under `delegatedGroups`
   ([#687](https://github.com/linagora/ldap-rest/issues/687),
   [details](docs/usage/plugins/auth/authz-linid1.md#delegated-group-membership)).
 
