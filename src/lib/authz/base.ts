@@ -636,8 +636,8 @@ export default abstract class AuthzBase extends DmPlugin {
    * request that *was* authenticated, whose identity this plugin's model
    * cannot place.
    *
-   * That used to return the operation untouched behind a `warn`, which made
-   * a configuration mismatch an open door rather than a refusal.
+   * Returning the operation untouched behind a `warn` made a configuration
+   * mismatch an open door rather than a refusal.
    * `authzLinid1` resolves `req.user` by searching
    * `(<ldap_user_main_attribute>=<identity>)`, so an authenticator
    * publishing anything else — `core/auth/openidconnect` publishes the OIDC
@@ -663,10 +663,10 @@ export default abstract class AuthzBase extends DmPlugin {
    *  - a *positive* answer can go stale. `authzLinid1` resolves an identity
    *    to a DN, so an administrator whose own entry is renamed or moved is
    *    still resolved to the former DN, where no organization names them:
-   *    every operation is refused until the TTL runs out. A rename or a
-   *    delete therefore drops what was resolved, which closes the window
-   *    for the case that produces it; a change made directly in the
-   *    directory still waits.
+   *    every operation is refused until the TTL runs out. A rename, a
+   *    delete or a status change therefore drops what was resolved, which
+   *    closes the window for the case that produces it; a change made
+   *    directly in the directory still waits.
    *
    * `authzScope` resolves the identity itself (`authzScope.ts`), outside
    * this cache, so during such a window it can describe a scope the hooks
@@ -893,7 +893,7 @@ export default abstract class AuthzBase extends DmPlugin {
     return (await this.getUserPermissions(user, top)).write === true;
   }
 
-  /** Forget what was resolved, for a test that changes the directory. */
+  /** Forget what was resolved: a write changed an identity or its status. */
   protected clearResolutionCache(): void {
     this.resolutionGeneration++;
     this.resolutionCache.clear();
