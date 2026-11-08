@@ -17,6 +17,7 @@ class HeaderInspector extends DmPlugin {
         remoteAddress: req.socket.remoteAddress,
         trustedProxy: req.trustedProxy || false,
         proxyAuthUser: req.proxyAuthUser || null,
+        clientIp: req.clientIp || null,
       });
     });
   }
@@ -152,6 +153,55 @@ describe('TrustedProxy Plugin', () => {
 
       expect(response.status).to.equal(200);
       expect(response.body.xForwardedFor).to.equal('203.0.113.50');
+      expect(response.body.clientIp).to.equal('203.0.113.50');
+    });
+
+    it('reads the client from the right of the forwarded chain', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('X-Forwarded-For', '1.2.3.4, 203.0.113.9');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.clientIp).to.equal('203.0.113.9');
+    });
+
+    it('skips trusted proxies in the forwarded chain', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('X-Forwarded-For', '198.51.100.7, 127.0.0.1');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.clientIp).to.equal('198.51.100.7');
+    });
+
+    it('reads an address carrying a port', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('X-Forwarded-For', '10.0.0.1, 203.0.113.9:4711');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.clientIp).to.equal('203.0.113.9');
+    });
+
+    it('reads a bracketed IPv6 address carrying a port', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('X-Forwarded-For', '10.0.0.2, [2001:db8::9]:4711');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.clientIp).to.equal('2001:db8::9');
+    });
+
+    it('uses the peer when the rightmost entry is not an address', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('X-Forwarded-For', '10.0.0.3, unknown');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.clientIp).to.be.oneOf([
+        '127.0.0.1',
+        '::ffff:127.0.0.1',
+      ]);
     });
   });
 
@@ -217,6 +267,10 @@ describe('TrustedProxy Plugin', () => {
       expect(response.status).to.equal(200);
       // X-Forwarded-For should be removed since 127.0.0.1 is not trusted
       expect(response.body.xForwardedFor).to.equal(null);
+      expect(response.body.clientIp).to.be.oneOf([
+        '127.0.0.1',
+        '::ffff:127.0.0.1',
+      ]);
     });
 
     it('should allow requests without X-Forwarded-For', async () => {

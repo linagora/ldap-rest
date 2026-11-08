@@ -5,9 +5,11 @@
 ### Security
 
 - Creating an entry is judged on the branch its DN lands in as well as on the
-  organization it links to: a local administrator can no longer create an
-  organization under another tenant's tree by linking it to one of theirs
+  organization it links to
   ([GHSA-9c94-qj49-5p89](https://github.com/linagora/ldap-rest/security/advisories/GHSA-9c94-qj49-5p89)).
+- Rate limiting, CrowdSec and access logs key on the client address
+  `trustedProxy` reads from the right of `X-Forwarded-For`
+  ([GHSA-c4vh-qfrh-5hmq](https://github.com/linagora/ldap-rest/security/advisories/GHSA-c4vh-qfrh-5hmq)).
 
 ### Added
 

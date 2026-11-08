@@ -361,7 +361,7 @@ export class DM {
       // parallel batch, where the order is import completion. A named
       // `core/auth/trustedProxy` then registered after the routes it was
       // meant to guard, and a forged `X-Forwarded-For` reached them — which
-      // is what `rateLimit` and `crowdsec` key on.
+      // `rateLimit` and `crowdsec` read their client from.
       //
       // Every instance of a priority module is loaded here, in configuration
       // order: two instances of one module are a deliberate configuration
@@ -538,8 +538,8 @@ export class DM {
    * Position is the whole point. Guards (`protect`: rate limiting, proxy
    * trust, CrowdSec) and access logging must see a request *before*
    * authentication — a rate limiter that runs after a 401 never gets to
-   * answer 429, and `trustedProxy` strips forged `X-Forwarded-For` headers
-   * that authentication relies on. Everything else may register routes, and
+   * answer 429, and `trustedProxy` publishes the client address those
+   * guards and the access log read. Everything else may register routes, and
    * a route must never precede authentication: mounting one layer here, at
    * the boundary between the two, is what makes protection independent of
    * the order plugins happen to load in.

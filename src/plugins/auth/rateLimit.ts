@@ -31,6 +31,9 @@ export default class RateLimit extends DmPlugin {
   private store: Map<string, RateLimitEntry> = new Map();
   private windowMs: number;
   private maxRequests: number;
+  private lastSweep = 0;
+  /** Distinct addresses remembered at once, so a rotating header cannot grow the map. */
+  private static readonly MAX_CLIENTS = 10000;
 
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
@@ -44,30 +47,22 @@ export default class RateLimit extends DmPlugin {
   }
 
   api(app: Express): void {
-    // The limiter keys on the client IP taken from X-Forwarded-For, which a
-    // client can set to anything. That is only safe because trustedProxy —
-    // loaded first — strips the header on requests that do not come from a
-    // declared proxy. Without it, rotating the header defeats the limiter
-    // entirely and the brute-force protection is decorative, with nothing to
-    // show for it in the logs.
+    // The limiter keys on the client IP `trustedProxy` publishes after
+    // reading the proxy chain from the right. Without that plugin the peer is
+    // the client, so a header a client writes cannot move the counter.
     if (!this.server.loadedPlugins.trustedProxy)
       this.logger.warn(
-        'Auth rate limiting keys on X-Forwarded-For but core/auth/trustedProxy ' +
-          'is not loaded: a client can forge that header and evade the limit. ' +
-          'Load core/auth/trustedProxy, or put the API behind a proxy that ' +
-          'overwrites the header.'
+        'Auth rate limiting ignores X-Forwarded-For because ' +
+          'core/auth/trustedProxy is not loaded and uses the TCP peer: ' +
+          'requests through a proxy share one counter. Load ' +
+          'core/auth/trustedProxy to key on the client it identifies.'
       );
 
     // Middleware to check rate limits and track failed authentications
     app.use((req: Request, res: Response, next: NextFunction) => {
       const ip = this.getClientIp(req);
       const now = Date.now();
-      const entry = this.store.get(ip);
-
-      // Clean up expired entries
-      if (entry && now > entry.resetTime) {
-        this.store.delete(ip);
-      }
+      this.prune(now);
 
       // Check if IP is rate limited
       const currentEntry = this.store.get(ip);
@@ -92,7 +87,10 @@ export default class RateLimit extends DmPlugin {
           const now = Date.now();
 
           if (!entry || now > entry.resetTime) {
-            // Create new entry
+            // Restarting a counter moves it to the end of the eviction order
+            if (entry) this.store.delete(ip);
+            this.prune(now);
+            if (this.store.size >= RateLimit.MAX_CLIENTS) this.evictOldest();
             this.store.set(ip, {
               count: 1,
               resetTime: now + this.windowMs,
@@ -112,17 +110,24 @@ export default class RateLimit extends DmPlugin {
     });
   }
 
+  /** Drop expired counters, at most once a window, and keep the map bounded. */
+  private prune(now: number): void {
+    if (now - this.lastSweep < this.windowMs) return;
+    this.lastSweep = now;
+    for (const [key, entry] of this.store)
+      if (now > entry.resetTime) this.store.delete(key);
+    while (this.store.size >= RateLimit.MAX_CLIENTS) this.evictOldest();
+  }
+
+  /** Drop the oldest counter: `Map` keeps insertion order. */
+  private evictOldest(): void {
+    const oldest = this.store.keys().next().value;
+    if (oldest !== undefined) this.store.delete(oldest);
+  }
+
   private getClientIp(req: Request): string {
-    // Support X-Forwarded-For header for proxied requests
-    // The header can be string | string[] | undefined
-    const forwarded = req.headers['x-forwarded-for'];
-    if (forwarded) {
-      // If it's an array, take the first element, otherwise use the string directly
-      const forwardedStr = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-      // X-Forwarded-For can contain multiple IPs separated by commas (client, proxy1, proxy2...)
-      // The first IP is the original client
-      return forwardedStr.split(',')[0].trim();
-    }
-    return req.socket.remoteAddress || 'unknown';
+    // `trustedProxy` reads the chain and publishes the client it trusts;
+    // without it the peer is the client.
+    return req.clientIp || req.socket.remoteAddress || 'unknown';
   }
 }
