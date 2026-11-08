@@ -14,6 +14,7 @@ import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Role } from '../../../src/abstract/plugin';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import AuthzScope from '../../../src/plugins/auth/authzScope';
+import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
@@ -61,6 +62,7 @@ describe('AuthzLinid1 group delegation', function () {
   const HR_USER = 'l1del.hr.user';
   const GROUP = 'l1del-all-staff';
   const SOLO = 'l1del-solo';
+  const NEW_GROUP = 'l1del-new';
   const accounts = [
     ADMIN,
     SOPHIE,
@@ -205,6 +207,10 @@ describe('AuthzLinid1 group delegation', function () {
       'ldapOrganizations',
       new LdapOrganizations(server)
     );
+    await server.registerPlugin(
+      'ldapEnterpriseRules',
+      new LdapEnterpriseRules(server)
+    );
     const scope = new AuthzScope(server);
     await server.registerPlugin('authzScope', scope);
     await waitFor(() => Boolean(groupsPlugin.schema), {
@@ -238,7 +244,7 @@ describe('AuthzLinid1 group delegation', function () {
   });
 
   after(async () => {
-    for (const cn of [GROUP, SOLO])
+    for (const cn of [GROUP, SOLO, NEW_GROUP])
       await server.ldap
         .delete(`cn=${cn},${groupBranch}`)
         .catch(() => undefined);
@@ -287,6 +293,34 @@ describe('AuthzLinid1 group delegation', function () {
       expect(membersOf(res.body)).to.have.members([dnOf(ALICE), dnOf(BOB)]);
       expect(membersOf(res.body)).not.to.include(dnOf(CAROL));
       expect(valuesOf(res.body, 'owner')).to.deep.equal([dnOf(ALICE)]);
+    });
+
+    it('does not reveal another organization member through a filter', async () => {
+      const hidden = await request
+        .get('/api/v1/ldap/groups')
+        .query({ match: `(member=${dnOf(CAROL)})` })
+        .set(as(SOPHIE));
+      expect(hidden.status).to.equal(200);
+      expect(hidden.body).not.to.have.property(GROUP);
+
+      const own = await request
+        .get('/api/v1/ldap/groups')
+        .query({ match: `(member=${dnOf(ALICE)})` })
+        .set(as(SOPHIE));
+      expect(own.status).to.equal(200);
+      expect(own.body).to.have.property(GROUP);
+    });
+
+    it('does not return the attributes the filter only widened for', async () => {
+      const res = await request
+        .get('/api/v1/ldap/groups')
+        .query({ attributes: 'cn,member' })
+        .set(as(SOPHIE));
+      expect(res.status).to.equal(200);
+      expect(res.body[GROUP]).to.have.property('cn', GROUP);
+      expect(res.body[GROUP]).not.to.have.property('twakeDepartmentLink');
+      expect(res.body[GROUP]).not.to.have.property('objectClass');
+      expect(res.body[GROUP]).not.to.have.property('twakeGroupAdminOrgLink');
     });
 
     it('keeps the whole group visible to its own administrators', async () => {
@@ -366,6 +400,14 @@ describe('AuthzLinid1 group delegation', function () {
           `/api/v1/ldap/groups/${GROUP}/members/${encodeURIComponent(dnOf(CAROL))}`
         )
         .set(as(SOPHIE));
+      expect(res.status).to.equal(403);
+    });
+
+    it('refuses an empty member change', async () => {
+      const res = await request
+        .post(`/api/v1/ldap/groups/${GROUP}/members`)
+        .set(as(SOPHIE))
+        .send({ member: [] });
       expect(res.status).to.equal(403);
     });
 
@@ -451,6 +493,34 @@ describe('AuthzLinid1 group delegation', function () {
       const res = await request.get('/api/v1/authz/scope').set(as(HR_ADMIN));
       expect(res.status).to.equal(200);
       expect(res.body).not.to.have.property('delegatedGroups');
+    });
+
+    it('lists a group created after the scope was cached', async () => {
+      const before = await request.get('/api/v1/authz/scope').set(as(SOPHIE));
+      expect(before.body.delegatedGroups).not.to.deep.include({
+        dn: `cn=${NEW_GROUP},${groupBranch}`,
+        manageMembers: true,
+      });
+
+      const created = await request
+        .post('/api/v1/ldap/groups')
+        .set(as(ADMIN))
+        .send({
+          cn: NEW_GROUP,
+          description: 'New group',
+          twakeDepartmentLink: top,
+          twakeGroupAdminOrgLink: [sales],
+          member: [dnOf(ALICE)],
+        });
+      expect(created.status, JSON.stringify(created.body)).to.equal(200);
+
+      const after = await request.get('/api/v1/authz/scope').set(as(SOPHIE));
+      expect(after.body.delegatedGroups).to.deep.include({
+        dn: `cn=${NEW_GROUP},${groupBranch}`,
+        manageMembers: true,
+      });
+
+      await request.delete(`/api/v1/ldap/groups/${NEW_GROUP}`).set(as(ADMIN));
     });
   });
 

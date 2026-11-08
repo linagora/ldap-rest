@@ -6,6 +6,7 @@
  * Grants permissions to users referenced in organization's twakeLocalAdminLink
  * @group Plugins
  */
+import { FilterParser, SearchFilter } from 'ldapts';
 import type { Entry, SearchOptions } from 'ldapts';
 
 import type { DM } from '../../bin/index.js';
@@ -22,6 +23,7 @@ import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base.js';
 import { AuthzRefusedError } from '../../lib/errors.js';
 import {
   escapeLdapFilter,
+  escapeRegex,
   isDnInBranch,
   isDummyMemberDn,
   normalizeDn,
@@ -66,6 +68,118 @@ function delegationsIntersect(
   );
 }
 
+/** The attribute names a parsed filter tests, at any depth. */
+function filterAttributeNames(filter: unknown): string[] {
+  const names: string[] = [];
+  const stack: unknown[] = [];
+  const seen = new Set<unknown>();
+  if (filter) stack.push(filter);
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (!node || typeof node !== 'object' || seen.has(node)) continue;
+    seen.add(node);
+    const record = node as Record<string, unknown>;
+    if (typeof record.attribute === 'string') names.push(record.attribute);
+    if (typeof record.matchType === 'string') names.push(record.matchType);
+    if (Array.isArray(record.filters))
+      stack.push(...(record.filters as unknown[]));
+    if (record.filter) stack.push(record.filter);
+  }
+  return names;
+}
+
+/** A filter value or an entry value as text, nothing for a shape LDAP cannot hold. */
+function asText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean')
+    return String(value);
+  return Buffer.isBuffer(value) ? value.toString('utf8') : '';
+}
+
+/** The values an entry holds for an attribute, as text. */
+function entryValues(entry: AttributesList, attribute: string): string[] {
+  if (attribute.toLowerCase() === 'dn') return [String(entry.dn ?? '')];
+  const key = Object.keys(entry).find(
+    name => name.split(';')[0].toLowerCase() === attribute.toLowerCase()
+  );
+  if (key === undefined) return [];
+  const value = entry[key];
+  return (Array.isArray(value) ? value : [value])
+    .filter(item => item !== undefined && item !== null)
+    .map(asText);
+}
+
+/**
+ * Whether a parsed LDAP filter matches an entry after its member lists were
+ * reduced. The directory judged the full entry; this judges what the caller
+ * is actually shown, so a search on another organization's member does not
+ * reveal that membership.
+ *
+ * A filter node this does not understand answers false: hiding a group the
+ * caller might have found is safe, showing one the directory matched on a
+ * hidden value is not.
+ */
+function matchesFilter(filter: unknown, entry: AttributesList): boolean {
+  const node = filter as
+    | {
+        type?: number;
+        attribute?: string;
+        value?: unknown;
+        initial?: unknown;
+        any?: unknown;
+        final?: unknown;
+        filters?: unknown[];
+        filter?: unknown;
+      }
+    | undefined;
+  if (!node) return false;
+  const values = (attribute: string): string[] => entryValues(entry, attribute);
+  switch (node.type) {
+    case SearchFilter.and:
+      return (node.filters ?? []).every(child => matchesFilter(child, entry));
+    case SearchFilter.or:
+      return (node.filters ?? []).some(child => matchesFilter(child, entry));
+    case SearchFilter.not:
+      return !matchesFilter(node.filter, entry);
+    case SearchFilter.equalityMatch: {
+      const wanted = asText(node.value).toLowerCase();
+      return values(String(node.attribute ?? '')).some(
+        value => value.toLowerCase() === wanted
+      );
+    }
+    case SearchFilter.present:
+      return values(String(node.attribute ?? '')).length > 0;
+    case SearchFilter.substrings: {
+      const initial = asText(node.initial);
+      const any = (Array.isArray(node.any) ? node.any : []).map(asText);
+      const final = asText(node.final);
+      const pattern = new RegExp(
+        `^${escapeRegex(initial)}` +
+          any.map(part => `.*${escapeRegex(part)}`).join('') +
+          `.*${escapeRegex(final)}$`,
+        'i'
+      );
+      return values(String(node.attribute ?? '')).some(value =>
+        pattern.test(value)
+      );
+    }
+    case SearchFilter.greaterOrEqual: {
+      const wanted = asText(node.value).toLowerCase();
+      return values(String(node.attribute ?? '')).some(
+        value => value.toLowerCase() >= wanted
+      );
+    }
+    case SearchFilter.lessOrEqual: {
+      const wanted = asText(node.value).toLowerCase();
+      return values(String(node.attribute ?? '')).some(
+        value => value.toLowerCase() <= wanted
+      );
+    }
+    default:
+      return false;
+  }
+}
+
 import { linid1Options } from './auth.options.js';
 
 export default class AuthzLinid1 extends AuthzBase {
@@ -79,6 +193,8 @@ export default class AuthzLinid1 extends AuthzBase {
    * into the cache afterwards.
    */
   private permissionsGeneration = 0;
+  /** The same guard for the delegated groups a scope request listed. */
+  private delegationsGeneration = 0;
 
   /** The delegation attribute, when the feature is on. */
   private readonly groupAdminAttr: string;
@@ -184,7 +300,7 @@ export default class AuthzLinid1 extends AuthzBase {
       ...this.declaredByBase,
       ldapadddone: (dn, entry, context): MaybePromise<void> => {
         // A group created with a delegation is absent from a cached scope
-        if (this.groupAdminAttr) this.delegatedGroupsCache.clear();
+        if (this.groupAdminAttr) this.forgetDelegations();
         return this.declaredByBase.ldapadddone?.(dn, entry, context);
       },
       ldapsearchrequest: (
@@ -208,7 +324,7 @@ export default class AuthzLinid1 extends AuthzBase {
           linkAttr &&
           touches(changes, [linkAttr])
         )
-          this.delegatedGroupsCache.clear();
+          this.forgetDelegations();
         return this.declaredByBase.ldapmodifydone?.(dn, changes, op, context);
       },
       ldapdeletedone: (dn, context): MaybePromise<void> => {
@@ -226,6 +342,12 @@ export default class AuthzLinid1 extends AuthzBase {
   forgetPermissions(): void {
     this.permissionsGeneration++;
     this.permissionsCache.clear();
+    this.forgetDelegations();
+  }
+
+  /** Drop the groups a scope request listed, without touching permissions. */
+  private forgetDelegations(): void {
+    this.delegationsGeneration++;
     this.delegatedGroupsCache.clear();
   }
 
@@ -315,6 +437,32 @@ export default class AuthzLinid1 extends AuthzBase {
       const keptDns = new Set(
         entries.map(entry => this.dnKey(String(entry.dn)))
       );
+      const { members, owners } = this.groupAttributes();
+      const reduced = new Set(
+        [members, owners].map(name => name.toLowerCase())
+      );
+      const filterText = opts?.filter;
+      let parsedFilter: unknown;
+      let unparseable = false;
+      try {
+        parsedFilter = filterText
+          ? FilterParser.parseString(String(filterText))
+          : undefined;
+      } catch {
+        unparseable = true;
+      }
+      const mustMatch =
+        parsedFilter !== undefined &&
+        filterAttributeNames(parsedFilter).some(name =>
+          reduced.has(name.split(';')[0].toLowerCase())
+        );
+      const linkAttr = this.config.ldap_organization_link_attribute;
+      const widenedLink = (opts as { [key: symbol]: unknown } | undefined)?.[
+        AuthzBase.widenedForLink
+      ];
+      const widenedObjectClass = (
+        opts as { [key: symbol]: unknown } | undefined
+      )?.[AuthzBase.widenedForObjectClass];
       const branches = await this.getAuthorizedBranches(user);
       const memberOrganization = new Map<string, Promise<string | undefined>>();
       const organizationOf = (dn: string): Promise<string | undefined> => {
@@ -339,11 +487,17 @@ export default class AuthzLinid1 extends AuthzBase {
       };
 
       for (const [key, entry] of delegated) {
-        if (keptDns.has(key)) continue;
+        if (keptDns.has(key) || unparseable) continue;
         const delegations = this.delegationsOf(entry, attr);
         if (!delegationsIntersect(branches, delegations)) continue;
         const copy = { ...entry };
         await this.keepManagedMembers(copy, delegations, manages);
+        // The directory matched the full entry; judge what this caller will
+        // actually see, or a search on another organization's member tells
+        // them that membership exists.
+        if (mustMatch && !matchesFilter(parsedFilter, copy)) continue;
+        if (widenedLink && linkAttr) delete copy[linkAttr];
+        if (widenedObjectClass) delete copy.objectClass;
         entries.push(copy);
       }
       kept.searchEntries = entries;
@@ -578,17 +732,22 @@ export default class AuthzLinid1 extends AuthzBase {
         if (!same(name)) refuse(name);
     }
 
-    const values = (part: AttributesList | undefined): string[] => {
-      if (!part) return [];
+    const values = (part: AttributesList | undefined): string[] | undefined => {
+      if (!part) return undefined;
       const key = Object.keys(part).find(name => same(name));
-      if (key === undefined) return [];
+      if (key === undefined) return undefined;
       const value = part[key];
       return (Array.isArray(value) ? value : [value]).map(item => String(item));
     };
-    for (const value of [
-      ...values(changes.add),
-      ...(Array.isArray(changes.delete) ? [] : values(changes.delete)),
-    ]) {
+    // An empty list deletes the whole attribute in LDAP: it names no value
+    // to judge, and would clear every member, not just the caller's.
+    const added = values(changes.add);
+    const deleted = Array.isArray(changes.delete)
+      ? undefined
+      : values(changes.delete);
+    if (added && added.length === 0) refuse('add no member');
+    if (deleted && deleted.length === 0) refuse('delete every member');
+    for (const value of [...(added ?? []), ...(deleted ?? [])]) {
       if (this.isDummyMember(value)) continue;
       if (await this.managesMember(user, delegations, value)) continue;
       throw new AuthzRefusedError(
@@ -628,9 +787,9 @@ export default class AuthzLinid1 extends AuthzBase {
     if (cached && Date.now() - cached.timestamp < this.cacheTTL)
       return cached.groups;
 
-    const generation = this.permissionsGeneration;
+    const generation = this.delegationsGeneration;
     const remember = (groups: DelegatedGroup[]): DelegatedGroup[] => {
-      if (generation === this.permissionsGeneration)
+      if (generation === this.delegationsGeneration)
         this.delegatedGroupsCache.set(user, {
           groups,
           timestamp: Date.now(),

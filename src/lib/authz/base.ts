@@ -87,10 +87,10 @@ export default abstract class AuthzBase extends DmPlugin {
    * `twake/tombstone` narrows the filter of a SCIM search — hands on a copy.
    * An object spread copies the key; a set would no longer know the copy.
    */
-  private static readonly widenedForLink = Symbol('widened for the link');
+  protected static readonly widenedForLink = Symbol('widened for the link');
 
   /** Searches widened to carry `objectClass`, by the same means and for the same reason. */
-  private static readonly widenedForObjectClass = Symbol(
+  protected static readonly widenedForObjectClass = Symbol(
     'widened for object classes'
   );
 
