@@ -22,6 +22,10 @@ import type { DmRequest } from '../../lib/auth/base.js';
 import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base.js';
 import { AuthzRefusedError } from '../../lib/errors.js';
 import {
+  filterAttributeKey,
+  filterAttributeNames,
+} from '../../lib/ldapFilter.js';
+import {
   escapeLdapFilter,
   escapeRegex,
   isDnInBranch,
@@ -46,6 +50,14 @@ interface CachedDelegatedGroups {
   timestamp: number;
 }
 
+/** The filter names that test a group's member or owner values. */
+interface ReducedFilterNames {
+  /** Any of these naming an attribute means the filter tests reduced values */
+  names: Set<string>;
+  /** Each name, and the entry attributes whose values it tests */
+  values: Map<string, string[]>;
+}
+
 /**
  * Whether a caller's written branches and a group's delegated organizations
  * intersect: one lies in the other, either way.
@@ -66,26 +78,6 @@ function delegationsIntersect(
       branch => within(branch, delegation) || within(delegation, branch)
     )
   );
-}
-
-/** The attribute names a parsed filter tests, at any depth. */
-function filterAttributeNames(filter: unknown): string[] {
-  const names: string[] = [];
-  const stack: unknown[] = [];
-  const seen = new Set<unknown>();
-  if (filter) stack.push(filter);
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (!node || typeof node !== 'object' || seen.has(node)) continue;
-    seen.add(node);
-    const record = node as Record<string, unknown>;
-    if (typeof record.attribute === 'string') names.push(record.attribute);
-    if (typeof record.matchType === 'string') names.push(record.matchType);
-    if (Array.isArray(record.filters))
-      stack.push(...(record.filters as unknown[]));
-    if (record.filter) stack.push(record.filter);
-  }
-  return names;
 }
 
 /** A filter value or an entry value as text, nothing for a shape LDAP cannot hold. */
@@ -109,6 +101,18 @@ function entryValues(entry: AttributesList, attribute: string): string[] {
     .map(asText);
 }
 
+/** The node fields the matcher reads. */
+interface FilterNode {
+  type?: number;
+  attribute?: string;
+  value?: unknown;
+  initial?: unknown;
+  any?: unknown;
+  final?: unknown;
+  filters?: unknown[];
+  filter?: unknown;
+}
+
 /**
  * Whether a parsed LDAP filter matches an entry after its member lists were
  * reduced. The directory judged the full entry; this judges what the caller
@@ -118,29 +122,23 @@ function entryValues(entry: AttributesList, attribute: string): string[] {
  * A filter node this does not understand answers false: hiding a group the
  * caller might have found is safe, showing one the directory matched on a
  * hidden value is not.
+ *
+ * @param filter parsed filter
+ * @param values values of the attribute a filter node names, as displayed
  */
-function matchesFilter(filter: unknown, entry: AttributesList): boolean {
-  const node = filter as
-    | {
-        type?: number;
-        attribute?: string;
-        value?: unknown;
-        initial?: unknown;
-        any?: unknown;
-        final?: unknown;
-        filters?: unknown[];
-        filter?: unknown;
-      }
-    | undefined;
+function matchesFilter(
+  filter: unknown,
+  values: (attribute: string) => string[]
+): boolean {
+  const node = filter as FilterNode | undefined;
   if (!node) return false;
-  const values = (attribute: string): string[] => entryValues(entry, attribute);
   switch (node.type) {
     case SearchFilter.and:
-      return (node.filters ?? []).every(child => matchesFilter(child, entry));
+      return (node.filters ?? []).every(child => matchesFilter(child, values));
     case SearchFilter.or:
-      return (node.filters ?? []).some(child => matchesFilter(child, entry));
+      return (node.filters ?? []).some(child => matchesFilter(child, values));
     case SearchFilter.not:
-      return !matchesFilter(node.filter, entry);
+      return !matchesFilter(node.filter, values);
     case SearchFilter.equalityMatch: {
       const wanted = asText(node.value).toLowerCase();
       return values(String(node.attribute ?? '')).some(
@@ -180,6 +178,24 @@ function matchesFilter(filter: unknown, entry: AttributesList): boolean {
   }
 }
 
+/**
+ * Whether a negation tests one of the reduced attributes. A group matched by
+ * what its hidden members do *not* satisfy still tells the caller about
+ * them, so it is not shown at all.
+ */
+function negatesReduced(filter: unknown, reduced: Set<string>): boolean {
+  const node = filter as FilterNode | undefined;
+  if (!node) return false;
+  if (node.type === SearchFilter.not) {
+    const names = filterAttributeNames(node.filter).map(filterAttributeKey);
+    if (names.some(name => reduced.has(name))) return true;
+    return negatesReduced(node.filter, reduced);
+  }
+  if (node.type === SearchFilter.and || node.type === SearchFilter.or)
+    return (node.filters ?? []).some(child => negatesReduced(child, reduced));
+  return false;
+}
+
 import { linid1Options } from './auth.options.js';
 
 export default class AuthzLinid1 extends AuthzBase {
@@ -203,6 +219,7 @@ export default class AuthzLinid1 extends AuthzBase {
     string,
     CachedDelegatedGroups
   >();
+  private reducedFilterNames?: Promise<ReducedFilterNames>;
 
   /**
    * Marks a search whose projection we widened for the delegation attribute.
@@ -437,10 +454,7 @@ export default class AuthzLinid1 extends AuthzBase {
       const keptDns = new Set(
         entries.map(entry => this.dnKey(String(entry.dn)))
       );
-      const { members, owners } = this.groupAttributes();
-      const reduced = new Set(
-        [members, owners].map(name => name.toLowerCase())
-      );
+      const reducedNames = await this.memberFilterNames();
       const filterText = opts?.filter;
       let parsedFilter: unknown;
       let unparseable = false;
@@ -451,11 +465,14 @@ export default class AuthzLinid1 extends AuthzBase {
       } catch {
         unparseable = true;
       }
+      const names = parsedFilter
+        ? filterAttributeNames(parsedFilter).map(filterAttributeKey)
+        : [];
       const mustMatch =
         parsedFilter !== undefined &&
-        filterAttributeNames(parsedFilter).some(name =>
-          reduced.has(name.split(';')[0].toLowerCase())
-        );
+        names.some(name => reducedNames.names.has(name));
+      const negated =
+        mustMatch && negatesReduced(parsedFilter, reducedNames.names);
       const linkAttr = this.config.ldap_organization_link_attribute;
       const widenedLink = (opts as { [key: symbol]: unknown } | undefined)?.[
         AuthzBase.widenedForLink
@@ -487,7 +504,7 @@ export default class AuthzLinid1 extends AuthzBase {
       };
 
       for (const [key, entry] of delegated) {
-        if (keptDns.has(key) || unparseable) continue;
+        if (keptDns.has(key) || unparseable || negated) continue;
         const delegations = this.delegationsOf(entry, attr);
         if (!delegationsIntersect(branches, delegations)) continue;
         const copy = { ...entry };
@@ -495,7 +512,13 @@ export default class AuthzLinid1 extends AuthzBase {
         // The directory matched the full entry; judge what this caller will
         // actually see, or a search on another organization's member tells
         // them that membership exists.
-        if (mustMatch && !matchesFilter(parsedFilter, copy)) continue;
+        const valuesFor = (name: string): string[] => {
+          const attributes = reducedNames.values.get(filterAttributeKey(name));
+          return attributes
+            ? attributes.flatMap(attribute => entryValues(copy, attribute))
+            : entryValues(copy, name);
+        };
+        if (mustMatch && !matchesFilter(parsedFilter, valuesFor)) continue;
         if (widenedLink && linkAttr) delete copy[linkAttr];
         if (widenedObjectClass) delete copy.objectClass;
         entries.push(copy);
@@ -595,6 +618,62 @@ export default class AuthzLinid1 extends AuthzBase {
     return {
       members: roleAttribute(groups?.schema, 'members') || 'member',
       owners: roleAttribute(groups?.schema, 'owners') || 'owner',
+    };
+  }
+
+  /**
+   * The filter names that test the member and owner values we reduce: their
+   * own names and OIDs, and every supertype they answer under. A filter on
+   * `distinguishedName`, which both inherit, tests both.
+   */
+  private memberFilterNames(): Promise<ReducedFilterNames> {
+    this.reducedFilterNames ??= this.resolveMemberFilterNames();
+    return this.reducedFilterNames;
+  }
+
+  private async resolveMemberFilterNames(): Promise<ReducedFilterNames> {
+    const { members, owners } = this.groupAttributes();
+    const names = new Set<string>();
+    const values = new Map<string, Set<string>>();
+    const add = (name: string, attribute: string): void => {
+      const key = filterAttributeKey(name);
+      if (!key) return;
+      names.add(key);
+      const set = values.get(key) ?? new Set<string>();
+      set.add(attribute);
+      values.set(key, set);
+    };
+    for (const attribute of [members, owners]) add(attribute, attribute);
+    // Both are distinguishedName subtypes; the common case needs no schema
+    add('distinguishedName', members);
+    add('distinguishedName', owners);
+
+    try {
+      const index = await this.server.ldap.schemaIndex();
+      for (const attribute of [members, owners]) {
+        let current = index.getAttributeType(attribute);
+        const seen = new Set<string>();
+        while (current && !seen.has(current.oid)) {
+          seen.add(current.oid);
+          add(current.oid, attribute);
+          for (const name of current.names) add(name, attribute);
+          current = current.sup
+            ? index.getAttributeType(current.sup)
+            : undefined;
+        }
+      }
+    } catch (err) {
+      this.logger.debug(
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        `AuthzLinid1: could not resolve member attribute types: ${err}`
+      );
+    }
+
+    return {
+      names,
+      values: new Map(
+        [...values].map(([name, attributes]) => [name, [...attributes]])
+      ),
     };
   }
 

@@ -311,6 +311,22 @@ describe('AuthzLinid1 group delegation', function () {
       expect(own.body).to.have.property(GROUP);
     });
 
+    it('does not reveal a member through the distinguishedName supertype', async () => {
+      const hidden = await request
+        .get('/api/v1/ldap/groups')
+        .query({ match: `(distinguishedName=${dnOf(CAROL)})` })
+        .set(as(SOPHIE));
+      expect(hidden.status).to.equal(200);
+      expect(hidden.body).not.to.have.property(GROUP);
+
+      const own = await request
+        .get('/api/v1/ldap/groups')
+        .query({ match: `(distinguishedName=${dnOf(ALICE)})` })
+        .set(as(SOPHIE));
+      expect(own.status).to.equal(200);
+      expect(own.body).to.have.property(GROUP);
+    });
+
     it('does not return the attributes the filter only widened for', async () => {
       const res = await request
         .get('/api/v1/ldap/groups')
@@ -409,6 +425,21 @@ describe('AuthzLinid1 group delegation', function () {
         .set(as(SOPHIE))
         .send({ member: [] });
       expect(res.status).to.equal(403);
+    });
+
+    it('refuses deleting the whole member attribute', async () => {
+      let refused = false;
+      try {
+        await server.ldap.authorize('ldapmodifyrequest', [
+          `cn=${GROUP},${groupBranch}`,
+          { delete: { member: [] } },
+          0,
+          { user: SOPHIE } as unknown as DmRequest,
+        ]);
+      } catch {
+        refused = true;
+      }
+      expect(refused).to.equal(true);
     });
 
     it('does not change another attribute of the group', async () => {
