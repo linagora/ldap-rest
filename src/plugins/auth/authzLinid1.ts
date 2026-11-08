@@ -35,28 +35,12 @@ interface CachedPermissions {
   timestamp: number;
 }
 
-/** A group whose members the caller may manage through a delegation. */
-export interface DelegatedGroup {
-  dn: string;
-  manageMembers: boolean;
-}
-
-interface CachedDelegatedGroups {
-  groups: DelegatedGroup[];
-  timestamp: number;
-}
-
 /** The filter names that test a group's member or owner values. */
-interface ReducedFilterNames {
-  /** Any of these naming an attribute means the filter tests reduced values */
-  names: Set<string>;
-  /** Each name, and the entry attributes whose values it tests */
-  values: Map<string, string[]>;
-}
+type ReducedFilterNames = Set<string>;
 
 /**
- * Whether a caller's written branches and a group's delegated organizations
- * intersect: one lies in the other, either way.
+ * Whether one of a caller's written branches lies in a delegated
+ * organization, or is one.
  */
 function delegationsIntersect(
   branches: string[],
@@ -70,34 +54,11 @@ function delegationsIntersect(
     }
   };
   return delegations.some(delegation =>
-    branches.some(
-      branch => within(branch, delegation) || within(delegation, branch)
-    )
+    branches.some(branch => within(branch, delegation))
   );
 }
 
-/** A filter value or an entry value as text, nothing for a shape LDAP cannot hold. */
-function asText(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean')
-    return String(value);
-  return Buffer.isBuffer(value) ? value.toString('utf8') : '';
-}
-
-/** The values an entry holds for an attribute, as text. */
-function entryValues(entry: AttributesList, attribute: string): string[] {
-  if (attribute.toLowerCase() === 'dn') return [String(entry.dn ?? '')];
-  const key = Object.keys(entry).find(
-    name => name.split(';')[0].toLowerCase() === attribute.toLowerCase()
-  );
-  if (key === undefined) return [];
-  const value = entry[key];
-  return (Array.isArray(value) ? value : [value])
-    .filter(item => item !== undefined && item !== null)
-    .map(asText);
-}
-
-/** The node fields the matcher reads. */
+/** The node fields the filter guard reads. */
 interface FilterNode {
   type?: number;
   attribute?: string;
@@ -110,47 +71,16 @@ interface FilterNode {
   filter?: unknown;
 }
 
-/** A filter that always matches any entry. */
-const TRUE_FILTER = '(objectClass=*)';
-/** A filter no entry matches. */
-const FALSE_FILTER = '(objectClass=__ldap_rest_never__)';
-
-/** Two DN strings as LDAP compares them: case and spacing folded. */
-function sameDn(left: string, right: string): boolean {
-  try {
-    return normalizeDn(left) === normalizeDn(right);
-  } catch {
-    return left.toLowerCase() === right.toLowerCase();
-  }
-}
-
-/**
- * Whether a leaf the caller can see satisfies a filter test. Only equality
- * and presence are answered here: LDAP does not order or substring-match a
- * distinguishedName, and guessing one is how a hidden member answers.
- */
-function reducedTestMatches(
-  node: FilterNode,
-  values: (attribute: string) => string[]
-): boolean {
-  if (node.type === SearchFilter.present)
-    return values(String(node.attribute ?? '')).length > 0;
-  if (node.type !== SearchFilter.equalityMatch) return false;
-  const wanted = asText(node.value);
-  return values(String(node.attribute ?? '')).some(value =>
-    sameDn(value, wanted)
-  );
-}
-
 /** Whether a leaf tests a value the group's delegation would hide. */
 function testsReduced(node: FilterNode, names: ReducedFilterNames): boolean {
   if (typeof node.attribute === 'string' && node.attribute.length > 0)
-    return names.names.has(filterAttributeKey(node.attribute));
-  // An extensible match with no attribute runs over every attribute: it may
-  // test a hidden member whatever its matching rule.
-  if (node.type === SearchFilter.extensibleMatch) return true;
+    return names.has(filterAttributeKey(node.attribute));
+  // An extensible match keeps its attribute in `matchType`; an empty one
+  // runs over every attribute and may test a hidden member whatever its
+  // matching rule.
   if (typeof node.matchType === 'string' && node.matchType.length > 0)
-    return names.names.has(filterAttributeKey(node.matchType));
+    return names.has(filterAttributeKey(node.matchType));
+  if (node.type === SearchFilter.extensibleMatch) return true;
   return false;
 }
 
@@ -170,68 +100,6 @@ function filterTouchesReduced(
   return testsReduced(node, names);
 }
 
-/**
- * Rewrite a parsed filter against the group entry the caller is shown.
- *
- * A test of a reduced attribute becomes a constant the directory evaluates
- * (true when the trimmed entry satisfies it, false otherwise); every other
- * test is left to the directory, which alone knows substring, ordering,
- * approximate and extensible matching. Running the result as a base search
- * on the group then answers what the caller can see, without letting a
- * filter reveal a member it never returns.
- *
- * @param filter parsed filter
- * @param names the member and owner names, with the entry attributes they test
- * @param values values of an attribute in the trimmed entry
- * @returns an LDAP filter string
- */
-function rewriteFilter(
-  filter: unknown,
-  names: ReducedFilterNames,
-  values: (attribute: string) => string[]
-): string {
-  const node = filter as (FilterNode & { toString(): string }) | undefined;
-  if (!node) return FALSE_FILTER;
-  switch (node.type) {
-    case SearchFilter.and: {
-      const children = node.filters ?? [];
-      if (children.length === 0) return TRUE_FILTER;
-      return `(&${children
-        .map(child => rewriteFilter(child, names, values))
-        .join('')})`;
-    }
-    case SearchFilter.or: {
-      const children = node.filters ?? [];
-      if (children.length === 0) return FALSE_FILTER;
-      return `(|${children
-        .map(child => rewriteFilter(child, names, values))
-        .join('')})`;
-    }
-    case SearchFilter.not:
-      return `(!${rewriteFilter(node.filter, names, values)})`;
-    default:
-      if (!testsReduced(node, names)) return node.toString();
-      return reducedTestMatches(node, values) ? TRUE_FILTER : FALSE_FILTER;
-  }
-}
-
-/**
- * Whether a negation tests one of the reduced attributes. A group matched by
- * what its hidden members do *not* satisfy still tells the caller about
- * them, so it is not shown at all.
- */
-function negatesReduced(filter: unknown, names: ReducedFilterNames): boolean {
-  const node = filter as FilterNode | undefined;
-  if (!node) return false;
-  if (node.type === SearchFilter.not) {
-    if (filterTouchesReduced(node.filter, names)) return true;
-    return negatesReduced(node.filter, names);
-  }
-  if (node.type === SearchFilter.and || node.type === SearchFilter.or)
-    return (node.filters ?? []).some(child => negatesReduced(child, names));
-  return false;
-}
-
 import { linid1Options } from './auth.options.js';
 
 export default class AuthzLinid1 extends AuthzBase {
@@ -245,16 +113,10 @@ export default class AuthzLinid1 extends AuthzBase {
    * into the cache afterwards.
    */
   private permissionsGeneration = 0;
-  /** The same guard for the delegated groups a scope request listed. */
-  private delegationsGeneration = 0;
 
   /** The delegation attribute, when the feature is on. */
   private readonly groupAdminAttr: string;
   private readonly adminAttr: string;
-  private readonly delegatedGroupsCache = new Map<
-    string,
-    CachedDelegatedGroups
-  >();
   private reducedFilterNames?: Promise<ReducedFilterNames>;
 
   /**
@@ -268,7 +130,6 @@ export default class AuthzLinid1 extends AuthzBase {
   declare hooks: AuthzBase['hooks'] &
     Pick<
       Hooks,
-      | 'ldapadddone'
       | 'ldapmodifydone'
       | 'ldapdeletedone'
       | 'ldaprenamedone'
@@ -334,10 +195,7 @@ export default class AuthzLinid1 extends AuthzBase {
     // map then. A rename or delete moves the organization naming them, so
     // it drops the map too. The base hooks run after, as they do for the
     // other in-process writes.
-    const watched = [this.adminAttr, this.groupAdminAttr].filter(
-      (name): name is string => name.length > 0
-    );
-    const linkAttr = this.config.ldap_organization_link_attribute || '';
+    const watched = [this.adminAttr];
     const touches = (changes: ModifyRequest, attrs: string[]): boolean => {
       const names = [
         ...Object.keys(changes.add ?? {}),
@@ -351,11 +209,6 @@ export default class AuthzLinid1 extends AuthzBase {
     };
     this.hooks = {
       ...this.declaredByBase,
-      ldapadddone: (dn, entry, context): MaybePromise<void> => {
-        // A group created with a delegation is absent from a cached scope
-        if (this.groupAdminAttr) this.forgetDelegations();
-        return this.declaredByBase.ldapadddone?.(dn, entry, context);
-      },
       ldapsearchrequest: (
         args
       ): MaybePromise<[string, SearchOptions, DmRequest?]> =>
@@ -370,14 +223,6 @@ export default class AuthzLinid1 extends AuthzBase {
         this.judgeDelegatedGroup(args),
       ldapmodifydone: (dn, changes, op, context): MaybePromise<void> => {
         if (touches(changes, watched)) this.forgetPermissions();
-        // A move changes what a group's own administrators read, not its
-        // delegation: only the scope it appears in is stale.
-        else if (
-          this.groupAdminAttr &&
-          linkAttr &&
-          touches(changes, [linkAttr])
-        )
-          this.forgetDelegations();
         return this.declaredByBase.ldapmodifydone?.(dn, changes, op, context);
       },
       ldapdeletedone: (dn, context): MaybePromise<void> => {
@@ -391,17 +236,10 @@ export default class AuthzLinid1 extends AuthzBase {
     };
   }
 
-  /** Drop every cached permission and delegation lookup. */
+  /** Drop every cached permission lookup. */
   forgetPermissions(): void {
     this.permissionsGeneration++;
     this.permissionsCache.clear();
-    this.forgetDelegations();
-  }
-
-  /** Drop the groups a scope request listed, without touching permissions. */
-  private forgetDelegations(): void {
-    this.delegationsGeneration++;
-    this.delegatedGroupsCache.clear();
   }
 
   /**
@@ -414,26 +252,27 @@ export default class AuthzLinid1 extends AuthzBase {
     SearchOptions,
     DmRequest?,
   ]): Promise<[string, SearchOptions, DmRequest?]> {
-    const widened = (await this.declaredByBase.ldapsearchrequest!([
-      base,
-      opts,
-      req,
-    ])) as [string, SearchOptions, DmRequest?];
-    const attr = this.groupAdminAttr;
-    if (!attr) return widened;
-    const [judgedBase, judgedOpts, judgedReq] = widened;
-    if (AuthzBase.wantsAttribute(judgedOpts, attr)) return widened;
-    const asked = judgedOpts.attributes;
-    const list = Array.isArray(asked) ? asked.map(String) : [String(asked)];
-    return [
-      judgedBase,
-      {
-        ...judgedOpts,
-        attributes: [...list, attr],
-        [AuthzLinid1.widenedForDelegation]: true,
-      } as SearchOptions,
-      judgedReq,
+    const [judgedBase, initialOpts, judgedReq] = (await this.declaredByBase
+      .ldapsearchrequest!([base, opts, req])) as [
+      string,
+      SearchOptions,
+      DmRequest?,
     ];
+    const attr = this.groupAdminAttr;
+    if (!attr || this.shouldSkipAuthorization(req))
+      return [judgedBase, initialOpts, judgedReq];
+
+    let judgedOpts = initialOpts;
+    if (!AuthzBase.wantsAttribute(judgedOpts, attr)) {
+      const value = judgedOpts.attributes;
+      const asked = Array.isArray(value) ? value.map(String) : [String(value)];
+      judgedOpts = {
+        ...judgedOpts,
+        attributes: [...asked, attr],
+        [AuthzLinid1.widenedForDelegation]: true,
+      } as SearchOptions;
+    }
+    return [judgedBase, judgedOpts, judgedReq];
   }
 
   /**
@@ -448,26 +287,22 @@ export default class AuthzLinid1 extends AuthzBase {
     SearchOptions?,
   ]): Promise<[SearchResult, DmRequest?, SearchOptions?]> {
     const baseFilter = this.declaredByBase.ldapsearchfilter!;
+    const passThrough = async (): Promise<
+      [SearchResult, DmRequest?, SearchOptions?]
+    > => {
+      const filtered = (await baseFilter([result, req, opts])) as [
+        SearchResult,
+        DmRequest?,
+        SearchOptions?,
+      ];
+      this.stripWidened(filtered[0], filtered[2]);
+      return filtered;
+    };
     const attr = this.groupAdminAttr;
-    if (!attr || !result?.searchEntries?.length)
-      return (await baseFilter([result, req, opts])) as [
-        SearchResult,
-        DmRequest?,
-        SearchOptions?,
-      ];
-    if (this.shouldSkipAuthorization(req))
-      return (await baseFilter([result, req, opts])) as [
-        SearchResult,
-        DmRequest?,
-        SearchOptions?,
-      ];
+    if (!attr || !result?.searchEntries?.length) return passThrough();
+    if (this.shouldSkipAuthorization(req)) return passThrough();
     const user = await this.resolveCaller(req!);
-    if (!user)
-      return (await baseFilter([result, req, opts])) as [
-        SearchResult,
-        DmRequest?,
-        SearchOptions?,
-      ];
+    if (!user) return passThrough();
 
     // Read before the base filter: it mutates the entries it judges, and a
     // group it drops is one we may have to put back.
@@ -491,20 +326,19 @@ export default class AuthzLinid1 extends AuthzBase {
         entries.map(entry => this.dnKey(String(entry.dn)))
       );
       const reducedNames = await this.memberFilterNames();
-      const filterText = opts?.filter;
-      let parsedFilter: unknown;
-      let unparseable = false;
-      try {
-        parsedFilter = filterText
-          ? FilterParser.parseString(String(filterText))
-          : undefined;
-      } catch {
-        unparseable = true;
+      let touchesReduced = false;
+      if (opts?.filter) {
+        try {
+          touchesReduced = filterTouchesReduced(
+            FilterParser.parseString(String(opts.filter)),
+            reducedNames
+          );
+        } catch {
+          // A filter this cannot read is not judged against the trimmed
+          // group: keeping the group out is safer than guessing.
+          touchesReduced = true;
+        }
       }
-      const mustMatch =
-        parsedFilter !== undefined &&
-        filterTouchesReduced(parsedFilter, reducedNames);
-      const negated = mustMatch && negatesReduced(parsedFilter, reducedNames);
       const linkAttr = this.config.ldap_organization_link_attribute;
       const widenedLink = (opts as { [key: symbol]: unknown } | undefined)?.[
         AuthzBase.widenedForLink
@@ -536,28 +370,11 @@ export default class AuthzLinid1 extends AuthzBase {
       };
 
       for (const [key, entry] of delegated) {
-        if (keptDns.has(key) || unparseable || negated) continue;
+        if (keptDns.has(key) || touchesReduced) continue;
         const delegations = this.delegationsOf(entry, attr);
         if (!delegationsIntersect(branches, delegations)) continue;
         const copy = { ...entry };
         await this.keepManagedMembers(copy, delegations, manages);
-        // The directory matched the full entry; judge what this caller will
-        // actually see, or a search on another organization's member tells
-        // them that membership exists.
-        const valuesFor = (name: string): string[] => {
-          const attributes = reducedNames.values.get(filterAttributeKey(name));
-          return attributes
-            ? attributes.flatMap(attribute => entryValues(copy, attribute))
-            : entryValues(copy, name);
-        };
-        if (
-          mustMatch &&
-          !(await this.filterStillMatches(
-            String(entry.dn),
-            rewriteFilter(parsedFilter, reducedNames, valuesFor)
-          ))
-        )
-          continue;
         if (widenedLink && linkAttr) delete copy[linkAttr];
         if (widenedObjectClass) delete copy.objectClass;
         entries.push(copy);
@@ -565,35 +382,19 @@ export default class AuthzLinid1 extends AuthzBase {
       kept.searchEntries = entries;
     }
 
-    if (
-      (keptOpts as { [key: symbol]: unknown } | undefined)?.[
-        AuthzLinid1.widenedForDelegation
-      ]
-    )
-      for (const entry of kept.searchEntries ?? []) delete entry[attr];
+    this.stripWidened(kept, keptOpts);
 
     return filtered;
   }
 
-  /**
-   * Whether the directory matches the rewritten filter on the group entry.
-   * Any failure answers no: a search that cannot be judged is not shown.
-   */
-  private async filterStillMatches(
-    dn: string,
-    filter: string
-  ): Promise<boolean> {
-    try {
-      // As the server: the judgement's own read, on a filter rewritten to
-      // test only what the caller sees
-      const result = (await this.server.ldap.system.search(
-        { paged: false, scope: 'base', filter, attributes: ['1.1'] },
-        dn
-      )) as SearchResult;
-      return (result.searchEntries?.length ?? 0) > 0;
-    } catch {
-      return false;
-    }
+  /** Remove the delegation attribute a search only carried for this judgement. */
+  private stripWidened(result: SearchResult, opts?: SearchOptions): void {
+    const marked = opts as { [key: symbol]: unknown } | undefined;
+    const groupAttr = marked?.[AuthzLinid1.widenedForDelegation]
+      ? this.groupAdminAttr
+      : undefined;
+    if (!groupAttr) return;
+    for (const entry of result.searchEntries ?? []) delete entry[groupAttr];
   }
 
   /**
@@ -694,19 +495,13 @@ export default class AuthzLinid1 extends AuthzBase {
   private async resolveMemberFilterNames(): Promise<ReducedFilterNames> {
     const { members, owners } = this.groupAttributes();
     const names = new Set<string>();
-    const values = new Map<string, Set<string>>();
-    const add = (name: string, attribute: string): void => {
+    const add = (name: string): void => {
       const key = filterAttributeKey(name);
-      if (!key) return;
-      names.add(key);
-      const set = values.get(key) ?? new Set<string>();
-      set.add(attribute);
-      values.set(key, set);
+      if (key) names.add(key);
     };
-    for (const attribute of [members, owners]) add(attribute, attribute);
+    for (const attribute of [members, owners]) add(attribute);
     // Both are distinguishedName subtypes; the common case needs no schema
-    add('distinguishedName', members);
-    add('distinguishedName', owners);
+    add('distinguishedName');
 
     try {
       const index = await this.server.ldap.schemaIndex();
@@ -715,8 +510,8 @@ export default class AuthzLinid1 extends AuthzBase {
         const seen = new Set<string>();
         while (current && !seen.has(current.oid)) {
           seen.add(current.oid);
-          add(current.oid, attribute);
-          for (const name of current.names) add(name, attribute);
+          add(current.oid);
+          for (const name of current.names) add(name);
           current = current.sup
             ? index.getAttributeType(current.sup)
             : undefined;
@@ -732,19 +527,7 @@ export default class AuthzLinid1 extends AuthzBase {
       );
     }
 
-    return {
-      names,
-      values: new Map(
-        [...values].map(([name, attributes]) => [name, [...attributes]])
-      ),
-    };
-  }
-
-  /** The branch the groups are stored under, when the group plugin is loaded. */
-  private groupBase(): string | undefined {
-    const groups = this.server.loadedPlugins['ldapGroups'] as
-      { base?: string } | undefined;
-    return groups?.base;
+    return names;
   }
 
   /** Whether `dn` is in a branch only its organization's administrators read. */
@@ -913,63 +696,6 @@ export default class AuthzLinid1 extends AuthzBase {
   /** The group plugin's placeholder, which takes the last member's place. */
   private isDummyMember(dn: string): boolean {
     return isDummyMemberDn(dn, this.config.group_dummy_user);
-  }
-
-  /**
-   * The groups a caller reads or manages through a delegation, for
-   * `GET /authz/scope`.
-   *
-   * @param user the caller's DN
-   * @returns the delegated groups, empty when the option is off
-   */
-  async delegatedGroups(user: string): Promise<DelegatedGroup[]> {
-    const attr = this.groupAdminAttr;
-    if (!attr) return [];
-    const cached = this.delegatedGroupsCache.get(user);
-    if (cached && Date.now() - cached.timestamp < this.cacheTTL)
-      return cached.groups;
-
-    const generation = this.delegationsGeneration;
-    const remember = (groups: DelegatedGroup[]): DelegatedGroup[] => {
-      if (generation === this.delegationsGeneration)
-        this.delegatedGroupsCache.set(user, {
-          groups,
-          timestamp: Date.now(),
-        });
-      return groups;
-    };
-
-    const branches = await this.getAuthorizedBranches(user);
-    const base = this.groupBase();
-    if (branches.length === 0 || !base) return remember([]);
-    let entries: AttributesList[];
-    try {
-      const result = (await this.server.ldap.system.search(
-        {
-          paged: false,
-          scope: 'sub',
-          filter: `(${attr}=*)`,
-          attributes: ['dn', attr],
-        },
-        base
-      )) as SearchResult;
-      entries = result.searchEntries ?? [];
-    } catch (err) {
-      this.logger.error(
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        `AuthzLinid1: could not read delegated groups: ${err}`
-      );
-      return [];
-    }
-
-    const groups: DelegatedGroup[] = [];
-    for (const entry of entries) {
-      const dn = String(entry.dn);
-      if (this.isGlobalBranch(dn)) continue;
-      if (delegationsIntersect(branches, this.delegationsOf(entry, attr)))
-        groups.push({ dn, manageMembers: true });
-    }
-    return remember(groups);
   }
 
   /**

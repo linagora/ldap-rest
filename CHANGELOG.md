@@ -9,8 +9,6 @@
   `--authz-group-admin-attribute`
   ([#687](https://github.com/linagora/ldap-rest/issues/687),
   [details](docs/usage/plugins/auth/authz-linid1.md#delegated-group-membership)).
-- `GET /authz/scope` lists those groups under `delegatedGroups`
-  ([details](docs/usage/plugins/auth/authz-scope.md#delegated-groups)).
 
 ## v2.1.1 (2026-11-08)
 

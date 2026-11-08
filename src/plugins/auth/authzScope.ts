@@ -28,12 +28,6 @@ import type { AttributesList, SearchResult } from '../../lib/ldapActions.js';
 import { UnauthorizedError } from '../../lib/errors.js';
 import { roleAttribute, type Schema } from '../../config/schema.js';
 
-/** A group whose members the caller may manage through a delegation. */
-interface DelegatedGroup {
-  dn: string;
-  manageMembers: boolean;
-}
-
 /** The part of an authorization plugin this endpoint needs. */
 interface AuthzLike extends DmPlugin {
   resolveUser(uid: string): Promise<string | null>;
@@ -41,8 +35,6 @@ interface AuthzLike extends DmPlugin {
   getUserPermissions(user: string, branch: string): Promise<BranchPermissions>;
   /** `--authz-transit-branch`, where the plugin honours it. */
   transitBranch?(): string | undefined;
-  /** The groups the caller manages through a delegation. */
-  delegatedGroups?(user: string): Promise<DelegatedGroup[]>;
   /** Whether the caller links an organization to any mail domain. */
   mayLinkAnyDomain?(user: string): Promise<boolean>;
   /** Why the caller may not search under a base, if they may not. */
@@ -85,14 +77,6 @@ export const ScopeResponse = Type.Object({
     })
   ),
   transit: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  delegatedGroups: Type.Optional(
-    Type.Array(
-      Type.Object({
-        dn: Type.String(),
-        manageMembers: Type.Boolean(),
-      })
-    )
-  ),
   linksAnyDomain: Type.Boolean(),
   passwordPolicies: Type.Optional(Type.Boolean()),
   entities: Type.Array(
@@ -140,11 +124,6 @@ export default class AuthzScope extends DmPlugin {
      *   otherwise. Every administrator may put an entry they manage there,
      *   and claim one from it into a branch they write.
      *
-     *   `delegatedGroups` lists the groups the caller may read, and whose
-     *   members of their own organizations they may add or remove, through
-     *   `--authz-group-admin-attribute`. It is absent when that option is off
-     *   or the caller has none.
-     *
      *   `linksAnyDomain` says whether the caller may link an organization to
      *   any mail domain, rather than only to those an organization above it
      *   links: with `authzLinid1`, an administrator holding write on the top
@@ -184,9 +163,6 @@ export default class AuthzScope extends DmPlugin {
      *               write: true
      *               delete: true
      *           transit: ou=Transit,ou=organization,dc=example,dc=com
-     *           delegatedGroups:
-     *             - dn: cn=all-staff,ou=groups,dc=example,dc=com
-     *               manageMembers: true
      *           linksAnyDomain: false
      *           passwordPolicies: false
      *           entities:
@@ -487,7 +463,6 @@ export default class AuthzScope extends DmPlugin {
       entities.push({ name, base, create });
     }
 
-    const delegated = await authz.delegatedGroups?.(user);
     res.json({
       user,
       unrestricted: false,
@@ -497,9 +472,6 @@ export default class AuthzScope extends DmPlugin {
       branches,
       // Where any administrator may hand an entry over, and claim one from.
       transit: authz.transitBranch?.() ?? null,
-      ...(delegated && delegated.length > 0
-        ? { delegatedGroups: delegated }
-        : {}),
       // The question the domain link guard asks, of the describing plugin
       // only: another one judging this caller may still refuse
       linksAnyDomain: (await authz.mayLinkAnyDomain?.(user)) === true,

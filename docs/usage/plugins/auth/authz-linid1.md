@@ -259,9 +259,7 @@ Let `D` be the organizations a group delegates to, `L` the organization a
 member is attached to (its link attribute), and `C` the caller's written
 branches. Then:
 
-- `C` reads the group when a branch of `C` intersects `D`: a written branch
-  lies in a delegated organization, or a delegated organization lies in a
-  written branch.
+- `C` reads the group when a branch of `C` lies in one of the `D`.
 - `C` reads a member or owner of the group only when it is attached to an
   `L` inside some `D` and `C` writes `L`. A member attached to no
   organization (in transit) is neither read nor managed through the
@@ -278,15 +276,14 @@ branches. Then:
 Removing the last real member keeps the group plugin's rule: the placeholder
 takes its place, or the request is refused with `409`.
 
-The groups a caller is delegated are cached for
-`--authz-linid1-cache-ttl`; the member lists are filtered on each read. A
-write through this server that changes the delegation attribute, moves a
-group, or creates, renames or deletes one drops the cache at once. A change
-made directly in the directory waits for the TTL.
+A search whose filter tests `member`, `owner`, or a supertype they inherit
+(`distinguishedName`) does not return a delegated group: the directory judged
+the full group, and answering from the filtered membership would tell the
+caller whether a user of another organization belongs to it. The group stays
+in the ordinary listing and can be read directly.
 
-`GET /api/v1/authz/scope` lists the delegated groups under
-`delegatedGroups`, so a client does not duplicate the rule
-([scope](authz-scope.md#delegated-groups)).
+The delegation is read from the group entry, so a change takes effect at
+once; the plugin does not keep a second copy of it.
 
 ## Configuration
 
