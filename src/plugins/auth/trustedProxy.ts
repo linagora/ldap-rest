@@ -6,8 +6,9 @@
  * upstream reverse proxies. If the request comes from an untrusted IP,
  * the X-Forwarded-For header is removed to prevent IP spoofing attacks.
  *
- * This plugin MUST be loaded BEFORE any plugin that uses X-Forwarded-For
- * (like crowdsec and rateLimit) to ensure they receive sanitized headers.
+ * This plugin MUST be loaded BEFORE any plugin that needs the client
+ * address (rate limiting, CrowdSec, access logs): it publishes `req.clientIp`
+ * after reading the proxy chain from the right.
  *
  * Configuration:
  * - trusted_proxy: Array of trusted proxy IPs or CIDR ranges (required)
@@ -17,6 +18,7 @@
  *
  * When a request comes from a trusted proxy:
  * - X-Forwarded-For header is preserved
+ * - The client address is published as `req.clientIp`
  * - The request is marked as trusted (req.trustedProxy = true)
  * - If trusted_proxy_auth_header is set and the header is present,
  *   req.proxyAuthUser is set to its value for use by other plugins (e.g., weblogs)

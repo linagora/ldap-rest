@@ -60,9 +60,8 @@ value a client writes at the left of the chain never becomes its key. Without
 client share one counter; the plugin says so at startup:
 
 ```
-Auth rate limiting uses the TCP peer as the client address because
-core/auth/trustedProxy is not loaded: requests through a proxy share one
-counter.
+Auth rate limiting ignores X-Forwarded-For because core/auth/trustedProxy is
+not loaded and uses the TCP peer: requests through a proxy share one counter.
 ```
 
 Load `trustedProxy` when a reverse proxy sits in front. It is no longer
