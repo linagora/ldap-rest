@@ -12,6 +12,8 @@
   ([GHSA-c4vh-qfrh-5hmq](https://github.com/linagora/ldap-rest/security/advisories/GHSA-c4vh-qfrh-5hmq)).
 - `core/auth/totp` binds a code to its user and accepts it once
   ([GHSA-9c6p-2jmp-x26h](https://github.com/linagora/ldap-rest/security/advisories/GHSA-9c6p-2jmp-x26h)).
+- `authzLinid1` refuses a caller whose account status is not `enabled`
+  ([GHSA-8hw2-g4fp-6xfx](https://github.com/linagora/ldap-rest/security/advisories/GHSA-8hw2-g4fp-6xfx)).
 
 ### Added
 

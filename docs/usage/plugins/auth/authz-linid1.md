@@ -340,6 +340,17 @@ directly in the directory waits out the TTL.
 `GET /api/v1/authz/scope` resolves the identity outside that cache, so
 during such a window it can describe a scope the hooks no longer grant.
 
+### Account status
+
+When the user schema declares an `accountStatus` attribute, the resolved
+caller must carry its `states.enabled` value; any other value is refused with
+`403`, like an identity that does not resolve. A disabled, no-access or
+to-delete administrator therefore loses the API even when the identity
+provider still lets them sign in, and cannot re-enable themselves through the
+console. A write through this server that changes the status drops the
+resolved identity at once; a change made directly in the directory waits for
+`--authz-linid1-cache-ttl`.
+
 ## Permission Resolution
 
 For each LDAP operation, the plugin:

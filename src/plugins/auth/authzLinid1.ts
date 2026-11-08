@@ -203,9 +203,8 @@ export default class AuthzLinid1 extends AuthzBase {
         ...(Array.isArray(changes.delete)
           ? changes.delete
           : Object.keys(changes.delete ?? {})),
-      ];
-      const lower = names.map(name => name.split(';')[0].toLowerCase());
-      return attrs.some(attr => lower.includes(attr.toLowerCase()));
+      ].map(name => name.split(';')[0].toLowerCase());
+      return attrs.some(attr => names.includes(attr.toLowerCase()));
     };
     this.hooks = {
       ...this.declaredByBase,
@@ -223,6 +222,9 @@ export default class AuthzLinid1 extends AuthzBase {
         this.judgeDelegatedGroup(args),
       ldapmodifydone: (dn, changes, op, context): MaybePromise<void> => {
         if (touches(changes, watched)) this.forgetPermissions();
+        // A suspension through this server takes effect on the next request
+        if (touches(changes, this.statusAttributes()))
+          this.clearResolutionCache();
         return this.declaredByBase.ldapmodifydone?.(dn, changes, op, context);
       },
       ldapdeletedone: (dn, context): MaybePromise<void> => {
@@ -782,9 +784,85 @@ export default class AuthzLinid1 extends AuthzBase {
 
   /**
    * Resolve user - for authzLinid1, convert uid to userDn via LDAP
+   *
+   * An account the schema marks with a state other than `enabled` is
+   * refused: the identity provider may still let it sign in, and the
+   * lifecycle state is the directory's way to stop it.
    */
   async resolveUser(uid: string): Promise<string | null> {
-    return this.getUserDn(uid);
+    const dn = await this.getUserDn(uid);
+    if (!dn) return null;
+    if (!(await this.enabled(dn)))
+      throw new AuthzRefusedError(`User ${uid} is not enabled`);
+    return dn;
+  }
+
+  /**
+   * The attribute carrying an account's lifecycle state, and the value that
+   * means enabled, from the flat entity schema holding `dn`.
+   */
+  private accountStatus(
+    dn: string
+  ): { attribute: string; enabled: string } | undefined {
+    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
+      { instances?: { base: string; schema?: Schema }[] } | undefined;
+    const holding = (flat?.instances ?? [])
+      .filter(
+        instance =>
+          instance.schema && instance.base && isDnInBranch(dn, instance.base)
+      )
+      .sort(
+        (left, right) =>
+          normalizeDn(right.base).length - normalizeDn(left.base).length
+      );
+    for (const instance of holding) {
+      const attribute = roleAttribute(instance.schema, 'accountStatus');
+      const value = attribute
+        ? instance.schema?.attributes[attribute]?.states?.enabled
+        : undefined;
+      const enabled = organizationLink(value);
+      if (attribute && enabled) return { attribute, enabled };
+    }
+    return undefined;
+  }
+
+  /**
+   * Whether the account carries the enabled state, or carries no status at
+   * all: an entry the schema does not manage keeps the access it had.
+   */
+  private async enabled(dn: string): Promise<boolean> {
+    const status = this.accountStatus(dn);
+    if (!status) return true;
+    // As the server: the judgement's own read: as the caller, it would be
+    // judged by itself. A failed read propagates, as it does for the
+    // identity itself: a cached "enabled" from a failed read would reopen
+    // the suspension for the whole TTL.
+    const result = (await this.server.ldap.system.search(
+      { paged: false, scope: 'base', attributes: [status.attribute] },
+      dn
+    )) as SearchResult;
+    const entry = result.searchEntries?.[0];
+    // The schema may spell the name in another case than the directory
+    const key = Object.keys(entry ?? {}).find(
+      name =>
+        name.split(';')[0].toLowerCase() === status.attribute.toLowerCase()
+    );
+    const value = organizationLink(key ? entry?.[key] : undefined);
+    return (
+      value === undefined || normalizeDn(value) === normalizeDn(status.enabled)
+    );
+  }
+
+  /** The account status attributes the loaded user schemas declare. */
+  private statusAttributes(): string[] {
+    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
+      { instances?: { schema?: Schema }[] } | undefined;
+    const attributes = new Set<string>();
+    for (const instance of flat?.instances ?? []) {
+      const attribute = roleAttribute(instance.schema, 'accountStatus');
+      if (attribute) attributes.add(attribute);
+    }
+    return [...attributes];
   }
 
   /**

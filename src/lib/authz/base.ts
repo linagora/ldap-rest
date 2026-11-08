@@ -670,6 +670,12 @@ export default abstract class AuthzBase extends DmPlugin {
     string,
     { user: string | null; at: number }
   >();
+  /**
+   * Bumped by every invalidation. A resolution that started before a write
+   * may have read the status or the identity before it, so it must not put
+   * what it read back into the cache afterwards.
+   */
+  private resolutionGeneration = 0;
   /** How many identities to remember at once. A cap, not a threshold. */
   private static readonly RESOLUTION_CACHE_MAX = 10000;
   /** Said once, when the cap is reached: a log line per request helps nobody. */
@@ -683,8 +689,8 @@ export default abstract class AuthzBase extends DmPlugin {
    * request that *was* authenticated, whose identity this plugin's model
    * cannot place.
    *
-   * That used to return the operation untouched behind a `warn`, which made
-   * a configuration mismatch an open door rather than a refusal.
+   * Returning the operation untouched behind a `warn` made a configuration
+   * mismatch an open door rather than a refusal.
    * `authzLinid1` resolves `req.user` by searching
    * `(<ldap_user_main_attribute>=<identity>)`, so an authenticator
    * publishing anything else — `core/auth/openidconnect` publishes the OIDC
@@ -710,10 +716,10 @@ export default abstract class AuthzBase extends DmPlugin {
    *  - a *positive* answer can go stale. `authzLinid1` resolves an identity
    *    to a DN, so an administrator whose own entry is renamed or moved is
    *    still resolved to the former DN, where no organization names them:
-   *    every operation is refused until the TTL runs out. A rename or a
-   *    delete therefore drops what was resolved, which closes the window
-   *    for the case that produces it; a change made directly in the
-   *    directory still waits.
+   *    every operation is refused until the TTL runs out. A rename, a
+   *    delete or a status change therefore drops what was resolved, which
+   *    closes the window for the case that produces it; a change made
+   *    directly in the directory still waits.
    *
    * `authzScope` resolves the identity itself (`authzScope.ts`), outside
    * this cache, so during such a window it can describe a scope the hooks
@@ -743,6 +749,7 @@ export default abstract class AuthzBase extends DmPlugin {
     if (cached && now - cached.at < this.cacheTTL) {
       user = cached.user;
     } else {
+      const generation = this.resolutionGeneration;
       user = await this.resolveUser(identity);
       if (this.resolutionCache.size >= AuthzBase.RESOLUTION_CACHE_MAX)
         for (const [key, entry] of this.resolutionCache)
@@ -751,9 +758,15 @@ export default abstract class AuthzBase extends DmPlugin {
       // make the constant a threshold rather than a cap, and the case that
       // reaches it — an identity provider where every user is a new key — is
       // exactly the one this fix is about.
-      if (this.resolutionCache.size < AuthzBase.RESOLUTION_CACHE_MAX)
+      if (
+        generation === this.resolutionGeneration &&
+        this.resolutionCache.size < AuthzBase.RESOLUTION_CACHE_MAX
+      )
         this.resolutionCache.set(identity, { user, at: now });
-      else if (!this.resolutionCacheFullWarned) {
+      else if (
+        generation === this.resolutionGeneration &&
+        !this.resolutionCacheFullWarned
+      ) {
         this.resolutionCacheFullWarned = true;
         this.logger.warn(
           `${this.name}: more than ${AuthzBase.RESOLUTION_CACHE_MAX} ` +
@@ -933,8 +946,9 @@ export default abstract class AuthzBase extends DmPlugin {
     return (await this.getUserPermissions(user, top)).write === true;
   }
 
-  /** Forget what was resolved, for a test that changes the directory. */
+  /** Forget what was resolved: a write changed an identity or its status. */
   protected clearResolutionCache(): void {
+    this.resolutionGeneration++;
     this.resolutionCache.clear();
   }
 
@@ -954,7 +968,7 @@ export default abstract class AuthzBase extends DmPlugin {
      * cheaper than working out which identity moved.
      */
     ldaprenamedone: (): void => {
-      this.resolutionCache.clear();
+      this.clearResolutionCache();
     },
 
     /**
@@ -969,7 +983,7 @@ export default abstract class AuthzBase extends DmPlugin {
      * cheaper than working out which identity the DN held.
      */
     ldapdeletedone: (): void => {
-      this.resolutionCache.clear();
+      this.clearResolutionCache();
     },
 
     ldapmodifyrequest: async ([dn, changes, opNumber, req]: [
