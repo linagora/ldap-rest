@@ -52,10 +52,10 @@ export default class RateLimit extends DmPlugin {
     // the client, so a header a client writes cannot move the counter.
     if (!this.server.loadedPlugins.trustedProxy)
       this.logger.warn(
-        'Auth rate limiting uses the TCP peer as the client address because ' +
-          'core/auth/trustedProxy is not loaded: requests through a proxy ' +
-          'share one counter. Load core/auth/trustedProxy to key on the ' +
-          'client it identifies.'
+        'Auth rate limiting ignores X-Forwarded-For because ' +
+          'core/auth/trustedProxy is not loaded and uses the TCP peer: ' +
+          'requests through a proxy share one counter. Load ' +
+          'core/auth/trustedProxy to key on the client it identifies.'
       );
 
     // Middleware to check rate limits and track failed authentications
