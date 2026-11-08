@@ -241,6 +241,10 @@
 
           <div class="config-grid">
             <div class="config-field">
+              <label for="user-input">User</label>
+              <input type="text" id="user-input" value="admin" />
+            </div>
+            <div class="config-field">
               <label for="digits-input">Digits</label>
               <select id="digits-input">
                 <option value="6" selected>6 digits</option>
@@ -363,14 +367,10 @@
         <h3>Use TotpAuthClient for API Requests</h3>
         <div class="api-response" style="margin-bottom: 20px">
           // Create authenticated client const client = new TotpAuthClient({
-          secret: 'JBSWY3DPEHPK3PXP', digits: 6, step: 30 }); // Make
-          authenticated requests const users = await
-          client.get('/api/v1/ldap/users'); const userData = await users.json();
-          // POST with automatic authentication await
-          client.post('/api/v1/ldap/users', { uid: 'user1', mail:
-          'user1@example.com' }); // Other methods: put, patch, delete await
-          client.put('/api/v1/ldap/users/user1', { mail: 'new@example.com' });
-          await client.delete('/api/v1/ldap/users/user1');
+          secret: 'JBSWY3DPEHPK3PXP', user: 'admin', digits: 6, step: 30 }); //
+          Each request consumes the code of its step, so make one per step const
+          users = await client.get('/api/v1/ldap/users'); const userData = await
+          users.json();
         </div>
 
         <h3>Helper Functions</h3>
@@ -394,6 +394,7 @@
       import { showStatus } from '/static/browser/shared/components/StatusMessage.js';
 
       const secretInput = document.getElementById('secret-input');
+      const userInput = document.getElementById('user-input');
       const digitsInput = document.getElementById('digits-input');
       const stepInput = document.getElementById('step-input');
       const totpCodeEl = document.getElementById('totp-code');
@@ -508,6 +509,7 @@
 
       btnTestApi.addEventListener('click', async () => {
         const secret = secretInput.value.trim().toUpperCase();
+        const user = userInput.value.trim();
         const digits = parseInt(digitsInput.value);
         const step = parseInt(stepInput.value);
         const endpoint = apiEndpoint.value;
@@ -521,6 +523,11 @@
           return;
         }
 
+        if (!user) {
+          showStatus('status-container', 'Please enter a user name', 'error');
+          return;
+        }
+
         if (!isValidBase32(secret)) {
           showStatus('status-container', 'Invalid Base32 secret', 'error');
           return;
@@ -529,7 +536,7 @@
         try {
           showStatus('status-container', 'Sending request...', 'info');
 
-          const client = new TotpAuthClient({ secret, digits, step });
+          const client = new TotpAuthClient({ secret, user, digits, step });
           const response = await client.get(endpoint);
 
           apiResponseContainer.style.display = 'block';

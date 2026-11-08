@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `core/auth/totp` requires `Authorization: Bearer <name>:<code>`, checks
+  only that user's secret, refuses a replayed code and no longer logs it
+  ([GHSA-9c6p-2jmp-x26h](https://github.com/linagora/ldap-rest/security/advisories/GHSA-9c6p-2jmp-x26h)).
+
 ## v2.1.1 (2026-11-08)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0, zlib updated to 1.4-r0.
