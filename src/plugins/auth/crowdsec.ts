@@ -43,6 +43,9 @@ export default class CrowdSec extends DmPlugin {
   private apiKey: string;
   private cacheTtl: number;
   private cache: Map<string, DecisionCache> = new Map();
+  private lastSweep = 0;
+  /** Distinct addresses remembered at once, so a rotating header cannot grow the map. */
+  private static readonly MAX_CLIENTS = 10000;
 
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
@@ -143,6 +146,8 @@ export default class CrowdSec extends DmPlugin {
     }
 
     // Cache the result
+    this.prune(now);
+    if (!this.cache.has(ip)) this.evictOldest();
     this.cache.set(ip, {
       isBanned,
       expiresAt: now + this.cacheTtl * 1000,
@@ -155,17 +160,24 @@ export default class CrowdSec extends DmPlugin {
     return isBanned;
   }
 
+  /** Drop expired decisions, at most once a TTL, and keep the map bounded. */
+  private prune(now: number): void {
+    if (now - this.lastSweep < this.cacheTtl * 1000) return;
+    this.lastSweep = now;
+    for (const [key, entry] of this.cache)
+      if (now > entry.expiresAt) this.cache.delete(key);
+    while (this.cache.size >= CrowdSec.MAX_CLIENTS) this.evictOldest();
+  }
+
+  /** Drop the oldest decision: `Map` keeps insertion order. */
+  private evictOldest(): void {
+    const oldest = this.cache.keys().next().value;
+    if (oldest !== undefined) this.cache.delete(oldest);
+  }
+
   private getClientIp(req: Request): string {
-    // Support X-Forwarded-For header for proxied requests
-    // The header can be string | string[] | undefined
-    const forwarded = req.headers['x-forwarded-for'];
-    if (forwarded) {
-      // If it's an array, take the first element, otherwise use the string directly
-      const forwardedStr = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-      // X-Forwarded-For can contain multiple IPs separated by commas (client, proxy1, proxy2...)
-      // The first IP is the original client
-      return forwardedStr.split(',')[0].trim();
-    }
-    return req.socket.remoteAddress || 'unknown';
+    // `trustedProxy` reads the chain and publishes the client it trusts;
+    // without it the peer is the client.
+    return req.clientIp || req.socket.remoteAddress || 'unknown';
   }
 }

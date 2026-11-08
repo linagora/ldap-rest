@@ -5,6 +5,7 @@ import type { Express } from 'express';
 
 import { DM } from '../../../src/bin';
 import CrowdSec from '../../../src/plugins/auth/crowdsec';
+import TrustedProxy from '../../../src/plugins/auth/trustedProxy';
 import DmPlugin from '../../../src/abstract/plugin';
 import { outboundCalls } from '../../helpers/metrics';
 
@@ -29,13 +30,16 @@ describe('CrowdSec Plugin', () => {
     process.env.DM_CROWDSEC_URL = `${crowdsecUrl}/v1/decisions`;
     process.env.DM_CROWDSEC_API_KEY = apiKey;
     process.env.DM_CROWDSEC_CACHE_TTL = '1'; // 1 second cache for tests
+    process.env.DM_TRUSTED_PROXIES = '127.0.0.1';
 
     dm = new DM();
     await dm.ready;
 
+    const trustedProxy = new TrustedProxy(dm);
     const crowdsec = new CrowdSec(dm);
     const testPlugin = new TestPlugin(dm);
 
+    await dm.registerPlugin('trustedProxy', trustedProxy);
     await dm.registerPlugin('crowdsec', crowdsec);
     await dm.registerPlugin('testPlugin', testPlugin);
 
@@ -44,6 +48,7 @@ describe('CrowdSec Plugin', () => {
 
   afterEach(() => {
     nock.cleanAll();
+    delete process.env.DM_TRUSTED_PROXIES;
   });
 
   it('should allow requests from non-banned IPs', async () => {

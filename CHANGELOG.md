@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- Rate limiting, CrowdSec and weblogs key on the client address
+  `core/auth/trustedProxy` reads from the right of `X-Forwarded-For`, so a
+  value the client writes at the left of the chain can no longer evade a
+  limit or a ban; the address maps are bounded
+  ([GHSA-c4vh-qfrh-5hmq](https://github.com/linagora/ldap-rest/security/advisories/GHSA-c4vh-qfrh-5hmq)).
+
 ## v2.1.1 (2026-11-08)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0, zlib updated to 1.4-r0.

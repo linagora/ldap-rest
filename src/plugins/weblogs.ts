@@ -81,13 +81,8 @@ export default class WebLogs extends DmPlugin {
   }
 
   private getClientIp(req: Request): string {
-    // Use X-Forwarded-For if available (already sanitized by trustedProxy plugin)
-    const forwarded = req.headers['x-forwarded-for'];
-    if (forwarded) {
-      const forwardedStr = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-      // Take the first IP (original client) from the chain
-      return forwardedStr.split(',')[0].trim();
-    }
-    return req.socket.remoteAddress || 'unknown';
+    // `trustedProxy` reads the chain and publishes the client it trusts;
+    // without it the peer is the client.
+    return req.clientIp || req.socket.remoteAddress || 'unknown';
   }
 }

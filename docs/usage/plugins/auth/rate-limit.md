@@ -52,16 +52,22 @@ For correct IP detection behind reverse proxies:
 --rate-limit-max 100
 ```
 
-The rate limiter will use the real client IP from `X-Forwarded-For` when the request comes from a trusted proxy.
-
-This pairing is not a refinement, it is what makes the limit hold. The limiter keys on `X-Forwarded-For`, a header any client can set to anything; `trustedProxy` is what strips it on requests that do not come from a declared proxy. Loaded alone, the limiter counts forged keys: rotating the header on every attempt gives an attacker a fresh counter each time, and the brute-force protection becomes decorative while still looking configured. The plugin therefore warns at startup when `trustedProxy` is absent:
+The limiter reads the client address `trustedProxy` publishes on the request
+(`req.clientIp`). That plugin walks `X-Forwarded-For` from the right, skips
+the addresses it trusts as proxies, and takes the first one it does not, so a
+value a client writes at the left of the chain never becomes its key. Without
+`trustedProxy`, the limiter uses the TCP peer and a reverse proxy makes every
+client share one counter; the plugin says so at startup:
 
 ```
-Auth rate limiting keys on X-Forwarded-For but core/auth/trustedProxy is not
-loaded: a client can forge that header and evade the limit.
+Auth rate limiting uses the TCP peer as the client address because
+core/auth/trustedProxy is not loaded: requests through a proxy share one
+counter.
 ```
 
-Either load `trustedProxy`, or make sure the reverse proxy in front **overwrites** `X-Forwarded-For` rather than appending to it.
+Load `trustedProxy` when a reverse proxy sits in front. It is no longer
+necessary for the proxy to overwrite the header: appending
+(`$proxy_add_x_forwarded_for`) is read correctly.
 
 ## Security Considerations
 

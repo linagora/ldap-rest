@@ -38,6 +38,8 @@ declare global {
     interface Request {
       trustedProxy?: boolean;
       proxyAuthUser?: string;
+      /** The client address, read through the trusted proxy chain. */
+      clientIp?: string;
     }
   }
 }
@@ -95,6 +97,7 @@ export default class TrustedProxy extends DmPlugin {
       if (!remoteAddr) {
         // No remote address, remove X-Forwarded-For to be safe
         this.logger.debug('No remote address, removing X-Forwarded-For header');
+        req.clientIp = 'unknown';
         delete req.headers['x-forwarded-for'];
         return next();
       }
@@ -104,6 +107,7 @@ export default class TrustedProxy extends DmPlugin {
       if (this.isTrustedProxy(remoteAddr)) {
         // Mark request as coming from trusted proxy
         req.trustedProxy = true;
+        req.clientIp = this.clientIpFromXff(xff, remoteAddr);
 
         // Extract auth user from header if present
         const authUser = req.headers[this.authHeader];
@@ -120,6 +124,7 @@ export default class TrustedProxy extends DmPlugin {
       } else {
         // Untrusted source: remove X-Forwarded-For to prevent spoofing
         req.trustedProxy = false;
+        req.clientIp = remoteAddr;
         if (xff) {
           this.logger.warn(
             `Removing X-Forwarded-For header from untrusted source ${remoteAddr} (was: ${String(xff)})`
@@ -130,6 +135,34 @@ export default class TrustedProxy extends DmPlugin {
 
       next();
     });
+  }
+
+  /**
+   * The client address in a proxy chain: walk `X-Forwarded-For` from the
+   * right, skip the addresses this server trusts as proxies, and take the
+   * first one it does not. An invalid entry cannot name a client and is
+   * skipped; a chain made only of trusted addresses falls back to the peer.
+   *
+   * @param xff the header as received from a trusted peer
+   * @param remoteAddr the TCP peer
+   * @returns the address to key rate limits and logs on
+   */
+  private clientIpFromXff(
+    xff: string | string[] | undefined,
+    remoteAddr: string
+  ): string {
+    if (!xff) return remoteAddr;
+    const entries = (Array.isArray(xff) ? xff.join(',') : xff)
+      .split(',')
+      .map(entry => entry.trim())
+      .filter(Boolean);
+    for (let index = entries.length - 1; index >= 0; index--) {
+      const candidate = entries[index].replace(/^\[|\]$/g, '');
+      if (isIP(candidate) === 0) continue;
+      if (this.isTrustedProxy(candidate)) continue;
+      return candidate;
+    }
+    return remoteAddr;
   }
 
   /**
