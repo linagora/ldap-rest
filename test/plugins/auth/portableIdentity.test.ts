@@ -102,6 +102,8 @@ describe('The two names of a caller', function () {
       process.env.DM_OIDC_SERVER = 'http://oidc.example.test';
       process.env.DM_OIDC_CLIENT_ID = 'client';
       process.env.DM_OIDC_CLIENT_SECRET = 'a-secret-long-enough-for-the-lib';
+      process.env.DM_OIDC_SESSION_SECRET =
+        'a-session-key-long-enough-for-the-lib';
       process.env.DM_BASE_URL = 'http://localhost:3000';
       process.env.DM_OIDC_USERNAME_CLAIM = 'preferred_username';
       const server = new DM();

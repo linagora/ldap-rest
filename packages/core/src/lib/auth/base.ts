@@ -52,19 +52,23 @@ function stripTrailingSlashes(path: string): string {
 
 /**
  * Tell whether a mount prefix covers a request path, with the rule Express
- * itself applies: on segment boundaries, so `/api/m` covers `/api/m` and
- * `/api/m/entry` but never `/api/machines`.
+ * applies to the routes of this server: on segment boundaries, so `/api/m`
+ * covers `/api/m` and `/api/m/entry` but never `/api/machines`, and
+ * ignoring letter case, since `case sensitive routing` is left off.
  *
- * The catch-all uses this to decide what another plugin already guards, so
- * it must agree with Express exactly — a looser rule here would skip paths
- * nobody guards.
+ * The dispatcher uses this to decide which authenticator guards a path, so
+ * it must agree with Express exactly: a looser rule would skip paths nobody
+ * guards, and a stricter one — a case-sensitive comparison — would hand a
+ * path to the wrong authenticator, or to none.
  *
  * @param prefix mount prefix
  * @param path request path
  * @returns true when the prefix covers the path
  */
 export function prefixCoversPath(prefix: string, path: string): boolean {
-  return path === prefix || path.startsWith(`${prefix}/`);
+  const lowerPrefix = prefix.toLowerCase();
+  const lowerPath = path.toLowerCase();
+  return lowerPath === lowerPrefix || lowerPath.startsWith(`${lowerPrefix}/`);
 }
 
 /** What `--authz-identity` accepts. */

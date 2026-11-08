@@ -18,6 +18,7 @@ import type winston from 'winston';
 // @public
 abstract class AuthzBase extends DmPlugin {
     constructor(server: DM);
+    protected administeredBranches(_dn: string): Promise<string[]>;
     // (undocumented)
     cacheTTL: number;
     protected clearResolutionCache(): void;
@@ -48,6 +49,8 @@ abstract class AuthzBase extends DmPlugin {
     transitBranch(): string | undefined;
     protected transitOriginAttribute(): string | undefined;
     protected static wantsAttribute(opts: SearchOptions | undefined, attr: string): boolean;
+    protected static readonly widenedForLink: unique symbol;
+    protected static readonly widenedForObjectClass: unique symbol;
 }
 
 // @public (undocumented)

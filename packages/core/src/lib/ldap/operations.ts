@@ -186,7 +186,7 @@ async function applyModify(
           operation: 'add',
           modification: new Attribute({
             type: key,
-            values: Array.isArray(value) ? value : [value as string],
+            values: Array.isArray(value) ? value : [value],
           }),
         })
       );
@@ -199,7 +199,7 @@ async function applyModify(
           operation: 'replace',
           modification: new Attribute({
             type: key,
-            values: Array.isArray(value) ? value : [value as string],
+            values: Array.isArray(value) ? value : [value],
           }),
         })
       );
@@ -222,9 +222,7 @@ async function applyModify(
           modification: value
             ? new Attribute({
                 type: key,
-                values: Array.isArray(value)
-                  ? (value as string[])
-                  : [value as string],
+                values: Array.isArray(value) ? value : [value],
               })
             : new Attribute({ type: key }),
         });

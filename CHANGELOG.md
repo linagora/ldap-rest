@@ -54,6 +54,57 @@
   the plugin. It named a module no release shipped, so the documented form
   failed at startup; `ldap-rest/plugin-scim` names the same module.
 
+## v2.2.0 (2026-11-08)
+
+### Security
+
+- Creating an entry is judged on the branch its DN lands in as well as on the
+  organization it links to
+  ([GHSA-9c94-qj49-5p89](https://github.com/linagora/ldap-rest/security/advisories/GHSA-9c94-qj49-5p89)).
+- Rate limiting, CrowdSec and access logs key on the client address
+  `trustedProxy` reads from the right of `X-Forwarded-For`
+  ([GHSA-c4vh-qfrh-5hmq](https://github.com/linagora/ldap-rest/security/advisories/GHSA-c4vh-qfrh-5hmq)).
+- `core/auth/totp` binds a code to its user and accepts it once
+  ([GHSA-9c6p-2jmp-x26h](https://github.com/linagora/ldap-rest/security/advisories/GHSA-9c6p-2jmp-x26h)).
+- `authzLinid1` refuses a caller whose account status is not `enabled`
+  ([GHSA-8hw2-g4fp-6xfx](https://github.com/linagora/ldap-rest/security/advisories/GHSA-8hw2-g4fp-6xfx)).
+- The LDAP unit editor escapes the error text it renders.
+
+### Added
+
+- `authzLinid1` lets a group delegate membership management to the
+  administrators of other organizations, through
+  `--authz-group-admin-attribute`; `GET /authz/scope` lists those groups
+  under `delegatedGroups`
+  ([#687](https://github.com/linagora/ldap-rest/issues/687),
+  [details](docs/usage/plugins/auth/authz-linid1.md#delegated-group-membership)).
+
+## v2.1.1 (2026-11-08)
+
+Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0, zlib updated to 1.4-r0.
+
+## v2.1.0 (2026-11-07)
+
+### Security
+
+- `core/auth/openidconnect` requires a `--oidc-session-secret` separate from
+  the client secret and refuses to start without it
+  ([GHSA-qmmv-5748-px9r](https://github.com/linagora/ldap-rest/security/advisories/GHSA-qmmv-5748-px9r),
+  [upgrading](docs/usage/upgrading.md#openid-connect-requires-a-session-key-of-its-own)).
+- Authentication path prefixes now match the route Express serves, whatever the
+  letter case ([GHSA-rgc7-fv78-p73h](https://github.com/linagora/ldap-rest/security/advisories/GHSA-rgc7-fv78-p73h)).
+- James and Calendar encode addresses and resource ids as single WebAdmin URL
+  segments ([GHSA-jrmm-4w24-qqc5](https://github.com/linagora/ldap-rest/security/advisories/GHSA-jrmm-4w24-qqc5)).
+- `authzLinid1` checks write access to every organization naming an account's
+  administrator ([GHSA-2g53-22cj-hwfm](https://github.com/linagora/ldap-rest/security/advisories/GHSA-2g53-22cj-hwfm)).
+- `authzLinid1` drops a revoked permission as soon as a write goes through this
+  server ([GHSA-vg7q-jffp-g33c](https://github.com/linagora/ldap-rest/security/advisories/GHSA-vg7q-jffp-g33c)).
+
+### Fixed
+
+- `--plugin core/scim` now loads the plugin under the documented name
+  ([#680](https://github.com/linagora/ldap-rest/issues/680)).
+
 ## v2.0.5 (2026-11-06)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0.

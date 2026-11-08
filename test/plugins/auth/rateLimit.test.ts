@@ -4,6 +4,7 @@ import type { Express, Request, Response } from 'express';
 import type { ChainedHook, Hooks } from '@ldap-rest/core/hooks';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import RateLimit from '@ldap-rest/auth-ratelimit';
+import TrustedProxy from '@ldap-rest/auth-trustedproxy';
 
 import { DM } from '../../helpers/dm';
 
@@ -50,17 +51,24 @@ describe('Rate Limit Plugin', () => {
   beforeEach(async () => {
     process.env.DM_RATE_LIMIT_WINDOW_MS = '60000'; // 1 minute
     process.env.DM_RATE_LIMIT_MAX = '5'; // 5 attempts max
+    process.env.DM_TRUSTED_PROXIES = '127.0.0.1';
 
     dm = new DM();
     await dm.ready;
 
+    const trustedProxy = new TrustedProxy(dm);
     const rateLimit = new RateLimit(dm);
     const testAuth = new TestAuthPlugin(dm);
 
+    await dm.registerPlugin('trustedProxy', trustedProxy);
     await dm.registerPlugin('rateLimit', rateLimit);
     await dm.registerPlugin('testAuth', testAuth);
 
     app = dm.app;
+  });
+
+  afterEach(() => {
+    delete process.env.DM_TRUSTED_PROXIES;
   });
 
   it('should allow requests with valid token', async () => {
@@ -136,6 +144,33 @@ describe('Rate Limit Plugin', () => {
       .set('Authorization', 'Bearer invalid-token')
       .set('X-Forwarded-For', '192.168.1.2');
     expect(response2.status).to.equal(401);
+  });
+
+  it('keeps the counters of two clients taking turns', async () => {
+    const send = (ip: string): request.Test =>
+      request(app)
+        .get('/api/test')
+        .set('Authorization', 'Bearer invalid-token')
+        .set('X-Forwarded-For', ip);
+
+    for (let i = 0; i < 5; i++) {
+      expect((await send('192.168.1.10')).status).to.equal(401);
+      expect((await send('192.168.1.11')).status).to.equal(401);
+    }
+    expect((await send('192.168.1.10')).status).to.equal(429);
+    expect((await send('192.168.1.11')).status).to.equal(429);
+  });
+
+  it('does not let a rotating leftmost chain entry evade the limit', async () => {
+    const send = (leftmost: string): request.Test =>
+      request(app)
+        .get('/api/test')
+        .set('Authorization', 'Bearer invalid-token')
+        .set('X-Forwarded-For', `${leftmost}, 203.0.113.9`);
+
+    for (let i = 0; i < 5; i++)
+      expect((await send(`10.0.0.${i}`)).status).to.equal(401);
+    expect((await send('10.0.0.99')).status).to.equal(429);
   });
 
   it('should block all requests from rate-limited IP', async () => {

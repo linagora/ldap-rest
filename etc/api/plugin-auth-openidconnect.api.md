@@ -47,7 +47,7 @@ interface OidcConfig {
         logout: boolean;
     };
     // (undocumented)
-    secret: string;
+    secret: string | string[];
 }
 
 // @public
@@ -78,6 +78,7 @@ class OpenIDConnect extends AuthBase {
         oidc_username_claim: StringOption;
         oidc_client_id: StringOption;
         oidc_client_secret: StringOption;
+        oidc_session_secret: ArrayOption;
         base_url: StringOption;
         oidc_logout_origins: ArrayOption;
     };

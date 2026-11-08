@@ -11,3 +11,6 @@ static/*.html
 _site/
 scripts/client-values.txt
 temp/
+
+# Temporary review worktrees
+.review-*

@@ -54,6 +54,10 @@ name: TOptional<TString>;
 path: TOptional<TString>;
 }>>;
 transit: TOptional<TUnion<[TString, TNull]>>;
+delegatedGroups: TOptional<TArray<TObject<    {
+dn: TString;
+manageMembers: TBoolean;
+}>>>;
 linksAnyDomain: TBoolean;
 passwordPolicies: TOptional<TBoolean>;
 entities: TArray<TObject<    {

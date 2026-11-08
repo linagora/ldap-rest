@@ -32,12 +32,15 @@ describe('OpenID Connect through the plugin loader', function () {
       'DM_OIDC_SERVER',
       'DM_OIDC_CLIENT_ID',
       'DM_OIDC_CLIENT_SECRET',
+      'DM_OIDC_SESSION_SECRET',
       'DM_BASE_URL',
     ])
       saved[k] = process.env[k];
     process.env.DM_OIDC_SERVER = 'http://oidc.example.test';
     process.env.DM_OIDC_CLIENT_ID = 'client';
     process.env.DM_OIDC_CLIENT_SECRET = 'a-secret-long-enough-for-the-library';
+    process.env.DM_OIDC_SESSION_SECRET =
+      'a-session-key-long-enough-for-the-library';
     process.env.DM_BASE_URL = 'http://localhost:3000';
   });
 

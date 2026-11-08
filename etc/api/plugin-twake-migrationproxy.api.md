@@ -87,6 +87,7 @@ abstract class TwakePlugin extends DmPlugin {
     protected shouldRetry(statusCode: number, retryOn: readonly number[], attempt: number): boolean;
     protected waitBeforeRetry(attempt: number): Promise<void>;
     protected webadminHealth(): Promise<HealthStatus>;
+    protected webadminPath(...segments: string[]): string;
     // (undocumented)
     protected webadminToken: string;
     // (undocumented)

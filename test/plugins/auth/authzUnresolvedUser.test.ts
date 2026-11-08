@@ -189,6 +189,44 @@ describe('An authenticated identity the model cannot resolve', function () {
     expect(lookups, 'the rename dropped what was resolved').to.equal(2);
   });
 
+  it('should not cache a resolution overtaken by an invalidation', async () => {
+    // A resolution that started before a rename may have read the former
+    // directory: what it answers is returned, but it must not be stored.
+    const { server, authz } = await build();
+    const resolveCaller = (
+      authz as unknown as {
+        resolveCaller(req: DmRequest): Promise<string | null>;
+      }
+    ).resolveCaller.bind(authz);
+    let started!: () => void;
+    const began = new Promise<void>(resolve => {
+      started = resolve;
+    });
+    let release!: (dn: string | null) => void;
+    const gate = new Promise<string | null>(resolve => {
+      release = resolve;
+    });
+    authz.resolveUser = async () => {
+      started();
+      return gate;
+    };
+
+    const first = resolveCaller({ user: STRANGER } as DmRequest);
+    await began;
+    for (const hook of server.hookBus.subscribers('ldaprenamedone'))
+      (hook as (dn: string, newDn: string) => void)('uid=a,dc=x', 'uid=b,dc=x');
+    release('uid=late,dc=example,dc=com');
+    expect(await first).to.equal('uid=late,dc=example,dc=com');
+
+    let lookups = 0;
+    authz.resolveUser = async () => {
+      lookups++;
+      return 'uid=late,dc=example,dc=com';
+    };
+    await resolveCaller({ user: STRANGER } as DmRequest);
+    expect(lookups, 'the invalidation discarded the late answer').to.equal(1);
+  });
+
   it('should still skip a request that carries no identity at all', async () => {
     // Anonymous is not unresolvable: nothing authenticated, nothing to
     // resolve, and the route's own authentication answers that.

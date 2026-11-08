@@ -152,6 +152,21 @@
       },
       "referentialIntegrity": "remove"
     },
+    "twakeGroupAdminOrgLink": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["__LDAP_BASE__"]
+      },
+      "referentialIntegrity": "remove",
+      "required": false,
+      "role": "groupAdminOrganizations",
+      "label": {
+        "en": "Delegated organizations",
+        "fr": "Organisations déléguées",
+        "mn": "Томилогдсон байгууллагууд"
+      }
+    },
     "twakeDepartmentLink": {
       "type": "pointer",
       "branch": ["__LDAP_BASE__"],

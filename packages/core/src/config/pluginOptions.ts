@@ -29,7 +29,7 @@ function optionChain(plugin: PluginClass): PluginClass[] {
   const chain: PluginClass[] = [];
   let current: unknown = plugin;
   while (current && current !== Function.prototype) {
-    chain.unshift(current as PluginClass);
+    chain.unshift(current);
     current = Object.getPrototypeOf(current) as unknown;
   }
   return chain;

@@ -14,6 +14,7 @@ import ConfigApi from '../../src/plugins/configApi';
 import { DM } from './dm';
 
 export const SECRET = 'a-secret-long-enough-for-the-library';
+export const SESSION_SECRET = 'a-session-key-long-enough-for-the-library';
 export const BASE_URL = 'http://localhost:3000';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', {
@@ -109,6 +110,7 @@ export const build = async (
   server.config.oidc_server = issuer;
   server.config.oidc_client_id = 'client';
   server.config.oidc_client_secret = SECRET;
+  server.config.oidc_session_secret = [SESSION_SECRET];
   server.config.base_url = BASE_URL;
   Object.assign(server.config, config);
   // Scoped, so that `/v1/config` stays readable without a session.

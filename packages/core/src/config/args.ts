@@ -155,11 +155,16 @@ export interface Config {
   auth_hmac?: string[];
   auth_hmac_window?: number;
 
+  // auth/authzLinid1
+  authz_linid1_cache_ttl?: number;
+
   // auth/openidconnect
   oidc_server?: string;
   oidc_username_claim?: string;
   oidc_client_id?: string;
   oidc_client_secret?: string;
+  /** One or more keys for the session cookie, newest first; rotating keeps old sessions valid */
+  oidc_session_secret?: string[];
   base_url?: string;
 
   // auth/authzPerRoute

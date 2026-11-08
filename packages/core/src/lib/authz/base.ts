@@ -83,10 +83,10 @@ export default abstract class AuthzBase extends DmPlugin {
    * `twake/tombstone` narrows the filter of a SCIM search — hands on a copy.
    * An object spread copies the key; a set would no longer know the copy.
    */
-  private static readonly widenedForLink = Symbol('widened for the link');
+  protected static readonly widenedForLink = Symbol('widened for the link');
 
   /** Searches widened to carry `objectClass`, by the same means and for the same reason. */
-  private static readonly widenedForObjectClass = Symbol(
+  protected static readonly widenedForObjectClass = Symbol(
     'widened for object classes'
   );
 
@@ -308,6 +308,59 @@ export default abstract class AuthzBase extends DmPlugin {
   }
 
   /**
+   * The flat branches holding entries that are not branches of their own:
+   * the user, group and other schema-driven stores. An entry created there is
+   * judged on the organization it links to, not on the store it lands in.
+   */
+  private flatBases(): string[] {
+    const bases: string[] = [];
+    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
+      { instances?: { base?: string }[] } | undefined;
+    for (const instance of flat?.instances ?? [])
+      if (instance.base) bases.push(instance.base);
+    const groups = this.server.loadedPlugins['ldapGroups'] as
+      { base?: string } | undefined;
+    // Without `--ldap-group-base` the plugin falls back to `--ldap-base`:
+    // that is the directory root, not a flat store holding groups.
+    if (groups?.base && this.config.ldap_group_base) bases.push(groups.base);
+    const bulk = this.server.loadedPlugins['ldapBulkImport'] as
+      { bases?: () => string[] } | undefined;
+    if (typeof bulk?.bases === 'function') bases.push(...bulk.bases());
+    if (this.config.ldap_users_base) bases.push(this.config.ldap_users_base);
+    if (this.config.ldap_group_base) bases.push(this.config.ldap_group_base);
+    if (this.config.applicative_account_base)
+      bases.push(this.config.applicative_account_base);
+    if (this.config.external_members_branch)
+      bases.push(this.config.external_members_branch);
+    if (this.config.scim_user_base) bases.push(this.config.scim_user_base);
+    if (this.config.scim_group_base) bases.push(this.config.scim_group_base);
+    // The conventional stores when no plugin or option names them: a
+    // deployment without `ldapFlatGeneric` still keeps users and groups there.
+    if (this.config.ldap_base) {
+      bases.push(`ou=users,${this.config.ldap_base}`);
+      bases.push(`ou=groups,${this.config.ldap_base}`);
+    }
+    return bases;
+  }
+
+  /** Whether `dn` is one of the flat branches an attached entry lands in. */
+  private isFlatBase(dn: string): boolean {
+    let target: string;
+    try {
+      target = normalizeDn(dn);
+    } catch {
+      return false;
+    }
+    return this.flatBases().some(base => {
+      try {
+        return normalizeDn(base) === target;
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  /**
    * The organization entries are handed over through between
    * administrators: `--authz-transit-branch`. It only means something when
    * entries are judged by their attachment, and is `undefined` otherwise.
@@ -501,6 +554,46 @@ export default abstract class AuthzBase extends DmPlugin {
   abstract ruleBranches(user: string): Promise<string[]>;
 
   /**
+   * The branches that name `dn` one of their administrators.
+   *
+   * Taking over an administrator account grants everything it administers,
+   * so it is not an ordinary entry of the branch it is attached to. Empty
+   * for a model that does not name administrators in the directory.
+   *
+   * @param _dn the entry about to be written
+   * @returns the branches it administers
+   */
+  protected administeredBranches(_dn: string): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+
+  /**
+   * Refuse a write on an account some organization names as one of its
+   * administrators, unless the caller holds every such branch with write.
+   *
+   * Judged by attachment alone, the account would otherwise follow the
+   * branch it is attached to: a local administrator could claim an
+   * administrator account in transit or attached to their own branch, then
+   * reset its password and use the rights it carries.
+   *
+   * @param user the resolved caller
+   * @param dn the entry about to be written
+   * @throws AuthzRefusedError when the caller does not hold one of them
+   */
+  private async guardAdministratorAccount(
+    user: string,
+    dn: string
+  ): Promise<void> {
+    for (const branch of await this.administeredBranches(dn)) {
+      if (!(await this.getUserPermissions(user, branch)).write)
+        throw new AuthzRefusedError(
+          `User ${user} may not write administrator account ${dn}: no ` +
+            `write permission for branch ${branch}`
+        );
+    }
+  }
+
+  /**
    * Whether a write changes nothing but the organization link and the path
    * that goes with it: what moving an entry between organizations writes.
    */
@@ -573,6 +666,12 @@ export default abstract class AuthzBase extends DmPlugin {
     string,
     { user: string | null; at: number }
   >();
+  /**
+   * Bumped by every invalidation. A resolution that started before a write
+   * may have read the status or the identity before it, so it must not put
+   * what it read back into the cache afterwards.
+   */
+  private resolutionGeneration = 0;
   /** How many identities to remember at once. A cap, not a threshold. */
   private static readonly RESOLUTION_CACHE_MAX = 10000;
   /** Said once, when the cap is reached: a log line per request helps nobody. */
@@ -586,8 +685,8 @@ export default abstract class AuthzBase extends DmPlugin {
    * request that *was* authenticated, whose identity this plugin's model
    * cannot place.
    *
-   * That used to return the operation untouched behind a `warn`, which made
-   * a configuration mismatch an open door rather than a refusal.
+   * Returning the operation untouched behind a `warn` made a configuration
+   * mismatch an open door rather than a refusal.
    * `authzLinid1` resolves `req.user` by searching
    * `(<ldap_user_main_attribute>=<identity>)`, so an authenticator
    * publishing anything else — `core/auth/openidconnect` publishes the OIDC
@@ -613,10 +712,10 @@ export default abstract class AuthzBase extends DmPlugin {
    *  - a *positive* answer can go stale. `authzLinid1` resolves an identity
    *    to a DN, so an administrator whose own entry is renamed or moved is
    *    still resolved to the former DN, where no organization names them:
-   *    every operation is refused until the TTL runs out. A rename or a
-   *    delete therefore drops what was resolved, which closes the window
-   *    for the case that produces it; a change made directly in the
-   *    directory still waits.
+   *    every operation is refused until the TTL runs out. A rename, a
+   *    delete or a status change therefore drops what was resolved, which
+   *    closes the window for the case that produces it; a change made
+   *    directly in the directory still waits.
    *
    * `authzScope` resolves the identity itself (`authzScope.ts`), outside
    * this cache, so during such a window it can describe a scope the hooks
@@ -646,6 +745,7 @@ export default abstract class AuthzBase extends DmPlugin {
     if (cached && now - cached.at < this.cacheTTL) {
       user = cached.user;
     } else {
+      const generation = this.resolutionGeneration;
       user = await this.resolveUser(identity);
       if (this.resolutionCache.size >= AuthzBase.RESOLUTION_CACHE_MAX)
         for (const [key, entry] of this.resolutionCache)
@@ -654,9 +754,15 @@ export default abstract class AuthzBase extends DmPlugin {
       // make the constant a threshold rather than a cap, and the case that
       // reaches it — an identity provider where every user is a new key — is
       // exactly the one this fix is about.
-      if (this.resolutionCache.size < AuthzBase.RESOLUTION_CACHE_MAX)
+      if (
+        generation === this.resolutionGeneration &&
+        this.resolutionCache.size < AuthzBase.RESOLUTION_CACHE_MAX
+      )
         this.resolutionCache.set(identity, { user, at: now });
-      else if (!this.resolutionCacheFullWarned) {
+      else if (
+        generation === this.resolutionGeneration &&
+        !this.resolutionCacheFullWarned
+      ) {
         this.resolutionCacheFullWarned = true;
         this.logger.warn(
           `${this.name}: more than ${AuthzBase.RESOLUTION_CACHE_MAX} ` +
@@ -835,8 +941,9 @@ export default abstract class AuthzBase extends DmPlugin {
     return (await this.getUserPermissions(user, top)).write === true;
   }
 
-  /** Forget what was resolved, for a test that changes the directory. */
+  /** Forget what was resolved: a write changed an identity or its status. */
   protected clearResolutionCache(): void {
+    this.resolutionGeneration++;
     this.resolutionCache.clear();
   }
 
@@ -856,7 +963,7 @@ export default abstract class AuthzBase extends DmPlugin {
      * cheaper than working out which identity moved.
      */
     ldaprenamedone: (): void => {
-      this.resolutionCache.clear();
+      this.clearResolutionCache();
     },
 
     /**
@@ -871,7 +978,7 @@ export default abstract class AuthzBase extends DmPlugin {
      * cheaper than working out which identity the DN held.
      */
     ldapdeletedone: (): void => {
-      this.resolutionCache.clear();
+      this.clearResolutionCache();
     },
 
     ldapmodifyrequest: async ([dn, changes, opNumber, req]: [
@@ -891,6 +998,7 @@ export default abstract class AuthzBase extends DmPlugin {
 
       // The entry written, as the directory and the rules name it
       const judged = await this.storedDn(dn);
+      await this.guardAdministratorAccount(user, judged);
 
       // Check if this is a move operation (changing organization link)
       const linkAttr = this.config.ldap_organization_link_attribute;
@@ -1047,10 +1155,15 @@ export default abstract class AuthzBase extends DmPlugin {
         return [dn, entry, req];
       }
 
-      // Determine which branch to check permissions for
-      let branchToCheck: string;
+      // A DN an organization still names may have no entry: creating one
+      // there would take over what the name administers.
+      await this.guardAdministratorAccount(user, dn);
 
-      // If the entry has an organization link, check permissions for that organization
+      // If the entry has an organization link, check permissions for that
+      // organization. The branch the DN lands in is judged too, unless it is
+      // a flat store holding attached entries: an organization may not be
+      // created under another tenant's tree because it links to one of the
+      // caller's own.
       const linkAttr = this.config.ldap_organization_link_attribute;
       // Whatever case the entry spells the attribute in
       const links = linkAttr
@@ -1061,21 +1174,31 @@ export default abstract class AuthzBase extends DmPlugin {
         : [];
       // The entry created, under its parent as the directory names it
       const judged = await this.storedParent(dn);
+      const location = this.extractBranchDn(judged);
+      const organizationClasses = (this.config.ldap_organization_class ?? [])
+        .filter(name => name.toLowerCase() !== 'top')
+        .map(name => name.toLowerCase());
+      const isOrganization = AuthzBase.valuesOf(entry, 'objectClass')
+        .map(name => String(name).toLowerCase())
+        .some(name => organizationClasses.includes(name));
+      const branches = new Set<string>();
       if (links.length > 0) {
-        branchToCheck = await this.storedDn(links[0]);
+        branches.add(await this.storedDn(links[0]));
+        if (isOrganization || !this.isFlatBase(location))
+          branches.add(location);
       } else {
         // For organizations (ou entries) or entries without link, check the
         // parent DN
-        branchToCheck = this.extractBranchDn(judged);
+        branches.add(location);
       }
 
-      const permissions = await this.getUserPermissions(user, branchToCheck);
-
-      // Check write permission
-      if (!permissions.write) {
-        throw new AuthzRefusedError(
-          `User ${req!.user} does not have write permission for branch ${branchToCheck}`
-        );
+      for (const branch of branches) {
+        const permissions = await this.getUserPermissions(user, branch);
+        if (!permissions.write) {
+          throw new AuthzRefusedError(
+            `User ${req!.user} does not have write permission for branch ${branch}`
+          );
+        }
       }
       // Nor where a rule refuses it, at the very DN created
       const named = await this.refusingRule(user, judged, ['write'], false);
@@ -1438,7 +1561,9 @@ export default abstract class AuthzBase extends DmPlugin {
       // Extract source and destination branches, as the directory names
       // them
       const from = await this.storedDn(oldDn);
+      await this.guardAdministratorAccount(user, from);
       const to = await this.storedParent(newDn);
+      await this.guardAdministratorAccount(user, to);
       const sourceBranch = this.extractBranchDn(from);
       const destBranch = this.extractBranchDn(to);
 
@@ -1502,6 +1627,7 @@ export default abstract class AuthzBase extends DmPlugin {
       const targets = Array.isArray(dn) ? dn : [dn];
       for (const given of targets) {
         const target = await this.storedDn(given);
+        await this.guardAdministratorAccount(user, target);
         const branchToCheck = await this.effectiveBranch(target);
         const permissions = await this.getUserPermissions(user, branchToCheck);
         if (!permissions.delete) {

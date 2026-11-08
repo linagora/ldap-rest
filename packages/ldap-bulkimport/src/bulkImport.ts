@@ -178,6 +178,16 @@ export default class LdapBulkImport extends DmPlugin {
   private resources: Map<string, BulkImportResource> = new Map();
   private upload: multer.Multer;
 
+  /**
+   * The branches the import writes into. An authorization plugin judges an
+   * added entry on its link rather than on a flat store it lands in.
+   *
+   * @returns the distinct resource bases
+   */
+  bases(): string[] {
+    return [...new Set([...this.resources.values()].map(r => r.base))];
+  }
+
   constructor(parent: DM) {
     super(parent);
     this.settings = this.options(bulkImportOptions);

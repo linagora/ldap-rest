@@ -24,6 +24,50 @@ const server = new DM(await composeOptions());
 The `ldap-rest` command does this already, so a deployment started from the
 command line needs no change.
 
+## From 2.1.1
+
+### TOTP requires the user name
+
+**Who is affected:** every deployment loading `core/auth/totp`.
+
+`Authorization: Bearer <code>` is refused. Write
+`Authorization: Bearer <name>:<code>`, where `<name>` is the name given in
+`--auth-totp`; the server checks only that user's secret. A code is accepted
+once per user, so a replay, or a second request with the same code inside its
+time step, is refused: wait for the next code. Each process remembers its own
+accepted codes; with several replicas a code can be used once against each
+until they share state. Update the bundled `TotpAuthClient` to pass `user`;
+see [TOTP](plugins/auth/totp.md#usage).
+
+### Rate limits use the TCP peer without `trustedProxy`
+
+**Who is affected:** a deployment that relied on a reverse proxy overwriting
+`X-Forwarded-For` and did not load `core/auth/trustedProxy`.
+
+`rateLimit`, `crowdsec` and `weblogs` no longer read the header themselves:
+without `trustedProxy` the TCP peer is the client, so every request through a
+proxy shares one rate-limit counter and one CrowdSec lookup. Load
+`core/auth/trustedProxy` with the proxy addresses; it now reads an appended
+chain from the right, so the proxy need not overwrite the header. See
+[trusted proxy](plugins/auth/trusted-proxy.md).
+
+### OpenID Connect requires a session key of its own
+
+**Who is affected:** every deployment loading `core/auth/openidconnect`.
+
+`--oidc-session-secret` / `DM_OIDC_SESSION_SECRET` is now required, and the
+plugin refuses to start without it or with a value equal to, or a fragment
+of, `DM_OIDC_CLIENT_SECRET`. The cookie holds the whole session, so its key
+must not be the client secret known to the provider's administrators. Set a
+key of its own, at least 32 characters; see
+[OIDC](plugins/auth/oidc.md#session-key). Give it to every replica.
+
+Sessions opened before the upgrade were encrypted with the client secret
+and are refused: every user signs in again. During a rolling upgrade, old
+and new replicas reject each other's cookies until the rollout completes.
+A later rotation keeps the previous key in the list while its sessions
+expire ([OIDC](plugins/auth/oidc.md#session-key)).
+
 ## From 2.0.3
 
 ### An `authzDynamic` flag must be a JSON boolean

@@ -11,7 +11,9 @@
  */
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
-import TwakePlugin from '@ldap-rest/core/abstract/twakePlugin';
+import TwakePlugin, {
+  assertPathSegment,
+} from '@ldap-rest/core/abstract/twakePlugin';
 import { defineRoute, type Role } from '@ldap-rest/core/abstract/plugin';
 import type { DM } from '@ldap-rest/core';
 import type { Hooks } from '@ldap-rest/core/hooks';
@@ -243,6 +245,8 @@ export default class MigrationProxy extends TwakePlugin {
   }
 
   private userUrl(address: string): string {
+    // This endpoint already receives a percent-encoded `@`; keep that form.
+    assertPathSegment(address);
     return `${this.webadminUrl}/migratedUsers/${encodeURIComponent(address)}`;
   }
 

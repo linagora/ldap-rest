@@ -80,7 +80,7 @@ describe('AuthTotp', () => {
     const testSecret = 'JBSWY3DPEHPK3PXP'; // Standard test secret
 
     before(async () => {
-      process.env.DM_AUTH_TOTP = `${testSecret}:admin:6`;
+      process.env.DM_AUTH_TOTP = `${testSecret}:admin:6,${testSecret}:replay:6`;
       dm = new DM();
       await dm.ready;
       const p = new AuthTotp(dm);
@@ -99,7 +99,7 @@ describe('AuthTotp', () => {
     it('should return 401 if an invalid token is provided', async () => {
       const res = await request(app)
         .get('/api/hello')
-        .set('Authorization', 'Bearer 000000');
+        .set('Authorization', 'Bearer admin:000000');
       expect(res.status).to.equal(401);
       expect(res.body).to.deep.equal({ error: 'Unauthorized' });
     });
@@ -108,7 +108,7 @@ describe('AuthTotp', () => {
       const code = generateTestTotp(testSecret, 6, 30);
       const res = await request(app)
         .get('/api/hello')
-        .set('Authorization', `Bearer ${code}`);
+        .set('Authorization', `Bearer admin:${code}`);
       expect(res.status).to.equal(200);
       expect(res.body).to.deep.equal({ message: 'Hello', hookResults: [] });
     });
@@ -119,6 +119,27 @@ describe('AuthTotp', () => {
         .set('Authorization', '123456');
       expect(res.status).to.equal(401);
     });
+
+    it('should refuse the old form without a user', async () => {
+      const code = generateTestTotp(testSecret, 6, 30);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', `Bearer ${code}`);
+      expect(res.status).to.equal(401);
+    });
+
+    it('should refuse a replayed code', async () => {
+      const code = generateTestTotp(testSecret, 6, 30);
+      const first = await request(app)
+        .get('/api/hello')
+        .set('Authorization', `Bearer replay:${code}`);
+      expect(first.status).to.equal(200);
+
+      const second = await request(app)
+        .get('/api/hello')
+        .set('Authorization', `Bearer replay:${code}`);
+      expect(second.status).to.equal(401);
+    });
   });
 
   describe('Multiple users with different digit counts', () => {
@@ -127,9 +148,10 @@ describe('AuthTotp', () => {
     const secret6 = 'JBSWY3DPEHPK3PXP'; // 6 digits
     const secret8 = 'HXDMVJECJJWSRB3H'; // 8 digits
     const secret10 = 'IXDMVJECJJWSRB2A'; // 10 digits (custom)
+    const secret6b = 'GEZDGNBVGY3TQOJQ'; // another 6-digit user
 
     before(async () => {
-      process.env.DM_AUTH_TOTP = `${secret6}:user6:6,${secret8}:user8:8,${secret10}:user10:10`;
+      process.env.DM_AUTH_TOTP = `${secret6}:user6:6,${secret6b}:user6b:6,${secret8}:user8:8,${secret10}:user10:10`;
       process.env.DM_AUTH_TOTP_STEP = '30';
       process.env.DM_AUTH_TOTP_WINDOW = '1';
       dm = new DM();
@@ -146,7 +168,7 @@ describe('AuthTotp', () => {
       expect(code.length).to.equal(6);
       const res = await request(app)
         .get('/api/hello')
-        .set('Authorization', `Bearer ${code}`);
+        .set('Authorization', `Bearer user6:${code}`);
       expect(res.status).to.equal(200);
     });
 
@@ -155,7 +177,7 @@ describe('AuthTotp', () => {
       expect(code.length).to.equal(8);
       const res = await request(app)
         .get('/api/hello')
-        .set('Authorization', `Bearer ${code}`);
+        .set('Authorization', `Bearer user8:${code}`);
       expect(res.status).to.equal(200);
     });
 
@@ -164,15 +186,23 @@ describe('AuthTotp', () => {
       expect(code.length).to.equal(10);
       const res = await request(app)
         .get('/api/hello')
-        .set('Authorization', `Bearer ${code}`);
+        .set('Authorization', `Bearer user10:${code}`);
       expect(res.status).to.equal(200);
+    });
+
+    it('should not accept a code issued to another user', async () => {
+      const code = generateTestTotp(secret6, 6, 30);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', `Bearer user6b:${code}`);
+      expect(res.status).to.equal(401);
     });
 
     it('should reject 8-digit code for 6-digit user', async () => {
       const code = generateTestTotp(secret6, 8, 30);
       const res = await request(app)
         .get('/api/hello')
-        .set('Authorization', `Bearer ${code}`);
+        .set('Authorization', `Bearer user6:${code}`);
       expect(res.status).to.equal(401);
     });
   });
@@ -199,7 +229,7 @@ describe('AuthTotp', () => {
       expect(code.length).to.equal(6);
       const res = await request(app)
         .get('/api/hello')
-        .set('Authorization', `Bearer ${code}`);
+        .set('Authorization', `Bearer admin:${code}`);
       expect(res.status).to.equal(200);
     });
   });
@@ -225,7 +255,7 @@ describe('AuthTotp', () => {
       const code = generateTestTotp(testSecret, 6, 60);
       const res = await request(app)
         .get('/api/hello')
-        .set('Authorization', `Bearer ${code}`);
+        .set('Authorization', `Bearer admin:${code}`);
       expect(res.status).to.equal(200);
     });
 
@@ -233,7 +263,7 @@ describe('AuthTotp', () => {
       const wrongCode = generateTestTotp(testSecret, 6, 30);
       await request(app)
         .get('/api/hello')
-        .set('Authorization', `Bearer ${wrongCode}`);
+        .set('Authorization', `Bearer admin:${wrongCode}`);
       // This might pass or fail depending on timing, but it's a good edge case
       // In most cases, it should fail
     });
@@ -313,7 +343,7 @@ describe('AuthTotp', () => {
       const code = generateTestTotp(secret1, 6, 30);
       const res = await request(app)
         .get('/api/hello')
-        .set('Authorization', `Bearer ${code}`);
+        .set('Authorization', `Bearer user1:${code}`);
       expect(res.status).to.equal(200);
     });
 
@@ -321,7 +351,7 @@ describe('AuthTotp', () => {
       const code = generateTestTotp(secret2, 8, 30);
       const res = await request(app)
         .get('/api/hello')
-        .set('Authorization', `Bearer ${code}`);
+        .set('Authorization', `Bearer user2:${code}`);
       expect(res.status).to.equal(200);
     });
   });

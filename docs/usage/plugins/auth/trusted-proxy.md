@@ -27,12 +27,17 @@ DM_TRUSTED_PROXY_AUTH_HEADER="Auth-User"
 2. **Plugin checks** if `req.socket.remoteAddress` matches a trusted proxy
 3. **If trusted:**
    - `X-Forwarded-For` header is preserved
+   - The client address is read from the right of the chain, skipping the
+     trusted proxy addresses, and published as `req.clientIp`; a value the
+     client wrote at the left of the chain is never taken for the client
    - `Auth-User` header (or custom header) is extracted for logging
    - Request is marked as `req.trustedProxy = true`
 4. **If untrusted:**
    - `X-Forwarded-For` header is **removed** to prevent IP spoofing
+   - `req.clientIp` is the TCP peer
    - Request is marked as `req.trustedProxy = false`
-5. **Other plugins** (rate limiting, CrowdSec, weblogs) see sanitized headers
+5. **Other plugins** (rate limiting, CrowdSec, weblogs) read `req.clientIp`
+   rather than parsing the header themselves
 
 ## Supported Formats
 
@@ -117,6 +122,9 @@ backend ldap_rest
 - **Load Balancers:** Trust headers from known load balancer IPs
 - **CDN Integration:** Trust headers from CDN edge servers
 - **Kubernetes:** Trust headers from ingress controllers
+- **Only list proxies:** `--trusted-proxy` / `DM_TRUSTED_PROXIES` must name
+  the reverse proxies, never a network that also holds clients: a trusted
+  client entry would make the walk trust an address the client wrote.
 - **Security:** Prevent attackers from spoofing `X-Forwarded-For` to bypass rate limits
 
 ## Security Considerations

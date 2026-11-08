@@ -177,10 +177,22 @@
     "kind": "dns"
   },
   {
+    "cli": "--authz-group-admin-attribute",
+    "type": "string",
+    "default": "",
+    "env": "DM_AUTHZ_GROUP_ADMIN_ATTRIBUTE"
+  },
+  {
     "cli": "--authz-identity",
     "type": "string",
     "default": "req.user",
     "env": "DM_AUTHZ_IDENTITY"
+  },
+  {
+    "cli": "--authz-linid1-cache-ttl",
+    "type": "number",
+    "default": 300,
+    "env": "DM_AUTHZ_LINID1_CACHE_TTL"
   },
   {
     "cli": "--authz-local-admin-attribute",
@@ -985,6 +997,14 @@
     "type": "string",
     "default": "",
     "env": "DM_OIDC_SERVER"
+  },
+  {
+    "cli": "--oidc-session-secret",
+    "type": "array",
+    "default": [],
+    "plural": "--oidc-session-secrets",
+    "env": "DM_OIDC_SESSION_SECRET",
+    "kind": "phrases"
   },
   {
     "cli": "--oidc-username-claim",

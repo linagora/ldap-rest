@@ -11,6 +11,7 @@ The `authzLinid1` plugin provides dynamic, LDAP-driven access control by reading
 - **Full CRUD rights** - Local admins get read, write, and delete permissions
 - **Sub-branch inheritance** - Permissions apply recursively to sub-branches
 - **Cross-branch access** - Users/groups can be managed if their `twakeDepartmentLink` points to an authorized organization
+- **Delegated group membership** - A group can let other organizations' administrators manage their own members ([details](#delegated-group-membership))
 - **Permission caching** - Configurable TTL reduces LDAP queries (default: 5 minutes)
 
 ## How It Works
@@ -95,6 +96,13 @@ may claim it into one they manage, and the first to claim it takes it.
   claiming it may carry other changes to the entry — its password, say —
   judged with it: the entry lands in the organization that write is
   allowed in.
+- An account some organization names in
+  `--authz-local-admin-attribute` is not created, claimed, moved, changed or
+  deleted by an administrator who does not write **every** organization
+  naming it, including when the DN is one the organization still names with
+  no entry behind it. Taking such an account over would hand over the
+  branches it administers, which is why it is judged on those branches
+  rather than on the one it is attached to.
 - **Putting** one in transit asks for write on the organization it leaves,
   and nothing on the transit branch: an administrator only lets go of what
   they manage. Handing an account over to an organization one does not manage
@@ -231,6 +239,56 @@ other: the global branch would hide the write branch it holds from the
 administrators meant to read it. In either case the server refuses to
 start.
 
+### Delegated group membership
+
+A group may delegate membership management to the administrators of other
+organizations, so that a group spanning several organizations can be
+maintained by each of them without opening the others' members. Off by
+default: name the attribute to turn it on.
+
+```bash
+--authz-group-admin-attribute twakeGroupAdminOrgLink
+```
+
+The attribute is multi-valued and holds organization DNs. The Twake group
+schema declares it as `twakeGroupAdminOrgLink` (`groupAdminOrganizations`
+role, `referentialIntegrity: remove`), and `twakeGroup` and
+`twakeStaticGroup` must allow it (`MAY`).
+
+Let `D` be the organizations a group delegates to, `L` the organization a
+member is attached to (its link attribute), and `C` the caller's written
+branches. Then:
+
+- `C` reads the group when a branch of `C` lies in one of the `D`.
+- `C` reads a member or owner of the group only when it is attached to an
+  `L` inside some `D` and `C` writes `L`. A member attached to no
+  organization (in transit) is neither read nor managed through the
+  delegation.
+- `C` adds or removes a `member` under the same rule. Nothing else on the
+  group changes: not its description, delegation, name, position or
+  existence. The delegation grants no creation, rename, move or delete of a
+  group.
+- The group's own administrators keep the whole group and every right they
+  had. A group attached to no organization is already readable by every
+  administrator; the delegation only adds the member write there. A member
+  that is a group follows the same link rule.
+
+Removing the last real member keeps the group plugin's rule: the placeholder
+takes its place, or the request is refused with `409`.
+
+A search whose filter tests `member`, `owner`, or a supertype they inherit
+(`distinguishedName`) does not return a delegated group: the directory judged
+the full group, and answering from the filtered membership would tell the
+caller whether a user of another organization belongs to it. The group stays
+in the ordinary listing and can be read directly.
+
+`GET /api/v1/authz/scope` lists the delegated groups under
+`delegatedGroups`, so a client does not duplicate the rule
+([scope](authz-scope.md#delegated-groups)).
+
+The delegation is read from the group entry, so a change takes effect at
+once; the plugin does not keep a second copy of it.
+
 ## Configuration
 
 No configuration file needed - permissions are read from LDAP. Simply load the plugin:
@@ -241,7 +299,17 @@ No configuration file needed - permissions are read from LDAP. Simply load the p
 
 **Optional Cache Configuration:**
 
-The plugin caches permissions for 5 minutes by default. This is hardcoded but can be modified in the source if needed.
+The plugin caches permissions for 5 minutes by default:
+
+```bash
+--authz-linid1-cache-ttl 60
+```
+
+A write through this server that touches the admin attribute clears the
+cache at once, so a revocation does not wait for the TTL. A change made
+directly in the directory waits for it. With several instances, a write
+clears the cache of the instance that served it; another instance's cache
+waits for the TTL, like a change made directly in the directory.
 
 ### The identity has to be a `uid`
 
@@ -264,7 +332,7 @@ An identity naming **several** entries is refused (403) whatever that
 option says, and a warning gives the number of entries. A lookup the
 directory fails fails the request and is not cached.
 
-Both answers are cached for the plugin's TTL (5 minutes), negatives
+Both answers are cached for the plugin's TTL (5 minutes by default), negatives
 included, so a mismatch does not turn every request into a directory search.
 The TTL cuts both ways: an identity added to the directory after being
 refused waits it out, and an administrator whose **own entry is renamed or
@@ -276,13 +344,24 @@ directly in the directory waits out the TTL.
 `GET /api/v1/authz/scope` resolves the identity outside that cache, so
 during such a window it can describe a scope the hooks no longer grant.
 
+### Account status
+
+When the user schema declares an `accountStatus` attribute, the resolved
+caller must carry its `states.enabled` value; any other value is refused with
+`403`, like an identity that does not resolve. A disabled, no-access or
+to-delete administrator therefore loses the API even when the identity
+provider still lets them sign in, and cannot re-enable themselves through the
+console. A write through this server that changes the status drops the
+resolved identity at once; a change made directly in the directory waits for
+`--authz-linid1-cache-ttl`.
+
 ## Permission Resolution
 
 For each LDAP operation, the plugin:
 
 1. **Resolves user DN** - Converts username to LDAP DN
 2. **Searches for permissions** - Finds all organizations where user is in `twakeLocalAdminLink`
-3. **Caches results** - Stores permissions for 5 minutes
+3. **Caches results** - Stores permissions for the configured TTL (5 minutes by default)
 4. **Checks branch access** - Verifies if requested branch matches authorized organizations
 5. **Checks link attributes** - For entries with `twakeDepartmentLink`, checks if link points to authorized org
 
@@ -458,7 +537,7 @@ Response: 403 Forbidden
 
 Permissions are cached to reduce LDAP queries:
 
-- **Cache TTL**: 5 minutes (hardcoded)
+- **Cache TTL**: 5 minutes by default (`--authz-linid1-cache-ttl`)
 - **Per-user cache**: Each user's permissions cached separately
 - **Automatic refresh**: Cache expires after TTL
 - **On-demand refresh**: New permissions fetched on cache miss
@@ -503,6 +582,13 @@ User makes request → Check cache → (if expired) Search LDAP once → Cache f
 
 - `twakeDepartmentLink` (single-valued) - DN of parent organization
 
+**Groups, when `--authz-group-admin-attribute` is set:**
+
+- `twakeGroupAdminOrgLink` (multi-valued) - DNs of the organizations whose
+  administrators manage their own members
+  ([delegated group membership](#delegated-group-membership)). The directory's
+  `twakeGroup` and `twakeStaticGroup` object classes must allow it.
+
 ### Example Schema
 
 ```ldif
@@ -538,7 +624,7 @@ member: uid=employee1,ou=users,dc=example,dc=com
 - **Centralized control** - All permissions in LDAP, no config files to sync
 - **Audit trail** - LDAP modifications can be logged/audited
 - **Consistency** - Single source of truth for permissions
-- **Real-time updates** - Changes effective after cache expiry (5 min max)
+- **Real-time updates** - A write through this server takes effect at once; a change made directly in the directory waits for the cache TTL
 
 ### Permission Model
 
@@ -559,8 +645,8 @@ This plugin only handles **authorization**. Combine with an authentication plugi
 
 ### Cache Security
 
-- **Cache delays permission revocation** - Up to 5 minutes after removing user from `twakeLocalAdminLink`
-- **Cache per user** - Removing one user doesn't invalidate others
+- **Cache delays permission revocation** - Up to the TTL after removing user from `twakeLocalAdminLink` directly in the directory; a write through this server clears it at once
+- **Cache per user** - A write touching the admin attribute clears every cached entry, since the hook does not resolve which users it affects
 - **No cache persistence** - Cache cleared on server restart
 
 ## Troubleshooting
@@ -585,7 +671,7 @@ This plugin only handles **authorization**. Combine with an authentication plugi
 
 2. Check user DN matches exactly (spaces, case, order)
 
-3. Wait up to 5 minutes for cache to expire after adding user
+3. Wait up to the cache TTL after adding the user directly in the directory
 
 4. Check user is authenticated (verify `req.user` is set)
 
@@ -621,7 +707,7 @@ Added user to `twakeLocalAdminLink` but they still get access denied.
 
 **Solutions:**
 
-1. Wait up to 5 minutes for cache to expire
+1. Wait up to the cache TTL, or empty the cache with a write through this server
 2. Restart server to clear all caches immediately
 3. Verify LDAP modification succeeded:
    ```bash
@@ -667,6 +753,7 @@ User jdoe not found in LDAP
 --oidc-server "https://auth.example.com" \
 --oidc-client-id "ldap-rest" \
 --oidc-client-secret "secret" \
+--oidc-session-secret "a-session-key-of-32-characters-min" \
 --base-url "https://api.example.com" \
 --ldap-top-organization "ou=organization,dc=example,dc=com"
 ```
@@ -690,7 +777,7 @@ User jdoe not found in LDAP
 | Read-only access  | No (always full access)            | Yes (separate read/write/delete) |
 | Cross-branch      | Yes (via `twakeDepartmentLink`)    | Yes (if configured)              |
 | Dynamic updates   | Yes (via LDAP)                     | No (requires restart)            |
-| Cache             | 5 min (hardcoded)                  | Configurable TTL                 |
+| Cache             | 5 min (`--authz-linid1-cache-ttl`) | `--authz-per-branch-cache-ttl`   |
 | Use case          | Organization-based delegated admin | Fine-grained access control      |
 
 **When to use authzLinid1:**

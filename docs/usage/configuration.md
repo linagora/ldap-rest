@@ -369,14 +369,15 @@ Development only, refused with `NODE_ENV=production` — see [Fake Authenticatio
 
 #### `core/auth/openidconnect`
 
-| CLI                     | Env                      | Default | Description                                                                             |
-| ----------------------- | ------------------------ | ------- | --------------------------------------------------------------------------------------- |
-| `--oidc-server`         | `DM_OIDC_SERVER`         |         | OIDC server URL                                                                         |
-| `--oidc-client-id`      | `DM_OIDC_CLIENT_ID`      |         | OIDC Client ID                                                                          |
-| `--oidc-client-secret`  | `DM_OIDC_CLIENT_SECRET`  |         | OIDC Client Secret                                                                      |
-| `--oidc-username-claim` | `DM_OIDC_USERNAME_CLAIM` | `sub`   | Claim naming the caller, published as `req.userName` (see [OIDC](plugins/auth/oidc.md)) |
-| `--oidc-logout-origins` | `DM_OIDC_LOGOUT_ORIGINS` | `[]`    | Other origins a console may log out from (see [OIDC](plugins/auth/oidc.md#logout))      |
-| `--base-url`            | `DM_BASE_URL`            |         | Public URL for callbacks                                                                |
+| CLI                                                | Env                      | Default | Description                                                                                                                                                |
+| -------------------------------------------------- | ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--oidc-server`                                    | `DM_OIDC_SERVER`         |         | OIDC server URL                                                                                                                                            |
+| `--oidc-client-id`                                 | `DM_OIDC_CLIENT_ID`      |         | OIDC Client ID                                                                                                                                             |
+| `--oidc-client-secret`                             | `DM_OIDC_CLIENT_SECRET`  |         | OIDC Client Secret                                                                                                                                         |
+| `--oidc-session-secret` / `--oidc-session-secrets` | `DM_OIDC_SESSION_SECRET` |         | Key of the session cookie; required, and must differ from the client secret. Several values rotate sessions (see [OIDC](plugins/auth/oidc.md#session-key)) |
+| `--oidc-username-claim`                            | `DM_OIDC_USERNAME_CLAIM` | `sub`   | Claim naming the caller, published as `req.userName` (see [OIDC](plugins/auth/oidc.md))                                                                    |
+| `--oidc-logout-origins`                            | `DM_OIDC_LOGOUT_ORIGINS` | `[]`    | Other origins a console may log out from (see [OIDC](plugins/auth/oidc.md#logout))                                                                         |
+| `--base-url`                                       | `DM_BASE_URL`            |         | Public URL for callbacks                                                                                                                                   |
 
 #### `core/bcl`
 
@@ -455,12 +456,14 @@ whichever of the two names it selects. A value other than `req.user` or
 
 #### `core/auth/authzLinid1`
 
-| CLI                                                             | Env                              | Default                   | Description                                                                                                                                                                                   |
-| --------------------------------------------------------------- | -------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--authz-local-admin-attribute`                                 | `DM_AUTHZ_LOCAL_ADMIN_ATTRIBUTE` | `twakeLocalAdminLink`     | Local admin attribute                                                                                                                                                                         |
-| `--authz-global-branch` / `--authz-global-branches`             | `DM_AUTHZ_GLOBAL_BRANCHES`       |                           | Branches outside the tree only the administrators of `--authz-global-organization` read and write, [details](plugins/auth/authz-linid1.md#global-branches)                                    |
-| `--authz-global-write-branch` / `--authz-global-write-branches` | `DM_AUTHZ_GLOBAL_WRITE_BRANCHES` |                           | Branches outside the tree every administrator reads and only the administrators of `--authz-global-organization` write and delete in, [details](plugins/auth/authz-linid1.md#global-branches) |
-| `--authz-global-organization`                                   | `DM_AUTHZ_GLOBAL_ORGANIZATION`   | `--ldap-top-organization` | The organization holding the global branches and global write branches                                                                                                                        |
+| CLI                                                             | Env                              | Default                   | Description                                                                                                                                                                                        |
+| --------------------------------------------------------------- | -------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--authz-local-admin-attribute`                                 | `DM_AUTHZ_LOCAL_ADMIN_ATTRIBUTE` | `twakeLocalAdminLink`     | Local admin attribute                                                                                                                                                                              |
+| `--authz-linid1-cache-ttl`                                      | `DM_AUTHZ_LINID1_CACHE_TTL`      | `300`                     | Seconds a user's resolved permissions are cached; a write touching the admin attribute clears the cache at once                                                                                    |
+| `--authz-global-branch` / `--authz-global-branches`             | `DM_AUTHZ_GLOBAL_BRANCHES`       |                           | Branches outside the tree only the administrators of `--authz-global-organization` read and write, [details](plugins/auth/authz-linid1.md#global-branches)                                         |
+| `--authz-global-write-branch` / `--authz-global-write-branches` | `DM_AUTHZ_GLOBAL_WRITE_BRANCHES` |                           | Branches outside the tree every administrator reads and only the administrators of `--authz-global-organization` write and delete in, [details](plugins/auth/authz-linid1.md#global-branches)      |
+| `--authz-global-organization`                                   | `DM_AUTHZ_GLOBAL_ORGANIZATION`   | `--ldap-top-organization` | The organization holding the global branches and global write branches                                                                                                                             |
+| `--authz-group-admin-attribute`                                 | `DM_AUTHZ_GROUP_ADMIN_ATTRIBUTE` |                           | Attribute on a group naming the organizations whose administrators manage their own members; empty means the delegation is off, [details](plugins/auth/authz-linid1.md#delegated-group-membership) |
 
 ### Security Plugins
 

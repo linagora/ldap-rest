@@ -2195,7 +2195,7 @@
     "/api/v1/authz/scope": {
       "get": {
         "summary": "Administration scope of the current user",
-        "description": "Returns the branches the signed-in user administers, the permissions\nheld on each, and — per entity — whether they may create a new entry.\nA client uses it to show the scope explicitly and to hide actions that\nwould be refused.\n\nWith no authorization plugin judging the caller the server grants\neverything, and the answer says so through `unrestricted: true`.\nWhen plugins judge the caller and none of them can describe a scope\n(`authzPerRoute`, `authzDynamic`), the answer is `described: false`\nwith nothing in it: no model can say what will be granted, and a\nclient should not offer what it cannot know.\n\n`sources` names the authorization plugins judging the caller, and\n`source` the one this scope comes from — the first loaded, or the one\n`--authz-scope-source` names — so a client can tell a scope from one\nmodel among several from the server's whole answer.\n\n`transit` is the transit branch (`--authz-transit-branch`) when the\ndescribing plugin judges entries by their attachment, `null`\notherwise. Every administrator may put an entry they manage there,\nand claim one from it into a branch they write.\n\n`linksAnyDomain` says whether the caller may link an organization to\nany mail domain, rather than only to those an organization above it\nlinks: with `authzLinid1`, an administrator holding write on the top\norganization or on `--authz-global-organization`. `true` when\nunrestricted, `false` when the describing plugin cannot tell, and\nwhen the scope is not described. Like the rest of the scope, it is\nthe answer of `source` alone: another authorization plugin judging\nthe same caller may still refuse the link — `authzPerBranch`\ngrants it on the top organization only.\n\n`passwordPolicies` says whether the caller may list the password\npolicies (`GET /password-policies`), so a client offers them without\nasking for them and being refused: the judgement the describing\nplugin makes of a search of `--ppolicy-base` — with `authzLinid1`\nand `--authz-global-branches` holding it, only those who read that\nbranch. `true` when unrestricted, `false` when the scope is not\ndescribed, and absent when `core/ldap/passwordPolicy` is not loaded.\nIt is the answer of `source` too: another authorization plugin\njudging the same caller (`--authz-combine`) may still refuse the\nlisting, and so may a route-level gate (`authzPerRoute`).\n",
+        "description": "Returns the branches the signed-in user administers, the permissions\nheld on each, and — per entity — whether they may create a new entry.\nA client uses it to show the scope explicitly and to hide actions that\nwould be refused.\n\nWith no authorization plugin judging the caller the server grants\neverything, and the answer says so through `unrestricted: true`.\nWhen plugins judge the caller and none of them can describe a scope\n(`authzPerRoute`, `authzDynamic`), the answer is `described: false`\nwith nothing in it: no model can say what will be granted, and a\nclient should not offer what it cannot know.\n\n`sources` names the authorization plugins judging the caller, and\n`source` the one this scope comes from — the first loaded, or the one\n`--authz-scope-source` names — so a client can tell a scope from one\nmodel among several from the server's whole answer.\n\n`transit` is the transit branch (`--authz-transit-branch`) when the\ndescribing plugin judges entries by their attachment, `null`\notherwise. Every administrator may put an entry they manage there,\nand claim one from it into a branch they write.\n\n`delegatedGroups` lists the groups the caller reads, and whose\nmembers of their own organizations they may add or remove, through\n`--authz-group-admin-attribute`. It is absent when that option is off\nor the caller has none.\n\n`linksAnyDomain` says whether the caller may link an organization to\nany mail domain, rather than only to those an organization above it\nlinks: with `authzLinid1`, an administrator holding write on the top\norganization or on `--authz-global-organization`. `true` when\nunrestricted, `false` when the describing plugin cannot tell, and\nwhen the scope is not described. Like the rest of the scope, it is\nthe answer of `source` alone: another authorization plugin judging\nthe same caller may still refuse the link — `authzPerBranch`\ngrants it on the top organization only.\n\n`passwordPolicies` says whether the caller may list the password\npolicies (`GET /password-policies`), so a client offers them without\nasking for them and being refused: the judgement the describing\nplugin makes of a search of `--ppolicy-base` — with `authzLinid1`\nand `--authz-global-branches` holding it, only those who read that\nbranch. `true` when unrestricted, `false` when the scope is not\ndescribed, and absent when `core/ldap/passwordPolicy` is not loaded.\nIt is the answer of `source` too: another authorization plugin\njudging the same caller (`--authz-combine`) may still refuse the\nlisting, and so may a route-level gate (`authzPerRoute`).\n",
         "responses": {
           "200": {
             "description": "Scope of the current user.",
@@ -2285,6 +2285,24 @@
                         }
                       ]
                     },
+                    "delegatedGroups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "dn",
+                          "manageMembers"
+                        ],
+                        "properties": {
+                          "dn": {
+                            "type": "string"
+                          },
+                          "manageMembers": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
                     "linksAnyDomain": {
                       "type": "boolean"
                     },
@@ -2332,6 +2350,12 @@
                     }
                   ],
                   "transit": "ou=Transit,ou=organization,dc=example,dc=com",
+                  "delegatedGroups": [
+                    {
+                      "dn": "cn=all-staff,ou=groups,dc=example,dc=com",
+                      "manageMembers": true
+                    }
+                  ],
                   "linksAnyDomain": false,
                   "passwordPolicies": false,
                   "entities": [

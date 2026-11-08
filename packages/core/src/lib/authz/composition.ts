@@ -128,7 +128,9 @@ export function servesRequest(
  */
 export function runTogether(a: Authenticator, b: Authenticator): boolean {
   if (a.pathPrefixes.length === 0 && b.pathPrefixes.length === 0) return true;
-  return a.pathPrefixes.some(prefix => b.pathPrefixes.includes(prefix));
+  return a.pathPrefixes.some(prefix =>
+    b.pathPrefixes.some(other => other.toLowerCase() === prefix.toLowerCase())
+  );
 }
 
 /** A plugin that judges LDAP operations, and whose. */

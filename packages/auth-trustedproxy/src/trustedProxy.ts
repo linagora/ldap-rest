@@ -6,8 +6,9 @@
  * upstream reverse proxies. If the request comes from an untrusted IP,
  * the X-Forwarded-For header is removed to prevent IP spoofing attacks.
  *
- * This plugin MUST be loaded BEFORE any plugin that uses X-Forwarded-For
- * (like crowdsec and rateLimit) to ensure they receive sanitized headers.
+ * This plugin MUST be loaded BEFORE any plugin that needs the client
+ * address (rate limiting, CrowdSec, access logs): it publishes `req.clientIp`
+ * after reading the proxy chain from the right.
  *
  * Configuration:
  * - trusted_proxy: Array of trusted proxy IPs or CIDR ranges (required)
@@ -17,6 +18,7 @@
  *
  * When a request comes from a trusted proxy:
  * - X-Forwarded-For header is preserved
+ * - The client address is published as `req.clientIp`
  * - The request is marked as trusted (req.trustedProxy = true)
  * - If trusted_proxy_auth_header is set and the header is present,
  *   req.proxyAuthUser is set to its value for use by other plugins (e.g., weblogs)
@@ -37,6 +39,8 @@ declare global {
     interface Request {
       trustedProxy?: boolean;
       proxyAuthUser?: string;
+      /** The client address, read through the trusted proxy chain. */
+      clientIp?: string;
     }
   }
 }
@@ -94,6 +98,7 @@ export default class TrustedProxy extends DmPlugin {
       if (!remoteAddr) {
         // No remote address, remove X-Forwarded-For to be safe
         this.logger.debug('No remote address, removing X-Forwarded-For header');
+        req.clientIp = 'unknown';
         delete req.headers['x-forwarded-for'];
         return next();
       }
@@ -103,6 +108,7 @@ export default class TrustedProxy extends DmPlugin {
       if (this.isTrustedProxy(remoteAddr)) {
         // Mark request as coming from trusted proxy
         req.trustedProxy = true;
+        req.clientIp = this.clientIpFromXff(xff, remoteAddr);
 
         // Extract auth user from header if present
         const authUser = req.headers[this.authHeader];
@@ -119,6 +125,7 @@ export default class TrustedProxy extends DmPlugin {
       } else {
         // Untrusted source: remove X-Forwarded-For to prevent spoofing
         req.trustedProxy = false;
+        req.clientIp = remoteAddr;
         if (xff) {
           this.logger.warn(
             `Removing X-Forwarded-For header from untrusted source ${remoteAddr} (was: ${String(xff)})`
@@ -129,6 +136,53 @@ export default class TrustedProxy extends DmPlugin {
 
       next();
     });
+  }
+
+  /**
+   * The client address in a proxy chain: walk `X-Forwarded-For` from the
+   * right, skip the addresses this server trusts as proxies, and take the
+   * first one it does not. A port is stripped from the entry (`ip:port`,
+   * `[v6]:port`) since some proxies write one.
+   *
+   * An entry that is not an address stops the walk and the peer is used: the
+   * entries to its left are the ones a client wrote, so continuing would let
+   * it choose the address. A chain made only of trusted addresses falls back
+   * to the peer too.
+   *
+   * @param xff the header as received from a trusted peer
+   * @param remoteAddr the TCP peer
+   * @returns the address to key rate limits and logs on
+   */
+  private clientIpFromXff(
+    xff: string | string[] | undefined,
+    remoteAddr: string
+  ): string {
+    if (!xff) return remoteAddr;
+    const entries = (Array.isArray(xff) ? xff.join(',') : xff)
+      .split(',')
+      .map(entry => entry.trim())
+      .filter(Boolean);
+    for (let index = entries.length - 1; index >= 0; index--) {
+      const candidate = this.forwardedAddress(entries[index]);
+      if (!candidate) return remoteAddr;
+      if (this.isTrustedProxy(candidate)) continue;
+      return candidate;
+    }
+    return remoteAddr;
+  }
+
+  /**
+   * An `X-Forwarded-For` entry as an address: a plain one, a bracketed IPv6
+   * address, or either carrying a port. Anything else is undefined.
+   */
+  private forwardedAddress(entry: string): string | undefined {
+    const text = entry.trim();
+    if (!text) return undefined;
+    const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(text);
+    if (bracketed) return isIP(bracketed[1]) === 0 ? undefined : bracketed[1];
+    if (isIP(text) !== 0) return text;
+    const withPort = /^([^:]+):\d+$/.exec(text);
+    return withPort && isIP(withPort[1]) === 4 ? withPort[1] : undefined;
   }
 
   /**

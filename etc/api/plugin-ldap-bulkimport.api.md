@@ -20,6 +20,7 @@ class LdapBulkImport extends DmPlugin {
     constructor(parent: DM);
     // (undocumented)
     api(app: Express_2): void;
+    bases(): string[];
     getConfigApiData(): Record<string, unknown>;
     // (undocumented)
     name: string;

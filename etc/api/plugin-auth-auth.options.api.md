@@ -68,9 +68,11 @@ export type Linid1Options = OptionsOf<typeof linid1Options>;
 // @public (undocumented)
 export const linid1Options: {
     authz_local_admin_attribute: StringOption;
+    authz_linid1_cache_ttl: NumberOption;
     authz_global_branch: ArrayOption;
     authz_global_write_branch: ArrayOption;
     authz_global_organization: StringOption;
+    authz_group_admin_attribute: StringOption;
 };
 
 // @public (undocumented)
@@ -91,6 +93,7 @@ export const openidconnectOptions: {
     oidc_username_claim: StringOption;
     oidc_client_id: StringOption;
     oidc_client_secret: StringOption;
+    oidc_session_secret: ArrayOption;
     base_url: StringOption;
     oidc_logout_origins: ArrayOption;
 };

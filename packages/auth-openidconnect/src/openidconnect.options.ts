@@ -16,6 +16,15 @@ export const openidconnectOptions = defineOptions({
     env: 'DM_OIDC_CLIENT_SECRET',
     default: '',
   }),
+  // Separate from the client secret on purpose: the library derives the
+  // session cookie's encryption key from it, so anyone holding the client
+  // secret could otherwise forge an administrator's session.
+  oidc_session_secret: opt.array({
+    env: 'DM_OIDC_SESSION_SECRET',
+    default: [],
+    plural: 'oidc-session-secrets',
+    kind: 'phrases',
+  }),
   base_url: opt.string({ env: 'DM_BASE_URL', default: '' }),
   oidc_logout_origins: opt.array({
     env: 'DM_OIDC_LOGOUT_ORIGINS',

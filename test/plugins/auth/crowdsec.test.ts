@@ -4,6 +4,7 @@ import nock from 'nock';
 import type { Express } from 'express';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
 import CrowdSec from '@ldap-rest/auth-crowdsec';
+import TrustedProxy from '@ldap-rest/auth-trustedproxy';
 
 import { DM } from '../../helpers/dm';
 import { outboundCalls } from '../../helpers/metrics';
@@ -29,13 +30,16 @@ describe('CrowdSec Plugin', () => {
     process.env.DM_CROWDSEC_URL = `${crowdsecUrl}/v1/decisions`;
     process.env.DM_CROWDSEC_API_KEY = apiKey;
     process.env.DM_CROWDSEC_CACHE_TTL = '1'; // 1 second cache for tests
+    process.env.DM_TRUSTED_PROXIES = '127.0.0.1';
 
     dm = new DM();
     await dm.ready;
 
+    const trustedProxy = new TrustedProxy(dm);
     const crowdsec = new CrowdSec(dm);
     const testPlugin = new TestPlugin(dm);
 
+    await dm.registerPlugin('trustedProxy', trustedProxy);
     await dm.registerPlugin('crowdsec', crowdsec);
     await dm.registerPlugin('testPlugin', testPlugin);
 
@@ -44,6 +48,7 @@ describe('CrowdSec Plugin', () => {
 
   afterEach(() => {
     nock.cleanAll();
+    delete process.env.DM_TRUSTED_PROXIES;
   });
 
   it('should allow requests from non-banned IPs', async () => {
@@ -146,6 +151,29 @@ describe('CrowdSec Plugin', () => {
 
     // Only one API call should have been made
     expect(nock.pendingMocks().length).to.equal(0);
+  });
+
+  it('caches two clients taking turns independently', async () => {
+    const first = '192.168.1.201';
+    const second = '192.168.1.202';
+    const one = nock(crowdsecUrl)
+      .get('/v1/decisions')
+      .query({ ip: first })
+      .matchHeader('X-Api-Key', apiKey)
+      .reply(200, 'null');
+    const two = nock(crowdsecUrl)
+      .get('/v1/decisions')
+      .query({ ip: second })
+      .matchHeader('X-Api-Key', apiKey)
+      .reply(200, 'null');
+
+    for (let turn = 0; turn < 2; turn++) {
+      await request(app).get('/api/test').set('X-Forwarded-For', first);
+      await request(app).get('/api/test').set('X-Forwarded-For', second);
+    }
+
+    expect(one.isDone(), 'first client').to.be.true;
+    expect(two.isDone(), 'second client').to.be.true;
   });
 
   it('should fail open if CrowdSec API is unavailable', async () => {

@@ -18,6 +18,7 @@ import type winston from 'winston';
 // @public
 abstract class AuthzBase extends DmPlugin {
     constructor(server: DM);
+    protected administeredBranches(_dn: string): Promise<string[]>;
     // (undocumented)
     cacheTTL: number;
     protected clearResolutionCache(): void;
@@ -48,30 +49,42 @@ abstract class AuthzBase extends DmPlugin {
     transitBranch(): string | undefined;
     protected transitOriginAttribute(): string | undefined;
     protected static wantsAttribute(opts: SearchOptions | undefined, attr: string): boolean;
+    protected static readonly widenedForLink: unique symbol;
+    protected static readonly widenedForObjectClass: unique symbol;
 }
 
 // @public (undocumented)
 class AuthzLinid1 extends AuthzBase {
     constructor(server: DM);
+    protected administeredBranches(dn: string): Promise<string[]>;
+    delegatedGroups(user: string): Promise<{
+        dn: string;
+        manageMembers: boolean;
+    }[]>;
     protected filtersAttachedEntries(): boolean;
+    forgetPermissions(): void;
     getAuthorizedBranches(userDn: string): Promise<string[]>;
     getUserDn(uid: string): Promise<string | null>;
     getUserPermissions(userDn: string, branch: string): Promise<BranchPermissions>;
     // (undocumented)
     protected globalBranches(): string[];
+    // (undocumented)
+    hooks: AuthzBase['hooks'] & Pick<Hooks, 'ldapmodifydone' | 'ldapdeletedone' | 'ldaprenamedone' | 'ldapsearchrequest' | 'ldapsearchfilter' | 'ldapmodifyrequest'>;
     mayLinkAnyDomain(user: string): Promise<boolean>;
     // (undocumented)
     name: string;
     // (undocumented)
     static optionDefinitions: {
         authz_local_admin_attribute: StringOption;
+        authz_linid1_cache_ttl: NumberOption;
         authz_global_branch: ArrayOption;
         authz_global_write_branch: ArrayOption;
         authz_global_organization: StringOption;
+        authz_group_admin_attribute: StringOption;
     };
     // (undocumented)
     permissionsCache: Map<string, CachedPermissions>;
-    refreshUserPermissions(userDn: string): Promise<void>;
+    refreshUserPermissions(userDn: string): Promise<Map<string, BranchPermissions>>;
     resolveUser(uid: string): Promise<string | null>;
     ruleBranches(userDn: string): Promise<string[]>;
     protected sourcePermission(branch: string): keyof BranchPermissions;

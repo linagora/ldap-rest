@@ -53,6 +53,9 @@ export function assertedRdnValue(dn: string, attribute: string, base?: string): 
 export function assertModifyRequest(body: object): asserts body is ModifyRequest;
 
 // @public
+export function assertPathSegment(value: string): void;
+
+// @public
 export function assertRfc4514Escapes(dn: string, what: string): void;
 
 // @public
@@ -316,6 +319,8 @@ export interface Config {
     // (undocumented)
     authz_identity?: string;
     // (undocumented)
+    authz_linid1_cache_ttl?: number;
+    // (undocumented)
     authz_local_admin_attribute?: string;
     // (undocumented)
     authz_per_branch_cache_ttl?: number;
@@ -558,6 +563,7 @@ export interface Config {
     oidc_client_secret?: string;
     // (undocumented)
     oidc_server?: string;
+    oidc_session_secret?: string[];
     // (undocumented)
     oidc_username_claim?: string;
     // (undocumented)
@@ -2513,6 +2519,7 @@ export abstract class TwakePlugin extends DmPlugin {
     protected shouldRetry(statusCode: number, retryOn: readonly number[], attempt: number): boolean;
     protected waitBeforeRetry(attempt: number): Promise<void>;
     protected webadminHealth(): Promise<HealthStatus>;
+    protected webadminPath(...segments: string[]): string;
     // (undocumented)
     protected webadminToken: string;
     // (undocumented)
