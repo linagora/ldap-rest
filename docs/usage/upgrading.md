@@ -6,6 +6,19 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### TOTP requires the user name
+
+**Who is affected:** every deployment loading `core/auth/totp`.
+
+`Authorization: Bearer <code>` is refused. Write
+`Authorization: Bearer <name>:<code>`, where `<name>` is the name given in
+`--auth-totp`; the server checks only that user's secret. A code is accepted
+once per user, so a replay, or a second request with the same code inside its
+time step, is refused: wait for the next code. Each process remembers its own
+accepted codes; with several replicas a code can be used once against each
+until they share state. Update the bundled `TotpAuthClient` to pass `user`;
+see [TOTP](plugins/auth/totp.md#usage).
+
 ### Rate limits use the TCP peer without `trustedProxy`
 
 **Who is affected:** a deployment that relied on a reverse proxy overwriting

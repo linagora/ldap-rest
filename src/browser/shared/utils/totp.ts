@@ -12,6 +12,11 @@ export interface TotpConfig {
   step?: number; // Time step in seconds (default: 30)
 }
 
+/** A TOTP client names the user the server must check the code against. */
+export interface TotpClientConfig extends TotpConfig {
+  user: string;
+}
+
 /**
  * Generate a TOTP code from a Base32 secret
  */
@@ -122,11 +127,12 @@ export function getRemainingSeconds(step: number = 30): number {
  * Provides HTTP client with TOTP authentication header
  */
 export class TotpAuthClient {
-  private config: Required<TotpConfig>;
+  private config: Required<TotpClientConfig>;
 
-  constructor(config: TotpConfig) {
+  constructor(config: TotpClientConfig) {
     this.config = {
       secret: config.secret,
+      user: config.user,
       digits: config.digits ?? 6,
       step: config.step ?? 30,
     };
@@ -148,7 +154,7 @@ export class TotpAuthClient {
    */
   async getAuthHeader(): Promise<string> {
     const code = await this.getCode();
-    return `Bearer ${code}`;
+    return `Bearer ${this.config.user}:${code}`;
   }
 
   /**

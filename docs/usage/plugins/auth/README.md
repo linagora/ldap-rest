@@ -181,18 +181,18 @@ base class, but nothing obliges a third implementation to.
 
 ## Choosing an Authentication Method
 
-| Feature                | Token         | TOTP              | HMAC                   | LemonLDAP::NG         | OpenID Connect                   |
-| ---------------------- | ------------- | ----------------- | ---------------------- | --------------------- | -------------------------------- |
-| **Setup Complexity**   | Simple        | Simple            | Medium                 | Medium                | Medium                           |
-| **User Management**    | None          | Manual            | Manual (service-based) | External (LLNG)       | External (Provider)              |
-| **SSO Support**        | No            | No                | No                     | Yes                   | Yes                              |
-| **MFA Support**        | No            | Yes (TOTP itself) | N/A                    | Yes (via LLNG)        | Yes (via Provider)               |
-| **Session Management** | Stateless     | Stateless         | Stateless              | LLNG Sessions         | OIDC Sessions                    |
-| **Code Expiration**    | Never         | 30-60 seconds     | Per-request            | Session-based         | Session-based                    |
-| **Request Integrity**  | No            | No                | Yes (body + path hash) | No                    | No                               |
-| **Replay Protection**  | No            | Yes (time-based)  | Yes (timestamp)        | Session-based         | Session-based                    |
-| **Best For**           | APIs, Scripts | APIs, Enhanced    | Backend Services       | Enterprises with LLNG | Cloud/SaaS, Enterprises with SSO |
-| **Dependencies**       | None          | None              | None                   | lemonldap-ng-handler  | express-openid-connect           |
+| Feature                | Token         | TOTP                      | HMAC                   | LemonLDAP::NG         | OpenID Connect                   |
+| ---------------------- | ------------- | ------------------------- | ---------------------- | --------------------- | -------------------------------- |
+| **Setup Complexity**   | Simple        | Simple                    | Medium                 | Medium                | Medium                           |
+| **User Management**    | None          | Manual                    | Manual (service-based) | External (LLNG)       | External (Provider)              |
+| **SSO Support**        | No            | No                        | No                     | Yes                   | Yes                              |
+| **MFA Support**        | No            | Yes (TOTP itself)         | N/A                    | Yes (via LLNG)        | Yes (via Provider)               |
+| **Session Management** | Stateless     | Stateless                 | Stateless              | LLNG Sessions         | OIDC Sessions                    |
+| **Code Expiration**    | Never         | 30-60 seconds             | Per-request            | Session-based         | Session-based                    |
+| **Request Integrity**  | No            | No                        | Yes (body + path hash) | No                    | No                               |
+| **Replay Protection**  | No            | Yes (single-use code)     | Yes (timestamp)        | Session-based         | Session-based                    |
+| **Best For**           | APIs, Scripts | MFA, one request per step | Backend Services       | Enterprises with LLNG | Cloud/SaaS, Enterprises with SSO |
+| **Dependencies**       | None          | None                      | None                   | lemonldap-ng-handler  | express-openid-connect           |
 
 ## Serving several populations from one server
 

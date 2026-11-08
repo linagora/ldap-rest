@@ -5,7 +5,7 @@
  * TOTP-based authentication plugin
  * @group Plugins
  */
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 import type { Response } from 'express';
 
@@ -37,6 +37,8 @@ export default class AuthTotp extends AuthBase {
   private totpUsers: TotpUser[] = [];
   private window: number; // Time window for validation (±window * step seconds)
   private step: number; // Time step in seconds (typically 30)
+  /** Last counter accepted per user, so an observed code is not reusable. */
+  private lastCounters = new Map<string, number>();
 
   constructor(...args: ConstructorParameters<typeof AuthBase>) {
     super(...args);
@@ -89,27 +91,58 @@ export default class AuthTotp extends AuthBase {
       return unauthorized(res);
     }
 
-    const token = authHeader.split(' ')[1];
-
-    // Try to validate token against all configured users
-    for (const user of this.totpUsers) {
-      if (this.verifyTotp(user.secret, token, user.digits)) {
-        this.logger.debug(
-          `TOTP authentication successful for user: ${user.name}`
-        );
-        this.publishIdentity(req, user.name);
-        return next();
-      }
+    // `Bearer <name>:<code>`: a code names the user it was issued to, so one
+    // is never tried against every secret in the configuration.
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const separator = token.lastIndexOf(':');
+    if (separator <= 0 || separator === token.length - 1) {
+      this.logger.warn(
+        'Missing TOTP user: expected Authorization: Bearer <name>:<code>'
+      );
+      return unauthorized(res);
+    }
+    const name = token.slice(0, separator);
+    const code = token.slice(separator + 1);
+    const user = this.totpUsers.find(entry => entry.name === name);
+    if (!user) {
+      this.logger.warn(`Unknown TOTP user: ${name}`);
+      return unauthorized(res);
     }
 
-    this.logger.warn(`Unauthorized TOTP token: ${token}`);
+    const counter = this.verifyTotp(user.secret, code, user.digits);
+    if (counter !== null && this.acceptCounter(user.name, counter)) {
+      this.logger.debug(
+        `TOTP authentication successful for user: ${user.name}`
+      );
+      this.publishIdentity(req, user.name);
+      return next();
+    }
+
+    this.logger.warn(`Unauthorized TOTP token for user: ${name}`);
     return unauthorized(res);
   }
 
   /**
-   * Verify a TOTP token against a secret
+   * Whether a counter is new for this user: a code is accepted once, so an
+   * observed one is not a bearer credential for the rest of its window.
    */
-  private verifyTotp(secret: string, token: string, digits: number): boolean {
+  private acceptCounter(name: string, counter: number): boolean {
+    const last = this.lastCounters.get(name);
+    if (last !== undefined && counter <= last) return false;
+    this.lastCounters.set(name, counter);
+    return true;
+  }
+
+  /**
+   * Verify a TOTP token against a secret
+   *
+   * @returns the counter it matched, or null
+   */
+  private verifyTotp(
+    secret: string,
+    token: string,
+    digits: number
+  ): number | null {
     const now = Math.floor(Date.now() / 1000);
 
     // Check current time window and adjacent windows
@@ -117,12 +150,17 @@ export default class AuthTotp extends AuthBase {
       const counter = Math.floor(now / this.step) + i;
       const expectedToken = this.generateTotp(secret, counter, digits);
 
-      if (expectedToken === token) {
-        return true;
-      }
+      if (this.sameCode(expectedToken, token)) return counter;
     }
 
-    return false;
+    return null;
+  }
+
+  /** Compare two codes without letting a difference shorten the comparison. */
+  private sameCode(expected: string, given: string): boolean {
+    const left = Buffer.from(expected, 'utf8');
+    const right = Buffer.from(given, 'utf8');
+    return left.length === right.length && timingSafeEqual(left, right);
   }
 
   /**

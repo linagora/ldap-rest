@@ -58,7 +58,7 @@ Include the current TOTP code in the `Authorization` header:
 
 ```bash
 # Get current TOTP code from your authenticator app
-curl -H "Authorization: Bearer 123456" \
+curl -H "Authorization: Bearer admin:123456" \
   http://localhost:8081/api/v1/ldap/users
 ```
 
@@ -80,6 +80,7 @@ import {
 
 const client = new TotpAuthClient({
   secret: 'JBSWY3DPEHPK3PXP',
+  user: 'admin',
   digits: 6,
   step: 30,
 });
@@ -97,12 +98,18 @@ console.log(`Current TOTP code: ${code}`);
 
 ## How It Works
 
-1. Extracts TOTP code from `Authorization: Bearer <code>` header
-2. Generates expected TOTP codes for current time window
-3. Validates code against all configured users' secrets
-4. Supports multiple time windows (±window × step seconds) for clock drift tolerance
-5. Sets `req.user` to the user's name on successful validation
-6. Returns 401 Unauthorized if code is missing, invalid, or expired
+1. Extracts the user name and TOTP code from
+   `Authorization: Bearer <name>:<code>`
+2. Looks up that user and generates the expected codes for the current time
+   window
+3. Validates the code against that user's secret, in constant time
+4. Accepts a counter once per user: a replay, or the same code twice inside
+   one time step, is refused
+5. Supports multiple time windows (±window × step seconds) for clock drift
+   tolerance
+6. Sets `req.user` to the user's name on successful validation
+7. Returns 401 Unauthorized if the name is missing or unknown, or the code is
+   missing, invalid, replayed or expired
 
 ## Multi-User Example
 
@@ -126,7 +133,7 @@ INFO: TOTP authentication successful for user: api-service
 - **Enhanced Security**: Dynamic codes that expire every 30 seconds
 - **No Shared Secrets**: Each user/service has unique TOTP secret
 - **Compatible**: Works with Google Authenticator, Authy, 1Password, etc.
-- **API Access**: Suitable for automated scripts with TOTP generation
+- **API Access**: One code per request; a client making several calls must wait for the next step or use a session token
 - **Multi-Factor**: Can be combined with other authentication methods
 
 ## Security Considerations
@@ -136,7 +143,11 @@ INFO: TOTP authentication successful for user: api-service
 - **Clock Synchronization**: Ensure server and client clocks are synchronized (NTP recommended)
 - **Window Size**: Larger windows are more tolerant but slightly less secure
 - **Secret Rotation**: Rotate TOTP secrets periodically for better security
-- **Rate Limiting**: Consider adding rate limiting to prevent brute force attacks
+- **Rate Limiting**: Load `core/auth/rateLimit`; a six-digit code is still guessable without it
+- **Single use**: A code is accepted once per user, so a second request with
+  the same code in the same step is refused. The record is per process: with
+  several replicas, a code can be used once against each until they share
+  state
 
 ## Browser Client Features
 
@@ -147,14 +158,14 @@ import {
   generateTotp,
   getRemainingSeconds,
   isValidBase32,
-  TotpAuthClient
+  TotpAuthClient,
 } from 'ldap-rest/browser-shared-utils-totp';
 
 // Generate TOTP code
 const code = await generateTotp({
   secret: 'JBSWY3DPEHPK3PXP',
   digits: 6,
-  step: 30
+  step: 30,
 });
 
 // Check validity time
@@ -169,15 +180,24 @@ if (isValidBase32('JBSWY3DPEHPK3PXP')) {
 // HTTP client with automatic TOTP authentication
 const client = new TotpAuthClient({
   secret: 'JBSWY3DPEHPK3PXP',
+  user: 'admin',
   digits: 6,
-  step: 30
+  step: 30,
 });
 
-// All HTTP methods automatically include TOTP in Authorization header
-await client.post('/api/v1/ldap/users', { uid: 'user1', ... });
-await client.put('/api/v1/ldap/users/user1', { mail: 'new@example.com' });
-await client.delete('/api/v1/ldap/users/user1');
+// Every request carries the current code; a code is accepted once, so this
+// works for one call per time step. Wait for the next code before the next.
+const created = await client.post('/api/v1/ldap/users', {
+  uid: 'user1',
+  mail: 'user1@example.com',
+});
 ```
+
+**One request per code step.** TOTP has no session: each request is
+authenticated on its own. A code is accepted once per user, so a second
+request in the same 30-second step is refused. A client making several calls
+must wait for the next code, or use another authentication plugin for the
+session after the first TOTP call.
 
 **Module Export:** `ldap-rest/browser-shared-utils-totp`
 
@@ -193,7 +213,7 @@ await client.delete('/api/v1/ldap/users/user1');
 2. Check system clock synchronization (use NTP)
 3. Increase `--auth-totp-window` if experiencing timing issues
 4. Ensure code is used immediately (codes expire every 30s)
-5. Verify `Authorization: Bearer {code}` format
+5. Verify the `Authorization: Bearer <name>:<code>` format and that the name is one configured in `--auth-totp`
 
 **Problem:** Codes don't match authenticator app
 
