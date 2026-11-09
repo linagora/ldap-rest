@@ -104,13 +104,22 @@ export default [
           'no-loaded-plugins': noLoadedPlugins,
           'no-plugin-family-import': noPluginFamilyImport,
           'no-ldap-internals': noLdapInternals,
-          'relative-import-extension': relativeImportExtension,
         },
       },
     },
+  },
+
+  // See docs/development/contracts.md. Its own plugin key: the block above
+  // ignores the browser sources, and this one covers them too.
+  {
+    files: ['packages/*/src/**/*.{ts,tsx}'],
+    plugins: {
+      sources: {
+        rules: { 'relative-import-extension': relativeImportExtension },
+      },
+    },
     rules: {
-      // See docs/development/contracts.md
-      'local/relative-import-extension': 'error',
+      'sources/relative-import-extension': 'error',
     },
   },
 

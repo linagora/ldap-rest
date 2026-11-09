@@ -58,7 +58,7 @@ without a warning.
 
 `npm run lint` refuses an extensionless relative specifier in every package's
 sources (the `local/relative-import-extension` rule, which also catches a
-name such as `./totp.options` that `import-x/extensions` takes an extension),
+name such as `./totp.options` that `import-x/extensions` takes for an extension),
 so the mistake shows up locally. `npm run
 check:declarations` then reads the built declarations for one, and type-checks
 a small `nodenext` consumer against the package entries installed with only the
