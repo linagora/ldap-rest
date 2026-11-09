@@ -1070,10 +1070,10 @@ export default class LdapGroups extends DmPlugin {
    * Add members to a group.
    *
    * With `req`, the change is judged as a modification of the group, and
-   * each member must be an entry the caller can read: the routes used to
-   * call this without it, which every authorization plugin reads as an
-   * internal call and lets through — anyone authenticated could join any
-   * group, a team mailbox included (#325).
+   * each member must be an entry the caller can read: without it, every
+   * authorization plugin reads the call as an internal one and lets it
+   * through — anyone authenticated could join any group, a team mailbox
+   * included.
    *
    * @param cn group cn or DN
    * @param member member DN(s)
@@ -1423,7 +1423,7 @@ export default class LdapGroups extends DmPlugin {
   /**
    * {@link toGroupDn} for a route serving the groups branch: what is not
    * below it, nor named as these groups are (`cn=`), is no group of these
-   * routes, whatever entry it is (#395). The branch may be the whole
+   * routes, whatever entry it is. The branch may be the whole
    * directory, which is the default: the naming is what tells an account
    * from a group there. A multi-valued RDN holding the main attribute
    * passes here; the group class, checked next, is what settles it.
@@ -1466,7 +1466,7 @@ export default class LdapGroups extends DmPlugin {
 
   /**
    * That the entry a route writes is a group, once the write is judged:
-   * another entry named alike is not one, and is not written as one (#395).
+   * another entry named alike is not one, and is not written as one.
    *
    * Judged first, a caller who may not make the write gets the refusal
    * whether the entry is there, a group or not; only one who may learns

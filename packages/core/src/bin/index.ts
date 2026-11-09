@@ -736,7 +736,7 @@ export class DM {
     // first would answer before the refusal — registration order deciding an
     // authorization answer, in the direction that fails open.
     // Let through: what serves the request is made for it, whether or not
-    // the request is handed down (#385)
+    // the request is handed down
     const finish = (index: number): void => {
       if (index >= selected.length) return runForRequest(req, next);
       const plugin = selected[index];

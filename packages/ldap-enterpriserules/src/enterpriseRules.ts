@@ -907,7 +907,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
       cursor = parent === cursor ? undefined : parent;
     }
     // A domain linked at several levels is one domain: the refusal listed it
-    // once per level (#350)
+    // once per level
     return domains.filter(
       (domain, i) =>
         domains.findIndex(d => d.toLowerCase() === domain.toLowerCase()) === i

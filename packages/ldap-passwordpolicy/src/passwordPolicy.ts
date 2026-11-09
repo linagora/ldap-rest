@@ -1042,7 +1042,7 @@ export default class PasswordPolicy extends DmPlugin {
    * Every account lookup and write carries the request, so an authorization
    * plugin answers for the caller: without it, a route read as an internal
    * call, and a delegated administrator could read or unlock any account of
-   * the directory (#325).
+   * the directory.
    */
   private async getPasswordStatus(
     userId: string,

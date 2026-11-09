@@ -444,7 +444,7 @@ export default class AppAccountsConsistency extends DmPlugin {
         // without their password — entries that could not authenticate, were
         // still listed by the API as if they could, and still counted against
         // `max_app_accounts`, eventually locking the user out of creating new
-        // ones (#103).
+        // ones.
         if (!isPrincipalAccount) {
           await this.deleteApplicativeEntry(oldApplicativeDn);
           continue;

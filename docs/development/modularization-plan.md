@@ -225,8 +225,10 @@ compatible.
 1. [#595], part 2: one api-extractor report per remaining public sub-path,
    and non-additive diffs refused by `contracts`. The `./plugin-*` reports
    and their entries go away with the shims.
-2. [#549], part 2: the modularization decision record, a shrinking comment
-   baseline, and the `require_code_owner_review` ruleset.
+2. (**done**) [#549], part 2: the modularization decision record
+   ([0009](../architecture/adr/0009-one-package-per-plugin.md)), the
+   `require_code_owner_review` ruleset, and the comment baseline, which only
+   shrinks from here.
 3. (**done**) Remove every `ldap-rest/plugin-*` entry, the `src/plugins/*.ts`
    shims and the `./plugin-*` api-extractor reports. A plugin is imported from
    the `@ldap-rest/*` package the deployment installs.
@@ -261,35 +263,20 @@ spike. [#593] and [#594] can then run in parallel, but both touch the core:
 freeze new cross-family imports and new `loadedPlugins` reads from the start of
 phase 1.
 
-## Decisions to make
+## Decisions
 
-1. **Granularity** (**decided**): one package per plugin, as today's
-   `./plugin-*` entries are split.
-2. **Versioning** (**decided**): 3.0.0 with the former sub-paths removed,
-   `ldap-rest/plugin-*` included, on the `v3.0` branch. No deprecation
-   window: the packages are the interface.
-3. **`TwakeGroups extends LdapGroups`** (**decided**): keep the inheritance;
-   the Twake plugin package depends on `@ldap-rest/ldap-groups` as a peer.
-4. **`Config` type**: type-only aggregate in `core` (recommended to start), or
-   split per package with declaration merging?
-5. **Build**: Rollup per package (consistent with today) or `tsc` with
-   generated exports?
-6. **Mandatory plugins** (**decided**): only `@ldap-rest/core`. Every plugin
-   package is optional and installed by the deployment.
-7. **A plugin that names another one** (**decided**): it depends on that
-   plugin's package, as a peer, exactly as its `optionDependencies` or its
-   `dependencies` names it — `@ldap-rest/ldap-groups` and
-   `@ldap-rest/ldap-departmentsync` on `ldap-organizations`,
-   `ldap-externalusers` on `ldap-groups`, `ldap-enterpriserules` on both,
-   `ldap-flatgeneric` on `ldap-departmentsync`, `ldap-accountlifecycle` on
-   `ldap-flatgeneric`. Configuration shared by two plugins is not a service,
-   so the attributes an entry uses to name its organization stay declared
-   once, in the plugin that owns them; a plugin another one only needs
-   registered is a peer all the same, or a standalone install reports every
-   peer met and fails at startup on a module nobody installed.
-8. **Monorepo layout** (**done**): the umbrella lives in `packages/ldap-rest`
-   and the root `package.json` is the private `ldap-rest-monorepo`,
-   workspace-only. Every published artefact lives under `packages/`.
+Recorded once in
+[ADR 0009](../architecture/adr/0009-one-package-per-plugin.md); the phases
+below refer to them by number.
+
+1. Granularity: one package per plugin.
+2. Versioning: 3.0.0, the former sub-paths removed, no deprecation window.
+3. `TwakeGroups extends LdapGroups` kept, as a peer dependency.
+4. `Config`: a type-only aggregate in `packages/core`.
+5. Build: Rollup per package, the umbrella with its own configuration.
+6. Only `@ldap-rest/core` is mandatory; every plugin package is optional.
+7. A plugin that names another depends on its package as a peer.
+8. The umbrella lives in `packages/ldap-rest`; the root is private.
 
 ## First actions
 
@@ -298,9 +285,9 @@ moved the umbrella into `packages/ldap-rest` (decision 8): every published
 artefact is a package, and `packages/ldap-rest/src/pluginModules.json` maps
 each `core/…` name to its package. What remains:
 
-1. Complete the contracts and the review ruleset ([#549] part 2).
-2. Publish the scoped packages and write the `3.0.0` upgrade note and
-   CHANGELOG entry.
+1. Complete the contracts: a report per package export, or the decision that
+   each package's declarations are its API ([#595], part 2).
+2. Publish the scoped packages.
 3. Close [#397].
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397

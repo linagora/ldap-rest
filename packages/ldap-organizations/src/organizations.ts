@@ -1173,10 +1173,10 @@ export default class LdapOrganizations extends DmPlugin {
    * The child organizations of a node, and what to do when the directory
    * will not list them all.
    *
-   * Every failure used to be read as "no children" (#179): the node's own
-   * children were searched without a limit, and a directory answering
-   * `sizeLimitExceeded` rather than a long list left the endpoint returning
-   * `200 []` with nothing above `debug` to say so. An empty tree is what a
+   * Reading every failure as "no children" is how a broken directory comes
+   * to look empty: the node's own children are searched without a limit, and
+   * a directory answering `sizeLimitExceeded` rather than a long list leaves
+   * the endpoint returning `200 []` with nothing above `debug` to say so. An empty tree is what a
    * console then draws for a branch holding a thousand organizations.
    *
    * Three outcomes, and only one of them is emptiness:
@@ -1524,7 +1524,7 @@ export default class LdapOrganizations extends DmPlugin {
    * The same two searches as `getOrganisationSubnodes`, narrowed by a query.
    *
    * Both go through the helpers that classify a failure rather than reading
-   * every one of them as emptiness (#179), and both carry the request the
+   * every one of them as emptiness, and both carry the request the
    * authorization plugins judge them by. The
    * attached entries are capped like the other endpoint's, since an answer
    * the directory refuses to finish is what this is about.

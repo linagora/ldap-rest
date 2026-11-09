@@ -143,8 +143,8 @@ export default class AppAccountsApi extends DmPlugin {
   private maxAppAccounts: number;
   private mailAttr: string;
   // Attribute used to resolve the `:user` path param to the principal entry.
-  // Defaults to the (unique) mail attribute; set to `uid` for the legacy
-  // pre-#89 contract where `:user` is the LDAP uid. The app-account uid is
+  // Defaults to the (unique) mail attribute; `uid` is only safe where `:user`
+  // is the LDAP uid and it is unique directory-wide. The app-account uid is
   // prefixed from this (unique) `:user` value, sanitized — so with uid it stays
   // `<uid>_c<digits>`, and with mail it becomes `<sanitized-mail>_c<digits>`.
   private userAttr: string;
@@ -341,7 +341,7 @@ export default class AppAccountsApi extends DmPlugin {
    * globally unique; resolving by the LDAP `uid` instead is only safe when uid
    * is unique directory-wide: a `uid` repeated under different subtrees is
    * answered 409 when the caller reads several of its holders, and resolves
-   * to the one it reads otherwise (see #88).
+   * to the one it reads otherwise.
    *
    * On failure (no match, or an ambiguous one) this writes the HTTP error
    * response and returns null, so callers can simply `return` when it does.

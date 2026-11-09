@@ -19,7 +19,7 @@ import {
  *
  * Undefined until then, and said so in the type: this module is loaded
  * before any `DM` exists, and a caller reading it as always there throws
- * from inside the error path it was reporting on (#182, #199). The compiler
+ * from inside the error path it was reporting on. The compiler
  * now holds every reader to a guard.
  */
 let _logger: winston.Logger | undefined;

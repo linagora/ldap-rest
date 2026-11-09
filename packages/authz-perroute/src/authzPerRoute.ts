@@ -202,7 +202,7 @@ export default class AuthzPerRoute extends DmPlugin {
    * Say, once every plugin is loaded, when no rule can ever match.
    *
    * The rules are keyed on identities, and which values an authenticator
-   * publishes is the whole subject of #187: a rule written for a token name
+   * publishes decides which rules can match: a rule written for a token name
    * is inert behind OpenID Connect, where the identity is a `sub`. Inert is
    * the part worth a line — nothing is refused, so nothing looks wrong.
    */

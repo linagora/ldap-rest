@@ -392,7 +392,7 @@ export function assertAuthzComposition(
 
 /**
  * What the loaded plugins can enforce, decided once the configuration is
- * loaded (#385).
+ * loaded.
  *
  * - No authentication nor authorization plugin: every request is served
  *   with every right. An open mode on purpose — local development, a

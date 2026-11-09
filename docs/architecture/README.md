@@ -4,9 +4,10 @@ How the server is put together, and the two paths that carry most of the
 work. Every design decision the code already embodies is recorded once, in
 [`adr/`](adr/); this page is the map and the tour.
 
-The plan that will split the repository into packages is
-[Modularization plan](../development/modularization-plan.md). That plan is a
-roadmap; this page describes the code as it is.
+The repository is split into one package per plugin; the roadmap that led
+there is the [Modularization plan](../development/modularization-plan.md),
+and the decision itself is [0009](adr/0009-one-package-per-plugin.md). The
+plan is a roadmap; this page describes the code as it is.
 
 ## Module map
 
@@ -174,6 +175,7 @@ configuration to refuse.
 | [0006](adr/0006-search-cache.md)                | The search cache is off by default and only the process's own writes invalidate it      |
 | [0007](adr/0007-trash-and-tombstone.md)         | A delete becomes a move to trash or a tombstone, never a loss                           |
 | [0008](adr/0008-withconfig-views.md)            | A plugin with overrides sees a server view that shares everything but the configuration |
+| [0009](adr/0009-one-package-per-plugin.md)      | One package per plugin; the umbrella keeps the CLI and the `core/…` names               |
 
 ## Checking the comments
 

@@ -60,7 +60,7 @@ export type { SearchOptions, SearchResult };
  *
  * `ldapActions`'s own methods take the request as a trailing optional
  * argument, which the authorization plugins judge by. One naming none is
- * made for the request being served, if any (#385); this says which
+ * made for the request being served, if any; this says which
  * request is meant rather than leaving it to the context.
  *
  * These methods take no request parameter: it is captured once by

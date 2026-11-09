@@ -871,7 +871,7 @@ export default abstract class AuthzBase extends DmPlugin {
    * those every organization above it links (`enterpriseRules`). Writing an
    * organization only asks for write on its parent, so an administrator
    * could create a sub-organization of their branch linked to any domain of
-   * the directory — another customer's — and create addresses in it (#325).
+   * the directory — another customer's — and create addresses in it.
    *
    * A domain newly linked to an organization must therefore be one an
    * organization above it already links. Only a caller accepted by

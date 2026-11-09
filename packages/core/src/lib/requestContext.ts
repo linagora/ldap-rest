@@ -11,7 +11,7 @@ import type { Request } from 'express';
  * The authenticated request being served. The authentication dispatcher
  * runs everything downstream of a request it let through inside it, so an
  * operation made while serving it, by whatever plugin, is judged as its
- * caller even when the request was not handed down (#385). A call that
+ * caller even when the request was not handed down. A call that
  * forgets the request then fails closed instead of being let through
  * unjudged.
  */

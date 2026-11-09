@@ -166,9 +166,9 @@ export async function search(
     // Cache non-paginated, base-scope search results.
     //
     // The chain awaits whatever each hook returns, so by here `res` is the
-    // resolved result of a non-paginated search and never a Promise: the
-    // `res instanceof Promise` guard that used to stand here could not be
-    // true, and nothing was ever cached (#166). What the hooks see is
+    // resolved result of a non-paginated search and never a Promise: a guard
+    // on `res instanceof Promise` could not be true, and nothing would be
+    // cached. What the hooks see is
     // untouched — the chain is still handed the unawaited value the driver
     // returned, in the same place as before.
     //

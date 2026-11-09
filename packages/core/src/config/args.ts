@@ -404,8 +404,7 @@ export interface Config {
   max_app_accounts?: number;
   // LDAP attribute used to resolve the `:user` path param of the app-account
   // endpoints to the principal entry. Defaults to the mail attribute, which is
-  // globally unique (see #88). Set to `uid` to restore the pre-#89 contract
-  // where `:user` is the LDAP uid — only safe when uid is unique directory-wide.
+  // globally unique; `uid` is only safe where it is unique directory-wide.
   // Generated app-account uids are prefixed from this (unique) value, sanitized.
   app_accounts_user_attribute?: string;
   // Attributes copied from the user entry into the applicative entries. An
@@ -518,9 +517,8 @@ const configArgs: ConfigTemplate = [
   ],
   ['--ldap-user-main-attribute', 'DM_LDAP_USER_ATTRIBUTE', 'uid'],
   ['--ldap-cache-max', 'DM_LDAP_CACHE_MAX', 1000, 'number'],
-  // 0 means "do not cache", and it is the default: the base-scope search
-  // cache stored nothing at all until #166, so no deployment has ever run
-  // with it on. See ldapActions' constructor.
+  // 0 means "do not cache", and it is the default: no deployment has ever
+  // run with it on. See ldapActions' constructor.
   ['--ldap-cache-ttl', 'DM_LDAP_CACHE_TTL', 0, 'number'], // seconds, 0 = off
   ['--ldap-pool-size', 'DM_LDAP_POOL_SIZE', 5, 'number'],
   ['--ldap-connection-ttl', 'DM_LDAP_CONNECTION_TTL', 60, 'number'], // seconds

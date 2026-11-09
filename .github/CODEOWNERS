@@ -1,15 +1,23 @@
 # A change to a path listed here needs the approval of a human code owner,
 # other than its author. See "Reviewing changes" in CONTRIBUTING.md.
-*                          @yadd @rezk2ll
+*                                        @yadd @rezk2ll
 
-/src/bin/                  @yadd @rezk2ll
-/src/hooks.ts              @yadd @rezk2ll
-/src/lib/auth/             @yadd @rezk2ll
-/src/lib/authz/            @yadd @rezk2ll
-/src/lib/ldapActions.ts    @yadd @rezk2ll
-/src/lib/requestContext.ts @yadd @rezk2ll
-/src/config/               @yadd @rezk2ll
-/src/plugins/auth/         @yadd @rezk2ll
-/packages/auth-*/          @yadd @rezk2ll
-/packages/authz-*/         @yadd @rezk2ll
-/.github/                  @yadd @rezk2ll
+# The server: plugin loading, authentication dispatch, authorization
+# composition, request context and directory operations
+/packages/core/src/bin/                  @yadd @rezk2ll
+/packages/core/src/config/               @yadd @rezk2ll
+/packages/core/src/hooks.ts              @yadd @rezk2ll
+/packages/core/src/lib/auth/             @yadd @rezk2ll
+/packages/core/src/lib/authz/            @yadd @rezk2ll
+/packages/core/src/lib/ldapActions.ts    @yadd @rezk2ll
+/packages/core/src/lib/requestContext.ts @yadd @rezk2ll
+
+# The umbrella: the CLI, the option composition and the plugin resolver
+/packages/ldap-rest/src/                 @yadd @rezk2ll
+/packages/ldap-rest/package.json         @yadd @rezk2ll
+
+# Authentication and authorization plugins
+/packages/auth-*/                        @yadd @rezk2ll
+/packages/authz-*/                       @yadd @rezk2ll
+
+/.github/                                @yadd @rezk2ll

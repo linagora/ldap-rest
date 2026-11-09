@@ -299,9 +299,9 @@ export default class HookBus implements FlatHookBus {
    * the chain had said yes.
    *
    * Hooks run outside the request being served: what a hook reads or writes
-   * to validate, complete or keep track of an operation is the server's
-   * (#385). The request is in the arguments of the hooks that judge, which
-   * judge by it; a hook acting as the caller names it.
+   * to validate, complete or keep track of an operation is the server's.
+   * The request is in the arguments of the hooks that judge, which judge by
+   * it; a hook acting as the caller names it.
    *
    * @param name the hook
    * @param value the value to thread
