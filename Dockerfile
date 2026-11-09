@@ -13,7 +13,6 @@ COPY tsconfig.base.json .
 COPY packages ./packages
 COPY scripts ./scripts
 COPY src ./src
-COPY static ./static
 RUN npm ci && npm run build:packages && node scripts/composeAssets.mjs && NODE_ENV=production node_modules/.bin/rollup -c && npm pack && mv *.tgz /tmp/app.tgz
 
 WORKDIR /app
