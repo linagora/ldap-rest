@@ -8,7 +8,7 @@
  */
 import { expect } from 'chai';
 import { Valkey } from 'iovalkey';
-import ValkeyStore from '@ldap-rest/storage/valkey';
+import ValkeyStore from '@ldap-rest/storage-valkey';
 
 import { skipIfMissingEnvVars } from '../../helpers/env';
 

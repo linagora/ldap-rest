@@ -9,7 +9,7 @@
  */
 import { expect } from 'chai';
 import { Pool } from 'pg';
-import PostgresStore from '@ldap-rest/storage/postgres';
+import PostgresStore from '@ldap-rest/storage-postgres';
 
 import { skipIfMissingEnvVars } from '../../helpers/env';
 

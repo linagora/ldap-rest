@@ -175,9 +175,11 @@ families do not import each other, and `ldapActions` is a stable façade.
    umbrella's default template keeps the core options only. `src/options.full.ts`
    keeps the complete set for the build scripts and the tests.
 4. Extract one package per plugin, grouped for the order: storage → auth →
-   ldap → scim → twake → misc. (**started**) The storage plugin, its options
-   and its backends live in `packages/storage` (`@ldap-rest/storage`); the
-   umbrella keeps the `./plugin-storage*` shims and bundles the package until
+   ldap → scim → twake → misc. (**done**) The storage plugin and its options
+   live in `packages/storage` (`@ldap-rest/storage`); each backend is a
+   package of its own, `@ldap-rest/storage-{file,ldap,postgres,valkey}`
+   ([#651]); the umbrella keeps the `./plugin-storage*` shims and bundles
+   the package until
    phase 3 publishes it. Splitting it into one package per backend is [#651].
    (**done**) The authentication and authorization plugins are one package
    per plugin (`@ldap-rest/auth-token`, `@ldap-rest/authz-linid1`, …), each
@@ -299,8 +301,7 @@ each `core/…` name to its package. What remains:
 1. Complete the contracts and the review ruleset ([#549] part 2).
 2. Publish the scoped packages and write the `3.0.0` upgrade note and
    CHANGELOG entry.
-3. Split `@ldap-rest/storage` per backend ([#651]).
-4. Close [#397].
+3. Close [#397].
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397
 [#549]: https://github.com/linagora/ldap-rest/issues/549

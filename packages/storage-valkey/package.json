@@ -1,0 +1,40 @@
+{
+  "name": "@ldap-rest/storage-valkey",
+  "version": "3.0.0",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "LDAP-Rest keyed storage, Valkey backend",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/storage-valkey"
+  },
+  "exports": {
+    ".": {
+      "development": "./src/valkey.ts",
+      "types": "./dist/valkey.d.ts",
+      "import": "./dist/valkey.js"
+    }
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "iovalkey": "^0.4.0",
+    "winston": "^3.17.0"
+  },
+  "peerDependenciesMeta": {
+    "iovalkey": {
+      "optional": true
+    }
+  }
+}

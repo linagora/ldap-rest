@@ -1,0 +1,40 @@
+{
+  "name": "@ldap-rest/storage-postgres",
+  "version": "3.0.0",
+  "homepage": "https://github.com/linagora/ldap-rest",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <xguimard@linagora.com>",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "LDAP-Rest keyed storage, PostgreSQL backend",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/storage-postgres"
+  },
+  "exports": {
+    ".": {
+      "development": "./src/postgres.ts",
+      "types": "./dist/postgres.d.ts",
+      "import": "./dist/postgres.js"
+    }
+  },
+  "peerDependencies": {
+    "@ldap-rest/core": "3.0.0",
+    "pg": "^8.23.0",
+    "winston": "^3.17.0"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    }
+  }
+}

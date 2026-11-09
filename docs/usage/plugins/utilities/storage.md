@@ -45,6 +45,13 @@ the configuration does not name it.
 
 ## Backends
 
+Each backend ships in its own package: install the one `--storage-backend`
+names beside `@ldap-rest/storage` — `@ldap-rest/storage-file`,
+`@ldap-rest/storage-ldap`, `@ldap-rest/storage-postgres` or
+`@ldap-rest/storage-valkey`. The `postgres` and `valkey` backends also need
+their driver (`pg`, `iovalkey`); the plugin names the package to install when
+one is absent. The umbrella bundles them all.
+
 ### `ldap`
 
 One entry per record under `--storage-ldap-base`. The branch holds records
@@ -69,7 +76,7 @@ suits a single instance, not a cluster sharing one verdict.
 
 One row per record in `--storage-postgres-table`, with the consumer's
 namespace and key kept verbatim beside the value and an `expires_at` column,
-so a `SELECT` tells what a record is about. Needs the optional `pg` package.
+so a `SELECT` tells what a record is about. Needs the `pg` package.
 
 The table is created at the first connection when it is not there. A role
 that may not create tables works once it exists:
@@ -94,7 +101,7 @@ fails.
 
 One key per record, `--storage-valkey-prefix` followed by the namespace and
 the key, expiring with the record: nothing is left to sweep. Works with Redis
-too. Needs the optional `iovalkey` package.
+too. Needs the `iovalkey` package.
 
 **The instance must not evict.** An instance configured as a cache
 (`allkeys-lru`, `volatile-lru` and the like) drops keys under memory pressure,

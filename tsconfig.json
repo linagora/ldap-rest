@@ -165,16 +165,16 @@
       "@ldap-rest/scim/users": ["./packages/scim/src/users.ts"],
       "@ldap-rest/static": ["./packages/static/src/static.ts"],
       "@ldap-rest/static/options": ["./packages/static/src/static.options.ts"],
+      "@ldap-rest/storage-file": ["./packages/storage-file/src/file.ts"],
+      "@ldap-rest/storage-ldap": ["./packages/storage-ldap/src/ldap.ts"],
+      "@ldap-rest/storage-postgres": [
+        "./packages/storage-postgres/src/postgres.ts"
+      ],
+      "@ldap-rest/storage-valkey": ["./packages/storage-valkey/src/valkey.ts"],
       "@ldap-rest/storage": ["./packages/storage/src/storage.ts"],
       "@ldap-rest/storage/options": [
         "./packages/storage/src/storage.options.ts"
       ],
-      "@ldap-rest/storage/file": ["./packages/storage/src/storage/file.ts"],
-      "@ldap-rest/storage/ldap": ["./packages/storage/src/storage/ldap.ts"],
-      "@ldap-rest/storage/postgres": [
-        "./packages/storage/src/storage/postgres.ts"
-      ],
-      "@ldap-rest/storage/valkey": ["./packages/storage/src/storage/valkey.ts"],
       "@ldap-rest/twake-appaccounts": [
         "./packages/twake-appaccounts/src/appAccountsApi.ts"
       ],

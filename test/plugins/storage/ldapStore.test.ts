@@ -9,7 +9,7 @@
  */
 import { expect } from 'chai';
 import type { SearchResult } from '@ldap-rest/core/lib/ldapActions';
-import LdapStore from '@ldap-rest/storage/ldap';
+import LdapStore from '@ldap-rest/storage-ldap';
 
 import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';

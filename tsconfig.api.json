@@ -178,17 +178,17 @@
       "@ldap-rest/static/options": [
         "./packages/static/dist/static.options.d.ts"
       ],
+      "@ldap-rest/storage-file": ["./packages/storage-file/dist/file.d.ts"],
+      "@ldap-rest/storage-ldap": ["./packages/storage-ldap/dist/ldap.d.ts"],
+      "@ldap-rest/storage-postgres": [
+        "./packages/storage-postgres/dist/postgres.d.ts"
+      ],
+      "@ldap-rest/storage-valkey": [
+        "./packages/storage-valkey/dist/valkey.d.ts"
+      ],
       "@ldap-rest/storage": ["./packages/storage/dist/storage.d.ts"],
       "@ldap-rest/storage/options": [
         "./packages/storage/dist/storage.options.d.ts"
-      ],
-      "@ldap-rest/storage/file": ["./packages/storage/dist/storage/file.d.ts"],
-      "@ldap-rest/storage/ldap": ["./packages/storage/dist/storage/ldap.d.ts"],
-      "@ldap-rest/storage/postgres": [
-        "./packages/storage/dist/storage/postgres.d.ts"
-      ],
-      "@ldap-rest/storage/valkey": [
-        "./packages/storage/dist/storage/valkey.d.ts"
       ],
       "@ldap-rest/twake-appaccounts": [
         "./packages/twake-appaccounts/dist/appAccountsApi.d.ts"

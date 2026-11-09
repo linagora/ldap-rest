@@ -51,8 +51,9 @@ describe('Keyed storage, one instance', function () {
       else process.env[k] = v;
   });
 
-  it('should load one', () => {
+  it('should load one', async () => {
     first = new Storage(server);
+    await first.api();
     expect(first.store.name).to.equal('storage/file');
   });
 
@@ -62,13 +63,14 @@ describe('Keyed storage, one instance', function () {
     );
   });
 
-  it('should refuse a backend it does not know', () => {
+  it('should refuse a backend it does not know', async () => {
     Storage.release(first);
     process.env.DM_STORAGE_BACKEND = 'carrier-pigeon';
     const other = new DM();
     expect(() => new Storage(other)).to.throw(/unknown backend/);
     process.env.DM_STORAGE_BACKEND = 'file';
     first = new Storage(server);
+    await first.api();
   });
 });
 

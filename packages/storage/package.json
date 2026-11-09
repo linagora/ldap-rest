@@ -1,7 +1,7 @@
 {
   "name": "@ldap-rest/storage",
   "version": "3.0.0",
-  "description": "LDAP-Rest keyed storage plugin and its backends",
+  "description": "LDAP-Rest keyed storage plugin",
   "homepage": "https://github.com/linagora/ldap-rest",
   "bugs": {
     "url": "https://github.com/linagora/ldap-rest/issues"
@@ -24,26 +24,6 @@
       "development": "./src/storage.options.ts",
       "types": "./dist/storage.options.d.ts",
       "import": "./dist/storage.options.js"
-    },
-    "./file": {
-      "development": "./src/storage/file.ts",
-      "types": "./dist/storage/file.d.ts",
-      "import": "./dist/storage/file.js"
-    },
-    "./ldap": {
-      "development": "./src/storage/ldap.ts",
-      "types": "./dist/storage/ldap.d.ts",
-      "import": "./dist/storage/ldap.js"
-    },
-    "./postgres": {
-      "development": "./src/storage/postgres.ts",
-      "types": "./dist/storage/postgres.d.ts",
-      "import": "./dist/storage/postgres.js"
-    },
-    "./valkey": {
-      "development": "./src/storage/valkey.ts",
-      "types": "./dist/storage/valkey.d.ts",
-      "import": "./dist/storage/valkey.js"
     }
   },
   "files": [
@@ -54,15 +34,22 @@
   },
   "peerDependencies": {
     "@ldap-rest/core": "3.0.0",
-    "iovalkey": "^0.4.0",
-    "pg": "^8.23.0",
-    "winston": "^3.17.0"
+    "@ldap-rest/storage-file": "3.0.0",
+    "@ldap-rest/storage-ldap": "3.0.0",
+    "@ldap-rest/storage-postgres": "3.0.0",
+    "@ldap-rest/storage-valkey": "3.0.0"
   },
   "peerDependenciesMeta": {
-    "iovalkey": {
+    "@ldap-rest/storage-file": {
       "optional": true
     },
-    "pg": {
+    "@ldap-rest/storage-ldap": {
+      "optional": true
+    },
+    "@ldap-rest/storage-postgres": {
+      "optional": true
+    },
+    "@ldap-rest/storage-valkey": {
       "optional": true
     }
   }

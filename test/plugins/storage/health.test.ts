@@ -5,10 +5,10 @@ import { join } from 'node:path';
 import { expect } from 'chai';
 import type winston from 'winston';
 import type Store from '@ldap-rest/core/lib/storage/store';
-import FileStore from '@ldap-rest/storage/file';
-import PostgresStore from '@ldap-rest/storage/postgres';
-import ValkeyStore from '@ldap-rest/storage/valkey';
-import LdapStore from '@ldap-rest/storage/ldap';
+import FileStore from '@ldap-rest/storage-file';
+import PostgresStore from '@ldap-rest/storage-postgres';
+import ValkeyStore from '@ldap-rest/storage-valkey';
+import LdapStore from '@ldap-rest/storage-ldap';
 import Storage from '@ldap-rest/storage';
 
 import { DM } from '../../helpers/dm';

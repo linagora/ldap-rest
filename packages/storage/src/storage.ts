@@ -32,11 +32,7 @@ import type { HealthStatus } from '@ldap-rest/core/lib/health';
 import { StorageService } from '@ldap-rest/core/lib/services/storage';
 import type Store from '@ldap-rest/core/lib/storage/store';
 
-import FileStore from './storage/file';
-import LdapStore from './storage/ldap';
-import PostgresStore from './storage/postgres';
-import ValkeyStore from './storage/valkey';
-import { storageOptions } from './storage.options';
+import { storageOptions, type StorageOptions } from './storage.options';
 
 /**
  * The one instance, if there is one.
@@ -51,102 +47,168 @@ import { storageOptions } from './storage.options';
 let onlyInstance: Storage | undefined;
 
 const KNOWN = 'ldap, file, postgres, valkey';
+const BACKENDS = ['ldap', 'file', 'postgres', 'valkey'];
+
+/**
+ * Load the package that holds a backend, naming the package when it is not
+ * installed: a deployment installs the one its configuration names.
+ */
+async function loadBackend<T>(
+  backend: string,
+  load: () => Promise<T>
+): Promise<T> {
+  try {
+    return await load();
+  } catch {
+    throw new Error(
+      `storage: the ${backend} backend needs the ` +
+        `@ldap-rest/storage-${backend} package installed`
+    );
+  }
+}
 
 export default class Storage extends DmPlugin {
   static optionDefinitions = storageOptions;
 
   name = 'storage';
   provides = [StorageService.with(this)];
-  store: Store;
+  /** Built by `api()`, once the backend's package is loaded. */
+  store!: Store;
+  /** The backend named by `--storage-backend`, for the log and refusals. */
+  private backend = '';
+  private settings?: StorageOptions;
 
   constructor(server: DM) {
     super(server);
+    const settings = this.options(storageOptions);
+    this.settings = settings;
+    this.backend = settings.storage_backend;
     if (onlyInstance) {
       throw new Error(
         `storage: an instance is already loaded, keeping its records in ` +
-          `${onlyInstance.store.name}. A second one would put the same ` +
+          `${onlyInstance.storeName}. A second one would put the same ` +
           'record in two places and leave registration order to decide ' +
           'which answers. Load one, and let its consumers share it.'
       );
     }
-    const settings = this.options(storageOptions);
-    const backend = settings.storage_backend;
-
-    switch (backend) {
-      case 'ldap': {
-        const base = settings.storage_ldap_base;
-        if (!base)
-          throw new Error(
-            'storage: the ldap backend needs --storage-ldap-base, the branch ' +
-              'it writes its records to. It holds records and nothing else, ' +
-              'so it belongs outside the branches the directory serves.'
-          );
-        this.store = new LdapStore(
-          server,
-          base,
-          settings.storage_ldap_object_class
-        );
-        break;
-      }
-      case 'file': {
-        const dir = settings.storage_file_directory;
-        if (!dir)
-          throw new Error(
-            'storage: the file backend needs --storage-file-directory, the ' +
-              'directory it writes its records to. It writes one file per ' +
-              'record, so nothing else should be writing there.'
-          );
-        this.store = new FileStore(
-          server.logger,
-          dir,
-          settings.storage_sweep_interval
-        );
-        break;
-      }
-      case 'postgres': {
-        const url = settings.storage_postgres_url;
-        if (!url)
-          throw new Error(
-            'storage: the postgres backend needs --storage-postgres-url, ' +
-              'the database it writes its records to.'
-          );
-        this.store = new PostgresStore(
-          server.logger,
-          url,
-          settings.storage_postgres_table
-        );
-        break;
-      }
-      case 'valkey': {
-        const url = settings.storage_valkey_url;
-        if (!url)
-          throw new Error(
-            'storage: the valkey backend needs --storage-valkey-url, the ' +
-              'server it writes its records to.'
-          );
-        this.store = new ValkeyStore(
-          server.logger,
-          url,
-          settings.storage_valkey_prefix
-        );
-        break;
-      }
-      default:
-        throw new Error(
-          backend
-            ? `storage: unknown backend "${backend}". Known: ${KNOWN}.`
-            : 'storage: --storage-backend says which sub-plugin keeps the ' +
-                `records. Known: ${KNOWN}.`
-        );
+    if (this.backend && !BACKENDS.includes(this.backend)) {
+      throw new Error(
+        `storage: unknown backend "${this.backend}". Known: ${KNOWN}.`
+      );
     }
-
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     onlyInstance = this;
+  }
+
+  /** The name the refusal above reads before any store exists. */
+  private get storeName(): string {
+    return this.backend ? `storage/${this.backend}` : 'storage';
+  }
+
+  /**
+   * Load the backend's package and build its store.
+   *
+   * Deliberately not the constructor: the backends are packages of their own,
+   * and one a deployment did not install must not stop the others from
+   * loading. `registerPlugin` awaits `api()`.
+   */
+  async api(): Promise<void> {
+    const settings = this.settings as StorageOptions;
+    try {
+      switch (settings.storage_backend) {
+        case 'ldap': {
+          const base = settings.storage_ldap_base;
+          if (!base)
+            throw new Error(
+              'storage: the ldap backend needs --storage-ldap-base, the branch ' +
+                'it writes its records to. It holds records and nothing else, ' +
+                'so it belongs outside the branches the directory serves.'
+            );
+          const { default: LdapStore } = await loadBackend(
+            'ldap',
+            () => import('@ldap-rest/storage-ldap')
+          );
+          this.store = new LdapStore(
+            this.server,
+            base,
+            settings.storage_ldap_object_class
+          );
+          break;
+        }
+        case 'file': {
+          const dir = settings.storage_file_directory;
+          if (!dir)
+            throw new Error(
+              'storage: the file backend needs --storage-file-directory, the ' +
+                'directory it writes its records to. It writes one file per ' +
+                'record, so nothing else should be writing there.'
+            );
+          const { default: FileStore } = await loadBackend(
+            'file',
+            () => import('@ldap-rest/storage-file')
+          );
+          this.store = new FileStore(
+            this.server.logger,
+            dir,
+            settings.storage_sweep_interval
+          );
+          break;
+        }
+        case 'postgres': {
+          const url = settings.storage_postgres_url;
+          if (!url)
+            throw new Error(
+              'storage: the postgres backend needs --storage-postgres-url, ' +
+                'the database it writes its records to.'
+            );
+          const { default: PostgresStore } = await loadBackend(
+            'postgres',
+            () => import('@ldap-rest/storage-postgres')
+          );
+          this.store = new PostgresStore(
+            this.server.logger,
+            url,
+            settings.storage_postgres_table
+          );
+          break;
+        }
+        case 'valkey': {
+          const url = settings.storage_valkey_url;
+          if (!url)
+            throw new Error(
+              'storage: the valkey backend needs --storage-valkey-url, the ' +
+                'server it writes its records to.'
+            );
+          const { default: ValkeyStore } = await loadBackend(
+            'valkey',
+            () => import('@ldap-rest/storage-valkey')
+          );
+          this.store = new ValkeyStore(
+            this.server.logger,
+            url,
+            settings.storage_valkey_prefix
+          );
+          break;
+        }
+        default:
+          throw new Error(
+            settings.storage_backend
+              ? `storage: unknown backend "${settings.storage_backend}". Known: ${KNOWN}.`
+              : 'storage: --storage-backend says which sub-plugin keeps the ' +
+                  `records. Known: ${KNOWN}.`
+          );
+      }
+    } catch (err) {
+      // A failed `api()` leaves the plugin unregistered: let another attempt
+      // take the single-instance hold rather than refuse it for a store that
+      // was never built.
+      if (onlyInstance === this) onlyInstance = undefined;
+      throw err;
+    }
+
     this.logger.info(`storage: records kept by ${this.store.name}`);
-    // A constructor cannot wait, and an `api()` would mount the
-    // authentication dispatcher ahead of the plugins that must run before it.
-    // Started here, a wrong address or a missing driver is in the log at
-    // startup rather than at the first record written.
+    // A wrong address or a missing driver is in the log at startup rather
+    // than at the first record written.
     this.store
       .open()
       .catch(err =>

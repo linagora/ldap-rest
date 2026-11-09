@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { mkdtempSync, rmSync } from 'node:fs';
 
 import { expect } from 'chai';
-import FileStore from '@ldap-rest/storage/file';
+import FileStore from '@ldap-rest/storage-file';
 
 const quiet = {
   warn: (): void => undefined,

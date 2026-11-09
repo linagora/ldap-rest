@@ -44,8 +44,10 @@
   `@ldap-rest/authz-*`, `@ldap-rest/ldap-*`, `@ldap-rest/scim`,
   `@ldap-rest/twake-*`, `@ldap-rest/james`, `@ldap-rest/bcl`,
   `@ldap-rest/config-api`, `@ldap-rest/metrics`, `@ldap-rest/rabbitmq`,
-  `@ldap-rest/static` and `@ldap-rest/weblogs`. The `core/…` names still
-  select a plugin at startup, now from the installed package.
+  `@ldap-rest/static` and `@ldap-rest/weblogs`; the keyed storage backends
+  have one package each, `@ldap-rest/storage-{file,ldap,postgres,valkey}`.
+  The `core/…` names still select a plugin at startup, now from the installed
+  package.
 - The browser libraries and the JSON schemas ship as the
   `@ldap-rest/browser` and `@ldap-rest/schemas` packages. The umbrella
   composes the `static/` tree it serves from them at build time, so the
