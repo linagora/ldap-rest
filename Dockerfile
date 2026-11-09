@@ -24,7 +24,7 @@ COPY --from=builder /app /app
 ENV NODE_ENV=production \
  DM_PORT="8081" \
  DM_SHUTDOWN_TIMEOUT="20000" \
- DM_PLUGINS=core/static,core/demo/helloworld \
+ DM_PLUGINS= \
  DM_LOG_LEVEL="notice" \
  DM_LOGGER="console" \
  DM_DEBUG=false \
@@ -70,10 +70,7 @@ ENV NODE_ENV=production \
  DM_AUTHZ_FILTER_ATTACHED_ENTRIES=false \
  DM_AUTHZ_TRANSIT_BRANCH= \
  DM_AUTHZ_TRANSIT_ORIGIN_ATTRIBUTE= \
- DM_LDAP_CONCURRENCY="10" \
- DM_STATIC_PATH="/app/node_modules/ldap-rest/static" \
- DM_STATIC_CSP="frame-ancestors 'self'" \
- DM_STATIC_FRAME_OPTIONS="SAMEORIGIN"
+ DM_LDAP_CONCURRENCY="10"
 
 USER node
 

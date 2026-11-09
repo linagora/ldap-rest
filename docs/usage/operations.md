@@ -53,10 +53,10 @@ The image runs as its unprivileged `node` user: with `docker run`, a
 `DM_PORT` below 1024 stops the server at startup, where the default 8081
 changes nothing.
 
-Its environment declares the options of the plugins it loads by default,
-`core/static` and the demo plugin; every other plugin's package declares its
-own, and the image would report them as unread `DM_*` variables if it set
-them. Pass a `DM_*` variable for a plugin only once `DM_PLUGINS` loads it.
+Its environment declares the core options only, and it loads no plugin: a
+deployment names the ones it needs in `DM_PLUGINS`, and each plugin's package
+declares their options. Pass a `DM_*` variable for a plugin only once
+`DM_PLUGINS` loads it.
 
 The image is built in two stages: a builder produces the package and installs
 its production dependencies, the runtime stage copies them and carries no

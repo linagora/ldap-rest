@@ -59,8 +59,8 @@
 - `--plugin core/scim`, the short name the SCIM documentation gives, now loads
   the plugin. It named a module no release shipped, so the documented form
   failed at startup.
-- The default image declares the options of the plugins it loads only, so a
-  container no longer logs every other `DM_*` variable as unread.
+- The default image loads no plugin and declares the core options only, so a
+  container no longer logs every plugin's `DM_*` variables as unread.
 
 ## v2.2.0 (2026-11-08)
 

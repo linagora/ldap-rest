@@ -2,25 +2,17 @@ import fs from 'fs';
 import path, { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-import { toConfigEntries } from '@ldap-rest/core/config/options';
-import { staticOptions } from '@ldap-rest/static/options';
-
-import {
-  coreOptions,
-  withoutCoreDuplicates,
-} from '../packages/ldap-rest/src/coreOptions';
+import { coreOptions } from '../packages/ldap-rest/src/coreOptions';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const moduleDir = path.resolve(__dirname, '..');
 const umbrellaDir = join(moduleDir, 'packages', 'ldap-rest');
 const dockerFile = path.resolve(__dirname, '..', 'Dockerfile');
 
-// Only the options of the plugins the image loads by default; the other
-// packages declare their own. See docs/usage/operations.md.
-const defaultOptions = withoutCoreDuplicates([
-  ...coreOptions,
-  ...toConfigEntries(staticOptions),
-]);
+// The image loads no plugin by default, so it declares the core options only;
+// a package declares the options of the plugin it holds. See
+// docs/usage/operations.md.
+const defaultOptions = coreOptions;
 
 // The tag carries its digest: the image built here is the one that was
 // reviewed, even if the tag moves. See docs/usage/operations.md.
@@ -53,9 +45,7 @@ COPY --from=builder /app /app
 ENV NODE_ENV=production`;
 
 for (const [arg, env, def, type] of defaultOptions) {
-  if (env === 'DM_PLUGINS') {
-    content += ` \\\n ${env}=core/static,core/demo/helloworld`;
-  } else if (type === 'array') {
+  if (type === 'array') {
     content += ` \\\n ${env}=${(def as string[]).join(',')}`;
   } else if (type === 'boolean') {
     const boolDef = def ? 'true' : 'false';
