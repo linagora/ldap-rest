@@ -53,6 +53,11 @@ The image runs as its unprivileged `node` user: with `docker run`, a
 `DM_PORT` below 1024 stops the server at startup, where the default 8081
 changes nothing.
 
+Its environment declares the options of the plugins it loads by default,
+`core/static` and the demo plugin; every other plugin's package declares its
+own, and the image would report them as unread `DM_*` variables if it set
+them. Pass a `DM_*` variable for a plugin only once `DM_PLUGINS` loads it.
+
 The image is built in two stages: a builder produces the package and installs
 its production dependencies, the runtime stage copies them and carries no
 compiler nor package manager cache. The runtime stage upgrades the Alpine

@@ -2,11 +2,21 @@ import fs from 'fs';
 import path, { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-import configArgs from '../src/options.full';
+import { toConfigEntries } from '@ldap-rest/core/config/options';
+import { staticOptions } from '@ldap-rest/static/options';
+
+import { coreOptions, withoutCoreDuplicates } from '../src/coreOptions';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const moduleDir = path.resolve(__dirname, '..');
 const dockerFile = path.resolve(__dirname, '..', 'Dockerfile');
+
+// Only the options of the plugins the image loads by default; the other
+// packages declare their own. See docs/usage/operations.md.
+const defaultOptions = withoutCoreDuplicates([
+  ...coreOptions,
+  ...toConfigEntries(staticOptions),
+]);
 
 // The tag carries its digest: the image built here is the one that was
 // reviewed, even if the tag moves. See docs/usage/operations.md.
@@ -42,7 +52,7 @@ COPY --from=builder /app /app
 
 ENV NODE_ENV=production`;
 
-for (const [arg, env, def, type] of configArgs) {
+for (const [arg, env, def, type] of defaultOptions) {
   if (env === 'DM_PLUGINS') {
     content += ` \\\n ${env}=core/static,core/demo/helloworld`;
   } else if (type === 'array') {
