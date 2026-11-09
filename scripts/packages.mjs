@@ -257,6 +257,22 @@ async function check() {
   const umbrella = readJson('packages/ldap-rest/package.json');
   const bundled = new Set(umbrella.bundledDependencies ?? []);
   for (const pkg of packages()) {
+    // A package pins the siblings it names to its own version: another one
+    // installs a second copy of the same interface beside it.
+    for (const field of [
+      'dependencies',
+      'peerDependencies',
+      'optionalDependencies',
+    ])
+      for (const [dependency, pinned] of Object.entries(
+        pkg.manifest[field] ?? {}
+      )) {
+        if (!dependency.startsWith('@ldap-rest/')) continue;
+        if (pinned !== pkg.manifest.version)
+          problems.push(
+            `${pkg.dir}: ${field} pins ${dependency} ${pinned}, not ${pkg.manifest.version}`
+          );
+      }
     if (pkg.name === umbrella.name) continue;
     const version = umbrella.dependencies?.[pkg.name];
     if (version !== pkg.manifest.version)
