@@ -101,16 +101,10 @@ export const API_ENTRIES: Record<
 
 /** The reports whose declarations every other report may reuse */
 function isCoreReport(name: string): boolean {
+  const manifest = API_ENTRIES[name]?.manifest;
   return (
-    [
-      'ldap-rest',
-      'expressformatedresponses',
-      'hooks',
-      'ldapactions',
-      'plugin',
-    ].includes(name) ||
-    name === 'core' ||
-    name.startsWith('core-')
+    manifest === 'packages/ldap-rest/package.json' ||
+    manifest === 'packages/core/package.json'
   );
 }
 
