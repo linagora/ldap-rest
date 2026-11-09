@@ -1,0 +1,9 @@
+# Inscrit ce dépôt au bot auto-js-pr (mises à jour de dépendances vulnérables).
+#
+# La suite mocha veut Postgres, Valkey et un LDAP en conteneur (voir les
+# services de .github/workflows/test.yml), que le bot ne démarre pas : il s'en
+# tient à la vérification des types. `skipTests` le signale : la pull request
+# est un brouillon et le manque est rapporté.
+skipTests: true
+verifyCommands:
+  - npm run check:ts
