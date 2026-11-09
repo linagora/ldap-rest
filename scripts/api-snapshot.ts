@@ -16,7 +16,6 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
-  writeFileSync,
 } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -32,43 +31,17 @@ const declarations = path.join(root, 'temp', 'api', 'declarations');
 const reportTempDir = path.join(root, 'temp', 'api', 'reports');
 
 /**
- * The entry points of `.`, `./hooks`, `./plugin`, `./ldapactions`,
- * `./expressformatedresponses` and every `./plugin-*`, as
- * `rollup.config.mjs` generates them. The plugin entries are read from
- * `package.json`, so a new plugin is reported without another list to update.
+ * The entry points of the umbrella, as `rollup.config.mjs` generates them.
+ * A plugin package ships its own declarations; its `exports` is its API, and
+ * no report of the umbrella covers it.
  */
-const packageJson = JSON.parse(
-  readFileSync(path.join(root, 'package.json'), 'utf8')
-) as { exports?: Record<string, { types?: string }> };
-
-const pluginEntries: Record<string, string> = Object.fromEntries(
-  Object.entries(packageJson.exports ?? {})
-    .filter(
-      ([subpath, entry]) =>
-        subpath.startsWith('./plugin-') && typeof entry.types === 'string'
-    )
-    .map(([subpath, entry]) => [
-      subpath.slice(2).replace(/\//g, '-'),
-      entry.types!.replace(/^\.\/dist\//, ''),
-    ])
-);
-
 export const API_ENTRIES: Record<string, string> = {
   'ldap-rest': 'src/bin/index.d.ts',
   expressformatedresponses: 'src/lib/expressFormatedResponses.d.ts',
   hooks: 'src/hooks.d.ts',
   ldapactions: 'src/lib/ldapActions.d.ts',
   plugin: 'src/abstract/plugin.d.ts',
-  ...pluginEntries,
 };
-
-const CORE_ENTRIES = new Set([
-  'ldap-rest',
-  'expressformatedresponses',
-  'hooks',
-  'ldapactions',
-  'plugin',
-]);
 
 export function reportPath(name: string): string {
   return path.join(API_REPORT_DIR, `${name}.api.md`);
@@ -134,49 +107,6 @@ function extract(name: string, entryPoint: string, folder: string): void {
     throw new Error(
       `api-extractor failed on ${name}: ${result.errorCount} error(s)`
     );
-}
-
-/**
- * Drop from a plugin report the declaration blocks identical to one in a
- * core report: an inlined `Config` or `DM` is already gated there, and
- * repeating it makes every core option change rewrite every plugin report.
- */
-export function stripCoreDeclarations(
-  report: string,
-  core: Set<string>
-): string {
-  // The umbrella report re-exports the core declarations with `export`; a
-  // plugin report carries the same declaration without it.
-  const comparable = (block: string): string =>
-    block.replace(/^export\s+/m, '');
-  const coreBlocks = new Set([...core].map(comparable));
-  const lines = report.split('\n');
-  const fence = lines.findIndex(line => line.startsWith('```'));
-  const start = lines.findIndex(line => line.startsWith('// @'));
-  const end = lines.findIndex(
-    (line, index) => index > fence && line.startsWith('```')
-  );
-  if (start === -1) return report;
-  const out = lines.slice(0, start);
-  let current: string[] = [];
-  const flush = (): void => {
-    if (current.length === 0) return;
-    const block = current.join('\n').trimEnd();
-    if (!coreBlocks.has(comparable(block))) out.push(...current);
-    current = [];
-  };
-  for (const line of lines.slice(start, end === -1 ? undefined : end)) {
-    if (
-      line.startsWith('// @') ||
-      line.startsWith('export {') ||
-      line.startsWith('declare namespace ')
-    )
-      flush();
-    current.push(line);
-  }
-  flush();
-  if (end !== -1) out.push(...lines.slice(end));
-  return out.join('\n');
 }
 
 export interface ApiReportChanges {
@@ -307,16 +237,8 @@ export async function buildApiReports(
           path.join(folder, `${name}.api.md`)
         );
   emitDeclarations();
-  const coreBlocks = new Set<string>();
-  for (const [name, entryPoint] of Object.entries(API_ENTRIES)) {
+  for (const [name, entryPoint] of Object.entries(API_ENTRIES))
     extract(name, entryPoint, folder);
-    const file = path.join(folder, `${name}.api.md`);
-    const report = readFileSync(file, 'utf8');
-    if (CORE_ENTRIES.has(name))
-      for (const block of declarationsIn(report).values())
-        coreBlocks.add(block);
-    else writeFileSync(file, stripCoreDeclarations(report, coreBlocks));
-  }
 }
 
 function stale(name: string, folder: string): boolean {
@@ -360,7 +282,7 @@ async function main(): Promise<void> {
       if (file.endsWith('.api.md') && !produced.has(file)) {
         console.error(
           `${path.relative(root, reportPath(file.replace(/\.api\.md$/, '')))} ` +
-            'has no entry: remove it, or list it in package.json exports.'
+            'has no entry: remove it.'
         );
         outdated.push(file);
       }

@@ -1,9 +1,6 @@
 import { expect } from 'chai';
 
-import {
-  diffApiReports,
-  stripCoreDeclarations,
-} from '../../scripts/api-snapshot';
+import { diffApiReports } from '../../scripts/api-snapshot';
 
 function reportWith(imports: string[], ...blocks: string[]): string {
   return [
@@ -154,31 +151,5 @@ describe('API reports', () => {
 
     expect(changes.removed).to.deep.equal(['f #2']);
     expect(changes.changed).to.deep.equal([]);
-  });
-});
-
-describe('Plugin reports', () => {
-  const coreConfig = '// @public\nexport interface Config {\n  a: string;\n}';
-  const own = '// @public\nexport interface Only {\n  b: string;\n}';
-
-  it('drops a block identical to one in a core report', () => {
-    const stripped = stripCoreDeclarations(
-      report(coreConfig, own),
-      new Set([coreConfig])
-    );
-    expect(stripped).to.not.contain('export interface Config');
-    expect(stripped).to.contain('export interface Only');
-    expect(stripped.startsWith('## API Report File')).to.equal(true);
-    expect(stripped.trimEnd().endsWith('```')).to.equal(true);
-  });
-
-  it('keeps a declaration sharing a core name with another shape', () => {
-    const different = '// @public\nexport interface Config {\n  b: string;\n}';
-    const stripped = stripCoreDeclarations(
-      report(different),
-      new Set([coreConfig])
-    );
-    expect(stripped).to.contain('export interface Config');
-    expect(stripped).to.contain('b: string');
   });
 });

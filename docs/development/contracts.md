@@ -10,10 +10,10 @@ request says so before it merges.
   [REST API](../client-development/api/rest-api.md), their parameters,
   responses (references resolved), statuses and response headers. The error
   `code` values are reviewed by hand: the document types them as strings.
-- **Plugin API**: what the npm sub-path exports declare — `ldap-rest`,
-  `./hooks`, `./plugin`, `./ldapactions`, `./expressformatedresponses`, the
-  `./plugin-*`, `./abstract-*` and `./browser-*` entries — and the JSON
-  schema format of the `./schema-*` entries.
+- **Plugin API**: what the `exports` of the `ldap-rest` umbrella
+  (`./hooks`, `./plugin`, `./ldapactions`, `./expressformatedresponses`,
+  `./abstract-*` and `./browser-*`) and of every `@ldap-rest/*` package
+  declare, and the JSON schema format of the `./schema-*` entries.
 
 [API stability](../README.md#api-stability) says what a minor or patch
 release promises. This page says how a change is detected, and what to do
@@ -31,19 +31,16 @@ contract shows up as a diff instead of a surprise after the release:
 - `openapi.json` is the REST API document the published reference is built
   from. Regenerate it with `npm run generate:openapi`; `npm run check:openapi`
   fails when it is stale.
-- `etc/api/*.api.md` are the API Extractor reports, one file per sub-path:
-  the five main entry points — `ldap-rest`, `./plugin`, `./hooks`,
-  `./ldapactions` and `./expressformatedresponses` — and every `./plugin-*`
-  entry. A new plugin gets its report from `package.json`, without another
-  list to update. Regenerate them with `npm run snapshot:api`;
+- `etc/api/*.api.md` are the API Extractor reports, one file per entry of the
+  umbrella: `ldap-rest`, `./plugin`, `./hooks`, `./ldapactions` and
+  `./expressformatedresponses`. Regenerate them with `npm run snapshot:api`;
   `npm run check:api`, part of `npm run check`, fails when one is stale. A
   report lists what the entry exports and the shapes of the types those
   exports reference, including the types the entry does not export itself, so
   a change to `RouteDefinition` or `OptionSet` shows up even though a plugin
-  cannot name them. A declaration a plugin report shares verbatim with a
-  core report is dropped from the plugin report: the core report already
-  gates it, and repeating it would rewrite every plugin report on a core
-  change.
+  cannot name them. The `@ldap-rest/*` packages ship their own declarations:
+  their `exports` is their API, and the report of the umbrella does not cover
+  them.
 
 The snapshot records what the parser reads. A narrowed `choices` list, a
 raised `min` or a lowered `max` is checked when a plugin reads its options,

@@ -36,7 +36,7 @@ const entries = Object.entries(
 
 const consumer = `import DmPlugin, { HttpError } from 'ldap-rest/plugin';
 import { escapeLdapFilter } from 'ldap-rest';
-import type { ScimUser } from 'ldap-rest/plugin-scim-types';
+import type { ScimUser } from 'ldap-rest/hooks';
 ${entries
   .map(([subpath], index) => {
     const name = subpath === '.' ? 'ldap-rest' : `ldap-rest${subpath.slice(1)}`;
