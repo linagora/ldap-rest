@@ -165,6 +165,15 @@ export default abstract class DmPlugin {
    */
   followedOperationalAttributes?: string[];
 
+  /**
+   * Load what `api()` needs, before the server mounts anything.
+   *
+   * `registerPlugin` awaits it after the dependencies are loaded and before
+   * `api()`, so a plugin whose routes depend on a package it loads on demand
+   * has it there when the routes are registered.
+   */
+  prepare?(): MaybePromise<void>;
+
   /* Function to register API */
   api?(app: Express): MaybePromise<void>;
 

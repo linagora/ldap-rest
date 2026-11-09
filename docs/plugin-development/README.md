@@ -40,8 +40,8 @@ Plugins can combine multiple features: hook into LDAP operations, expose API end
 Every plugin extends the `DmPlugin` base class and defines a unique name:
 
 ```typescript
-import DmPlugin from '../../abstract/plugin';
-import type { Role } from '../../abstract/plugin';
+import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import type { Role } from '@ldap-rest/core/abstract/plugin';
 
 export default class MyPlugin extends DmPlugin {
   name = 'myPlugin'; // Unique identifier for your plugin
@@ -57,6 +57,8 @@ export default class MyPlugin extends DmPlugin {
 - **hooks** (optional): Callbacks for LDAP operations
 - **provides** (optional): Typed services this plugin offers, see
   [plugin services](services.md)
+- **prepare()** (optional): Load what `api()` needs from a package the
+  plugin imports on demand; awaited before the routes are registered
 - **api()** (optional): Method to register REST endpoints
 
 ### Available from Base Class

@@ -1252,6 +1252,10 @@ export class DM {
         }
       }
     }
+    if (obj.prepare) {
+      this.logger.debug(`Plugin ${obj.name} is preparing`);
+      await obj.prepare();
+    }
     if (this._compositionState.composed) await this.admitToComposition(obj);
     if (obj.api) {
       this.mountAuthDispatcher(obj);

@@ -53,7 +53,7 @@ describe('Keyed storage, one instance', function () {
 
   it('should load one', async () => {
     first = new Storage(server);
-    await first.api();
+    await first.prepare();
     expect(first.store.name).to.equal('storage/file');
   });
 
@@ -70,7 +70,7 @@ describe('Keyed storage, one instance', function () {
     expect(() => new Storage(other)).to.throw(/unknown backend/);
     process.env.DM_STORAGE_BACKEND = 'file';
     first = new Storage(server);
-    await first.api();
+    await first.prepare();
   });
 });
 

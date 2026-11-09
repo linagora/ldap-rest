@@ -110,9 +110,11 @@ export default class Storage extends DmPlugin {
    *
    * Deliberately not the constructor: the backends are packages of their own,
    * and one a deployment did not install must not stop the others from
-   * loading. `registerPlugin` awaits `api()`.
+   * loading. This is `prepare()`, not `api()`: the plugin mounts no route, and
+   * an `api()` would mount the authentication dispatcher ahead of the guards
+   * that must run before it.
    */
-  async api(): Promise<void> {
+  async prepare(): Promise<void> {
     const settings = this.settings as StorageOptions;
     try {
       switch (settings.storage_backend) {
