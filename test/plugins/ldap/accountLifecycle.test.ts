@@ -40,7 +40,8 @@ describe('Account lifecycle', () => {
       deptDn = `ou=LifecycleOrg,${base}`;
       userDn = `uid=lifecycle.user,ou=users,${base}`;
 
-      process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
+      process.env.DM_LDAP_FLAT_SCHEMA =
+        './packages/ldap-rest/static/schemas/twake/users.json';
       server = new DM();
       await server.ready;
       try {

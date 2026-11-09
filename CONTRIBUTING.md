@@ -69,7 +69,7 @@ thresholds set in `package.json`. They sit a few points under the measured
 values to catch drift; when they fail, the fix is usually a missing test, not
 a lower threshold. Raise them when the real figure moves up.
 
-The gate excludes `src/browser`, which the suite cannot exercise without a
+The gate excludes `packages/browser/src`, which the suite cannot exercise without a
 DOM, and the type-only files listed in `.c8rc.json`. `npm run coverage` still
 reports everything in `coverage/index.html`.
 

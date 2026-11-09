@@ -29,7 +29,9 @@ describe('Enterprise rules: the placeholder is not a member', function () {
     server = new DM();
     await server.ready;
     // The only shipped schema that declares `deleteGuard: nonEmpty`.
-    server.config.ldap_flat_schema = ['./static/schemas/example/groups.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/example/groups.json',
+    ];
     // Written as an operator types it, spaces and all: the same DN as the one
     // the directory will store, spelled differently.
     placeholder = 'CN = FakeUser';

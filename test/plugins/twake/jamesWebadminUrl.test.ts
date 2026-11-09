@@ -3,7 +3,7 @@ import Calendar from '@ldap-rest/twake-calendar';
 import James from '@ldap-rest/james';
 import MigrationProxy from '@ldap-rest/twake-mail-migration';
 
-import { DM } from '../../../src/bin';
+import { DM } from '../../../packages/ldap-rest/src/bin';
 
 /**
  * Addresses come from the directory, and James and Calendar WebAdmin URLs are

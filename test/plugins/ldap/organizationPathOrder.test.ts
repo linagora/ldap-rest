@@ -46,7 +46,7 @@ describe('Organization paths', function () {
     rulesFirst: boolean
   ): Promise<{ server: DM; request: ReturnType<typeof supertest> }> => {
     process.env.DM_ORGANIZATION_SCHEMA =
-      './static/schemas/twake/organizations.json';
+      './packages/ldap-rest/static/schemas/twake/organizations.json';
     const server = new DM();
     await server.ready;
     if (rulesFirst)

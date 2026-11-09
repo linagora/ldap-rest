@@ -132,9 +132,10 @@ describe('Delegated administration bypasses (#325)', function () {
     ])
       saved[name] = process.env[name];
     process.env.DM_LDAP_TOP_ORGANIZATION = top;
-    process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
+    process.env.DM_LDAP_FLAT_SCHEMA =
+      './packages/ldap-rest/static/schemas/twake/users.json';
     process.env.DM_ORGANIZATION_SCHEMA =
-      './static/schemas/twake/organizations.json';
+      './packages/ldap-rest/static/schemas/twake/organizations.json';
 
     server = new DM();
     await server.ready;

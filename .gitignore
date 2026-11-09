@@ -4,10 +4,8 @@ CLAUDE.md
 coverage/
 dist/
 node_modules
-static/browser/
-static/schemas/
+packages/ldap-rest/static/
 packages/browser/static/
-static/*.html
 _site/
 scripts/client-values.txt
 temp/

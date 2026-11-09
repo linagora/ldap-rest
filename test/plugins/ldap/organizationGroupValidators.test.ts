@@ -34,8 +34,9 @@ describe('Organization and group validators', function () {
     previousOrgSchema = process.env.DM_ORGANIZATION_SCHEMA;
     previousGroupSchema = process.env.DM_GROUP_SCHEMA;
     process.env.DM_ORGANIZATION_SCHEMA =
-      './static/schemas/twake/organizations.json';
-    process.env.DM_GROUP_SCHEMA = './static/schemas/twake/groups.json';
+      './packages/ldap-rest/static/schemas/twake/organizations.json';
+    process.env.DM_GROUP_SCHEMA =
+      './packages/ldap-rest/static/schemas/twake/groups.json';
     server = new DM();
     await server.ready;
     await server.ldap

@@ -5,7 +5,7 @@ import type { DmRequest } from '@ldap-rest/core/lib/auth/base';
 import AuthFake from '@ldap-rest/auth-fake';
 
 import { DM } from '../../helpers/dm';
-import HelloWorld from '../../../src/plugins/demo/helloworld';
+import HelloWorld from '../../../packages/ldap-rest/src/plugins/demo/helloworld';
 
 describe('AuthFake', () => {
   let savedUser: string | undefined;

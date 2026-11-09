@@ -31,16 +31,16 @@ const copyTree = (src, dest, accept = () => true) => {
 };
 
 for (const [from, dest] of [
-  ['packages/schemas/static/schemas', 'static/schemas'],
-  ['packages/browser/static/browser', 'static/browser'],
+  ['packages/schemas/static/schemas', 'packages/ldap-rest/static/schemas'],
+  ['packages/browser/static/browser', 'packages/ldap-rest/static/browser'],
 ]) {
   rmSync(dest, { recursive: true, force: true });
   copyTree(from, dest);
 }
 
 if (existsSync('packages/browser/dist')) {
-  rmSync('dist/src/browser', { recursive: true, force: true });
-  copyTree('packages/browser/dist', 'dist/src/browser', file =>
+  rmSync('packages/ldap-rest/dist/browser', { recursive: true, force: true });
+  copyTree('packages/browser/dist', 'packages/ldap-rest/dist/browser', file =>
     file.endsWith('.d.ts')
   );
 }

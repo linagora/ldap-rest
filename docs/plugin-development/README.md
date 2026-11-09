@@ -127,7 +127,8 @@ See [Exposing API Endpoints](#exposing-api-endpoints) for detailed examples.
 
 ### Option 1: Core Plugin (Inside ldap-rest Repository)
 
-Create a file in `src/plugins/<category>/<pluginName>.ts`:
+Create a package under `packages/`, as [Workspace packages](../development/packages.md)
+describes, and put the plugin in its `src/`:
 
 ```typescript
 /**
@@ -138,9 +139,12 @@ Create a file in `src/plugins/<category>/<pluginName>.ts`:
  */
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { type Role, asyncHandler } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
+import DmPlugin, {
+  type Role,
+  asyncHandler,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { Hooks } from '@ldap-rest/core/hooks';
 
 export default class WebhookNotifier extends DmPlugin {
   name = 'webhookNotifier';
@@ -285,7 +289,8 @@ A core plugin declares its options next to its code, in a
 `<plugin>.options.ts` file, and reads them through `this.options()` with their
 types, defaults and checks. See [plugin options](options.md).
 
-A plugin outside the repository cannot add to `src/options.ts` yet. It keeps
+A plugin outside the repository cannot add to the umbrella's option
+composition yet. It keeps
 reading `this.config.<name>`: LDAP-Rest accepts and stores unknown
 `--option-name value` pairs under `option_name`, with `--option-name` and
 `DM_OPTION_NAME` overriding in that order. See
@@ -298,7 +303,7 @@ reading `this.config.<name>`: LDAP-Rest accepts and stores unknown
 ### Core Plugin
 
 ```bash
-# Load by path within src/plugins/
+# Load by its core name: it resolves to the installed package
 npx ldap-rest --plugin core/notification/webhook
 
 # Load multiple plugins
@@ -929,9 +934,12 @@ Here's a complete, production-ready plugin that sends webhook notifications on L
 import type { Express, Request, Response } from 'express';
 import crypto from 'crypto';
 
-import DmPlugin, { type Role, asyncHandler } from '../../abstract/plugin';
-import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
+import DmPlugin, {
+  type Role,
+  asyncHandler,
+} from '@ldap-rest/core/abstract/plugin';
+import type { DM } from '@ldap-rest/core';
+import type { Hooks } from '@ldap-rest/core/hooks';
 import type { AttributesList, ModifyRequest } from '../../lib/ldapActions';
 
 interface WebhookPayload {
@@ -1189,8 +1197,8 @@ import { describe, it, before, after } from 'mocha';
 import { expect } from 'chai';
 import request from 'supertest';
 
-import { DM } from '../../../src/bin/index';
-import NotificationPlugin from '../../../src/plugins/notification/webhook';
+import { DM } from '../../helpers/dm';
+import NotificationPlugin from '@ldap-rest/notification-webhook';
 
 describe('NotificationPlugin', function () {
   let server: DM;
@@ -1327,7 +1335,7 @@ See [Tests and checks](../../CONTRIBUTING.md#tests-and-checks).
 - [Contributing Guide](../../CONTRIBUTING.md) - Git workflow and PR guidelines
 - [Hooks Reference](./hooks.md) - Complete list of available hooks
 - [Plugin services](./services.md) - Typed interfaces between plugins
-- [Core Plugin Examples](../../src/plugins/) - Browse existing plugins
+- [Plugin packages](../../packages/) - Browse existing plugins
 - [Test Examples](../../test/plugins/) - See how core plugins are tested
 
 ---

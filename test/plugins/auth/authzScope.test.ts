@@ -45,7 +45,8 @@ describe('Authorization scope endpoint', () => {
       policiesHeldBy?: string;
     } = {}
   ): Promise<ReturnType<typeof supertest>> => {
-    process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
+    process.env.DM_LDAP_FLAT_SCHEMA =
+      './packages/ldap-rest/static/schemas/twake/users.json';
     if (opts.perRoute) process.env.DM_AUTHZ_PER_ROUTES = `${user ?? ''}:*`;
     if (opts.perBranch) process.env.DM_AUTHZ_PER_BRANCH_CONFIG = opts.perBranch;
     const server = new DM();
@@ -444,8 +445,8 @@ describe('Authorization scope endpoint', () => {
     // came back 403.
     const request = await serve('alice.admin', true, {
       flatSchemas: [
-        './static/schemas/twake/users.json',
-        './static/schemas/twake/positions.json',
+        './packages/ldap-rest/static/schemas/twake/users.json',
+        './packages/ldap-rest/static/schemas/twake/positions.json',
       ],
     });
     const res = await request

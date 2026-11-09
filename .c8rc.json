@@ -32,6 +32,7 @@
     "packages/ldap-organizations/src",
     "packages/ldap-passwordpolicy/src",
     "packages/ldap-raw/src",
+    "packages/ldap-rest/src",
     "packages/ldap-trash/src",
     "packages/metrics/src",
     "packages/rabbitmq/src",

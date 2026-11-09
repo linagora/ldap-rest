@@ -15,7 +15,7 @@ import supertest from 'supertest';
 
 import { DM } from '../../helpers/dm';
 
-const PROBE = '../../test/fixtures/plugins/xffProbe.js';
+const PROBE = '../../../../test/fixtures/plugins/xffProbe.js';
 const TRUSTED_PROXY = '@ldap-rest/auth-trustedproxy';
 
 describe('Priority plugins named by their package', function () {

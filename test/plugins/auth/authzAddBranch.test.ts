@@ -12,8 +12,8 @@ import LdapGroups from '@ldap-rest/ldap-groups';
 import LdapOrganizations from '@ldap-rest/ldap-organizations';
 
 import { DM } from '../../helpers/dm';
-import type { AttributesList } from '../../../src/lib/ldapActions';
-import type { Role } from '../../../src/abstract/plugin';
+import type { AttributesList } from '../../../packages/ldap-rest/src/lib/ldapActions';
+import type { Role } from '../../../packages/ldap-rest/src/abstract/plugin';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 
 class TestAuthPlugin extends AuthBase {

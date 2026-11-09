@@ -50,7 +50,8 @@ describe('Object class repair on modify', function () {
     orgDn = `ou=RepairTest,${base}`;
     accountDn = `uid=repair-test,${usersBase}`;
     strayDn = `uid=repair-stray,${orgDn}`;
-    process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
+    process.env.DM_LDAP_FLAT_SCHEMA =
+      './packages/ldap-rest/static/schemas/twake/users.json';
     server = new DM();
     users = new LdapFlatGeneric(server).instances[0];
     await server.ldap

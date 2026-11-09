@@ -18,8 +18,25 @@ interface BuiltOptions {
   ) => Promise<Parameters<typeof parseConfig>[0]>;
 }
 
-const built = path.join(__dirname, '..', '..', 'dist', 'options.js');
-const builtServer = path.join(__dirname, '..', '..', 'dist', 'bin', 'index.js');
+const built = path.join(
+  __dirname,
+  '..',
+  '..',
+  'packages',
+  'ldap-rest',
+  'dist',
+  'options.js'
+);
+const builtServer = path.join(
+  __dirname,
+  '..',
+  '..',
+  'packages',
+  'ldap-rest',
+  'dist',
+  'bin',
+  'index.js'
+);
 
 const compose = async (
   entries: readonly string[]

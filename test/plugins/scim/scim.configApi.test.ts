@@ -15,7 +15,16 @@ import Static from '@ldap-rest/static';
 
 import { DM } from '../../helpers/dm';
 
-const shipped = join(__dirname, '..', '..', '..', 'static', 'schemas');
+const shipped = join(
+  __dirname,
+  '..',
+  '..',
+  '..',
+  'packages',
+  'schemas',
+  'static',
+  'schemas'
+);
 const files = ['User.json', 'Group.json', 'default-mapping.json'];
 type Urls = { user: string; group: string; defaultMapping?: string };
 

@@ -252,7 +252,6 @@
     "types": ["node", "mocha"]
   },
   "include": [
-    "src/**/*",
     "packages/core/src/types/**/*.d.ts",
     "packages/*/src/**/*",
     "test/**/*"

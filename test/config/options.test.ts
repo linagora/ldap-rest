@@ -29,7 +29,7 @@ import { twakeGroupsOptionsOf } from '@ldap-rest/twake-collaboration/groups-opti
 import { twakeInstancesOptionsOf } from '@ldap-rest/twake-provisioning/options';
 
 import { DM } from '../helpers/dm';
-import configArgs from '../../src/options.full';
+import configArgs from '../../packages/ldap-rest/src/options.full';
 
 describe('plugin options', () => {
   const parse = (argv: string[] = ['node', 'ldap-rest']) =>

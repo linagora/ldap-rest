@@ -1,4 +1,4 @@
-import Plugin from '../../../dist/abstract/plugin.js';
+import Plugin from '../../../packages/ldap-rest/dist/abstract/plugin.js';
 
 class HelloWorldPath extends Plugin {
   name = 'hellopath';

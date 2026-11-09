@@ -260,9 +260,196 @@
       "@ldap-rest/twake-mail-migration/options": [
         "./packages/twake-mail-migration/dist/migrationProxy.options.d.ts"
       ],
-      "@ldap-rest/weblogs": ["./packages/weblogs/dist/weblogs.d.ts"]
+      "@ldap-rest/weblogs": ["./packages/weblogs/dist/weblogs.d.ts"],
+      "ldap-rest": ["./packages/ldap-rest/dist/bin/index.d.ts"],
+      "ldap-rest/hooks": ["./packages/ldap-rest/dist/hooks.d.ts"],
+      "ldap-rest/plugin": ["./packages/ldap-rest/dist/abstract/plugin.d.ts"],
+      "ldap-rest/expressformatedresponses": [
+        "./packages/ldap-rest/dist/lib/expressFormatedResponses.d.ts"
+      ],
+      "ldap-rest/ldapactions": [
+        "./packages/ldap-rest/dist/lib/ldapActions.d.ts"
+      ],
+      "ldap-rest/options": ["./packages/ldap-rest/dist/options.d.ts"],
+      "ldap-rest/abstract-ldapflat": [
+        "./packages/ldap-rest/dist/abstract/ldapFlat.d.ts"
+      ],
+      "ldap-rest/abstract-plugin": [
+        "./packages/ldap-rest/dist/abstract/plugin.d.ts"
+      ],
+      "ldap-rest/abstract-twakeplugin": [
+        "./packages/ldap-rest/dist/abstract/twakePlugin.d.ts"
+      ],
+      "ldap-rest/browser-ldap-browser-ldapbrowser": [
+        "./packages/ldap-rest/dist/browser/ldap-browser/LdapBrowser.d.ts"
+      ],
+      "ldap-rest/browser-ldap-browser-api-rawapiclient": [
+        "./packages/ldap-rest/dist/browser/ldap-browser/api/RawApiClient.d.ts"
+      ],
+      "ldap-rest/browser-ldap-browser-components-entrytree": [
+        "./packages/ldap-rest/dist/browser/ldap-browser/components/EntryTree.d.ts"
+      ],
+      "ldap-rest/browser-ldap-browser-components-entryview": [
+        "./packages/ldap-rest/dist/browser/ldap-browser/components/EntryView.d.ts"
+      ],
+      "ldap-rest/browser-ldap-browser-index": [
+        "./packages/ldap-rest/dist/browser/ldap-browser/index.d.ts"
+      ],
+      "ldap-rest/browser-ldap-browser-schema": [
+        "./packages/ldap-rest/dist/browser/ldap-browser/schema.d.ts"
+      ],
+      "ldap-rest/browser-ldap-browser-types": [
+        "./packages/ldap-rest/dist/browser/ldap-browser/types.d.ts"
+      ],
+      "ldap-rest/browser-ldap-group-editor-ldapgroupeditor": [
+        "./packages/ldap-rest/dist/browser/ldap-group-editor/LdapGroupEditor.d.ts"
+      ],
+      "ldap-rest/browser-ldap-group-editor-api-groupapiclient": [
+        "./packages/ldap-rest/dist/browser/ldap-group-editor/api/GroupApiClient.d.ts"
+      ],
+      "ldap-rest/browser-ldap-group-editor-components-creategroupmodal": [
+        "./packages/ldap-rest/dist/browser/ldap-group-editor/components/CreateGroupModal.d.ts"
+      ],
+      "ldap-rest/browser-ldap-group-editor-components-grouppropertyeditor": [
+        "./packages/ldap-rest/dist/browser/ldap-group-editor/components/GroupPropertyEditor.d.ts"
+      ],
+      "ldap-rest/browser-ldap-group-editor-components-grouptree": [
+        "./packages/ldap-rest/dist/browser/ldap-group-editor/components/GroupTree.d.ts"
+      ],
+      "ldap-rest/browser-ldap-group-editor-components-movegroupmodal": [
+        "./packages/ldap-rest/dist/browser/ldap-group-editor/components/MoveGroupModal.d.ts"
+      ],
+      "ldap-rest/browser-ldap-group-editor-index": [
+        "./packages/ldap-rest/dist/browser/ldap-group-editor/index.d.ts"
+      ],
+      "ldap-rest/browser-ldap-group-editor-types": [
+        "./packages/ldap-rest/dist/browser/ldap-group-editor/types.d.ts"
+      ],
+      "ldap-rest/browser-ldap-resource-editor-api-resourceapiclient": [
+        "./packages/ldap-rest/dist/browser/ldap-resource-editor/api/ResourceApiClient.d.ts"
+      ],
+      "ldap-rest/browser-ldap-resource-editor-cache-cachemanager": [
+        "./packages/ldap-rest/dist/browser/ldap-resource-editor/cache/CacheManager.d.ts"
+      ],
+      "ldap-rest/browser-ldap-resource-editor-index": [
+        "./packages/ldap-rest/dist/browser/ldap-resource-editor/index.d.ts"
+      ],
+      "ldap-rest/browser-ldap-resource-editor-types": [
+        "./packages/ldap-rest/dist/browser/ldap-resource-editor/types.d.ts"
+      ],
+      "ldap-rest/browser-ldap-tree-viewer-ldaptreeviewer": [
+        "./packages/ldap-rest/dist/browser/ldap-tree-viewer/LdapTreeViewer.d.ts"
+      ],
+      "ldap-rest/browser-ldap-tree-viewer-api-ldapapiclient": [
+        "./packages/ldap-rest/dist/browser/ldap-tree-viewer/api/LdapApiClient.d.ts"
+      ],
+      "ldap-rest/browser-ldap-tree-viewer-components-treenode": [
+        "./packages/ldap-rest/dist/browser/ldap-tree-viewer/components/TreeNode.d.ts"
+      ],
+      "ldap-rest/browser-ldap-tree-viewer-components-treeroot": [
+        "./packages/ldap-rest/dist/browser/ldap-tree-viewer/components/TreeRoot.d.ts"
+      ],
+      "ldap-rest/browser-ldap-tree-viewer-index": [
+        "./packages/ldap-rest/dist/browser/ldap-tree-viewer/index.d.ts"
+      ],
+      "ldap-rest/browser-ldap-tree-viewer-store-store": [
+        "./packages/ldap-rest/dist/browser/ldap-tree-viewer/store/Store.d.ts"
+      ],
+      "ldap-rest/browser-ldap-tree-viewer-store-actions": [
+        "./packages/ldap-rest/dist/browser/ldap-tree-viewer/store/actions.d.ts"
+      ],
+      "ldap-rest/browser-ldap-tree-viewer-store-reducers": [
+        "./packages/ldap-rest/dist/browser/ldap-tree-viewer/store/reducers.d.ts"
+      ],
+      "ldap-rest/browser-ldap-tree-viewer-types": [
+        "./packages/ldap-rest/dist/browser/ldap-tree-viewer/types.d.ts"
+      ],
+      "ldap-rest/browser-ldap-unit-editor-ldapuniteditor": [
+        "./packages/ldap-rest/dist/browser/ldap-unit-editor/LdapUnitEditor.d.ts"
+      ],
+      "ldap-rest/browser-ldap-unit-editor-api-unitapiclient": [
+        "./packages/ldap-rest/dist/browser/ldap-unit-editor/api/UnitApiClient.d.ts"
+      ],
+      "ldap-rest/browser-ldap-unit-editor-components-moveunitmodal": [
+        "./packages/ldap-rest/dist/browser/ldap-unit-editor/components/MoveUnitModal.d.ts"
+      ],
+      "ldap-rest/browser-ldap-unit-editor-components-unitpropertyeditor": [
+        "./packages/ldap-rest/dist/browser/ldap-unit-editor/components/UnitPropertyEditor.d.ts"
+      ],
+      "ldap-rest/browser-ldap-unit-editor-components-unittree": [
+        "./packages/ldap-rest/dist/browser/ldap-unit-editor/components/UnitTree.d.ts"
+      ],
+      "ldap-rest/browser-ldap-unit-editor-index": [
+        "./packages/ldap-rest/dist/browser/ldap-unit-editor/index.d.ts"
+      ],
+      "ldap-rest/browser-ldap-unit-editor-types": [
+        "./packages/ldap-rest/dist/browser/ldap-unit-editor/types.d.ts"
+      ],
+      "ldap-rest/browser-ldap-user-editor-ldapusereditor": [
+        "./packages/ldap-rest/dist/browser/ldap-user-editor/LdapUserEditor.d.ts"
+      ],
+      "ldap-rest/browser-ldap-user-editor-api-userapiclient": [
+        "./packages/ldap-rest/dist/browser/ldap-user-editor/api/UserApiClient.d.ts"
+      ],
+      "ldap-rest/browser-ldap-user-editor-cache-cachemanager": [
+        "./packages/ldap-rest/dist/browser/ldap-user-editor/cache/CacheManager.d.ts"
+      ],
+      "ldap-rest/browser-ldap-user-editor-components-moveusermodal": [
+        "./packages/ldap-rest/dist/browser/ldap-user-editor/components/MoveUserModal.d.ts"
+      ],
+      "ldap-rest/browser-ldap-user-editor-components-pointerfield": [
+        "./packages/ldap-rest/dist/browser/ldap-user-editor/components/PointerField.d.ts"
+      ],
+      "ldap-rest/browser-ldap-user-editor-components-usereditor": [
+        "./packages/ldap-rest/dist/browser/ldap-user-editor/components/UserEditor.d.ts"
+      ],
+      "ldap-rest/browser-ldap-user-editor-components-userlist": [
+        "./packages/ldap-rest/dist/browser/ldap-user-editor/components/UserList.d.ts"
+      ],
+      "ldap-rest/browser-ldap-user-editor-components-usertree": [
+        "./packages/ldap-rest/dist/browser/ldap-user-editor/components/UserTree.d.ts"
+      ],
+      "ldap-rest/browser-ldap-user-editor-index": [
+        "./packages/ldap-rest/dist/browser/ldap-user-editor/index.d.ts"
+      ],
+      "ldap-rest/browser-ldap-user-editor-types": [
+        "./packages/ldap-rest/dist/browser/ldap-user-editor/types.d.ts"
+      ],
+      "ldap-rest/browser-shared-components-disposablecomponent": [
+        "./packages/ldap-rest/dist/browser/shared/components/DisposableComponent.d.ts"
+      ],
+      "ldap-rest/browser-shared-components-modal": [
+        "./packages/ldap-rest/dist/browser/shared/components/Modal.d.ts"
+      ],
+      "ldap-rest/browser-shared-components-statusmessage": [
+        "./packages/ldap-rest/dist/browser/shared/components/StatusMessage.d.ts"
+      ],
+      "ldap-rest/browser-shared-index": [
+        "./packages/ldap-rest/dist/browser/shared/index.d.ts"
+      ],
+      "ldap-rest/browser-shared-types-index": [
+        "./packages/ldap-rest/dist/browser/shared/types/index.d.ts"
+      ],
+      "ldap-rest/browser-shared-utils-dom": [
+        "./packages/ldap-rest/dist/browser/shared/utils/dom.d.ts"
+      ],
+      "ldap-rest/browser-shared-utils-form": [
+        "./packages/ldap-rest/dist/browser/shared/utils/form.d.ts"
+      ],
+      "ldap-rest/browser-shared-utils-hmac": [
+        "./packages/ldap-rest/dist/browser/shared/utils/hmac.d.ts"
+      ],
+      "ldap-rest/browser-shared-utils-schema": [
+        "./packages/ldap-rest/dist/browser/shared/utils/schema.d.ts"
+      ],
+      "ldap-rest/browser-shared-utils-totp": [
+        "./packages/ldap-rest/dist/browser/shared/utils/totp.d.ts"
+      ],
+      "ldap-rest/browser-types-css.d": [
+        "./packages/ldap-rest/dist/browser/types/css.d.d.ts"
+      ]
     }
   },
-  "include": ["src/**/*", "packages/*/src/types/**/*.d.ts"],
+  "include": ["packages/ldap-rest/src/**/*", "packages/*/src/types/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -80,7 +80,9 @@ describe('Flat entity read and write, authorization', function () {
 
     server = new DM();
     await server.ready;
-    server.config.ldap_flat_schema = ['./static/schemas/twake/users.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/users.json',
+    ];
 
     await server.ldap
       .add(orgDn, {

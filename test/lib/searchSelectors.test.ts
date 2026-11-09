@@ -25,7 +25,9 @@ describe('Attribute selectors in search results', function () {
     topOrg = process.env.DM_LDAP_TOP_ORGANIZATION as string;
     server = new DM();
     await server.ready;
-    server.config.ldap_flat_schema = ['./static/schemas/twake/users.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/users.json',
+    ];
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
     await server.registerPlugin(
       'ldapOrganizations',

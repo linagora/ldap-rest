@@ -36,7 +36,10 @@ describe('Schema copy without the generated markers', function () {
 
     // What the upgrade notes describe: the shipped schema, markers removed
     const schema = JSON.parse(
-      fs.readFileSync('./static/schemas/twake/users.json', 'utf8')
+      fs.readFileSync(
+        './packages/ldap-rest/static/schemas/twake/users.json',
+        'utf8'
+      )
     ) as { attributes: Record<string, { generated?: boolean }> };
     delete schema.attributes.uid.generated;
     delete schema.attributes.twakeDepartmentPath.generated;

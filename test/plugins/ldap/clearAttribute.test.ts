@@ -38,8 +38,9 @@ describe('Empty value lists', function () {
     server = new DM();
     await server.ready;
     server.config.organization_schema =
-      './static/schemas/twake/organizations.json';
-    server.config.group_schema = './static/schemas/twake/groups.json';
+      './packages/ldap-rest/static/schemas/twake/organizations.json';
+    server.config.group_schema =
+      './packages/ldap-rest/static/schemas/twake/groups.json';
     // Fills the organization path a creation needs
     await server.registerPlugin(
       'ldapEnterpriseRules',

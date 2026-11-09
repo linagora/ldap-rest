@@ -9,7 +9,7 @@ import RateLimit from '@ldap-rest/auth-ratelimit';
 import AuthToken from '@ldap-rest/auth-token';
 import TrustedProxy from '@ldap-rest/auth-trustedproxy';
 
-import HelloWorld from '../src/plugins/demo/helloworld';
+import HelloWorld from '../packages/ldap-rest/src/plugins/demo/helloworld';
 
 import { DM } from './helpers/dm';
 
@@ -345,7 +345,7 @@ describe('Server internals', () => {
   });
 
   describe('one plugin module requested twice', () => {
-    const hello = '../../test/__plugins__/hello/index.js';
+    const hello = '../../../../test/__plugins__/hello/index.js';
     const routes = (dm: DM, path: string): number => {
       const internal = dm.app as unknown as {
         router?: { stack: Array<{ route?: { path?: string } }> };
@@ -419,7 +419,7 @@ describe('Server internals', () => {
     it('should try again a load that failed', async () => {
       const dm = new DM();
       await dm.ready;
-      const missing = '../../test/__plugins__/missing/index.js';
+      const missing = '../../../../test/__plugins__/missing/index.js';
 
       // Count the real imports: a cached rejection would fail twice too
       const internals = dm as unknown as {

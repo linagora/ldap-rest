@@ -10,7 +10,7 @@ import {
   SNAPSHOT_PATH,
   serializeOptionsSnapshot,
 } from '../../scripts/options-snapshot';
-import configArgs from '../../src/options.full';
+import configArgs from '../../packages/ldap-rest/src/options.full';
 
 const config: ConfigEntry[] = [
   ['--port', 'DM_PORT', 8081, 'number'],

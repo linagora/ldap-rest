@@ -27,10 +27,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const umbrella = path.join(root, 'packages', 'ldap-rest');
 
 // The sub-paths that publish declarations; the `./schema-*` entries are JSON.
 const entries = Object.entries(
-  JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
+  JSON.parse(readFileSync(path.join(umbrella, 'package.json'), 'utf8'))
     .exports as Record<string, { types?: string }>
 ).filter(([, target]) => target.types);
 
@@ -123,10 +124,10 @@ function linkRuntimeDependencies(modules: string): void {
 }
 
 function main(): void {
-  const dist = path.join(root, 'dist');
-  if (!existsSync(path.join(dist, 'src', 'bin', 'index.d.ts'))) {
+  const dist = path.join(umbrella, 'dist');
+  if (!existsSync(path.join(dist, 'bin', 'index.d.ts'))) {
     console.error(
-      'dist/ holds no declarations: run `npm run build` before this check.'
+      'the umbrella dist/ holds no declarations: run `npm run build` first.'
     );
     process.exitCode = 1;
     return;
@@ -153,11 +154,11 @@ function main(): void {
     // repository's devDependencies back into resolution.
     const packageDir = path.join(modules, 'ldap-rest');
     mkdirSync(packageDir, { recursive: true });
-    cpSync(path.join(root, 'dist'), path.join(packageDir, 'dist'), {
+    cpSync(path.join(umbrella, 'dist'), path.join(packageDir, 'dist'), {
       recursive: true,
     });
     copyFileSync(
-      path.join(root, 'package.json'),
+      path.join(umbrella, 'package.json'),
       path.join(packageDir, 'package.json')
     );
     writeFileSync(

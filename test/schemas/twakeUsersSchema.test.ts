@@ -8,7 +8,7 @@ import { roleAttribute } from '@ldap-rest/core/config/schema';
 const read = (relative: string): Schema =>
   JSON.parse(
     fs.readFileSync(
-      path.join(__dirname, '../../static/schemas', relative),
+      path.join(__dirname, '../../packages/schemas/static/schemas', relative),
       'utf-8'
     )
   ) as Schema;
@@ -31,7 +31,10 @@ describe('Twake schemas', () => {
       organizations,
       ...fs
         .readdirSync(
-          path.join(__dirname, '../../static/schemas/twake/nomenclature')
+          path.join(
+            __dirname,
+            '../../packages/schemas/static/schemas/twake/nomenclature'
+          )
         )
         .filter(file => file.endsWith('.json'))
         .map(file => read(`twake/nomenclature/${file}`)),
@@ -261,7 +264,7 @@ describe('Twake schemas', () => {
   describe('translations', () => {
     it('should give every text a client shows in each shipped language', () => {
       // Every file, so a schema added later is held to it too
-      const dir = path.join(__dirname, '../../static/schemas');
+      const dir = path.join(__dirname, '../../packages/schemas/static/schemas');
       const files = fs
         .readdirSync(path.join(dir, 'twake'), { recursive: true })
         .map(String)

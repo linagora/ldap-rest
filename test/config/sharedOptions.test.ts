@@ -9,7 +9,7 @@ import coreConfigArgs from '@ldap-rest/core/config/args';
 import type { ConfigEntry } from '@ldap-rest/core/lib/parseConfig';
 import { expect } from 'chai';
 
-import { pluginConfigArgs } from '../../src/options.full';
+import { pluginConfigArgs } from '../../packages/ldap-rest/src/options.full';
 
 /** Compare the entries as the parser reads them, shorthand or not */
 const effective = (entry: ConfigEntry): unknown[] => [

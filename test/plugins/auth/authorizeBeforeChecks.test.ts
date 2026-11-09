@@ -186,7 +186,9 @@ describe('Authorization before the checks that read the directory', function () 
       server = new DM();
       await server.ready;
       Object.assign(server.config, {
-        ldap_flat_schema: ['./static/schemas/twake/users.json'],
+        ldap_flat_schema: [
+          './packages/ldap-rest/static/schemas/twake/users.json',
+        ],
         group_schema: '',
         twake_lifecycle_deleted_attribute: 'employeeType',
         twake_lifecycle_deleted_value: 'deleted',
@@ -465,7 +467,10 @@ describe('Authorization before the checks that read the directory', function () 
     before(async function () {
       this.timeout(20000);
       const schema = JSON.parse(
-        readFileSync('./static/schemas/twake/users.json', 'utf8')
+        readFileSync(
+          './packages/ldap-rest/static/schemas/twake/users.json',
+          'utf8'
+        )
       ) as { attributes: Record<string, { generatedFrom?: object }> };
       schema.attributes.uid.generatedFrom = {
         ...schema.attributes.uid.generatedFrom,

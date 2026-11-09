@@ -122,7 +122,9 @@ describe('OpenAPI generator', () => {
   });
 
   it('documents the demo route from its declaration', async () => {
-    const spec = await specOf(path.join(root, 'src', 'plugins', 'demo'));
+    const spec = await specOf(
+      path.join(root, 'packages', 'ldap-rest', 'src', 'plugins', 'demo')
+    );
     const operation = spec.paths['/api/hello']?.get;
 
     expect(operation, 'the defineRoute route is in the spec').to.exist;

@@ -123,15 +123,16 @@ describe('Flat entity rename, reference cascade', function () {
     // less than it is being tested for.
     previousOrganizationSchema = process.env.DM_ORGANIZATION_SCHEMA;
     process.env.DM_ORGANIZATION_SCHEMA =
-      './static/schemas/twake/organizations.json';
+      './packages/ldap-rest/static/schemas/twake/organizations.json';
     previousGroupSchema = process.env.DM_GROUP_SCHEMA;
-    process.env.DM_GROUP_SCHEMA = './static/schemas/twake/groups.json';
+    process.env.DM_GROUP_SCHEMA =
+      './packages/ldap-rest/static/schemas/twake/groups.json';
 
     server = new DM();
     await server.ready;
     server.config.ldap_flat_schema = [
-      './static/schemas/twake/users.json',
-      './static/schemas/twake/devices.json',
+      './packages/ldap-rest/static/schemas/twake/users.json',
+      './packages/ldap-rest/static/schemas/twake/devices.json',
     ];
     server.config.group_dummy_user = dummyDn;
 

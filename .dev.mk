@@ -1,11 +1,7 @@
 #!/usr/bin/make -f
 
 PACKAGESRCFILES:=$(shell find packages/*/src -name '*.ts')
-SRCFILES:=$(shell find src/*/ -name '*.ts' | grep -v browser/)
-_SRCFILES:=$(shell find src/*/ -name '*.ts' | grep -v src/config/schema | grep -v browser/)
-DSTFILES:=$(subst .ts,.js,$(subst src/,dist/,$(_SRCFILES)))
-PLUGINFILES:=$(shell find dist/plugins -name '*.js' | grep -v auth/ | grep -v json.js | grep -v appAccount)
-ALLPLUGINS:=$(subst dist/plugins/,--plugin core/,$(subst .js,,$(PLUGINFILES)))
+UMBRELLASRCFILES:=$(shell find packages/ldap-rest/src -name '*.ts')
 
 LDAPFLATSCHEMAS := $(shell find packages/schemas/static/schemas/twake -name '*.json'|grep -v organization|grep -v groups|sed -e 's/^/--ldap-flat-schema /')
 
@@ -15,36 +11,24 @@ buildpackages:
 staticassets:
 	node scripts/composeAssets.mjs
 
-all: $(DSTFILES)
-
-dist/%.js: src/%.ts
-	echo $*
-	$(MAKE) -f .dev.mk _builddev
-
 build:
 	npm run build:prod
 
-builddev: buildpackages staticassets $(DSTFILES) Dockerfile
-
-_builddev:
-	npx rimraf dist
-	node scripts/packages.mjs build
-	node scripts/composeAssets.mjs
-	npx rollup -c
+builddev: buildpackages staticassets Dockerfile
 
 builddocker: Dockerfile
 	docker build -t ldap-rest .
 
-Dockerfile: scripts/buildDockerfile.ts $(SRCFILES) $(PACKAGESRCFILES) bin rollup.config.mjs tsconfig.json static
+Dockerfile: scripts/buildDockerfile.ts $(UMBRELLASRCFILES) $(PACKAGESRCFILES) packages/ldap-rest/bin packages/ldap-rest/package.json tsconfig.json
 	npx tsx scripts/buildDockerfile.ts
 
-doc: $(SRCFILES)
-	typedoc --entryPoints src/bin/index.ts $(shell find src -name '*.ts' | grep -v bin/index) --out docs
+doc: $(UMBRELLASRCFILES)
+	typedoc --entryPoints packages/ldap-rest/src/bin/index.ts $(shell find packages/ldap-rest/src -name '*.ts' | grep -v bin/index) --out docs
 
-start: staticassets $(DSTFILES)
-	node bin/index.mjs --log-level debug $(ALLPLUGINS) $(LDAPFLATSCHEMAS)
+start: staticassets
+	node packages/ldap-rest/bin/index.mjs --log-level debug $(LDAPFLATSCHEMAS)
 
-test: buildpackages staticassets $(DSTFILES)
+test: buildpackages staticassets
 	npm run test
 
 .PHONY: builddev builddocker buildpackages test

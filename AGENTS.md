@@ -11,8 +11,9 @@ block merges, corrupt the codebase or make the maintainers unhappy.
 - The server is written in TypeScript. Features are plugins extending
   `DmPlugin`, communicating through hooks.
 
-- The build is based on Rollup. `rollup.config.mjs` generates the
-  `exports` field of `package.json`: never edit it by hand.
+- The build is based on Rollup. `packages/ldap-rest/rollup.config.mjs`
+  generates the `exports` field of `packages/ldap-rest/package.json`: never
+  edit it by hand.
 
 - Test with `npm run test:dev`, or `npm run test:one <files>`.
 

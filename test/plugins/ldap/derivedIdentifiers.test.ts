@@ -32,8 +32,8 @@ describe('Derived identifiers', function () {
     server = new DM();
     await server.ready;
     server.config.ldap_flat_schema = [
-      './static/schemas/twake/users.json',
-      './static/schemas/example/positions.json',
+      './packages/ldap-rest/static/schemas/twake/users.json',
+      './packages/ldap-rest/static/schemas/example/positions.json',
     ];
     await server.ldap
       .add(deptDn, {

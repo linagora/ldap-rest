@@ -131,7 +131,7 @@ describe('AuthzLinid1: global write branches', () => {
     });
 
     dm.config.ldap_flat_schema = [
-      './static/schemas/twake/nomenclature/twakeDomain.json',
+      './packages/ldap-rest/static/schemas/twake/nomenclature/twakeDomain.json',
     ];
     dm.config.authz_global_write_branch = [branch];
     await dm.registerPlugin('testAuth', new TestAuthPlugin(dm));

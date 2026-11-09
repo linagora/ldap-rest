@@ -33,7 +33,9 @@ describe('Flat entity read of declared operational attributes', function () {
 
     server = new DM();
     await server.ready;
-    server.config.ldap_flat_schema = ['./static/schemas/twake/users.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/users.json',
+    ];
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
     server.setupErrorMiddleware();
     request = supertest(server.app);

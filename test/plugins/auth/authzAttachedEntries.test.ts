@@ -110,7 +110,9 @@ describe('Authorization by attachment', function () {
       })
     );
     await server.ready;
-    server.config.ldap_flat_schema = ['./static/schemas/twake/users.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/users.json',
+    ];
 
     for (const [dn, ou] of [
       [orgA, 'AttachOrgA'],

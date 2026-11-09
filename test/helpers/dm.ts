@@ -13,9 +13,12 @@ import {
   optionDependenciesOf,
 } from '@ldap-rest/core/config/pluginOptions';
 
-import { DM as UmbrellaDM } from '../../src/bin';
-import { coreOptions, withoutCoreDuplicates } from '../../src/coreOptions';
-import configArgs from '../../src/options.full';
+import { DM as UmbrellaDM } from '../../packages/ldap-rest/src/bin';
+import {
+  coreOptions,
+  withoutCoreDuplicates,
+} from '../../packages/ldap-rest/src/coreOptions';
+import configArgs from '../../packages/ldap-rest/src/options.full';
 
 export class DM extends UmbrellaDM {
   constructor(options: ConfigTemplate = configArgs) {

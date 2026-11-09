@@ -120,7 +120,10 @@ describe('Enterprise rules', () => {
       // The shipped group owners, in `seeAlso`: `refint` rewrites `owner` by
       // itself, and would remove it whether or not the role is honoured.
       const groups = JSON.parse(
-        fs.readFileSync('./static/schemas/twake/groups.json', 'utf8')
+        fs.readFileSync(
+          './packages/ldap-rest/static/schemas/twake/groups.json',
+          'utf8'
+        )
       ) as { attributes: Record<string, { role?: string }> };
       expect(groups.attributes.owner.role).to.equal('owners');
       ownedSchema = path.join(
@@ -147,13 +150,13 @@ describe('Enterprise rules', () => {
       );
 
       process.env.DM_LDAP_FLAT_SCHEMA = [
-        './static/schemas/twake/users.json',
-        './static/schemas/twake/devices.json',
+        './packages/ldap-rest/static/schemas/twake/users.json',
+        './packages/ldap-rest/static/schemas/twake/devices.json',
         ownedSchema,
       ].join(',');
       previousOrganizationSchema = process.env.DM_ORGANIZATION_SCHEMA;
       process.env.DM_ORGANIZATION_SCHEMA =
-        './static/schemas/twake/organizations.json';
+        './packages/ldap-rest/static/schemas/twake/organizations.json';
       server = new DM();
       await server.ready;
 
@@ -232,7 +235,8 @@ describe('Enterprise rules', () => {
 
       const flat = new LdapFlatGeneric(server);
       await server.registerPlugin('ldapFlatGeneric', flat);
-      server.config.group_schema = './static/schemas/twake/groups.json';
+      server.config.group_schema =
+        './packages/ldap-rest/static/schemas/twake/groups.json';
       await server.registerPlugin('ldapGroups', new LdapGroups(server));
       const organizations = new LdapOrganizations(server);
       await server.registerPlugin('ldapOrganizations', organizations);

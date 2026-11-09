@@ -4,7 +4,7 @@ import {
   type ConfigEntry,
 } from '@ldap-rest/core/lib/parseConfig';
 
-import configArgs from '../../src/options.full';
+import configArgs from '../../packages/ldap-rest/src/options.full';
 
 describe('ConfigParser', () => {
   // test/setup.ts sets some DM_* variables for the whole run: give each test

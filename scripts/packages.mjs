@@ -254,9 +254,10 @@ async function check() {
 
   // Until phase 3 publishes the packages, the umbrella ships them in its own
   // tarball: one it does not depend on and bundle is missing once installed.
-  const umbrella = readJson('package.json');
+  const umbrella = readJson('packages/ldap-rest/package.json');
   const bundled = new Set(umbrella.bundledDependencies ?? []);
   for (const pkg of packages()) {
+    if (pkg.name === umbrella.name) continue;
     const version = umbrella.dependencies?.[pkg.name];
     if (version !== pkg.manifest.version)
       problems.push(

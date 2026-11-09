@@ -17,7 +17,15 @@ import Static from '@ldap-rest/static';
 
 import { DM } from '../helpers/dm';
 
-const shipped = join(__dirname, '..', '..', 'static', 'schemas');
+const shipped = join(
+  __dirname,
+  '..',
+  '..',
+  'packages',
+  'schemas',
+  'static',
+  'schemas'
+);
 const files = ['groups.json', 'organizations.json', 'positions.json'];
 type Urls = {
   group: string | undefined;

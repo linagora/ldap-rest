@@ -1,5 +1,5 @@
 /** Static files plugin options, see `docs/plugin-development/options.md`. */
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -15,34 +15,27 @@ import {
 export const STATIC_CSP = "frame-ancestors 'self'";
 export const STATIC_FRAME_OPTIONS = 'SAMEORIGIN';
 
-/** Where this package's own manifest sits: the search stops past it */
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * The `static` directory the umbrella ships: the repository root when this
- * package runs from its sources, the `ldap-rest` package beside the
- * `@ldap-rest` scope once installed. It is never this package's own
- * directory, which holds the plugin and no assets, and it does not depend on
- * the tree being composed already: the Dockerfile is generated from it before
- * a build.
+ * The `static` directory the umbrella ships: `packages/ldap-rest` in the
+ * repository, the `ldap-rest` package beside the `@ldap-rest` scope once
+ * installed. It is never this package's own directory, which holds the plugin
+ * and no assets, and it does not depend on the tree being composed already:
+ * the Dockerfile is generated from it before a build.
+ *
+ * @returns the directory, empty when no umbrella is installed
  */
 const shippedStaticPath = (): string => {
   for (let here = packageRoot; ; here = dirname(here)) {
-    const manifest = join(here, 'package.json');
-    if (existsSync(manifest)) {
-      try {
-        const { name } = JSON.parse(readFileSync(manifest, 'utf8')) as {
-          name?: string;
-        };
-        if (name === 'ldap-rest') return join(here, 'static');
-      } catch {
-        // An unreadable manifest is not the umbrella: keep looking upwards
-      }
-    }
-    if (dirname(here) === here) break;
+    for (const candidate of [
+      join(here, 'packages', 'ldap-rest'),
+      join(here, 'ldap-rest'),
+    ])
+      if (existsSync(join(candidate, 'package.json')))
+        return join(candidate, 'static');
+    if (dirname(here) === here) return '';
   }
-  // Installed: <modules>/@ldap-rest/static → <modules>/ldap-rest/static
-  return join(packageRoot, '..', '..', 'ldap-rest', 'static');
 };
 
 const staticPath = shippedStaticPath();

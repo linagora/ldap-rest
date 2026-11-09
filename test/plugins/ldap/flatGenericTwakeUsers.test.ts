@@ -40,7 +40,8 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       ],
     };
 
-    process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
+    process.env.DM_LDAP_FLAT_SCHEMA =
+      './packages/ldap-rest/static/schemas/twake/users.json';
     server = new DM();
     genericPlugin = new LdapFlatGeneric(server);
     plugin = genericPlugin.instances[0];

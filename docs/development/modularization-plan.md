@@ -15,15 +15,13 @@ not a contract; update it as the work lands.
 internal split, `ldap-rest/plugin-*` included. [#593], [#594], [#595] and
 [#603] are done.
 
-## What blocks #397 today
+## What remains
 
-`@ldap-rest/core`, the plugin packages, `browser` and `schemas` are packages
-of their own. What remains is the umbrella:
-
-- It still composes the options in `src/options.ts` and passes them to the
-  core `DM`; the core itself imports no family.
-- Its build composes `static/` from the browser and schemas packages, and
-  still generates the `./browser-*` and `./schema-*` exports from them.
+Every published artefact lives under `packages/`, the umbrella included:
+`packages/ldap-rest` composes the options in `src/options.ts` and passes them
+to the core `DM`, which imports no family, and its build composes `static/` and
+the `./browser-*` and `./schema-*` entries from the browser and schemas
+packages.
 
 Between plugin families the only coupling left is
 `TwakeGroups extends LdapGroups`, accepted as a peer dependency (decision 3).
@@ -101,18 +99,18 @@ Rules:
   The loader maps `core/…` to the package that provides it: naming a plugin
   whose package is absent is an error at startup, an uninstalled optional
   plugin in the priority list is skipped. Until that loader exists, the map is
-  the umbrella's (`src/pluginModules.json`, read by `DM.canonicalModule`): a
-  `DM` built from the core alone knows only the spellings it is handed, so an
-  embedder naming a plugin by its package gets neither its rank in the
-  priority list nor the duplicate-load guard.
+  the umbrella's (`packages/ldap-rest/src/pluginModules.json`, read by
+  `DM.canonicalModule`): a `DM` built from the core alone knows only the
+  spellings it is handed, so an embedder naming a plugin by its package gets
+  neither its rank in the priority list nor the duplicate-load guard.
 - The umbrella keeps only the main `ldap-rest` command, the loader that maps
   `core/…` to plugin packages, and the `DM` subclass that supplies the plugin
   tree.
 - The parser is two-phase: it reads the core options and the `--plugin` entries
   first, imports the named plugin packages, collects their `optionDefinitions`,
   then parses the full configuration. The umbrella does not import every
-  plugin's option set; `src/options.ts` is the temporary composition for the
-  monolith, not the target.
+  plugin's option set; `packages/ldap-rest/src/options.ts` is the temporary
+  composition for the monolith, not the target.
 - A plugin package exports its option set next to its class. A named plugin
   whose package is absent is an error; an optional package the configuration
   does not name is not needed.
@@ -287,26 +285,22 @@ phase 1.
    once, in the plugin that owns them; a plugin another one only needs
    registered is a peer all the same, or a standalone install reports every
    peer met and fails at startup on a module nobody installed.
-8. **Monorepo layout** (**decided, later**): the umbrella itself moves to
-   `packages/ldap-rest/`, and the repository root `package.json` becomes
-   `ldap-rest-monorepo`, private and workspace-only. This removes the split
-   between "the repository root" and "a package": every published artefact
-   lives under `packages/`. Do it once the extraction is over, before or with
-   the first published plugin package, so the root never ships as a package
-   by accident.
+8. **Monorepo layout** (**done**): the umbrella lives in `packages/ldap-rest`
+   and the root `package.json` is the private `ldap-rest-monorepo`,
+   workspace-only. Every published artefact lives under `packages/`.
 
 ## First actions
 
-Phases 0 to 2 are done, and phase 3 has removed the former plugin sub-paths:
-the workspaces hold the core, the plugin packages, `browser` and `schemas`,
-and `src/pluginModules.json` maps each `core/…` name to its package. What
-remains:
+Phases 0 to 2 are done. Phase 3 has removed the former plugin sub-paths and
+moved the umbrella into `packages/ldap-rest` (decision 8): every published
+artefact is a package, and `packages/ldap-rest/src/pluginModules.json` maps
+each `core/…` name to its package. What remains:
 
 1. Complete the contracts and the review ruleset ([#549] part 2).
 2. Publish the scoped packages and write the `3.0.0` upgrade note and
    CHANGELOG entry.
 3. Split `@ldap-rest/storage` per backend ([#651]).
-4. Move the umbrella to `packages/ldap-rest/` (decision 8) and close [#397].
+4. Close [#397].
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397
 [#549]: https://github.com/linagora/ldap-rest/issues/549

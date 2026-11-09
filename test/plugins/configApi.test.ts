@@ -45,7 +45,10 @@ describe('ConfigApi Plugin', () => {
     // package.json that ships with the server, never a hard-coded copy
     const pkg = JSON.parse(
       readFileSync(
-        join(dirname(fileURLToPath(import.meta.url)), '../../package.json'),
+        join(
+          dirname(fileURLToPath(import.meta.url)),
+          '../../packages/ldap-rest/package.json'
+        ),
         'utf-8'
       )
     ) as { version: string };
@@ -76,6 +79,8 @@ describe('ConfigApi Plugin', () => {
       dirname(fileURLToPath(import.meta.url)),
       '..',
       '..',
+      'packages',
+      'ldap-rest',
       'static',
       'schemas'
     );
@@ -198,6 +203,8 @@ describe('ConfigApi Plugin', () => {
       dirname(fileURLToPath(import.meta.url)),
       '..',
       '..',
+      'packages',
+      'ldap-rest',
       'static',
       'schemas'
     );
@@ -207,6 +214,8 @@ describe('ConfigApi Plugin', () => {
       dirname(fileURLToPath(import.meta.url)),
       '..',
       '..',
+      'packages',
+      'ldap-rest',
       'static'
     );
     dm.config.static_name = 'static';

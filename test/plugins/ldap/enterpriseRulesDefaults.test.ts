@@ -30,7 +30,9 @@ describe('Enterprise rules: schema defaults', function () {
 
     server = new DM();
     await server.ready;
-    server.config.ldap_flat_schema = ['./static/schemas/example/users.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/example/users.json',
+    ];
     await server.ldap
       .add(deptDn, {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],

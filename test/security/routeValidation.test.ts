@@ -132,7 +132,9 @@ describe('Every route refuses the input it cannot take', function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
     server = new DM();
     await server.ready;
-    server.config.ldap_flat_schema = ['./static/schemas/twake/users.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/users.json',
+    ];
     server.config.ppolicy_validate_complexity = true;
     server.config.mail_attribute = 'mail';
     server.config.twake_lifecycle_deleted_attribute = 'employeeType';

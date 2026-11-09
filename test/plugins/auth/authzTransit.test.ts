@@ -78,7 +78,8 @@ describe('Transit branch under authzPerBranch', function () {
     const env: Record<string, string> = {
       DM_AUTHZ_FILTER_ATTACHED_ENTRIES: 'true',
       DM_AUTHZ_TRANSIT_BRANCH: transit,
-      DM_LDAP_FLAT_SCHEMA: './static/schemas/twake/users.json',
+      DM_LDAP_FLAT_SCHEMA:
+        './packages/ldap-rest/static/schemas/twake/users.json',
       DM_AUTHZ_PER_BRANCH_CONFIG: JSON.stringify({
         default: { read: false, write: false, delete: false },
         users: {

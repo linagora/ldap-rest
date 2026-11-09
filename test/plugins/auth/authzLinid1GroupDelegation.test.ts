@@ -14,8 +14,8 @@ import AuthzScope from '@ldap-rest/authz-scope';
 import LdapGroups from '@ldap-rest/ldap-groups';
 import LdapOrganizations from '@ldap-rest/ldap-organizations';
 
-import type { Role } from '../../../src/abstract/plugin';
-import type { AttributesList } from '../../../src/lib/ldapActions';
+import type { Role } from '../../../packages/ldap-rest/src/abstract/plugin';
+import type { AttributesList } from '../../../packages/ldap-rest/src/lib/ldapActions';
 import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
@@ -118,7 +118,8 @@ describe('AuthzLinid1 group delegation', function () {
     process.env.DM_LDAP_TOP_ORGANIZATION = top;
     process.env.DM_AUTHZ_GROUP_ADMIN_ATTRIBUTE = 'twakeGroupAdminOrgLink';
     // Another suite clears it without restoring
-    process.env.DM_GROUP_SCHEMA = './static/schemas/twake/groups.json';
+    process.env.DM_GROUP_SCHEMA =
+      './packages/ldap-rest/static/schemas/twake/groups.json';
 
     server = new DM();
     await server.ready;

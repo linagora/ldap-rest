@@ -9,7 +9,7 @@
 
 // Points the core at the repository's schemas and version, as the umbrella
 // does when it composes the options.
-import '../src/options';
+import '../packages/ldap-rest/src/options';
 
 import {
   embeddedLdapEnvVars,

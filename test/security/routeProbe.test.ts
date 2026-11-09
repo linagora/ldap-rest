@@ -423,9 +423,10 @@ for (const model of MODELS)
         DM_APP_ACCOUNTS_USER_ATTRIBUTE: 'uid',
         ...model.env(orgs, base),
         DM_LDAP_FLAT_SCHEMA:
-          './static/schemas/twake/users.json,./static/schemas/example/positions.json',
+          './packages/ldap-rest/static/schemas/twake/users.json,./packages/ldap-rest/static/schemas/example/positions.json',
         // Its pointers are checked: a manager must exist
-        DM_ORGANIZATION_SCHEMA: './static/schemas/twake/organizations.json',
+        DM_ORGANIZATION_SCHEMA:
+          './packages/ldap-rest/static/schemas/twake/organizations.json',
         // Where SCIM finds the targets: by default, right under the base
         DM_SCIM_USER_BASE: `ou=users,${base}`,
         DM_SCIM_GROUP_BASE: `ou=groups,${base}`,

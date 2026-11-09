@@ -20,7 +20,8 @@ describe('LdapUsersFlat validation with standard schema (via flatGeneric)', func
   before(async function () {
     USER_BRANCH = `ou=users,${process.env.DM_LDAP_BASE}`;
     this.timeout(5000);
-    process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/standard/users.json';
+    process.env.DM_LDAP_FLAT_SCHEMA =
+      './packages/ldap-rest/static/schemas/standard/users.json';
     server = new DM();
     genericPlugin = new LdapFlatGeneric(server);
     plugin = genericPlugin.instances[0];

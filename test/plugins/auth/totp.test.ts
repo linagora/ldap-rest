@@ -6,7 +6,7 @@ import { expect } from 'chai';
 import AuthTotp from '@ldap-rest/auth-totp';
 
 import { DM } from '../../helpers/dm';
-import HelloWorld from '../../../src/plugins/demo/helloworld';
+import HelloWorld from '../../../packages/ldap-rest/src/plugins/demo/helloworld';
 
 /**
  * Generate a TOTP code for testing

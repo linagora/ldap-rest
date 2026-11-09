@@ -10,7 +10,7 @@ import {
   unknownEnvironmentOptions,
 } from '@ldap-rest/core/config/options';
 
-import configArgs from '../../src/options.full';
+import configArgs from '../../packages/ldap-rest/src/options.full';
 import { DM } from '../helpers/dm';
 
 describe('unknown options', () => {

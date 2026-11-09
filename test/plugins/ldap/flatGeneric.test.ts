@@ -17,7 +17,7 @@ describe('LdapFlatGeneric plugin', function () {
   before(async function () {
     this.timeout(5000);
     process.env.DM_LDAP_FLAT_SCHEMA =
-      './static/schemas/twake/nomenclature/twakeTitle.json,./static/schemas/twake/nomenclature/twakeListType.json';
+      './packages/ldap-rest/static/schemas/twake/nomenclature/twakeTitle.json,./packages/ldap-rest/static/schemas/twake/nomenclature/twakeListType.json';
     server = new DM();
     await server.ready;
     plugin = new LdapFlatGeneric(server);

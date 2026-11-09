@@ -211,9 +211,10 @@ async function main(): Promise<void> {
   const check = process.argv.includes('--check');
   // Imported here rather than at module load so the tests and the contracts
   // comparison can import this module without pulling every plugin option in
-  const { default: configArgs } = (await import('../src/options.full')) as {
-    default: ConfigEntry[];
-  };
+  const { default: configArgs } =
+    (await import('../packages/ldap-rest/src/options.full')) as {
+      default: ConfigEntry[];
+    };
   const generated = serializeOptionsSnapshot(buildOptionsSnapshot(configArgs));
 
   if (!check) {

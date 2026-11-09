@@ -9,7 +9,7 @@ const base = 'dc=example,dc=com';
 const pattern = (relative: string, name: string): RegExp => {
   const schema = JSON.parse(
     fs.readFileSync(
-      path.join(__dirname, '../../static/schemas', relative),
+      path.join(__dirname, '../../packages/schemas/static/schemas', relative),
       'utf-8'
     )
   ) as Schema;

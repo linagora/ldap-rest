@@ -62,7 +62,7 @@ describe('Generated attributes', function () {
     before(async () => {
       deptDn = `ou=GuardsOrg,${base}`;
       ({ server, request } = await serve(
-        './static/schemas/twake/users.json',
+        './packages/ldap-rest/static/schemas/twake/users.json',
         false
       ));
       await server.ldap
@@ -121,8 +121,9 @@ describe('Generated attributes', function () {
       server = new DM();
       await server.ready;
       server.config.organization_schema =
-        './static/schemas/twake/organizations.json';
-      server.config.group_schema = './static/schemas/twake/groups.json';
+        './packages/ldap-rest/static/schemas/twake/organizations.json';
+      server.config.group_schema =
+        './packages/ldap-rest/static/schemas/twake/groups.json';
       const organizations = new LdapOrganizations(server);
       groups = new LdapGroups(server);
       await server.registerPlugin('ldapOrganizations', organizations);

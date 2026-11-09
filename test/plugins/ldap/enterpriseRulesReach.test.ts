@@ -41,7 +41,7 @@ describe('Enterprise rules reach every spelling and every naming', function () {
 
     previousOrgSchema = process.env.DM_ORGANIZATION_SCHEMA;
     process.env.DM_ORGANIZATION_SCHEMA =
-      './static/schemas/twake/organizations.json';
+      './packages/ldap-rest/static/schemas/twake/organizations.json';
     server = new DM();
     await server.ready;
     server.config.ldap_flat_schema = [

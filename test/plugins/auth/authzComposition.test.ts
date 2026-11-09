@@ -34,7 +34,7 @@ import AuthzPerRoute from '@ldap-rest/authz-perroute';
 import { ssha } from '@ldap-rest/authz-dynamic/hash';
 
 import { DM } from '../../helpers/dm';
-import { type Config } from '../../../src/bin';
+import { type Config } from '../../../packages/ldap-rest/src/bin';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 const DYNAMIC_TOKEN = 'dynamic-token-for-authz-composition';
@@ -639,7 +639,7 @@ describe('Authorization plugins loaded together', function () {
 
     it('should not start when a check of a plugin rejects', async () => {
       process.env.DM_PLUGINS =
-        '../../test/__plugins__/refused-composition/index.js';
+        '../../../../test/__plugins__/refused-composition/index.js';
       const server = new DM();
       let refused: Error | undefined;
       await server.ready.catch((err: Error) => {

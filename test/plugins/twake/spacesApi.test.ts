@@ -109,7 +109,8 @@ describe('Twake spaces plugin routes', function () {
       twake_lifecycle_deleted_attribute: 'employeeType',
       twake_lifecycle_deleted_value: 'deleted',
       group_class: ['top', 'groupOfNames'],
-      group_schema: 'static/schemas/twake/organizationGroups.json',
+      group_schema:
+        'packages/schemas/static/schemas/twake/organizationGroups.json',
       twake_space_base: `ou=spaces,ou={org},${ORGS}`,
       // Standard attributes, so the test needs no Twake schema, and none
       // required, as in twakeSpace: a space may be left without an admin

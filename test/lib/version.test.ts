@@ -101,7 +101,10 @@ describe('lib/version', () => {
   it('finds the version of this repository from its own sources', () => {
     const declared = JSON.parse(
       readFileSync(
-        join(dirname(fileURLToPath(import.meta.url)), '../../package.json'),
+        join(
+          dirname(fileURLToPath(import.meta.url)),
+          '../../packages/ldap-rest/package.json'
+        ),
         'utf-8'
       )
     ) as { version: string };

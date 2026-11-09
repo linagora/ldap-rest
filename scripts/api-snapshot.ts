@@ -36,11 +36,12 @@ const reportTempDir = path.join(root, 'temp', 'api', 'reports');
  * no report of the umbrella covers it.
  */
 export const API_ENTRIES: Record<string, string> = {
-  'ldap-rest': 'src/bin/index.d.ts',
-  expressformatedresponses: 'src/lib/expressFormatedResponses.d.ts',
-  hooks: 'src/hooks.d.ts',
-  ldapactions: 'src/lib/ldapActions.d.ts',
-  plugin: 'src/abstract/plugin.d.ts',
+  'ldap-rest': 'packages/ldap-rest/src/bin/index.d.ts',
+  expressformatedresponses:
+    'packages/ldap-rest/src/lib/expressFormatedResponses.d.ts',
+  hooks: 'packages/ldap-rest/src/hooks.d.ts',
+  ldapactions: 'packages/ldap-rest/src/lib/ldapActions.d.ts',
+  plugin: 'packages/ldap-rest/src/abstract/plugin.d.ts',
 };
 
 export function reportPath(name: string): string {
@@ -96,7 +97,12 @@ function extract(name: string, entryPoint: string, folder: string): void {
   const config = ExtractorConfig.prepare({
     configObject,
     configObjectFullPath: path.join(root, 'api-extractor.json'),
-    packageJsonFullPath: path.join(root, 'package.json'),
+    packageJsonFullPath: path.join(
+      root,
+      'packages',
+      'ldap-rest',
+      'package.json'
+    ),
   });
   const result = Extractor.invoke(config, {
     localBuild: true,

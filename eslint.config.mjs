@@ -22,8 +22,8 @@ export default [
 
   // TypeScript config (except browser)
   {
-    files: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
-    ignores: ['src/browser/**', 'packages/browser/src/**'],
+    files: ['packages/ldap-rest/src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
+    ignores: ['packages/ldap-rest/src/browser/**', 'packages/browser/src/**'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -89,8 +89,8 @@ export default [
   // package keeps answering to them.
   {
     files: [
-      'src/plugins/**/*.ts',
-      'src/abstract/**/*.ts',
+      'packages/ldap-rest/src/plugins/**/*.ts',
+      'packages/ldap-rest/src/abstract/**/*.ts',
       'packages/*/src/**/*.ts',
       'packages/core/src/abstract/**/*.ts',
     ],
@@ -109,8 +109,13 @@ export default [
   },
 
   {
-    files: ['src/plugins/**/*.ts', 'packages/*/src/**/*.ts'],
-    ignores: ['packages/core/src/**', 'packages/browser/src/**'],
+    files: ['packages/ldap-rest/src/plugins/**/*.ts', 'packages/*/src/**/*.ts'],
+    ignores: [
+      'packages/core/src/**',
+      'packages/browser/src/**',
+      // The umbrella composes every family's options by design
+      'packages/ldap-rest/src/options.full.ts',
+    ],
     rules: {
       'local/no-raw-route': 'error',
       'local/no-config-cast': 'error',
@@ -124,7 +129,10 @@ export default [
     },
   },
   {
-    files: ['src/abstract/**/*.ts', 'packages/core/src/abstract/**/*.ts'],
+    files: [
+      'packages/ldap-rest/src/abstract/**/*.ts',
+      'packages/core/src/abstract/**/*.ts',
+    ],
     rules: {
       'local/no-raw-route': 'error',
       'local/no-config-cast': 'error',
@@ -165,7 +173,7 @@ export default [
 
   // See docs/development/contracts.md
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['packages/ldap-rest/src/**/*.{ts,tsx}'],
     plugins: { 'import-x': importX },
     rules: {
       'import-x/extensions': [
@@ -179,7 +187,7 @@ export default [
   // Reported as a warning: the rule treats assertions that other rules need
   // as unnecessary, so failing the build on it blocks correct changes.
   {
-    files: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
+    files: ['packages/ldap-rest/src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
     rules: {
       '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
     },
@@ -269,9 +277,9 @@ export default [
   // A later block for the same files replaces this rule's options rather
   // than adding to them: the SCIM block below repeats the fetch selector.
   {
-    files: ['src/**/*.ts', 'packages/*/src/**/*.ts'],
+    files: ['packages/ldap-rest/src/**/*.ts', 'packages/*/src/**/*.ts'],
     ignores: [
-      'src/browser/**',
+      'packages/ldap-rest/src/browser/**',
       'packages/browser/src/**',
       'packages/core/src/lib/ldap/operations.ts',
       'packages/core/src/lib/ldap/read.ts',
@@ -317,8 +325,8 @@ export default [
   // what a plugin declared. See docs/plugin-development/hooks.md
   {
     files: [
-      'src/abstract/plugin.ts',
-      'src/bin/index.ts',
+      'packages/ldap-rest/src/abstract/plugin.ts',
+      'packages/ldap-rest/src/bin/index.ts',
       'packages/core/src/lib/hookBus.ts',
       'packages/core/src/abstract/plugin.ts',
       'packages/core/src/bin/index.ts',
@@ -339,9 +347,9 @@ export default [
   // One validator enforces the entity schemas, see
   // docs/client-development/schemas/README.md#what-a-value-must-look-like
   {
-    files: ['src/**/*.ts', 'packages/*/src/**/*.ts'],
+    files: ['packages/ldap-rest/src/**/*.ts', 'packages/*/src/**/*.ts'],
     ignores: [
-      'src/lib/entitySchema/**',
+      'packages/ldap-rest/src/lib/entitySchema/**',
       'packages/core/src/config/schema.ts',
       'packages/core/src/lib/entitySchema/**',
       // The package entry re-exports the schema helpers on purpose
@@ -365,7 +373,7 @@ export default [
                 'checkDnValues',
               ],
               message:
-                'Validate through EntityValidator (src/lib/entitySchema/validator.ts); the schema helpers are its own.',
+                'Validate through EntityValidator (packages/core/src/lib/entitySchema/validator.ts); the schema helpers are its own.',
             },
           ],
         },
@@ -376,11 +384,11 @@ export default [
   // docs/usage/operations.md#metrics: a call to another service is timed
   // under its caller, which `DmPlugin.fetch` and the instance providers do
   {
-    files: ['src/**/*.ts', 'packages/*/src/**/*.ts'],
+    files: ['packages/ldap-rest/src/**/*.ts', 'packages/*/src/**/*.ts'],
     ignores: [
-      'src/browser/**',
+      'packages/ldap-rest/src/browser/**',
       'packages/browser/src/**',
-      'src/abstract/plugin.ts',
+      'packages/ldap-rest/src/abstract/plugin.ts',
       'packages/core/src/abstract/plugin.ts',
       'packages/core/src/lib/instanceProviders.ts',
     ],
@@ -418,7 +426,7 @@ export default [
   // `ldap.forRequest(req)`, so each operation names the request it means
   // rather than relying on the one being served.
   {
-    files: ['src/plugins/scim/**/*.ts'],
+    files: ['packages/ldap-rest/src/plugins/scim/**/*.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',

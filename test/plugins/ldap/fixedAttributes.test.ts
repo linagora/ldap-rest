@@ -10,7 +10,8 @@ describe('Fixed attributes validation', function () {
 
   before(async function () {
     this.timeout(5000);
-    process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/standard/users.json';
+    process.env.DM_LDAP_FLAT_SCHEMA =
+      './packages/ldap-rest/static/schemas/standard/users.json';
     server = new DM();
     genericPlugin = new LdapFlatGeneric(server);
     plugin = genericPlugin.instances[0];

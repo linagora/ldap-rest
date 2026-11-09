@@ -9,7 +9,7 @@ describe('Plugin Loading', () => {
     process.env.NODE_ENV = 'test';
     process.env.DM_PORT = '64322';
     process.env.DM_PLUGINS =
-      '../../dist/plugins/demo/helloworld.js,../../test/__plugins__/hello/index.js';
+      '../../dist/plugins/demo/helloworld.js,../../../../test/__plugins__/hello/index.js';
     server = new DM();
     await server.ready;
     await server.run();

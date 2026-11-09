@@ -41,7 +41,7 @@ describe('Group schema: a generated attribute is not asked of the client', funct
     previousGroupSchema = process.env.DM_GROUP_SCHEMA;
     process.env.DM_GROUP_SCHEMA = join(
       dirname(fileURLToPath(import.meta.url)),
-      '../../../static/schemas/twake/groups.json'
+      '../../../packages/schemas/static/schemas/twake/groups.json'
     );
     server = new DM();
     await server.ready;

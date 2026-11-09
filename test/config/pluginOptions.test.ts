@@ -14,7 +14,7 @@ import {
 import { defineOptions, opt } from '@ldap-rest/core/config/options';
 import { expect } from 'chai';
 
-import { composeOptions } from '../../src/options';
+import { composeOptions } from '../../packages/ldap-rest/src/options';
 import Sample from '../fixtures/pluginOptionSample';
 
 const Dependent = class {

@@ -58,7 +58,7 @@ await server.hookBus.settled();
 
 <!-- hooks: generated from packages/core/src/hooks.ts, do not edit by hand -->
 
-- **hello**: raised by the [demo plugin](../../src/plugins/demo/helloworld.ts) for `/hello`, answered by the demo plugins
+- **hello**: raised by the [demo plugin](../../packages/ldap-rest/src/plugins/demo/helloworld.ts) for `/hello`, answered by the demo plugins
 - **ldapsearchopts**: chained before any search, with its options
 - **ldapsearchrequest**: chained before any search, with `[base, options, request]`; an authorization plugin refuses by throwing
 - **ldapsearchresult**: chained after any search, with its result, before it is cached; for a paged search, when the first page is read

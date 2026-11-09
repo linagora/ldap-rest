@@ -63,7 +63,8 @@ describe('Twake groups plugin routes', function () {
       twake_lifecycle_deleted_attribute: 'employeeType',
       twake_lifecycle_deleted_value: 'deleted',
       group_class: ['top', 'groupOfNames'],
-      group_schema: 'static/schemas/twake/organizationGroups.json',
+      group_schema:
+        'packages/schemas/static/schemas/twake/organizationGroups.json',
     });
     await dm.ready;
     groups = new TwakeGroups(dm);

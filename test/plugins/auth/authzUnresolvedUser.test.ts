@@ -70,7 +70,9 @@ describe('An authenticated identity the model cannot resolve', function () {
     else process.env.DM_AUTHZ_UNRESOLVED_USER = policy;
     const server = new DM();
     await server.ready;
-    server.config.ldap_flat_schema = ['./static/schemas/twake/users.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/users.json',
+    ];
     const authz = new AuthzLinid1(server);
     await server.registerPlugin('testAuth', new TestAuthPlugin(server));
     await server.registerPlugin('authzLinid1', authz);

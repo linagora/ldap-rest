@@ -68,7 +68,9 @@ describe('flatGeneric against the plugins serving their own collection', functio
   it('should refuse a schema claiming the URL a loaded plugin serves', async () => {
     const server = new DM();
     await server.ready;
-    server.config.ldap_flat_schema = ['./static/schemas/twake/groups.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/groups.json',
+    ];
     await server.registerPlugin('ldapGroups', new LdapGroups(server));
 
     const { flat, errors } = buildCollectingErrors(server);
@@ -87,7 +89,9 @@ describe('flatGeneric against the plugins serving their own collection', functio
     const server = new DM();
     await server.ready;
     server.config.plugin = ['core/ldap/groups', 'core/ldap/flatGeneric'];
-    server.config.ldap_flat_schema = ['./static/schemas/twake/groups.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/groups.json',
+    ];
 
     const { flat, errors } = buildCollectingErrors(server);
     expect(flat.instances.map(instance => instance.pluralName)).to.deep.equal(
@@ -100,7 +104,9 @@ describe('flatGeneric against the plugins serving their own collection', functio
     const server = new DM();
     await server.ready;
     server.config.plugin = ['@ldap-rest/ldap-groups', 'core/ldap/flatGeneric'];
-    server.config.ldap_flat_schema = ['./static/schemas/twake/groups.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/groups.json',
+    ];
 
     const { flat, errors } = buildCollectingErrors(server);
     expect(flat.instances.map(instance => instance.pluralName)).to.deep.equal(
@@ -109,11 +115,13 @@ describe('flatGeneric against the plugins serving their own collection', functio
     expect(errors.join('\n')).to.contain('already served by plugin ldapGroups');
   });
 
-  it('should read a plugin named by its built module too', async () => {
+  it('should read a named instance of a plugin named by its package', async () => {
     const server = new DM();
     await server.ready;
-    server.config.plugin = ['./dist/plugins/ldap/groups.js:groups2:{}'];
-    server.config.ldap_flat_schema = ['./static/schemas/twake/groups.json'];
+    server.config.plugin = ['@ldap-rest/ldap-groups:groups2:{}'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/groups.json',
+    ];
 
     expect(
       buildCollectingErrors(server).flat.instances.map(
@@ -126,7 +134,9 @@ describe('flatGeneric against the plugins serving their own collection', functio
     const server = new DM();
     await server.ready;
     server.config.plugin = ['core/ldap/groups', 'core/ldap/organizations'];
-    server.config.ldap_flat_schema = ['./static/schemas/twake/positions.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/positions.json',
+    ];
     await server.registerPlugin('ldapGroups', new LdapGroups(server));
 
     const { flat, errors } = buildCollectingErrors(server);
@@ -142,10 +152,13 @@ describe('flatGeneric against the plugins serving their own collection', functio
     // and this is what keeps it from drifting away from them.
     const server = new DM();
     await server.ready;
-    server.config.ldap_flat_schema = ['./static/schemas/twake/users.json'];
-    server.config.group_schema = './static/schemas/twake/groups.json';
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/users.json',
+    ];
+    server.config.group_schema =
+      './packages/ldap-rest/static/schemas/twake/groups.json';
     server.config.bulk_import_schemas =
-      'users:./static/schemas/twake/users.json';
+      'users:./packages/ldap-rest/static/schemas/twake/users.json';
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
     await server.registerPlugin('ldapGroups', new LdapGroups(server));
     await server.registerPlugin(

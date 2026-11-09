@@ -296,10 +296,10 @@ jobs:
       - name: Verify tag matches package.json version
         run: |
           TAG="${GITHUB_REF_NAME#v}"
-          PKG="$(node -p "require('./package.json').version")"
+          PKG="$(node -p "require('./packages/ldap-rest/package.json').version")"
           if [ "$TAG" != "$PKG" ]; then
-            echo "Tag v$TAG does not match package.json version $PKG."
-            echo "Bump the version in package.json before pushing the tag."
+            echo "Tag v$TAG does not match the ldap-rest package version $PKG."
+            echo "Bump packages/ldap-rest/package.json before pushing the tag."
             exit 1
           fi
           echo "Tag matches package.json version: $PKG"
@@ -308,7 +308,9 @@ jobs:
         run: |
           node -e '
             const fs = require("fs");
-            const p = require("./package.json");
+            const path = require("path");
+            const dir = "packages/ldap-rest";
+            const p = require("./" + dir + "/package.json");
             const files = new Set();
             for (const v of Object.values(p.exports || {})) {
               if (v && typeof v === "object") {
@@ -317,7 +319,9 @@ jobs:
               }
             }
             for (const b of Object.values(p.bin || {})) files.add(b);
-            const missing = [...files].filter((f) => !fs.existsSync(f));
+            const missing = [...files]
+              .map((f) => path.join(dir, f))
+              .filter((f) => !fs.existsSync(f));
             if (missing.length) {
               console.error("Missing entry files:\n  " + missing.join("\n  "));
               process.exit(1);
@@ -326,7 +330,7 @@ jobs:
           '
 
       - name: Pack tarball
-        run: npm pack
+        run: node scripts/pack-umbrella.mjs --destination .
 
       - name: Publish to npm
         run: |
@@ -335,7 +339,7 @@ jobs:
             *-*) NPM_TAG=next ;;
             *)   NPM_TAG=latest ;;
           esac
-          npm publish --access public --tag "$NPM_TAG"
+          npm publish ./ldap-rest-*.tgz --access public --tag "$NPM_TAG"
 
       - name: Upload release tarball
         uses: actions/upload-artifact@v7

@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-import fs, { rmSync } from 'fs';
+import fs from 'fs';
 import { builtinModules } from 'module';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
@@ -9,7 +9,7 @@ import { sortPackageJson } from 'sort-package-json';
 import { writeFileSync } from 'fs';
 import { glob } from 'tinyglobby';
 
-import stripCssDeclarations from './scripts/stripCssDeclarations.mjs';
+import stripCssDeclarations from '../../scripts/stripCssDeclarations.mjs';
 
 const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
 
@@ -23,8 +23,7 @@ const commonPlugins = dir => [
     declarationDir: dir,
     declarationMap: false,
     sourceMap: process.env.NODE_ENV !== 'production',
-    include: ['src/**/*'],
-    exclude: ['packages/**', 'test/**'],
+    include: ['**/*.ts'],
     outDir: dir,
   }),
   stripCssDeclarations(),
@@ -77,47 +76,45 @@ async function getAbstractEntries() {
 }
 
 async function getSpecs() {
-  return (await glob('packages/schemas/static/schemas/**/*.json'))
-    .map(file => file.replace(/^packages\/schemas\/static\/schemas\//, ''))
+  return (await glob('../schemas/static/schemas/**/*.json'))
+    .map(file => file.replace(/^\.\.\/schemas\/static\/schemas\//, ''))
     .sort();
 }
 
 async function getBrowserLibraries() {
   return (
-    await glob('packages/browser/src/**/*.ts', {
+    await glob('../browser/src/**/*.ts', {
       ignore: ['**/*.test.ts', '**/*.css', '**/*.d.ts'],
     })
   )
-    .map(file =>
-      file.replace(/^packages\/browser\/src\//, '').replace(/\.ts$/, '')
-    )
+    .map(file => file.replace(/^\.\.\/browser\/src\//, '').replace(/\.ts$/, ''))
     .sort();
 }
 
 pkg.exports = {
   '.': {
     import: './dist/bin/index.js',
-    types: './dist/src/bin/index.d.ts',
+    types: './dist/bin/index.d.ts',
   },
   './hooks': {
     import: './dist/hooks.js',
-    types: './dist/src/hooks.d.ts',
+    types: './dist/hooks.d.ts',
   },
   './plugin': {
     import: './dist/abstract/plugin.js',
-    types: './dist/src/abstract/plugin.d.ts',
+    types: './dist/abstract/plugin.d.ts',
   },
   './expressformatedresponses': {
     import: './dist/lib/expressFormatedResponses.js',
-    types: './dist/src/lib/expressFormatedResponses.d.ts',
+    types: './dist/lib/expressFormatedResponses.d.ts',
   },
   './ldapactions': {
     import: './dist/lib/ldapActions.js',
-    types: './dist/src/lib/ldapActions.d.ts',
+    types: './dist/lib/ldapActions.d.ts',
   },
   './options': {
     import: './dist/options.js',
-    types: './dist/src/options.d.ts',
+    types: './dist/options.d.ts',
   },
 };
 
@@ -129,7 +126,7 @@ export default async () => {
     const name = abstract.replace(/\.ts$/, '');
     pkg.exports[`./abstract-${name.toLowerCase().replace(/\//g, '-')}`] = {
       import: `./dist/abstract/${name}.js`,
-      types: `./dist/src/abstract/${name}.d.ts`,
+      types: `./dist/abstract/${name}.d.ts`,
     };
   });
 
@@ -137,7 +134,7 @@ export default async () => {
     const name = browserLib.toLowerCase().replace(/\//g, '-');
     pkg.exports[`./browser-${name}`] = {
       import: `./static/browser/${browserLib}.js`,
-      types: `./dist/src/browser/${browserLib}.d.ts`,
+      types: `./dist/browser/${browserLib}.d.ts`,
     };
   });
 
@@ -170,18 +167,7 @@ export default async () => {
         banner: '',
         preserveModules: true,
       },
-      plugins: [
-        ...commonPlugins('dist'),
-        {
-          // The root program follows `@ldap-rest/core` through the tsconfig
-          // paths and emits its declarations beside the umbrella's; nothing
-          // references the copy.
-          name: 'drop-core-declarations',
-          writeBundle() {
-            rmSync('dist/packages', { recursive: true, force: true });
-          },
-        },
-      ],
+      plugins: [...commonPlugins('dist')],
       external,
     },
   ];

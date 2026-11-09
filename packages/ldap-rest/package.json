@@ -1,0 +1,578 @@
+{
+  "name": "ldap-rest",
+  "version": "3.0.0",
+  "description": "Light directory manager",
+  "keywords": [
+    "Identity-Manager"
+  ],
+  "homepage": "https://github.com/linagora/ldap-rest#readme",
+  "bugs": {
+    "url": "https://github.com/linagora/ldap-rest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/ldap-rest.git",
+    "directory": "packages/ldap-rest"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <yadd@debian.org>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/bin/index.js",
+      "types": "./dist/bin/index.d.ts"
+    },
+    "./hooks": {
+      "import": "./dist/hooks.js",
+      "types": "./dist/hooks.d.ts"
+    },
+    "./plugin": {
+      "import": "./dist/abstract/plugin.js",
+      "types": "./dist/abstract/plugin.d.ts"
+    },
+    "./expressformatedresponses": {
+      "import": "./dist/lib/expressFormatedResponses.js",
+      "types": "./dist/lib/expressFormatedResponses.d.ts"
+    },
+    "./ldapactions": {
+      "import": "./dist/lib/ldapActions.js",
+      "types": "./dist/lib/ldapActions.d.ts"
+    },
+    "./options": {
+      "import": "./dist/options.js",
+      "types": "./dist/options.d.ts"
+    },
+    "./abstract-ldapflat": {
+      "import": "./dist/abstract/ldapFlat.js",
+      "types": "./dist/abstract/ldapFlat.d.ts"
+    },
+    "./abstract-plugin": {
+      "import": "./dist/abstract/plugin.js",
+      "types": "./dist/abstract/plugin.d.ts"
+    },
+    "./abstract-twakeplugin": {
+      "import": "./dist/abstract/twakePlugin.js",
+      "types": "./dist/abstract/twakePlugin.d.ts"
+    },
+    "./browser-ldap-browser-ldapbrowser": {
+      "import": "./static/browser/ldap-browser/LdapBrowser.js",
+      "types": "./dist/browser/ldap-browser/LdapBrowser.d.ts"
+    },
+    "./browser-ldap-browser-api-rawapiclient": {
+      "import": "./static/browser/ldap-browser/api/RawApiClient.js",
+      "types": "./dist/browser/ldap-browser/api/RawApiClient.d.ts"
+    },
+    "./browser-ldap-browser-components-entrytree": {
+      "import": "./static/browser/ldap-browser/components/EntryTree.js",
+      "types": "./dist/browser/ldap-browser/components/EntryTree.d.ts"
+    },
+    "./browser-ldap-browser-components-entryview": {
+      "import": "./static/browser/ldap-browser/components/EntryView.js",
+      "types": "./dist/browser/ldap-browser/components/EntryView.d.ts"
+    },
+    "./browser-ldap-browser-index": {
+      "import": "./static/browser/ldap-browser/index.js",
+      "types": "./dist/browser/ldap-browser/index.d.ts"
+    },
+    "./browser-ldap-browser-schema": {
+      "import": "./static/browser/ldap-browser/schema.js",
+      "types": "./dist/browser/ldap-browser/schema.d.ts"
+    },
+    "./browser-ldap-browser-types": {
+      "import": "./static/browser/ldap-browser/types.js",
+      "types": "./dist/browser/ldap-browser/types.d.ts"
+    },
+    "./browser-ldap-group-editor-ldapgroupeditor": {
+      "import": "./static/browser/ldap-group-editor/LdapGroupEditor.js",
+      "types": "./dist/browser/ldap-group-editor/LdapGroupEditor.d.ts"
+    },
+    "./browser-ldap-group-editor-api-groupapiclient": {
+      "import": "./static/browser/ldap-group-editor/api/GroupApiClient.js",
+      "types": "./dist/browser/ldap-group-editor/api/GroupApiClient.d.ts"
+    },
+    "./browser-ldap-group-editor-components-creategroupmodal": {
+      "import": "./static/browser/ldap-group-editor/components/CreateGroupModal.js",
+      "types": "./dist/browser/ldap-group-editor/components/CreateGroupModal.d.ts"
+    },
+    "./browser-ldap-group-editor-components-grouppropertyeditor": {
+      "import": "./static/browser/ldap-group-editor/components/GroupPropertyEditor.js",
+      "types": "./dist/browser/ldap-group-editor/components/GroupPropertyEditor.d.ts"
+    },
+    "./browser-ldap-group-editor-components-grouptree": {
+      "import": "./static/browser/ldap-group-editor/components/GroupTree.js",
+      "types": "./dist/browser/ldap-group-editor/components/GroupTree.d.ts"
+    },
+    "./browser-ldap-group-editor-components-movegroupmodal": {
+      "import": "./static/browser/ldap-group-editor/components/MoveGroupModal.js",
+      "types": "./dist/browser/ldap-group-editor/components/MoveGroupModal.d.ts"
+    },
+    "./browser-ldap-group-editor-index": {
+      "import": "./static/browser/ldap-group-editor/index.js",
+      "types": "./dist/browser/ldap-group-editor/index.d.ts"
+    },
+    "./browser-ldap-group-editor-types": {
+      "import": "./static/browser/ldap-group-editor/types.js",
+      "types": "./dist/browser/ldap-group-editor/types.d.ts"
+    },
+    "./browser-ldap-resource-editor-api-resourceapiclient": {
+      "import": "./static/browser/ldap-resource-editor/api/ResourceApiClient.js",
+      "types": "./dist/browser/ldap-resource-editor/api/ResourceApiClient.d.ts"
+    },
+    "./browser-ldap-resource-editor-cache-cachemanager": {
+      "import": "./static/browser/ldap-resource-editor/cache/CacheManager.js",
+      "types": "./dist/browser/ldap-resource-editor/cache/CacheManager.d.ts"
+    },
+    "./browser-ldap-resource-editor-index": {
+      "import": "./static/browser/ldap-resource-editor/index.js",
+      "types": "./dist/browser/ldap-resource-editor/index.d.ts"
+    },
+    "./browser-ldap-resource-editor-types": {
+      "import": "./static/browser/ldap-resource-editor/types.js",
+      "types": "./dist/browser/ldap-resource-editor/types.d.ts"
+    },
+    "./browser-ldap-tree-viewer-ldaptreeviewer": {
+      "import": "./static/browser/ldap-tree-viewer/LdapTreeViewer.js",
+      "types": "./dist/browser/ldap-tree-viewer/LdapTreeViewer.d.ts"
+    },
+    "./browser-ldap-tree-viewer-api-ldapapiclient": {
+      "import": "./static/browser/ldap-tree-viewer/api/LdapApiClient.js",
+      "types": "./dist/browser/ldap-tree-viewer/api/LdapApiClient.d.ts"
+    },
+    "./browser-ldap-tree-viewer-components-treenode": {
+      "import": "./static/browser/ldap-tree-viewer/components/TreeNode.js",
+      "types": "./dist/browser/ldap-tree-viewer/components/TreeNode.d.ts"
+    },
+    "./browser-ldap-tree-viewer-components-treeroot": {
+      "import": "./static/browser/ldap-tree-viewer/components/TreeRoot.js",
+      "types": "./dist/browser/ldap-tree-viewer/components/TreeRoot.d.ts"
+    },
+    "./browser-ldap-tree-viewer-index": {
+      "import": "./static/browser/ldap-tree-viewer/index.js",
+      "types": "./dist/browser/ldap-tree-viewer/index.d.ts"
+    },
+    "./browser-ldap-tree-viewer-store-store": {
+      "import": "./static/browser/ldap-tree-viewer/store/Store.js",
+      "types": "./dist/browser/ldap-tree-viewer/store/Store.d.ts"
+    },
+    "./browser-ldap-tree-viewer-store-actions": {
+      "import": "./static/browser/ldap-tree-viewer/store/actions.js",
+      "types": "./dist/browser/ldap-tree-viewer/store/actions.d.ts"
+    },
+    "./browser-ldap-tree-viewer-store-reducers": {
+      "import": "./static/browser/ldap-tree-viewer/store/reducers.js",
+      "types": "./dist/browser/ldap-tree-viewer/store/reducers.d.ts"
+    },
+    "./browser-ldap-tree-viewer-types": {
+      "import": "./static/browser/ldap-tree-viewer/types.js",
+      "types": "./dist/browser/ldap-tree-viewer/types.d.ts"
+    },
+    "./browser-ldap-unit-editor-ldapuniteditor": {
+      "import": "./static/browser/ldap-unit-editor/LdapUnitEditor.js",
+      "types": "./dist/browser/ldap-unit-editor/LdapUnitEditor.d.ts"
+    },
+    "./browser-ldap-unit-editor-api-unitapiclient": {
+      "import": "./static/browser/ldap-unit-editor/api/UnitApiClient.js",
+      "types": "./dist/browser/ldap-unit-editor/api/UnitApiClient.d.ts"
+    },
+    "./browser-ldap-unit-editor-components-moveunitmodal": {
+      "import": "./static/browser/ldap-unit-editor/components/MoveUnitModal.js",
+      "types": "./dist/browser/ldap-unit-editor/components/MoveUnitModal.d.ts"
+    },
+    "./browser-ldap-unit-editor-components-unitpropertyeditor": {
+      "import": "./static/browser/ldap-unit-editor/components/UnitPropertyEditor.js",
+      "types": "./dist/browser/ldap-unit-editor/components/UnitPropertyEditor.d.ts"
+    },
+    "./browser-ldap-unit-editor-components-unittree": {
+      "import": "./static/browser/ldap-unit-editor/components/UnitTree.js",
+      "types": "./dist/browser/ldap-unit-editor/components/UnitTree.d.ts"
+    },
+    "./browser-ldap-unit-editor-index": {
+      "import": "./static/browser/ldap-unit-editor/index.js",
+      "types": "./dist/browser/ldap-unit-editor/index.d.ts"
+    },
+    "./browser-ldap-unit-editor-types": {
+      "import": "./static/browser/ldap-unit-editor/types.js",
+      "types": "./dist/browser/ldap-unit-editor/types.d.ts"
+    },
+    "./browser-ldap-user-editor-ldapusereditor": {
+      "import": "./static/browser/ldap-user-editor/LdapUserEditor.js",
+      "types": "./dist/browser/ldap-user-editor/LdapUserEditor.d.ts"
+    },
+    "./browser-ldap-user-editor-api-userapiclient": {
+      "import": "./static/browser/ldap-user-editor/api/UserApiClient.js",
+      "types": "./dist/browser/ldap-user-editor/api/UserApiClient.d.ts"
+    },
+    "./browser-ldap-user-editor-cache-cachemanager": {
+      "import": "./static/browser/ldap-user-editor/cache/CacheManager.js",
+      "types": "./dist/browser/ldap-user-editor/cache/CacheManager.d.ts"
+    },
+    "./browser-ldap-user-editor-components-moveusermodal": {
+      "import": "./static/browser/ldap-user-editor/components/MoveUserModal.js",
+      "types": "./dist/browser/ldap-user-editor/components/MoveUserModal.d.ts"
+    },
+    "./browser-ldap-user-editor-components-pointerfield": {
+      "import": "./static/browser/ldap-user-editor/components/PointerField.js",
+      "types": "./dist/browser/ldap-user-editor/components/PointerField.d.ts"
+    },
+    "./browser-ldap-user-editor-components-usereditor": {
+      "import": "./static/browser/ldap-user-editor/components/UserEditor.js",
+      "types": "./dist/browser/ldap-user-editor/components/UserEditor.d.ts"
+    },
+    "./browser-ldap-user-editor-components-userlist": {
+      "import": "./static/browser/ldap-user-editor/components/UserList.js",
+      "types": "./dist/browser/ldap-user-editor/components/UserList.d.ts"
+    },
+    "./browser-ldap-user-editor-components-usertree": {
+      "import": "./static/browser/ldap-user-editor/components/UserTree.js",
+      "types": "./dist/browser/ldap-user-editor/components/UserTree.d.ts"
+    },
+    "./browser-ldap-user-editor-index": {
+      "import": "./static/browser/ldap-user-editor/index.js",
+      "types": "./dist/browser/ldap-user-editor/index.d.ts"
+    },
+    "./browser-ldap-user-editor-types": {
+      "import": "./static/browser/ldap-user-editor/types.js",
+      "types": "./dist/browser/ldap-user-editor/types.d.ts"
+    },
+    "./browser-shared-components-disposablecomponent": {
+      "import": "./static/browser/shared/components/DisposableComponent.js",
+      "types": "./dist/browser/shared/components/DisposableComponent.d.ts"
+    },
+    "./browser-shared-components-modal": {
+      "import": "./static/browser/shared/components/Modal.js",
+      "types": "./dist/browser/shared/components/Modal.d.ts"
+    },
+    "./browser-shared-components-statusmessage": {
+      "import": "./static/browser/shared/components/StatusMessage.js",
+      "types": "./dist/browser/shared/components/StatusMessage.d.ts"
+    },
+    "./browser-shared-index": {
+      "import": "./static/browser/shared/index.js",
+      "types": "./dist/browser/shared/index.d.ts"
+    },
+    "./browser-shared-types-index": {
+      "import": "./static/browser/shared/types/index.js",
+      "types": "./dist/browser/shared/types/index.d.ts"
+    },
+    "./browser-shared-utils-dom": {
+      "import": "./static/browser/shared/utils/dom.js",
+      "types": "./dist/browser/shared/utils/dom.d.ts"
+    },
+    "./browser-shared-utils-form": {
+      "import": "./static/browser/shared/utils/form.js",
+      "types": "./dist/browser/shared/utils/form.d.ts"
+    },
+    "./browser-shared-utils-hmac": {
+      "import": "./static/browser/shared/utils/hmac.js",
+      "types": "./dist/browser/shared/utils/hmac.d.ts"
+    },
+    "./browser-shared-utils-schema": {
+      "import": "./static/browser/shared/utils/schema.js",
+      "types": "./dist/browser/shared/utils/schema.d.ts"
+    },
+    "./browser-shared-utils-totp": {
+      "import": "./static/browser/shared/utils/totp.js",
+      "types": "./dist/browser/shared/utils/totp.d.ts"
+    },
+    "./browser-types-css.d": {
+      "import": "./static/browser/types/css.d.js",
+      "types": "./dist/browser/types/css.d.d.ts"
+    },
+    "./schema-ad-computers": {
+      "import": "./static/schemas/ad/computers.json",
+      "require": "./static/schemas/ad/computers.json"
+    },
+    "./schema-ad-groups": {
+      "import": "./static/schemas/ad/groups.json",
+      "require": "./static/schemas/ad/groups.json"
+    },
+    "./schema-ad-organizations": {
+      "import": "./static/schemas/ad/organizations.json",
+      "require": "./static/schemas/ad/organizations.json"
+    },
+    "./schema-ad-users": {
+      "import": "./static/schemas/ad/users.json",
+      "require": "./static/schemas/ad/users.json"
+    },
+    "./schema-example-groups": {
+      "import": "./static/schemas/example/groups.json",
+      "require": "./static/schemas/example/groups.json"
+    },
+    "./schema-example-nomenclature-domains": {
+      "import": "./static/schemas/example/nomenclature/domains.json",
+      "require": "./static/schemas/example/nomenclature/domains.json"
+    },
+    "./schema-example-organizations": {
+      "import": "./static/schemas/example/organizations.json",
+      "require": "./static/schemas/example/organizations.json"
+    },
+    "./schema-example-positions": {
+      "import": "./static/schemas/example/positions.json",
+      "require": "./static/schemas/example/positions.json"
+    },
+    "./schema-example-users": {
+      "import": "./static/schemas/example/users.json",
+      "require": "./static/schemas/example/users.json"
+    },
+    "./schema-obm-organizations": {
+      "import": "./static/schemas/obm/organizations.json",
+      "require": "./static/schemas/obm/organizations.json"
+    },
+    "./schema-obm-users": {
+      "import": "./static/schemas/obm/users.json",
+      "require": "./static/schemas/obm/users.json"
+    },
+    "./schema-scim-group": {
+      "import": "./static/schemas/scim/Group.json",
+      "require": "./static/schemas/scim/Group.json"
+    },
+    "./schema-scim-user": {
+      "import": "./static/schemas/scim/User.json",
+      "require": "./static/schemas/scim/User.json"
+    },
+    "./schema-scim-default-mapping": {
+      "import": "./static/schemas/scim/default-mapping.json",
+      "require": "./static/schemas/scim/default-mapping.json"
+    },
+    "./schema-standard-automountmaps": {
+      "import": "./static/schemas/standard/automountMaps.json",
+      "require": "./static/schemas/standard/automountMaps.json"
+    },
+    "./schema-standard-devices": {
+      "import": "./static/schemas/standard/devices.json",
+      "require": "./static/schemas/standard/devices.json"
+    },
+    "./schema-standard-dhcphosts": {
+      "import": "./static/schemas/standard/dhcpHosts.json",
+      "require": "./static/schemas/standard/dhcpHosts.json"
+    },
+    "./schema-standard-dnsrecords": {
+      "import": "./static/schemas/standard/dnsRecords.json",
+      "require": "./static/schemas/standard/dnsRecords.json"
+    },
+    "./schema-standard-groups": {
+      "import": "./static/schemas/standard/groups.json",
+      "require": "./static/schemas/standard/groups.json"
+    },
+    "./schema-standard-netgroups": {
+      "import": "./static/schemas/standard/netgroups.json",
+      "require": "./static/schemas/standard/netgroups.json"
+    },
+    "./schema-standard-organizations": {
+      "import": "./static/schemas/standard/organizations.json",
+      "require": "./static/schemas/standard/organizations.json"
+    },
+    "./schema-standard-posixaccounts": {
+      "import": "./static/schemas/standard/posixAccounts.json",
+      "require": "./static/schemas/standard/posixAccounts.json"
+    },
+    "./schema-standard-posixgroups": {
+      "import": "./static/schemas/standard/posixGroups.json",
+      "require": "./static/schemas/standard/posixGroups.json"
+    },
+    "./schema-standard-sshpublickeys": {
+      "import": "./static/schemas/standard/sshPublicKeys.json",
+      "require": "./static/schemas/standard/sshPublicKeys.json"
+    },
+    "./schema-standard-sudorules": {
+      "import": "./static/schemas/standard/sudoRules.json",
+      "require": "./static/schemas/standard/sudoRules.json"
+    },
+    "./schema-standard-users": {
+      "import": "./static/schemas/standard/users.json",
+      "require": "./static/schemas/standard/users.json"
+    },
+    "./schema-twake-devices": {
+      "import": "./static/schemas/twake/devices.json",
+      "require": "./static/schemas/twake/devices.json"
+    },
+    "./schema-twake-groups": {
+      "import": "./static/schemas/twake/groups.json",
+      "require": "./static/schemas/twake/groups.json"
+    },
+    "./schema-twake-nomenclature-twakeaccountstatus": {
+      "import": "./static/schemas/twake/nomenclature/twakeAccountStatus.json",
+      "require": "./static/schemas/twake/nomenclature/twakeAccountStatus.json"
+    },
+    "./schema-twake-nomenclature-twakedeliverymode": {
+      "import": "./static/schemas/twake/nomenclature/twakeDeliveryMode.json",
+      "require": "./static/schemas/twake/nomenclature/twakeDeliveryMode.json"
+    },
+    "./schema-twake-nomenclature-twakedomain": {
+      "import": "./static/schemas/twake/nomenclature/twakeDomain.json",
+      "require": "./static/schemas/twake/nomenclature/twakeDomain.json"
+    },
+    "./schema-twake-nomenclature-twakelisttype": {
+      "import": "./static/schemas/twake/nomenclature/twakeListType.json",
+      "require": "./static/schemas/twake/nomenclature/twakeListType.json"
+    },
+    "./schema-twake-nomenclature-twakemailboxtype": {
+      "import": "./static/schemas/twake/nomenclature/twakeMailboxType.json",
+      "require": "./static/schemas/twake/nomenclature/twakeMailboxType.json"
+    },
+    "./schema-twake-nomenclature-twaketitle": {
+      "import": "./static/schemas/twake/nomenclature/twakeTitle.json",
+      "require": "./static/schemas/twake/nomenclature/twakeTitle.json"
+    },
+    "./schema-twake-organizationgroups": {
+      "import": "./static/schemas/twake/organizationGroups.json",
+      "require": "./static/schemas/twake/organizationGroups.json"
+    },
+    "./schema-twake-organizations": {
+      "import": "./static/schemas/twake/organizations.json",
+      "require": "./static/schemas/twake/organizations.json"
+    },
+    "./schema-twake-positions": {
+      "import": "./static/schemas/twake/positions.json",
+      "require": "./static/schemas/twake/positions.json"
+    },
+    "./schema-twake-teammailboxes": {
+      "import": "./static/schemas/twake/teamMailboxes.json",
+      "require": "./static/schemas/twake/teamMailboxes.json"
+    },
+    "./schema-twake-users": {
+      "import": "./static/schemas/twake/users.json",
+      "require": "./static/schemas/twake/users.json"
+    }
+  },
+  "main": "dist/bin/index.js",
+  "types": "./dist/src/bin/index.d.ts",
+  "bin": {
+    "cleanup-external-users": "bin/cleanup-external-users.mjs",
+    "ldap-rest": "bin/index.mjs",
+    "sync-app-accounts": "bin/sync-app-accounts.mjs",
+    "sync-james": "bin/sync-james.mjs"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "static",
+    "docs",
+    "!docs/usage/options.snapshot.json",
+    "examples",
+    "LICENSE",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c --watch"
+  },
+  "dependencies": {
+    "@ldap-rest/auth-crowdsec": "3.0.0",
+    "@ldap-rest/auth-fake": "3.0.0",
+    "@ldap-rest/auth-hmac": "3.0.0",
+    "@ldap-rest/auth-llng": "3.0.0",
+    "@ldap-rest/auth-openidconnect": "3.0.0",
+    "@ldap-rest/auth-ratelimit": "3.0.0",
+    "@ldap-rest/auth-token": "3.0.0",
+    "@ldap-rest/auth-totp": "3.0.0",
+    "@ldap-rest/auth-trustedproxy": "3.0.0",
+    "@ldap-rest/authz-dynamic": "3.0.0",
+    "@ldap-rest/authz-linid1": "3.0.0",
+    "@ldap-rest/authz-perbranch": "3.0.0",
+    "@ldap-rest/authz-perroute": "3.0.0",
+    "@ldap-rest/authz-scope": "3.0.0",
+    "@ldap-rest/bcl": "3.0.0",
+    "@ldap-rest/browser": "3.0.0",
+    "@ldap-rest/config-api": "3.0.0",
+    "@ldap-rest/core": "3.0.0",
+    "@ldap-rest/james": "3.0.0",
+    "@ldap-rest/ldap-accountlifecycle": "3.0.0",
+    "@ldap-rest/ldap-bulkimport": "3.0.0",
+    "@ldap-rest/ldap-departmentsync": "3.0.0",
+    "@ldap-rest/ldap-enterpriserules": "3.0.0",
+    "@ldap-rest/ldap-externalusers": "3.0.0",
+    "@ldap-rest/ldap-flatgeneric": "3.0.0",
+    "@ldap-rest/ldap-groups": "3.0.0",
+    "@ldap-rest/ldap-onchange": "3.0.0",
+    "@ldap-rest/ldap-organizations": "3.0.0",
+    "@ldap-rest/ldap-passwordpolicy": "3.0.0",
+    "@ldap-rest/ldap-raw": "3.0.0",
+    "@ldap-rest/ldap-trash": "3.0.0",
+    "@ldap-rest/metrics": "3.0.0",
+    "@ldap-rest/rabbitmq": "3.0.0",
+    "@ldap-rest/schemas": "3.0.0",
+    "@ldap-rest/scim": "3.0.0",
+    "@ldap-rest/static": "3.0.0",
+    "@ldap-rest/storage": "3.0.0",
+    "@ldap-rest/twake-appaccounts": "3.0.0",
+    "@ldap-rest/twake-calendar": "3.0.0",
+    "@ldap-rest/twake-collaboration": "3.0.0",
+    "@ldap-rest/twake-drive": "3.0.0",
+    "@ldap-rest/twake-lifecycle": "3.0.0",
+    "@ldap-rest/twake-mail-migration": "3.0.0",
+    "@ldap-rest/twake-provisioning": "3.0.0",
+    "@ldap-rest/weblogs": "3.0.0",
+    "@sinclair/typebox": "^0.34.52",
+    "@types/express": "^5.0.3",
+    "body-parser": "^2.2.0",
+    "csv-parse": "^7.0.2",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "ldapts": "^9.2.0",
+    "lru-cache": "^11.2.2",
+    "multer": "^2.0.2",
+    "p-limit": "^7.1.1",
+    "prom-client": "^15.1.3",
+    "winston": "^3.17.0"
+  },
+  "optionalDependencies": {
+    "@linagora/rabbitmq-client": "^0.7.2",
+    "@types/pg": "^8.23.1",
+    "express-openid-connect": "^3.4.0",
+    "iovalkey": "^0.4.0",
+    "lemonldap-ng-handler": "^0.9.6",
+    "pg": "^8.23.0",
+    "re2": "^1.22.1"
+  },
+  "bundledDependencies": [
+    "@ldap-rest/auth-crowdsec",
+    "@ldap-rest/auth-fake",
+    "@ldap-rest/auth-hmac",
+    "@ldap-rest/auth-llng",
+    "@ldap-rest/auth-openidconnect",
+    "@ldap-rest/auth-ratelimit",
+    "@ldap-rest/auth-token",
+    "@ldap-rest/auth-totp",
+    "@ldap-rest/auth-trustedproxy",
+    "@ldap-rest/authz-dynamic",
+    "@ldap-rest/authz-linid1",
+    "@ldap-rest/authz-perbranch",
+    "@ldap-rest/authz-perroute",
+    "@ldap-rest/authz-scope",
+    "@ldap-rest/bcl",
+    "@ldap-rest/browser",
+    "@ldap-rest/config-api",
+    "@ldap-rest/core",
+    "@ldap-rest/james",
+    "@ldap-rest/ldap-accountlifecycle",
+    "@ldap-rest/ldap-bulkimport",
+    "@ldap-rest/ldap-departmentsync",
+    "@ldap-rest/ldap-enterpriserules",
+    "@ldap-rest/ldap-externalusers",
+    "@ldap-rest/ldap-flatgeneric",
+    "@ldap-rest/ldap-groups",
+    "@ldap-rest/ldap-onchange",
+    "@ldap-rest/ldap-organizations",
+    "@ldap-rest/ldap-passwordpolicy",
+    "@ldap-rest/ldap-raw",
+    "@ldap-rest/ldap-trash",
+    "@ldap-rest/metrics",
+    "@ldap-rest/rabbitmq",
+    "@ldap-rest/schemas",
+    "@ldap-rest/scim",
+    "@ldap-rest/static",
+    "@ldap-rest/storage",
+    "@ldap-rest/twake-appaccounts",
+    "@ldap-rest/twake-calendar",
+    "@ldap-rest/twake-collaboration",
+    "@ldap-rest/twake-drive",
+    "@ldap-rest/twake-lifecycle",
+    "@ldap-rest/twake-mail-migration",
+    "@ldap-rest/twake-provisioning",
+    "@ldap-rest/weblogs"
+  ],
+  "engines": {
+    "node": ">=22"
+  }
+}

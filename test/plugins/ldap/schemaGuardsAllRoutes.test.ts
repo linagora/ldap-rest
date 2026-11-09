@@ -137,10 +137,12 @@ describe('Schema guards on every route', function () {
       previousFlatSchema = process.env.DM_LDAP_FLAT_SCHEMA;
       previousOrgSchema = process.env.DM_ORGANIZATION_SCHEMA;
       previousGroupSchema = process.env.DM_GROUP_SCHEMA;
-      process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
+      process.env.DM_LDAP_FLAT_SCHEMA =
+        './packages/ldap-rest/static/schemas/twake/users.json';
       process.env.DM_ORGANIZATION_SCHEMA =
-        './static/schemas/twake/organizations.json';
-      process.env.DM_GROUP_SCHEMA = './static/schemas/twake/groups.json';
+        './packages/ldap-rest/static/schemas/twake/organizations.json';
+      process.env.DM_GROUP_SCHEMA =
+        './packages/ldap-rest/static/schemas/twake/groups.json';
       server = new DM();
       await server.ready;
 

@@ -3,17 +3,13 @@
 FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS builder
 
 WORKDIR /app-build
-COPY .dev.mk .
-COPY bin ./bin
 COPY package.json .
 COPY package-lock.json .
-COPY rollup.config.mjs .
 COPY tsconfig.json .
 COPY tsconfig.base.json .
 COPY packages ./packages
 COPY scripts ./scripts
-COPY src ./src
-RUN npm ci && npm run build:packages && node scripts/composeAssets.mjs && NODE_ENV=production node_modules/.bin/rollup -c && npm pack && mv *.tgz /tmp/app.tgz
+RUN npm ci && NODE_ENV=production npm run build:packages && node scripts/composeAssets.mjs && node scripts/pack-umbrella.mjs --destination /tmp && mv /tmp/ldap-rest-*.tgz /tmp/app.tgz
 
 WORKDIR /app
 RUN npm install --no-package-lock /tmp/app.tgz && rm -f /tmp/app.tgz && npm cache clean --force

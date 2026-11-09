@@ -3,9 +3,9 @@ import request from 'supertest';
 import { expect } from 'chai';
 import AuthToken from '@ldap-rest/auth-token';
 
-import { type Config } from '../../../src/bin';
+import { type Config } from '../../../packages/ldap-rest/src/bin';
 import { DM } from '../../helpers/dm';
-import HelloWorld from '../../../src/plugins/demo/helloworld';
+import HelloWorld from '../../../packages/ldap-rest/src/plugins/demo/helloworld';
 
 /**
  * Scoping authentication to a path prefix is what lets a single server host

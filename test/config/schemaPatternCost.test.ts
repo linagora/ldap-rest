@@ -16,7 +16,7 @@ import {
 } from '@ldap-rest/core/config/schema';
 import { EntityValidator } from '@ldap-rest/core/lib/entitySchema/validator';
 
-const schemaDir = join(__dirname, '../../static/schemas');
+const schemaDir = join(__dirname, '../../packages/schemas/static/schemas');
 
 /** Every schema file shipped, relative to `static/schemas` */
 const schemaFiles = (dir = schemaDir): string[] =>

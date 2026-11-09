@@ -159,8 +159,8 @@ export class OpenAPIGenerator {
   }
 
   /**
-   * Analyze all plugin files. Walks the demo plugin under `src/plugins/`
-   * and every workspace package's sources, abstract bases like LdapFlat
+   * Analyze all plugin files. Walks the demo plugin of the umbrella and
+   * every workspace package's sources, abstract bases like LdapFlat
    * included: they carry the generic per-resource CRUD routes inherited by
    * every flat plugin, which are documented too.
    */
@@ -174,17 +174,17 @@ export class OpenAPIGenerator {
       );
   }
 
-  /** `src/plugins`, the core's bases, then every plugin package's sources */
+  /** The umbrella's demo plugin, the core's bases, the packages' sources */
   private defaultDirs(): string[] {
     const packages = path.join(this.rootDir, 'packages');
     return [
-      path.join(this.rootDir, 'src', 'plugins'),
+      path.join(packages, 'ldap-rest', 'src', 'plugins'),
       // The core's plugins are its abstract bases; the rest is the server
       path.join(packages, 'core', 'src', 'abstract'),
       ...fs
         .readdirSync(packages)
         .sort()
-        .filter(name => name !== 'core')
+        .filter(name => name !== 'core' && name !== 'ldap-rest')
         .map(name => path.join(packages, name, 'src'))
         .filter(dir => fs.existsSync(dir)),
     ];

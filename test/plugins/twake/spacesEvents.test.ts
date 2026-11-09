@@ -197,7 +197,8 @@ const suite = (role: string) => (): void => {
       twake_lifecycle_deleted_attribute: 'employeeType',
       twake_lifecycle_deleted_value: 'deleted',
       group_class: ['top', 'groupOfNames'],
-      group_schema: 'static/schemas/twake/organizationGroups.json',
+      group_schema:
+        'packages/schemas/static/schemas/twake/organizationGroups.json',
       twake_space_base: `ou=spaces,ou={org},${ORGS}`,
       twake_space_class: ['top', 'groupOfNames'],
       twake_space_display_name_attribute: 'O',

@@ -1,8 +1,10 @@
 # Workspace packages
 
 The repository is an npm workspaces monorepo: each directory under
-`packages/` is a package (`@ldap-rest/core`, `@ldap-rest/storage`, …), and the
-root is the `ldap-rest` umbrella. The
+`packages/` is a package (`@ldap-rest/core`, `@ldap-rest/storage`, …), the
+umbrella included (`packages/ldap-rest`, published as `ldap-rest`). The root
+`package.json` is the private `ldap-rest-monorepo`: it holds the scripts, the
+development dependencies and the workspace list, and publishes nothing. The
 [modularization plan](modularization-plan.md) says which plugins move next.
 
 Nothing outside a package names it: the builds, the type-check, the tests, the
@@ -19,9 +21,17 @@ packages/<name>/
   src/                the sources
 ```
 
+`packages/ldap-rest` is the umbrella: its `package.json` also carries the CLI
+(`bin/`), the `files` it publishes and the packages it bundles, and its
+`rollup.config.mjs` is its own, not `packageConfig()`: it emits the `./hooks`,
+`./plugin`, `./abstract-*`, `./browser-*` and `./schema-*` entries beside the
+modules. Its sources sit in `packages/ldap-rest/src`, its served `static` tree
+in `packages/ldap-rest/static`.
+
 - **`package.json`**: `exports` is the package's API. Every entry carries a
   `development` condition (the source file), `types` (the declaration) and
-  `import` (the built module). Dependencies are declared as
+  `import` (the built module); the umbrella's generated entries have `types`
+  and `import` only. Dependencies are declared as
   `peerDependencies`, `@ldap-rest/core` included, so the umbrella installs
   one copy of each; a driver only some deployments need is an optional peer.
 - **`rollup.config.mjs`**: the shared configuration,
@@ -45,22 +55,30 @@ packages/<name>/
 1. Create the directory as above, and move the sources into `src/`.
 2. Run `npm install`: npm links the package under
    `node_modules/@ldap-rest/`.
-3. Add it to the umbrella's `package.json`, both in `dependencies` at its
+3. Add it to `packages/ldap-rest/package.json`, both in `dependencies` at its
    exact version and in `bundledDependencies`. Until phase 3 publishes the
    packages, the umbrella ships them in its own tarball.
 4. Run `npm run sync:packages`, which writes the package's TypeScript paths
    into `tsconfig.json` and `tsconfig.api.json` and its sources into the
    coverage roots of `.c8rc.json` (c8 takes directories there, not globs).
-5. Add the `core/…` names the package answers for to `src/pluginModules.json`.
-   The umbrella keeps no sub-path for a plugin: a deployment imports it from
-   the package.
+5. Add the `core/…` names the package answers for to
+   `packages/ldap-rest/src/pluginModules.json`. The umbrella keeps no sub-path
+   for a plugin: a deployment imports it from the package.
+
+`scripts/pack-umbrella.mjs` builds the published tarball: npm bundles only the
+dependencies found in the packed package's own `node_modules`, and a
+workspace's are links to `packages/`, so the script stages the umbrella with
+real copies of the packages it bundles before packing. The release and the
+image use it; `npm pack -w ldap-rest` would ship a tarball whose `@ldap-rest/*`
+imports resolve to nothing.
 
 `npm run check:packages`, part of `npm run check`, fails when step 3 or 4
 was forgotten, and when a package's sources import a module its
 `package.json` does not declare: a type import leaves every build here green
 and fails in a consumer's tree instead.
 
-`src/pluginModules.json` is the bridge between the two names a plugin has:
+`packages/ldap-rest/src/pluginModules.json` is the bridge between the two
+names a plugin has:
 it maps each `core/…` entry to the package — or the package's sub-path — that
 provides it. The loader resolves a `core/…` entry through it, and
 `DM.canonicalModule` reads it wherever a plugin is recognised rather than

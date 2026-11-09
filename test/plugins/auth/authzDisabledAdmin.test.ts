@@ -12,8 +12,8 @@ import AuthzScope from '@ldap-rest/authz-scope';
 import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 
 import { DM } from '../../helpers/dm';
-import type { AttributesList } from '../../../src/lib/ldapActions';
-import type { Role } from '../../../src/abstract/plugin';
+import type { AttributesList } from '../../../packages/ldap-rest/src/lib/ldapActions';
+import type { Role } from '../../../packages/ldap-rest/src/abstract/plugin';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 
@@ -67,7 +67,8 @@ describe('AuthzLinid1 and the account status', function () {
     userBranch = `ou=users,${base}`;
     org = `ou=StatusOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
     previousSchema = process.env.DM_LDAP_FLAT_SCHEMA;
-    process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
+    process.env.DM_LDAP_FLAT_SCHEMA =
+      './packages/ldap-rest/static/schemas/twake/users.json';
 
     server = new DM();
     await server.ready;

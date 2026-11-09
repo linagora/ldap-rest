@@ -33,9 +33,10 @@ describe('route declaration guard', () => {
   });
 
   it('leaves no raw route outside the allowlist', () => {
+    const umbrella = path.join(root, 'packages', 'ldap-rest', 'src');
     const raw = [
-      ...sources(path.join(root, 'src', 'plugins')),
-      ...sources(path.join(root, 'src', 'abstract')),
+      ...sources(path.join(umbrella, 'plugins')),
+      ...sources(path.join(umbrella, 'abstract')),
     ]
       .filter(declaresRawRoute)
       .map(file => path.relative(root, file).split(path.sep).join('/'))

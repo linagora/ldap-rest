@@ -15,7 +15,7 @@ import {
   shippedSchemasPath,
 } from '@ldap-rest/core/lib/schemaFile';
 
-import configArgs from '../../src/options.full';
+import configArgs from '../../packages/ldap-rest/src/options.full';
 
 type TestSchema = {
   entity?: Record<string, unknown>;

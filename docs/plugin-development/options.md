@@ -11,8 +11,12 @@ then reads typed values instead of casting `this.config`.
 ## Declaring options
 
 ```typescript
-// src/plugins/example/example.options.ts
-import { defineOptions, opt, type OptionsOf } from '../../config/options';
+// packages/example/src/example.options.ts
+import {
+  defineOptions,
+  opt,
+  type OptionsOf,
+} from '@ldap-rest/core/config/options';
 
 export const exampleOptions = defineOptions({
   example_url: opt.string({
@@ -135,7 +139,7 @@ cannot describe the wrong view.
 ## Wiring it in
 
 Name the declaration as the plugin class's `optionDefinitions`, as above.
-`composeOptions` in `src/options.ts` imports each plugin the `--plugin` entries
+`composeOptions` in `packages/ldap-rest/src/options.ts` imports each plugin the `--plugin` entries
 name and adds its declarations to the core options; there is no list to edit.
 `bin/index.mjs` passes the result to `DM`. A command that needs its feature's
 options without starting the server names its own plugin entries:

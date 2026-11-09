@@ -65,7 +65,10 @@ describe('Flat entity rename, roles rather than names', function () {
     // Copied from the shipped schema, so the member list keeps the exact
     // definition it has there — its role among the rest.
     const shipped = JSON.parse(
-      fs.readFileSync('./static/schemas/twake/groups.json', 'utf8')
+      fs.readFileSync(
+        './packages/ldap-rest/static/schemas/twake/groups.json',
+        'utf8'
+      )
     ) as Schema & { entity: Record<string, unknown> };
     const members = shipped.attributes.member;
     expect(members.role, 'the shipped schema still marks the members').to.equal(
@@ -101,7 +104,7 @@ describe('Flat entity rename, roles rather than names', function () {
     server = new DM();
     await server.ready;
     server.config.ldap_flat_schema = [
-      './static/schemas/twake/users.json',
+      './packages/ldap-rest/static/schemas/twake/users.json',
       schemaFile,
     ];
 

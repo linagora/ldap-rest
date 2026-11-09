@@ -1,4 +1,4 @@
-import Plugin from '../../../dist/abstract/plugin.js';
+import Plugin from '../../../packages/ldap-rest/dist/abstract/plugin.js';
 import {
   asyncHandler,
   AuthzRefusedError,
@@ -7,7 +7,7 @@ import {
   BadGatewayError,
   ServiceUnavailableError,
   GatewayTimeoutError,
-} from '../../../dist/bin/index.js';
+} from '../../../packages/ldap-rest/dist/bin/index.js';
 
 class ErrorTestPlugin extends Plugin {
   name = 'errortest';

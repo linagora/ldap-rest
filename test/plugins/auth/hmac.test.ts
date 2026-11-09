@@ -10,7 +10,7 @@ import AuthHmac from '@ldap-rest/auth-hmac';
 import { scimBodyParser } from '@ldap-rest/scim';
 
 import { DM } from '../../helpers/dm';
-import HelloWorld from '../../../src/plugins/demo/helloworld';
+import HelloWorld from '../../../packages/ldap-rest/src/plugins/demo/helloworld';
 
 /**
  * Helper function to generate HMAC signature for testing

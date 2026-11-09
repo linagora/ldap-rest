@@ -31,6 +31,8 @@ describe('LdapGroups validation', function () {
       '..',
       '..',
       '..',
+      'packages',
+      'ldap-rest',
       'static',
       'schemas',
       'twake',

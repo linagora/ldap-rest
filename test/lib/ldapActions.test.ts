@@ -9,7 +9,7 @@ import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
 import { NotFoundError } from '@ldap-rest/core/lib/errors';
 import type { ChainedHook } from '@ldap-rest/core/hooks';
 
-import configTemplate from '../../src/options.full';
+import configTemplate from '../../packages/ldap-rest/src/options.full';
 import { DM } from '../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 

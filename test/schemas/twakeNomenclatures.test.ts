@@ -19,7 +19,7 @@ interface NomenclatureSchema extends Schema {
 
 const nomenclatureDir = path.join(
   __dirname,
-  '../../static/schemas/twake/nomenclature'
+  '../../packages/schemas/static/schemas/twake/nomenclature'
 );
 
 const fixturePath = path.join(__dirname, '../fixtures/base-structure.ldif');

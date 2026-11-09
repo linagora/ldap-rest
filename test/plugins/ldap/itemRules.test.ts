@@ -29,7 +29,9 @@ describe('Element rules of an array attribute', function () {
     deptDn = `ou=ItemRulesOrg,${base}`;
     server = new DM();
     await server.ready;
-    server.config.ldap_flat_schema = ['./static/schemas/twake/users.json'];
+    server.config.ldap_flat_schema = [
+      './packages/ldap-rest/static/schemas/twake/users.json',
+    ];
     await server.ldap
       .add(deptDn, {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],

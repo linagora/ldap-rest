@@ -5,7 +5,7 @@ import AuthToken from '@ldap-rest/auth-token';
 import AuthzPerRoute, { globToRegex } from '@ldap-rest/authz-perroute';
 
 import { DM } from '../../helpers/dm';
-import HelloWorld from '../../../src/plugins/demo/helloworld';
+import HelloWorld from '../../../packages/ldap-rest/src/plugins/demo/helloworld';
 
 describe('AuthzPerRoute', () => {
   describe('Basic rule enforcement', () => {

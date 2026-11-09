@@ -113,7 +113,8 @@ describe('AuthzLinid1 by attachment', function () {
     previousFilter = process.env.DM_AUTHZ_FILTER_ATTACHED_ENTRIES;
     delete process.env.DM_AUTHZ_FILTER_ATTACHED_ENTRIES;
     previousSchema = process.env.DM_LDAP_FLAT_SCHEMA;
-    process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
+    process.env.DM_LDAP_FLAT_SCHEMA =
+      './packages/ldap-rest/static/schemas/twake/users.json';
     previousTransit = process.env.DM_AUTHZ_TRANSIT_BRANCH;
     process.env.DM_AUTHZ_TRANSIT_BRANCH = transit;
 

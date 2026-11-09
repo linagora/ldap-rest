@@ -14,7 +14,7 @@ describe('Error Handling', () => {
   before(async () => {
     process.env.NODE_ENV = 'test';
     process.env.DM_PORT = '64323';
-    process.env.DM_PLUGINS = '../../test/__plugins__/error-test/index.js';
+    process.env.DM_PLUGINS = '../../../../test/__plugins__/error-test/index.js';
     server = new DM();
     await server.ready;
     await server.run();

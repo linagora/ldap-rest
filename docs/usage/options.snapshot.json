@@ -604,7 +604,7 @@
   {
     "cli": "--group-schema",
     "type": "string",
-    "default": "<repo>/static/schemas/twake/groups.json",
+    "default": "<repo>/packages/ldap-rest/static/schemas/twake/groups.json",
     "env": "DM_GROUP_SCHEMA"
   },
   {
@@ -1113,7 +1113,7 @@
   {
     "cli": "--schemas-path",
     "type": "string",
-    "default": "<repo>/static/schemas",
+    "default": "<repo>/packages/ldap-rest/static/schemas",
     "env": "DM_SCHEMAS_PATH"
   },
   {
@@ -1305,7 +1305,7 @@
   {
     "cli": "--static-path",
     "type": "string",
-    "default": "<repo>/static",
+    "default": "<repo>/packages/ldap-rest/static",
     "env": "DM_STATIC_PATH"
   },
   {

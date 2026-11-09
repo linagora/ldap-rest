@@ -3,7 +3,7 @@
 #
 # A comment explains what is not obvious in the code beside it. Why a design
 # is what it is belongs in docs/architecture/adr/, once; the comment points
-# there. This check reads every comment under src/ and fails when one is new
+# there. This check reads every comment under a package's src/ and fails when one is new
 # compared with scripts/comment-baseline.txt: an issue number, "used to",
 # "since <version>" and the like.
 #
@@ -22,13 +22,13 @@ new=$(mktemp)
 stale=$(mktemp)
 trap 'rm -f "$current" "$texts" "$new" "$stale"' EXIT
 
-node - "$root/src" "$root"/packages/*/src <<'NODE' > "$current"
+node - "$root" "$root"/packages/*/src <<'NODE' > "$current"
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 
-const roots = process.argv.slice(2);
-const base = path.resolve(roots[0], '..');
+const base = process.argv[2];
+const roots = process.argv.slice(3);
 
 // "used to" is also the instrumental sense ("the attribute used to resolve
 // the DN"). It narrates history when it follows a subject, not a comma, a

@@ -37,7 +37,7 @@ describe('Twake team mailbox schema', () => {
     alice = `uid=tmalice-${timestamp},ou=users,${base}`;
     org = `ou=TM Org ${timestamp},ou=organization,${base}`;
     process.env.DM_LDAP_FLAT_SCHEMA =
-      './static/schemas/twake/teamMailboxes.json';
+      './packages/ldap-rest/static/schemas/twake/teamMailboxes.json';
     dm = new DM();
     dm.config.james_init_delay = 0;
     await dm.ready;
@@ -100,7 +100,10 @@ describe('Twake team mailbox schema', () => {
 
   it('gives every text a client shows in each shipped language', () => {
     const schema = JSON.parse(
-      fs.readFileSync('static/schemas/twake/teamMailboxes.json', 'utf-8')
+      fs.readFileSync(
+        'packages/schemas/static/schemas/twake/teamMailboxes.json',
+        'utf-8'
+      )
     ) as Record<string, unknown>;
     const texts: Record<string, string>[] = [];
     const walk = (node: unknown): void => {

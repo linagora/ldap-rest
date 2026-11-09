@@ -18,7 +18,10 @@ interface Attribute {
   default?: unknown;
 }
 
-const DIRS = ['./static/schemas/twake', './static/schemas/example'];
+const DIRS = [
+  './packages/ldap-rest/static/schemas/twake',
+  './packages/ldap-rest/static/schemas/example',
+];
 
 describe('Shipped pointers to reference data', () => {
   it('keep their target from being deleted while they name it', () => {

@@ -180,7 +180,7 @@ describe('Enterprise rules: what the checks actually cover', function () {
       childDn = `ou=MigratedChild,${topDn}`;
       previousOrgSchema = process.env.DM_ORGANIZATION_SCHEMA;
       process.env.DM_ORGANIZATION_SCHEMA =
-        './static/schemas/twake/organizations.json';
+        './packages/ldap-rest/static/schemas/twake/organizations.json';
       orgServer = new DM();
       await orgServer.ready;
       orgServer.config.ldap_top_organization = topDn;

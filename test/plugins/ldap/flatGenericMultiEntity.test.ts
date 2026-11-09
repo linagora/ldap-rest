@@ -33,8 +33,8 @@ describe('flatGeneric with several entities', function () {
     server = new DM();
     await server.ready;
     server.config.ldap_flat_schema = [
-      './static/schemas/twake/users.json',
-      './static/schemas/twake/positions.json',
+      './packages/ldap-rest/static/schemas/twake/users.json',
+      './packages/ldap-rest/static/schemas/twake/positions.json',
     ];
 
     await server.ldap
@@ -192,8 +192,8 @@ describe('flatGeneric with several entities', function () {
     it('should not silently give both instances the same identity', () => {
       const twin = new DM();
       twin.config.ldap_flat_schema = [
-        './static/schemas/standard/devices.json',
-        './static/schemas/twake/devices.json',
+        './packages/ldap-rest/static/schemas/standard/devices.json',
+        './packages/ldap-rest/static/schemas/twake/devices.json',
       ];
       const plugin = new LdapFlatGeneric(twin);
       const names = plugin.instances.map(i => i.name);
@@ -207,8 +207,8 @@ describe('flatGeneric with several entities', function () {
       const twin = new DM();
       await twin.ready;
       twin.config.ldap_flat_schema = [
-        './static/schemas/twake/users.json',
-        './static/schemas/standard/users.json',
+        './packages/ldap-rest/static/schemas/twake/users.json',
+        './packages/ldap-rest/static/schemas/standard/users.json',
       ];
       const plugin = new LdapFlatGeneric(twin);
       await twin.registerPlugin('ldapFlatGeneric', plugin);

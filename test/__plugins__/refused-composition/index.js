@@ -1,4 +1,4 @@
-import Plugin from '../../../dist/abstract/plugin.js';
+import Plugin from '../../../packages/ldap-rest/dist/abstract/plugin.js';
 
 /** A plugin whose startup check needs I/O, and fails */
 class RefusedComposition extends Plugin {

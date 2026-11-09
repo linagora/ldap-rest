@@ -68,7 +68,7 @@ describe('Flat list, limited', function () {
     server = new DM();
     await server.ready;
     server.config.ldap_flat_schema = [
-      './static/schemas/twake/nomenclature/twakeTitle.json',
+      './packages/ldap-rest/static/schemas/twake/nomenclature/twakeTitle.json',
     ];
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
     realSearch = server.ldap.search.bind(server.ldap);
@@ -358,7 +358,7 @@ describe('Flat list, bound as an account with a size limit', function () {
       const server = new DM();
       await server.ready;
       server.config.ldap_flat_schema = [
-        './static/schemas/twake/nomenclature/twakeTitle.json',
+        './packages/ldap-rest/static/schemas/twake/nomenclature/twakeTitle.json',
       ];
       await server.registerPlugin(
         'ldapFlatGeneric',

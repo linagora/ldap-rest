@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import AuthToken from '@ldap-rest/auth-token';
 
 import { DM } from '../../helpers/dm';
-import HelloWorld from '../../../src/plugins/demo/helloworld';
+import HelloWorld from '../../../packages/ldap-rest/src/plugins/demo/helloworld';
 
 describe('AuthToken', () => {
   describe('Unnamed tokens (legacy)', () => {
