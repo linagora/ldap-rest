@@ -356,9 +356,11 @@ jobs:
             *)   echo "NPM_TAG=latest" >> "$GITHUB_ENV" ;;
           esac
 
-      # The packages first: the umbrella tarball bundles them, and a
-      # deployment may install one of them on its own.
+      # A deployment may install a package on its own, so they are published
+      # beside the umbrella. Off until every package exists on the registry
+      # with its trusted publisher: see docs/development/packages.md.
       - name: Publish the packages to npm
+        if: vars.NPM_PUBLISH_PACKAGES == 'true'
         run: node scripts/publish-packages.mjs --tag "$NPM_TAG"
 
       - name: Publish the umbrella to npm

@@ -106,9 +106,17 @@ declarations.
 `scripts/publish-packages.mjs` publishes the packages in dependency order
 (`node scripts/publish-packages.mjs --tag latest`), skipping a version the
 registry already has; the umbrella follows from its own tarball, which bundles
-them. Every manifest carries the tag's version: the release workflow refuses a
-tag one of them does not match. Nothing is published by `npm run check` or the
-test workflow.
+them. Every manifest carries the tag's version, and every `@ldap-rest/*` pin
+equals the version of the package that names it: `npm run check` and the
+release refuse otherwise. Nothing is published by `npm run check` or the test
+workflow.
+
+The packages step of the release stays off until each package has been
+published once **by hand**, with a token: npm has no pending publisher, so a
+package that was never published cannot trust the workflow yet. Then configure
+that package's trusted publisher for this repository and the `release`
+workflow, and set the repository variable `NPM_PUBLISH_PACKAGES=true`. Until
+then the umbrella keeps publishing alone.
 
 ## How a package is resolved
 
