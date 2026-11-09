@@ -293,16 +293,32 @@ jobs:
       - name: Build package
         run: npm run build
 
-      - name: Verify tag matches package.json version
+      - name: Verify every package version matches the tag
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          PKG="$(node -p "require('./packages/ldap-rest/package.json').version")"
-          if [ "$TAG" != "$PKG" ]; then
-            echo "Tag v$TAG does not match the ldap-rest package version $PKG."
-            echo "Bump packages/ldap-rest/package.json before pushing the tag."
-            exit 1
-          fi
-          echo "Tag matches package.json version: $PKG"
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const tag = process.env.GITHUB_REF_NAME.replace(/^v/, "");
+            const dirs = fs
+              .readdirSync("packages", { withFileTypes: true })
+              .filter((entry) => entry.isDirectory())
+              .map((entry) => path.join("packages", entry.name))
+              .filter((dir) => fs.existsSync(path.join(dir, "package.json")));
+            const wrong = dirs
+              .map((dir) => ({
+                dir,
+                version: require("./" + dir + "/package.json").version,
+              }))
+              .filter((pkg) => pkg.version !== tag);
+            if (wrong.length) {
+              console.error(
+                "Packages not at " + tag + ":\n  " +
+                  wrong.map((pkg) => pkg.dir + " " + pkg.version).join("\n  ")
+              );
+              process.exit(1);
+            }
+            console.log("All " + dirs.length + " packages are at " + tag);
+          '
 
       - name: Verify package entry points exist
         run: |
@@ -332,14 +348,21 @@ jobs:
       - name: Pack tarball
         run: node scripts/pack-umbrella.mjs --destination .
 
-      - name: Publish to npm
+      # Keep prereleases (e.g. v1.2.3-rc.1) off the `latest` dist-tag.
+      - name: Pick the npm dist-tag
         run: |
-          # Keep prereleases (e.g. v1.2.3-rc.1) off the `latest` dist-tag.
           case "$GITHUB_REF_NAME" in
-            *-*) NPM_TAG=next ;;
-            *)   NPM_TAG=latest ;;
+            *-*) echo "NPM_TAG=next" >> "$GITHUB_ENV" ;;
+            *)   echo "NPM_TAG=latest" >> "$GITHUB_ENV" ;;
           esac
-          npm publish ./ldap-rest-*.tgz --access public --tag "$NPM_TAG"
+
+      # The packages first: the umbrella tarball bundles them, and a
+      # deployment may install one of them on its own.
+      - name: Publish the packages to npm
+        run: node scripts/publish-packages.mjs --tag "$NPM_TAG"
+
+      - name: Publish the umbrella to npm
+        run: npm publish ./ldap-rest-*.tgz --access public --tag "$NPM_TAG"
 
       - name: Upload release tarball
         uses: actions/upload-artifact@v7

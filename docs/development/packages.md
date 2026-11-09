@@ -101,6 +101,15 @@ spelling, and a plugin may depend on either.
 packages first; so do `check:api` and `snapshot:api`, which read the built
 declarations.
 
+## Publishing
+
+`scripts/publish-packages.mjs` publishes the packages in dependency order
+(`node scripts/publish-packages.mjs --tag latest`), skipping a version the
+registry already has; the umbrella follows from its own tarball, which bundles
+them. Every manifest carries the tag's version: the release workflow refuses a
+tag one of them does not match. Nothing is published by `npm run check` or the
+test workflow.
+
 ## How a package is resolved
 
 The type-check and the tests read the sources, not `dist/`: `tsconfig.json`
