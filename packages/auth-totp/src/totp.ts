@@ -12,7 +12,7 @@ import { unauthorized } from '@ldap-rest/core/lib/expressFormatedResponses';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 
-import { totpOptions } from './totp.options';
+import { totpOptions } from './totp.options.js';
 
 interface TotpUser {
   name: string;

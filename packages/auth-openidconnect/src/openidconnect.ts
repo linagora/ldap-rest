@@ -12,7 +12,7 @@ import {
 import type { Express, Request, RequestHandler, Response } from 'express';
 import type { ConfigParams } from 'express-openid-connect';
 
-import { openidconnectOptions } from './openidconnect.options';
+import { openidconnectOptions } from './openidconnect.options.js';
 
 /**
  * What this plugin uses of `express-openid-connect`, declared here rather

@@ -22,7 +22,7 @@ import { scimOptions, scimOptionsOf } from '@ldap-rest/core/lib/scim/options';
 import {
   twakeLifecycleOptions,
   twakeLifecycleOptionsOf,
-} from './twakeLifecycle.options';
+} from './twakeLifecycle.options.js';
 
 export type DeletedAtFormat = 'iso8601' | 'generalizedTime';
 

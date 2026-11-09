@@ -12,7 +12,7 @@ import {
   isAuthzRefusal,
   statusCodeOf,
   type Refusal,
-} from './errors';
+} from './errors.js';
 
 /**
  * The server's logger, once the `DM` constructor has installed it.

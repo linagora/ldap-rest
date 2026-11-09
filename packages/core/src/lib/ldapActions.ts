@@ -12,18 +12,18 @@ import type { SearchOptions, SearchResult } from 'ldapts';
 import type winston from 'winston';
 import pLimit from 'p-limit';
 
-import type { Config } from '../config/args';
-import type { DM } from '../bin';
-import type { Hooks } from '../hooks';
+import type { Config } from '../config/args.js';
+import type { DM } from '../bin/index.js';
+import type { Hooks } from '../hooks.js';
 
-import LdapPool from './ldap/pool';
-import SearchCache from './ldap/searchCache';
-import DirectorySchema from './ldap/schema';
-import CallerView from './ldap/callerView';
-import { createLdapState } from './ldap/state';
-import { BadRequestError } from './errors';
-import type { SchemaIndex } from './ldapSchema';
-import type { ChangeContext } from './changeContext';
+import LdapPool from './ldap/pool.js';
+import SearchCache from './ldap/searchCache.js';
+import DirectorySchema from './ldap/schema.js';
+import CallerView from './ldap/callerView.js';
+import { createLdapState } from './ldap/state.js';
+import { BadRequestError } from './errors.js';
+import type { SchemaIndex } from './ldapSchema.js';
+import type { ChangeContext } from './changeContext.js';
 import {
   add as addOperation,
   modify as modifyOperation,
@@ -32,19 +32,19 @@ import {
   remove as removeOperation,
   rename as renameOperation,
   type LdapHost,
-} from './ldap/operations';
+} from './ldap/operations.js';
 import {
   close as closeOperation,
   invalidateCache as invalidateCacheOperation,
   ping as pingOperation,
   poolStats as poolStatsOperation,
   systemView,
-} from './ldap/state';
+} from './ldap/state.js';
 import {
   authorize as authorizeOperation,
   search as searchOperation,
-} from './ldap/read';
-import type { AuthorizedHook } from './ldap/read';
+} from './ldap/read.js';
+import type { AuthorizedHook } from './ldap/read.js';
 
 // Typescript interface
 

@@ -4,8 +4,8 @@
  * families' options.
  * @author Xavier Guimard <xguimard@linagora.com>
  */
-import type { AttributesList } from '../lib/ldapActions';
-import type { ConfigTemplate } from '../lib/parseConfig';
+import type { AttributesList } from '../lib/ldapActions.js';
+import type { ConfigTemplate } from '../lib/parseConfig.js';
 
 export interface BranchPermissions {
   read?: boolean;

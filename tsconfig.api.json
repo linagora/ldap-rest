@@ -444,9 +444,6 @@
       ],
       "ldap-rest/browser-shared-utils-totp": [
         "./packages/ldap-rest/dist/browser/shared/utils/totp.d.ts"
-      ],
-      "ldap-rest/browser-types-css.d": [
-        "./packages/ldap-rest/dist/browser/types/css.d.d.ts"
       ]
     }
   },

@@ -32,7 +32,7 @@ import type { HealthStatus } from '@ldap-rest/core/lib/health';
 import { StorageService } from '@ldap-rest/core/lib/services/storage';
 import type Store from '@ldap-rest/core/lib/storage/store';
 
-import { storageOptions, type StorageOptions } from './storage.options';
+import { storageOptions, type StorageOptions } from './storage.options.js';
 
 /**
  * The one instance, if there is one.

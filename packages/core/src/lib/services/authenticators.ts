@@ -3,9 +3,9 @@
  *
  * @see docs/plugin-development/services.md
  */
-import type AuthBase from '../auth/base';
+import type AuthBase from '../auth/base.js';
 
-import { serviceToken } from './index';
+import { serviceToken } from './index.js';
 
 export interface AuthenticatorsInfo {
   /** The loaded authentication plugins, in registration order. */

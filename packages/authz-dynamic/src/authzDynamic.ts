@@ -42,8 +42,8 @@ import type { Hooks } from '@ldap-rest/core/hooks';
 import { ok, unauthorized } from '@ldap-rest/core/lib/expressFormatedResponses';
 import { getParentDn, isDnInBranch } from '@ldap-rest/core/lib/utils';
 
-import { dynamicOptions } from './authzDynamic.options';
-import { verifyLdapPassword } from './authzDynamicHash';
+import { dynamicOptions } from './authzDynamic.options.js';
+import { verifyLdapPassword } from './authzDynamicHash.js';
 
 export interface BranchAcl {
   dn: string;

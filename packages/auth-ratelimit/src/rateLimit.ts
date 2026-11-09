@@ -15,7 +15,7 @@
 import type { Express, Request, Response, NextFunction } from 'express';
 import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 
-import { rateLimitOptions } from './rateLimit.options';
+import { rateLimitOptions } from './rateLimit.options.js';
 
 interface RateLimitEntry {
   count: number;

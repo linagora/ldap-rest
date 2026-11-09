@@ -25,7 +25,7 @@ import {
 } from '@ldap-rest/core/lib/services/storage';
 import type Store from '@ldap-rest/core/lib/storage/store';
 
-import { bclOptions } from './bcl.options';
+import { bclOptions } from './bcl.options.js';
 
 /** One namespace, so nothing else in the store can answer for a logout. */
 const NAMESPACE = 'bcl';

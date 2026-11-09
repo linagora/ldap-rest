@@ -6,21 +6,21 @@ import type { Request } from 'express';
 import { Attribute, Change, Control } from 'ldapts';
 import type winston from 'winston';
 
-import type { Config } from '../../config/args';
-import type { DM } from '../../bin';
-import { escapeDnValue, rdnTypes } from '../utils';
-import { changeContext } from '../changeContext';
-import { outsideOperation, runOperation } from '../operation';
-import { currentRequest } from '../requestContext';
-import { timedLdap } from '../metrics';
-import { extractLdapCode } from '../ldapCodes';
-import { BadRequestError, NotFoundError } from '../errors';
+import type { Config } from '../../config/args.js';
+import type { DM } from '../../bin/index.js';
+import { escapeDnValue, rdnTypes } from '../utils.js';
+import { changeContext } from '../changeContext.js';
+import { outsideOperation, runOperation } from '../operation.js';
+import { currentRequest } from '../requestContext.js';
+import { timedLdap } from '../metrics.js';
+import { extractLdapCode } from '../ldapCodes.js';
+import { BadRequestError, NotFoundError } from '../errors.js';
 import type {
   AttributesList,
   AttributeValue,
   ModifyOptions,
   ModifyRequest,
-} from '../ldapActions';
+} from '../ldapActions.js';
 
 import {
   assertHasValue,
@@ -29,12 +29,12 @@ import {
   ldapModifyError,
   ldapRenameError,
   ldapWriteError,
-} from './errors';
-import type LdapPool from './pool';
-import { membersNamed } from './searchCache';
-import type SearchCache from './searchCache';
-import type DirectorySchema from './schema';
-import type CallerView from './callerView';
+} from './errors.js';
+import type LdapPool from './pool.js';
+import { membersNamed } from './searchCache.js';
+import type SearchCache from './searchCache.js';
+import type DirectorySchema from './schema.js';
+import type CallerView from './callerView.js';
 
 /**
  * The values of one attribute as `ldapts` takes them: a single value becomes

@@ -6,12 +6,12 @@
 import type { Request } from 'express';
 import pLimit from 'p-limit';
 
-import type { DM } from '../bin';
-import { PROBE_TIMEOUT_MS, type HealthStatus } from '../lib/health';
-import type { AttributesList, SearchResult } from '../lib/ldapActions';
-import { escapeLdapFilter } from '../lib/utils';
+import type { DM } from '../bin/index.js';
+import { PROBE_TIMEOUT_MS, type HealthStatus } from '../lib/health.js';
+import type { AttributesList, SearchResult } from '../lib/ldapActions.js';
+import { escapeLdapFilter } from '../lib/utils.js';
 
-import DmPlugin, { type Role } from './plugin';
+import DmPlugin, { type Role } from './plugin.js';
 
 /**
  * Refuse a segment no encoding can keep literal.

@@ -173,7 +173,7 @@ export default [
 
   // See docs/development/contracts.md
   {
-    files: ['packages/ldap-rest/src/**/*.{ts,tsx}'],
+    files: ['packages/*/src/**/*.{ts,tsx}'],
     plugins: { 'import-x': importX },
     rules: {
       'import-x/extensions': [

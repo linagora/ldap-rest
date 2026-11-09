@@ -8,10 +8,10 @@
 import fs from 'fs';
 import { dirname, isAbsolute, relative, resolve } from 'path';
 
-import type { Config } from '../bin';
+import type { Config } from '../bin/index.js';
 
-import type { ConfigTemplate } from './parseConfig';
-import { transformSchemas } from './utils';
+import type { ConfigTemplate } from './parseConfig.js';
+import { transformSchemas } from './utils.js';
 
 /** Directory of the schemas shipped with LDAP-Rest, whatever --schemas-path says */
 export let shippedSchemasPath = '';

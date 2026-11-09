@@ -507,7 +507,7 @@ export const ValidatePasswordBody = Type.Object({
 import {
   passwordPolicyOptions,
   type PasswordPolicyOptions,
-} from './passwordPolicy.options';
+} from './passwordPolicy.options.js';
 
 export default class PasswordPolicy extends DmPlugin {
   static optionDefinitions = passwordPolicyOptions;

@@ -5,9 +5,9 @@
  */
 import type { Request, Response } from 'express';
 
-import type { AttributesList } from '../ldapActions';
+import type { AttributesList } from '../ldapActions.js';
 
-import { serviceToken } from './index';
+import { serviceToken } from './index.js';
 
 /** A request's page, search and sort, as the list routes read them. */
 export interface Page {

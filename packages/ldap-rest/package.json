@@ -274,10 +274,6 @@
       "import": "./static/browser/shared/utils/totp.js",
       "types": "./dist/browser/shared/utils/totp.d.ts"
     },
-    "./browser-types-css.d": {
-      "import": "./static/browser/types/css.d.js",
-      "types": "./dist/browser/types/css.d.d.ts"
-    },
     "./schema-ad-computers": {
       "import": "./static/schemas/ad/computers.json",
       "require": "./static/schemas/ad/computers.json"

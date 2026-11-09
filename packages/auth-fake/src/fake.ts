@@ -10,7 +10,7 @@ import type { Response } from 'express';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 
-import { fakeOptions } from './fake.options';
+import { fakeOptions } from './fake.options.js';
 
 export default class AuthFake extends AuthBase {
   static optionDefinitions = fakeOptions;

@@ -10,14 +10,14 @@ import type {
   AttributesList,
   AttributeValue,
   LdapList,
-} from './lib/ldapActions';
-import type { ChangesToNotify } from './lib/changes';
-import type { ChangeContext } from './lib/changeContext';
-import type { BulkResponse, ScimGroup, ScimUser } from './lib/scim/types';
-import * as utils from './lib/utils';
+} from './lib/ldapActions.js';
+import type { ChangesToNotify } from './lib/changes.js';
+import type { ChangeContext } from './lib/changeContext.js';
+import type { BulkResponse, ScimGroup, ScimUser } from './lib/scim/types.js';
+import * as utils from './lib/utils.js';
 
-export type { ChangesToNotify } from './lib/changes';
-export * from './lib/scim/types';
+export type { ChangesToNotify } from './lib/changes.js';
+export * from './lib/scim/types.js';
 
 export type MaybePromise<T> = Promise<T> | T;
 export type ChainedHook<T> = (arg: T) => MaybePromise<T>;

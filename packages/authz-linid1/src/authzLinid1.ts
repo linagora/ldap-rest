@@ -101,7 +101,7 @@ function filterTouchesReduced(
   return testsReduced(node, names);
 }
 
-import { linid1Options } from './authzLinid1.options';
+import { linid1Options } from './authzLinid1.options.js';
 
 export default class AuthzLinid1 extends AuthzBase {
   static optionDefinitions = linid1Options;

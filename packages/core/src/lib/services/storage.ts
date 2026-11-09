@@ -3,9 +3,9 @@
  *
  * @see docs/plugin-development/services.md
  */
-import type Store from '../storage/store';
+import type Store from '../storage/store.js';
 
-import { serviceToken } from './index';
+import { serviceToken } from './index.js';
 
 export interface StorageApi {
   readonly store: Store;

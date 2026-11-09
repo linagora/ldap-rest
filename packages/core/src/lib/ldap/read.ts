@@ -5,23 +5,27 @@
 import type { Request } from 'express';
 import type { SearchOptions, SearchResult } from 'ldapts';
 
-import type { Hooks } from '../../hooks';
-import { hookOwner } from '../utils';
-import HookBus from '../hookBus';
-import { currentRequest } from '../requestContext';
+import type { Hooks } from '../../hooks.js';
+import { hookOwner } from '../utils.js';
+import HookBus from '../hookBus.js';
+import { currentRequest } from '../requestContext.js';
 import {
   ldapOperationDuration,
   ldapResult,
   ldapSearchCache,
   secondsSince,
   timedLdap,
-} from '../metrics';
-import type { AttributesList, ModifyRequest } from '../ldapActions';
+} from '../metrics.js';
+import type { AttributesList, ModifyRequest } from '../ldapActions.js';
 
-import { digestKey } from './searchCache';
-import { setDn } from './operations';
-import { dropSelectors, dropSelectorsPaged, ldapSearchError } from './errors';
-import type { LdapHost } from './operations';
+import { digestKey } from './searchCache.js';
+import { setDn } from './operations.js';
+import {
+  dropSelectors,
+  dropSelectorsPaged,
+  ldapSearchError,
+} from './errors.js';
+import type { LdapHost } from './operations.js';
 
 // search
 const defaultSearchOptions: SearchOptions = {

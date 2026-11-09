@@ -5,19 +5,23 @@
 import type { Express } from 'express';
 import type winston from 'winston';
 
-import type { Config, DM } from '../bin';
-import type { Hooks, MaybePromise } from '../hooks';
-import type HookBus from '../lib/hookBus';
-import type { HealthStatus } from '../lib/health';
+import type { Config, DM } from '../bin/index.js';
+import type { Hooks, MaybePromise } from '../hooks.js';
+import type HookBus from '../lib/hookBus.js';
+import type { HealthStatus } from '../lib/health.js';
 import {
   providedService,
   type ServiceProvider,
   type ServiceToken,
-} from '../lib/services';
-import { timedOutbound } from '../lib/metrics';
-import type { EntityDeclaration } from '../lib/entities';
-import { neverReturnAttributes, withoutAttributes } from '../config/schema';
-import { readOptions, type OptionsOf, type OptionSet } from '../config/options';
+} from '../lib/services/index.js';
+import { timedOutbound } from '../lib/metrics.js';
+import type { EntityDeclaration } from '../lib/entities/index.js';
+import { neverReturnAttributes, withoutAttributes } from '../config/schema.js';
+import {
+  readOptions,
+  type OptionsOf,
+  type OptionSet,
+} from '../config/options.js';
 
 /**
  * What the server's guards publish on the request: `trustedProxy` reads the
@@ -43,10 +47,10 @@ export {
   unescapeDnValue,
   escapeLdapFilter,
   validateDnValue,
-} from '../lib/utils';
-export { defineRoute, registeredRoutes } from '../lib/route';
-export { serviceToken } from '../lib/services';
-export type { ServiceProvider, ServiceToken } from '../lib/services';
+} from '../lib/utils.js';
+export { defineRoute, registeredRoutes } from '../lib/route.js';
+export { serviceToken } from '../lib/services/index.js';
+export type { ServiceProvider, ServiceToken } from '../lib/services/index.js';
 export {
   EntityRegistryService,
   type EntityDeclaration,
@@ -55,15 +59,15 @@ export {
   type EntityRegistry,
   type EntitySource,
   type FlatEntityApi,
-} from '../lib/entities';
+} from '../lib/entities/index.js';
 export {
   AuthenticatorsService,
   type AuthenticatorsInfo,
-} from '../lib/services/authenticators';
+} from '../lib/services/authenticators.js';
 export {
   PasswordPolicyService,
   type PasswordPolicyApi,
-} from '../lib/services/passwordPolicy';
+} from '../lib/services/passwordPolicy.js';
 export {
   RabbitMqService,
   type PublishOptions,
@@ -71,21 +75,24 @@ export {
   type RabbitMessageHandler,
   type RabbitMqApi,
   type SubscribeOptions,
-} from '../lib/services/rabbitmq';
-export { StorageService, type StorageApi } from '../lib/services/storage';
-export { PluginInfoService, type PluginInfo } from '../lib/services/plugins';
+} from '../lib/services/rabbitmq.js';
+export { StorageService, type StorageApi } from '../lib/services/storage.js';
+export { PluginInfoService, type PluginInfo } from '../lib/services/plugins.js';
 export {
   ReferenceRewriterService,
   type ReferenceRewriterApi,
-} from '../lib/services/referenceRewriter';
-export { ScimService, type ScimApi } from '../lib/services/scim';
-export { TombstoneService, type TombstoneApi } from '../lib/services/tombstone';
-export { TrashService, type TrashApi } from '../lib/services/trash';
+} from '../lib/services/referenceRewriter.js';
+export { ScimService, type ScimApi } from '../lib/services/scim.js';
+export {
+  TombstoneService,
+  type TombstoneApi,
+} from '../lib/services/tombstone.js';
+export { TrashService, type TrashApi } from '../lib/services/trash.js';
 export {
   TwakeGroupsService,
   type Page,
   type TwakeGroupsApi,
-} from '../lib/services/twakeGroups';
+} from '../lib/services/twakeGroups.js';
 export {
   HttpError,
   BadRequestError,
@@ -98,7 +105,7 @@ export {
   BadGatewayError,
   ServiceUnavailableError,
   GatewayTimeoutError,
-} from '../lib/errors';
+} from '../lib/errors.js';
 
 export type { HealthStatus };
 

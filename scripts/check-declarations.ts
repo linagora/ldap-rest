@@ -117,6 +117,9 @@ function linkRuntimeDependencies(modules: string): void {
       packages.set(name, where);
   }
   for (const [name, where] of packages) {
+    // The package under test is copied beside them, not linked into the
+    // repository: its own location would bring the devDependencies back.
+    if (name === 'ldap-rest') continue;
     const link = path.join(modules, name);
     mkdirSync(path.dirname(link), { recursive: true });
     symlinkSync(path.join(root, where), link, 'dir');
@@ -133,10 +136,20 @@ function main(): void {
     return;
   }
 
-  const extensionless = declarationFiles(dist).flatMap(file =>
-    specifiers(readFileSync(file, 'utf8'))
-      .filter(specifier => !/\.(js|json|css)$/.test(specifier))
-      .map(specifier => `${path.relative(root, file)}: ${specifier}`)
+  // Every package publishes declarations: one a consumer cannot resolve is a
+  // type it silently loses.
+  const packageDists = readdirSync(path.join(root, 'packages'), {
+    withFileTypes: true,
+  })
+    .filter(entry => entry.isDirectory())
+    .map(entry => path.join(root, 'packages', entry.name, 'dist'))
+    .filter(directory => existsSync(directory));
+  const extensionless = [dist, ...packageDists].flatMap(directory =>
+    declarationFiles(directory).flatMap(file =>
+      specifiers(readFileSync(file, 'utf8'))
+        .filter(specifier => !/\.(js|json|css)$/.test(specifier))
+        .map(specifier => `${path.relative(root, file)}: ${specifier}`)
+    )
   );
   if (extensionless.length > 0) {
     console.error('declaration specifiers a nodenext consumer cannot resolve:');
@@ -189,7 +202,8 @@ function main(): void {
       [path.join('node_modules', 'typescript', 'bin', 'tsc'), '-p', workDir],
       { cwd: root, stdio: 'inherit' }
     );
-  } catch {
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
     console.error(
       'the published declarations do not type-check under nodenext'
     );

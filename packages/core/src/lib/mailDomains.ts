@@ -6,8 +6,8 @@
  * each naming its domain in an attribute.
  * @group Libraries
  */
-import type { DM } from '../bin';
-import { roleAttribute } from '../config/schema';
+import type { DM } from '../bin/index.js';
+import { roleAttribute } from '../config/schema.js';
 
 import { getLogger } from './expressFormatedResponses.js';
 import { extractLdapCode } from './ldapCodes.js';

@@ -11,8 +11,8 @@
  */
 import fs from 'fs';
 
-import type { AttributesList, AttributeValue } from '../ldapActions';
-import { hasOnlyRfc4514Escapes, parseDirectoryDate } from '../utils';
+import type { AttributesList, AttributeValue } from '../ldapActions.js';
+import { hasOnlyRfc4514Escapes, parseDirectoryDate } from '../utils.js';
 
 import {
   type ScimUser,
@@ -22,8 +22,8 @@ import {
   type MultiValued,
   SCHEMA_USER,
   SCHEMA_GROUP,
-} from './types';
-import { kindOf, scimInvalidValue } from './errors';
+} from './types.js';
+import { kindOf, scimInvalidValue } from './errors.js';
 
 const OPERATIONAL_ATTRIBUTES = [
   'createTimestamp',

@@ -3,9 +3,9 @@
  */
 import type { SearchResult } from 'ldapts';
 
-import { getParentDn } from '../utils';
-import { BadRequestError, ConflictError, NotFoundError } from '../errors';
-import { extractLdapCode, isSchemaRefusal } from '../ldapCodes';
+import { getParentDn } from '../utils.js';
+import { BadRequestError, ConflictError, NotFoundError } from '../errors.js';
+import { extractLdapCode, isSchemaRefusal } from '../ldapCodes.js';
 
 // Code
 
