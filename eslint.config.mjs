@@ -11,6 +11,7 @@ import noLdapInternals from './eslint-rules/no-ldap-internals.mjs';
 import noLoadedPlugins from './eslint-rules/no-loaded-plugins.mjs';
 import noPluginFamilyImport from './eslint-rules/no-plugin-family-import.mjs';
 import noRawRoute from './eslint-rules/no-raw-route.mjs';
+import relativeImportExtension from './eslint-rules/relative-import-extension.mjs';
 
 export default [
   // Node.js config
@@ -103,8 +104,13 @@ export default [
           'no-loaded-plugins': noLoadedPlugins,
           'no-plugin-family-import': noPluginFamilyImport,
           'no-ldap-internals': noLdapInternals,
+          'relative-import-extension': relativeImportExtension,
         },
       },
+    },
+    rules: {
+      // See docs/development/contracts.md
+      'local/relative-import-extension': 'error',
     },
   },
 
@@ -168,19 +174,6 @@ export default [
       '@typescript-eslint/no-explicit-any': 'warn',
       'prefer-const': 'error',
       'no-var': 'error',
-    },
-  },
-
-  // See docs/development/contracts.md
-  {
-    files: ['packages/*/src/**/*.{ts,tsx}'],
-    plugins: { 'import-x': importX },
-    rules: {
-      'import-x/extensions': [
-        'error',
-        'ignorePackages',
-        { checkTypeImports: true },
-      ],
     },
   },
 
