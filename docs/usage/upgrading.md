@@ -24,6 +24,26 @@ const server = new DM(await composeOptions());
 The `ldap-rest` command does this already, so a deployment started from the
 command line needs no change.
 
+### The image loads no plugin by default
+
+**Who is affected:** deployments that start the published image without
+`DM_PLUGINS`.
+
+The image used to load `core/static` and `core/demo/helloworld`; it now
+starts with the core alone, so `/static` and `/hello` answer 404. Name the
+plugins the deployment needs:
+
+```shell
+docker run -p 8081:8081 \
+  -e DM_PLUGINS=core/static,core/auth/token \
+  -e DM_AUTH_TOKENS=tok:admins \
+  ghcr.io/linagora/ldap-rest:latest
+```
+
+A Helm deployment sets the same list in `env`. The image also declares the
+core options only now, so a `DM_*` variable for a plugin it does not load is
+reported as unread.
+
 ### Plugins come from their packages
 
 **Who is affected:** every deployment that installs `ldap-rest` and loads

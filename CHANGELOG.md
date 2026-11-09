@@ -53,14 +53,14 @@
   composes the `static/` tree it serves from them at build time, so the
   `ldap-rest/browser-*` and `ldap-rest/schema-*` entries and their URLs are
   unchanged.
+- The Docker image loads no plugin by default: name them in `DM_PLUGINS`
+  ([upgrading](docs/usage/upgrading.md#the-image-loads-no-plugin-by-default)).
 
 ### Fixed
 
 - `--plugin core/scim`, the short name the SCIM documentation gives, now loads
   the plugin. It named a module no release shipped, so the documented form
   failed at startup.
-- The default image loads no plugin and declares the core options only, so a
-  container no longer logs every plugin's `DM_*` variables as unread.
 
 ## v2.2.0 (2026-11-08)
 
