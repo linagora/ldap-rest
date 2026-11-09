@@ -9,10 +9,10 @@
  *
  * @see docs/plugin-development/services.md
  */
-import type DmPlugin from '../../abstract/plugin';
-import type { GeneratedAttributeFiller } from '../../config/schema';
+import type DmPlugin from '../../abstract/plugin.js';
+import type { GeneratedAttributeFiller } from '../../config/schema.js';
 
-import { serviceToken } from './index';
+import { serviceToken } from './index.js';
 
 export interface PluginInfo {
   /** Whether a plugin with this registry name is loaded. */

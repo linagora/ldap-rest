@@ -11,6 +11,7 @@ import noLdapInternals from './eslint-rules/no-ldap-internals.mjs';
 import noLoadedPlugins from './eslint-rules/no-loaded-plugins.mjs';
 import noPluginFamilyImport from './eslint-rules/no-plugin-family-import.mjs';
 import noRawRoute from './eslint-rules/no-raw-route.mjs';
+import relativeImportExtension from './eslint-rules/relative-import-extension.mjs';
 
 export default [
   // Node.js config
@@ -108,6 +109,20 @@ export default [
     },
   },
 
+  // See docs/development/contracts.md. Its own plugin key: the block above
+  // ignores the browser sources, and this one covers them too.
+  {
+    files: ['packages/*/src/**/*.{ts,tsx}'],
+    plugins: {
+      sources: {
+        rules: { 'relative-import-extension': relativeImportExtension },
+      },
+    },
+    rules: {
+      'sources/relative-import-extension': 'error',
+    },
+  },
+
   {
     files: ['packages/ldap-rest/src/plugins/**/*.ts', 'packages/*/src/**/*.ts'],
     ignores: [
@@ -168,19 +183,6 @@ export default [
       '@typescript-eslint/no-explicit-any': 'warn',
       'prefer-const': 'error',
       'no-var': 'error',
-    },
-  },
-
-  // See docs/development/contracts.md
-  {
-    files: ['packages/ldap-rest/src/**/*.{ts,tsx}'],
-    plugins: { 'import-x': importX },
-    rules: {
-      'import-x/extensions': [
-        'error',
-        'ignorePackages',
-        { checkTypeImports: true },
-      ],
     },
   },
 

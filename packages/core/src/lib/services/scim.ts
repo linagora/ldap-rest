@@ -3,7 +3,7 @@
  *
  * @see docs/plugin-development/services.md
  */
-import { serviceToken } from './index';
+import { serviceToken } from './index.js';
 
 export interface ScimApi {
   /** The attribute SCIM writes to lock an account, as configured. */

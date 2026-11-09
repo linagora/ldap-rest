@@ -166,7 +166,7 @@ interface BulkImportResult {
 import {
   bulkImportOptions,
   type BulkImportOptions,
-} from './bulkImport.options';
+} from './bulkImport.options.js';
 
 export default class LdapBulkImport extends DmPlugin {
   static optionDefinitions = bulkImportOptions;

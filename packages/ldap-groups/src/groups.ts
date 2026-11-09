@@ -193,7 +193,7 @@ export const GroupMoveBody = Type.Object({ targetOrgDn: Type.String() });
 
 export const GroupRenameBody = Type.Object({ newCn: Type.String() });
 
-import { groupsOptions, type GroupsOptions } from './groups.options';
+import { groupsOptions, type GroupsOptions } from './groups.options.js';
 
 export default class LdapGroups extends DmPlugin {
   static optionDefinitions: OptionSet = groupsOptions;

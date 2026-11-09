@@ -3,7 +3,7 @@
  *
  * @see docs/plugin-development/services.md
  */
-import { serviceToken } from './index';
+import { serviceToken } from './index.js';
 
 export interface TrashApi {
   /** The branch deleted entries are moved to. */

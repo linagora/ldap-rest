@@ -3,7 +3,7 @@
  *
  * @see docs/plugin-development/services.md
  */
-import { serviceToken } from './index';
+import { serviceToken } from './index.js';
 
 /** JSON-serialisable message payload. */
 export type RabbitMessage = Record<string, unknown>;

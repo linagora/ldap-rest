@@ -8,7 +8,7 @@
  */
 import type { Request } from 'express';
 
-import { serviceToken } from './index';
+import { serviceToken } from './index.js';
 
 export interface ReferenceRewriterApi {
   /** Every reference the directory holds to an entry, before it is renamed */

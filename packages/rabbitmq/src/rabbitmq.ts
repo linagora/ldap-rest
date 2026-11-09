@@ -29,7 +29,7 @@ import {
   type SubscribeOptions,
 } from '@ldap-rest/core/lib/services/rabbitmq';
 
-import { rabbitmqOptions } from './rabbitmq.options';
+import { rabbitmqOptions } from './rabbitmq.options.js';
 
 export type {
   PublishOptions,

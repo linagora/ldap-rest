@@ -10,7 +10,7 @@ import type { Express, Response } from 'express';
 import AuthBase, { DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 
-import { llngOptions } from './llng.options';
+import { llngOptions } from './llng.options.js';
 
 // The ambient declaration for `lemonldap-ng-handler` lives in
 // src/types/lemonldap-ng-handler.d.ts. Written here, in a module, it would be

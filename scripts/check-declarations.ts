@@ -35,6 +35,41 @@ const entries = Object.entries(
     .exports as Record<string, { types?: string }>
 ).filter(([, target]) => target.types);
 
+/**
+ * The entries of every package, which a deployment installs directly: the
+ * consumer imports each one, so a declaration that does not resolve fails
+ * here as it would in that deployment.
+ */
+function packageEntries(): string[] {
+  const specifiers: string[] = [];
+  for (const entry of readdirSync(path.join(root, 'packages'), {
+    withFileTypes: true,
+  })) {
+    if (!entry.isDirectory()) continue;
+    const manifestPath = path.join(
+      root,
+      'packages',
+      entry.name,
+      'package.json'
+    );
+    if (!existsSync(manifestPath)) continue;
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      name?: string;
+      exports?: Record<string, { types?: string }>;
+    };
+    if (!manifest.name || manifest.name === 'ldap-rest') continue;
+    for (const [subpath, target] of Object.entries(manifest.exports ?? {}))
+      // A wildcard entry names a family of modules, not one to import.
+      if (target.types && !subpath.includes('*'))
+        specifiers.push(
+          subpath === '.'
+            ? manifest.name
+            : `${manifest.name}/${subpath.slice(2)}`
+        );
+  }
+  return specifiers.sort();
+}
+
 const consumer = `import DmPlugin, { HttpError } from 'ldap-rest/plugin';
 import { escapeLdapFilter } from 'ldap-rest';
 import type { ScimUser } from 'ldap-rest/hooks';
@@ -43,6 +78,12 @@ ${entries
     const name = subpath === '.' ? 'ldap-rest' : `ldap-rest${subpath.slice(1)}`;
     return `import type * as entry${index} from '${name}';`;
   })
+  .join('\n')}
+${packageEntries()
+  .map(
+    (specifier, index) =>
+      `import type * as dependency${index} from '${specifier}';`
+  )
   .join('\n')}
 
 // A specifier nodenext cannot resolve turns the import into \`any\`: these
@@ -98,15 +139,27 @@ function declarationFiles(directory: string): string[] {
 }
 
 /**
- * Link the packages a consumer that installs only the runtime dependencies
+ * Stage the packages a consumer that installs only the runtime dependencies
  * gets, so a type the declarations need from a devDependency is missing here
  * too. Nested copies are flattened: type resolution needs one version.
+ *
+ * A workspace package is a link into the repository: copying what it
+ * publishes keeps its own location, and the devDependencies beside it, out
+ * of the consumer's resolution.
  */
-function linkRuntimeDependencies(modules: string): void {
+function stageRuntimeDependencies(modules: string): void {
   const lock = JSON.parse(
     readFileSync(path.join(root, 'package-lock.json'), 'utf8')
-  ) as { packages: Record<string, { dev?: boolean }> };
-  const packages = new Map<string, string>();
+  ) as {
+    packages: Record<
+      string,
+      { dev?: boolean; link?: boolean; resolved?: string }
+    >;
+  };
+  const packages = new Map<
+    string,
+    { where: string; link: boolean; resolved?: string }
+  >();
   for (const [where, meta] of Object.entries(lock.packages)) {
     if (!where.startsWith('node_modules/') || meta.dev) continue;
     if (!existsSync(path.join(root, where))) continue;
@@ -114,12 +167,31 @@ function linkRuntimeDependencies(modules: string): void {
       where.lastIndexOf('node_modules/') + 'node_modules/'.length
     );
     if (!packages.has(name) || where === `node_modules/${name}`)
-      packages.set(name, where);
+      packages.set(name, {
+        where,
+        link: Boolean(meta.link),
+        resolved: meta.resolved,
+      });
   }
-  for (const [name, where] of packages) {
-    const link = path.join(modules, name);
-    mkdirSync(path.dirname(link), { recursive: true });
-    symlinkSync(path.join(root, where), link, 'dir');
+  for (const [name, entry] of packages) {
+    const dest = path.join(modules, name);
+    // The umbrella is the package under test: main copies its dist beside
+    // the consumer, with the manifest it publishes.
+    if (name === 'ldap-rest') continue;
+    if (entry.link) {
+      const source = path.join(root, entry.resolved ?? '');
+      mkdirSync(dest, { recursive: true });
+      copyFileSync(
+        path.join(source, 'package.json'),
+        path.join(dest, 'package.json')
+      );
+      cpSync(path.join(source, 'dist'), path.join(dest, 'dist'), {
+        recursive: true,
+      });
+      continue;
+    }
+    mkdirSync(path.dirname(dest), { recursive: true });
+    symlinkSync(path.join(root, entry.where), dest, 'dir');
   }
 }
 
@@ -133,10 +205,20 @@ function main(): void {
     return;
   }
 
-  const extensionless = declarationFiles(dist).flatMap(file =>
-    specifiers(readFileSync(file, 'utf8'))
-      .filter(specifier => !/\.(js|json|css)$/.test(specifier))
-      .map(specifier => `${path.relative(root, file)}: ${specifier}`)
+  // Every package publishes declarations: one a consumer cannot resolve is a
+  // type it silently loses.
+  const packageDists = readdirSync(path.join(root, 'packages'), {
+    withFileTypes: true,
+  })
+    .filter(entry => entry.isDirectory())
+    .map(entry => path.join(root, 'packages', entry.name, 'dist'))
+    .filter(directory => existsSync(directory));
+  const extensionless = [dist, ...packageDists].flatMap(directory =>
+    declarationFiles(directory).flatMap(file =>
+      specifiers(readFileSync(file, 'utf8'))
+        .filter(specifier => !/\.(js|json|css)$/.test(specifier))
+        .map(specifier => `${path.relative(root, file)}: ${specifier}`)
+    )
   );
   if (extensionless.length > 0) {
     console.error('declaration specifiers a nodenext consumer cannot resolve:');
@@ -149,7 +231,7 @@ function main(): void {
   try {
     const modules = path.join(workDir, 'node_modules');
     mkdirSync(modules, { recursive: true });
-    linkRuntimeDependencies(modules);
+    stageRuntimeDependencies(modules);
     // Copy rather than link the package: its own location must not bring the
     // repository's devDependencies back into resolution.
     const packageDir = path.join(modules, 'ldap-rest');
@@ -189,7 +271,8 @@ function main(): void {
       [path.join('node_modules', 'typescript', 'bin', 'tsc'), '-p', workDir],
       { cwd: root, stdio: 'inherit' }
     );
-  } catch {
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
     console.error(
       'the published declarations do not type-check under nodenext'
     );

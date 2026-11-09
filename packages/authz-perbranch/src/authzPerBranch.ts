@@ -31,7 +31,7 @@ interface CachedGroups {
 
 type GroupRules = NonNullable<AuthConfig['groups']>[string];
 
-import { perBranchOptions } from './authzPerBranch.options';
+import { perBranchOptions } from './authzPerBranch.options.js';
 
 export default class AuthzPerBranch extends AuthzBase {
   static optionDefinitions = perBranchOptions;

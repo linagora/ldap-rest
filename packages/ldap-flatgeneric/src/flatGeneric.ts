@@ -17,7 +17,7 @@ import { staticSchemaUrl } from '@ldap-rest/core/lib/staticFiles';
 import type { LocalizedText, Schema } from '@ldap-rest/core/config/schema';
 import type { AttributesList } from '@ldap-rest/core/lib/ldapActions';
 
-import { flatGenericOptions } from './flatGeneric.options';
+import { flatGenericOptions } from './flatGeneric.options.js';
 
 interface EnrichedSchema extends Schema {
   entity: {

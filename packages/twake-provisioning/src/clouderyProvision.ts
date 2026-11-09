@@ -38,8 +38,8 @@ import { BaseResolver } from '@ldap-rest/core/lib/scim/baseResolver';
 import { scimOptions } from '@ldap-rest/core/lib/scim/options';
 import type { ScimUser } from '@ldap-rest/core/lib/scim/types';
 
-import { clouderyOptions, clouderyOptionsOf } from './cloudery.options';
-import { cozyOptions } from './cozy.options';
+import { clouderyOptions, clouderyOptionsOf } from './cloudery.options.js';
+import { cozyOptions } from './cozy.options.js';
 
 type ReqWithUser = Request & { user?: string };
 

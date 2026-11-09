@@ -10,9 +10,9 @@
  */
 import type { Request } from 'express';
 
-import type { Schema } from '../../config/schema';
-import type { ModifyRequest } from '../ldapActions';
-import { serviceToken } from '../services';
+import type { Schema } from '../../config/schema.js';
+import type { ModifyRequest } from '../ldapActions.js';
+import { serviceToken } from '../services/index.js';
 
 /** What kind of entity a descriptor describes. */
 export type EntityKind = 'flat' | 'groups' | 'organizations';

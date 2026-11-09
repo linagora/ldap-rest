@@ -3,7 +3,7 @@
  *
  * @see docs/plugin-development/services.md
  */
-import { serviceToken } from './index';
+import { serviceToken } from './index.js';
 
 export interface PasswordPolicyApi {
   /** The branch holding the password policies. */

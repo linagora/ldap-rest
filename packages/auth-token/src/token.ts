@@ -10,7 +10,7 @@ import { unauthorized } from '@ldap-rest/core/lib/expressFormatedResponses';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 
-import { tokenOptions } from './token.options';
+import { tokenOptions } from './token.options.js';
 
 export default class AuthToken extends AuthBase {
   static optionDefinitions = tokenOptions;

@@ -372,7 +372,7 @@ export function mailInDomains(
 import {
   enterpriseRulesOptions,
   type EnterpriseRulesOptions,
-} from './enterpriseRules.options';
+} from './enterpriseRules.options.js';
 
 export default class LdapEnterpriseRules extends DmPlugin {
   static optionDefinitions = enterpriseRulesOptions;

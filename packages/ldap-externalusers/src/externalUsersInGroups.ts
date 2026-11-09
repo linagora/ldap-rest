@@ -34,7 +34,7 @@ export const mailDomainOf = (mail: string): string => {
         .replace(/\.$/, '');
 };
 
-import { externalUsersOptions } from './externalUsersInGroups.options';
+import { externalUsersOptions } from './externalUsersInGroups.options.js';
 
 export default class ExternalUsersInGroups extends DmPlugin {
   static optionDefinitions = externalUsersOptions;

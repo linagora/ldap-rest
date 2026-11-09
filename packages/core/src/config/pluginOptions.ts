@@ -8,10 +8,10 @@
  */
 import { join, resolve } from 'path';
 
-import type { ConfigEntry } from '../lib/parseConfig';
-import { splitValue } from '../lib/parseConfig';
+import type { ConfigEntry } from '../lib/parseConfig.js';
+import { splitValue } from '../lib/parseConfig.js';
 
-import { toConfigEntries, type OptionSet } from './options';
+import { toConfigEntries, type OptionSet } from './options.js';
 
 /** A plugin class, or the module that exports it */
 interface PluginClass {

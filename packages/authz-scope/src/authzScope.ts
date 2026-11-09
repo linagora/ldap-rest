@@ -37,7 +37,7 @@ import {
 } from '@ldap-rest/core/lib/services/passwordPolicy';
 import { roleAttribute } from '@ldap-rest/core/config/schema';
 
-import { authzOptions } from './authzScope.options';
+import { authzOptions } from './authzScope.options.js';
 
 /** A group whose members the caller may manage through a delegation. */
 interface DelegatedGroup {

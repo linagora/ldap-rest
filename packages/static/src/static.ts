@@ -45,7 +45,7 @@ import {
   STATIC_FRAME_OPTIONS,
   staticOptions,
   type StaticOptions,
-} from './static.options';
+} from './static.options.js';
 
 /**
  * The path of a request as the configuration writes it: `schemaUrl` puts

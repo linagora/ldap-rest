@@ -3,9 +3,9 @@
  * Order: default < env < cli
  * @author Xavier Guimard <xguimard@linagora.com>
  */
-import type { Config } from '../config/args';
+import type { Config } from '../config/args.js';
 
-import type { AttributeValue } from './ldapActions';
+import type { AttributeValue } from './ldapActions.js';
 
 export type ConfigTemplate = ConfigEntry[];
 

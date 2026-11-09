@@ -20,7 +20,7 @@ import { BadRequestError } from '@ldap-rest/core/lib/errors';
 import { TrashService } from '@ldap-rest/core/lib/services/trash';
 import { isDnInBranch, normalizeDn, parseDn } from '@ldap-rest/core/lib/utils';
 
-import { trashOptions } from './trash.options';
+import { trashOptions } from './trash.options.js';
 
 class TrashPlugin extends DmPlugin {
   static optionDefinitions = trashOptions;

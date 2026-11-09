@@ -155,7 +155,7 @@ export const OrganizationSearchQuery = Type.Object({
 import {
   organizationOptions,
   type OrganizationOptions,
-} from './organizations.options';
+} from './organizations.options.js';
 
 export default class LdapOrganizations extends DmPlugin {
   static optionDefinitions = organizationOptions;

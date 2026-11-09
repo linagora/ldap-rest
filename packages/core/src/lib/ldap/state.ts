@@ -5,12 +5,12 @@
 import type { ClientOptions } from 'ldapts';
 import pLimit from 'p-limit';
 
-import type { DM } from '../../bin';
-import { outsideRequest } from '../requestContext';
+import type { DM } from '../../bin/index.js';
+import { outsideRequest } from '../requestContext.js';
 
-import type { LdapHost } from './operations';
-import LdapPool from './pool';
-import SearchCache from './searchCache';
+import type { LdapHost } from './operations.js';
+import LdapPool from './pool.js';
+import SearchCache from './searchCache.js';
 
 export const SYSTEM_OPERATIONS = new Set<string | symbol>([
   'search',

@@ -168,7 +168,7 @@ export const RawChildrenQuery = Type.Object({
   children: Type.Optional(Type.String()),
 });
 
-import { rawOptions } from './raw.options';
+import { rawOptions } from './raw.options.js';
 
 export default class LdapRaw extends DmPlugin {
   static optionDefinitions = rawOptions;

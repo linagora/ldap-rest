@@ -30,7 +30,7 @@ import { isIP } from 'node:net';
 import type { Express, Request, Response, NextFunction } from 'express';
 import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 
-import { trustedProxyOptions } from './trustedProxy.options';
+import { trustedProxyOptions } from './trustedProxy.options.js';
 
 interface ParsedCIDR {
   ip: bigint;

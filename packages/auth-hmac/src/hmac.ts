@@ -25,7 +25,7 @@ import { rawBodyOf } from '@ldap-rest/core/lib/rawBody';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import type { Role } from '@ldap-rest/core/abstract/plugin';
 
-import { hmacOptions } from './hmac.options';
+import { hmacOptions } from './hmac.options.js';
 
 interface HmacService {
   id: string;

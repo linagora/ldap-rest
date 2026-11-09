@@ -18,7 +18,7 @@ import {
 } from '@ldap-rest/core/lib/auth/base';
 import { authzFor, servesRequest } from '@ldap-rest/core/lib/authz/composition';
 
-import { perRouteOptions } from './authzPerRoute.options';
+import { perRouteOptions } from './authzPerRoute.options.js';
 
 // Whitelist of characters permitted in a glob pattern.
 // Covers all characters needed for typical REST paths: alphanumerics, slash,

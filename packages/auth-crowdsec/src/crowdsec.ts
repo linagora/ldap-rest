@@ -16,7 +16,7 @@
 import type { Express, Request, Response, NextFunction } from 'express';
 import DmPlugin, { Role } from '@ldap-rest/core/abstract/plugin';
 
-import { crowdsecOptions } from './crowdsec.options';
+import { crowdsecOptions } from './crowdsec.options.js';
 
 interface CrowdSecDecision {
   duration: string;

@@ -82,11 +82,13 @@ async function getSpecs() {
 }
 
 async function getBrowserLibraries() {
-  return (
-    await glob('../browser/src/**/*.ts', {
-      ignore: ['**/*.test.ts', '**/*.css', '**/*.d.ts'],
-    })
-  )
+  return (await glob('../browser/src/**/*.ts'))
+    .filter(
+      file =>
+        !file.endsWith('.d.ts') &&
+        !file.endsWith('.test.ts') &&
+        !file.endsWith('.css')
+    )
     .map(file => file.replace(/^\.\.\/browser\/src\//, '').replace(/\.ts$/, ''))
     .sort();
 }
