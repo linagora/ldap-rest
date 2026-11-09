@@ -107,8 +107,8 @@ declarations.
 (`node scripts/publish-packages.mjs --tag latest`), skipping a version the
 registry already has; the umbrella follows from its own tarball, which bundles
 them. Every manifest carries the tag's version, and every `@ldap-rest/*` pin
-equals the version of the package that names it: `npm run check` and the
-release refuse otherwise. Nothing is published by `npm run check` or the test
+equals the version of the package that names it: `npm run check` and CI
+refuse otherwise. Nothing is published by `npm run check` or the test
 workflow.
 
 The packages step of the release stays off until each package has been
