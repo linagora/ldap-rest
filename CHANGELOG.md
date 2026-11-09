@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v3.0.0 (2026-11-09)
 
 ### Added
 
@@ -18,6 +18,9 @@
   ones serve configuration, operational attributes, generated attributes or
   authorization
   ([details](docs/plugin-development/services.md#services-the-server-provides)).
+- A plugin can implement `prepare()` to load what its `api()` needs from a
+  package it imports on demand, before the routes are registered
+  ([details](docs/plugin-development/README.md#core-properties)).
 
 ### Breaking Changes
 
