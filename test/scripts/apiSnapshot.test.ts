@@ -159,26 +159,35 @@ describe('API reports', () => {
 
 describe('Package reports', () => {
   const coreConfig = '// @public\nexport interface Config {\n  a: string;\n}';
+  const referenced = '// @public\ninterface Config {\n  a: string;\n}';
   const own = '// @public\nexport interface Only {\n  b: string;\n}';
 
-  it('drops a block identical to one in a core report', () => {
+  it('drops a referenced block identical to one in a core report', () => {
     const stripped = stripCoreDeclarations(
-      report(coreConfig, own),
+      report(referenced, own),
       new Set([coreConfig])
     );
-    expect(stripped).to.not.contain('export interface Config');
+    expect(stripped).to.not.contain('interface Config');
     expect(stripped).to.contain('export interface Only');
     expect(stripped.startsWith('## API Report File')).to.equal(true);
     expect(stripped.trimEnd().endsWith('```')).to.equal(true);
   });
 
+  it('keeps a block the package exports, even with a core shape', () => {
+    const stripped = stripCoreDeclarations(
+      report(coreConfig),
+      new Set([coreConfig])
+    );
+    expect(stripped).to.contain('export interface Config');
+  });
+
   it('keeps a declaration sharing a core name with another shape', () => {
-    const different = '// @public\nexport interface Config {\n  b: string;\n}';
+    const different = '// @public\ninterface Config {\n  b: string;\n}';
     const stripped = stripCoreDeclarations(
       report(different),
       new Set([coreConfig])
     );
-    expect(stripped).to.contain('export interface Config');
+    expect(stripped).to.contain('interface Config');
     expect(stripped).to.contain('b: string');
   });
 });

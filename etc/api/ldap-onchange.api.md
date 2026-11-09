@@ -19,6 +19,12 @@ import type winston from 'winston';
 type AttributeHook = (typeof events)[keyof typeof events];
 
 // @public
+export type ChangesToNotify = Record<string, [
+AttributeValue | null,
+AttributeValue | null
+]>;
+
+// @public
 export function diffEntries(before: Entry | null, after: Entry | null): ChangesToNotify;
 
 // @public (undocumented)

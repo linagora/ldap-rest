@@ -114,6 +114,12 @@ export function loadPointerOptions(branch: string, apiLoader: (branch: string) =
 // @public
 export function loadSchema<T = unknown>(schemaSource: string | T): Promise<T>;
 
+// @public
+export type LocalizedText = string | Record<string, string>;
+
+// @public
+export function localizedText(text: LocalizedText | undefined, language?: string): string | undefined;
+
 // @public (undocumented)
 export class Modal extends DisposableComponent {
     constructor(options: ModalOptions);

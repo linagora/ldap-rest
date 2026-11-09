@@ -166,6 +166,22 @@ groupId: TString;
 // @public
 export function organizationIn(pattern: RegExp, dn: string): string | undefined;
 
+// @public
+export interface Page {
+    // (undocumented)
+    desc: boolean;
+    // (undocumented)
+    limit: number;
+    // (undocumented)
+    offset: number;
+    // (undocumented)
+    page: number;
+    // (undocumented)
+    search?: string;
+    // (undocumented)
+    sortBy?: string;
+}
+
 // @public (undocumented)
 export function parentOf(dn: string): string;
 

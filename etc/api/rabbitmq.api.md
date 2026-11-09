@@ -28,6 +28,20 @@ interface ClientLogger {
 }
 
 // @public
+export interface PublishOptions {
+    // (undocumented)
+    correlationId?: string;
+    // (undocumented)
+    expiration?: string;
+    // (undocumented)
+    headers?: Record<string, unknown>;
+    // (undocumented)
+    maxAttempts?: number;
+    // (undocumented)
+    messageId?: string;
+}
+
+// @public
 interface RabbitClient {
     // (undocumented)
     close(clearSubscriptions?: boolean): Promise<void>;
@@ -50,6 +64,12 @@ interface RabbitClientOptions {
     // (undocumented)
     url: string;
 }
+
+// @public
+export type RabbitMessage = Record<string, unknown>;
+
+// @public
+export type RabbitMessageHandler = (message: RabbitMessage) => Promise<void>;
 
 // @public (undocumented)
 class RabbitMq extends DmPlugin {
@@ -74,5 +94,11 @@ class RabbitMq extends DmPlugin {
     unsubscribe(queue: string): Promise<void>;
 }
 export default RabbitMq;
+
+// @public
+export interface SubscribeOptions {
+    // (undocumented)
+    queueArguments?: Record<string, unknown>;
+}
 
 ```

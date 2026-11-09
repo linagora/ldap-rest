@@ -40,9 +40,10 @@ export const API_ENTRIES: Record<
   string,
   { entryPoint: string; manifest: string }
 > = (() => {
-  const declarationRoot = path.posix.join(
-    path.relative(root, declarations).split(path.sep).join('/')
-  );
+  const declarationRoot = path
+    .relative(root, declarations)
+    .split(path.sep)
+    .join('/');
   const entries: Record<string, { entryPoint: string; manifest: string }> = {
     'ldap-rest': {
       entryPoint: `${declarationRoot}/packages/ldap-rest/src/bin/index.d.ts`,
@@ -74,16 +75,21 @@ export const API_ENTRIES: Record<
     if (!existsSync(manifestPath)) continue;
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
       name?: string;
-      exports?: Record<string, { types?: string }>;
+      exports?: Record<string, string | { types?: string }>;
     };
     if (!manifest.name || manifest.name === 'ldap-rest') continue;
     const short = manifest.name.replace(/^@ldap-rest\//, '');
     for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
+      if (typeof target === 'string') continue;
       if (!target.types || subpath.includes('*')) continue;
       const name =
         subpath === '.'
           ? short
           : `${short}-${subpath.slice(2).replace(/\//g, '-')}`;
+      if (entries[name])
+        throw new Error(
+          `api-snapshot: ${name} would name two reports: ${entries[name].entryPoint} and ${path.posix.join(dir, target.types)}`
+        );
       entries[name] = {
         entryPoint: path.posix.join(dir, target.types),
         manifest: `${dir}/package.json`,
@@ -187,8 +193,10 @@ export function stripCoreDeclarations(
   report: string,
   core: Set<string>
 ): string {
-  // The core reports re-export the declarations with `export`; a package
-  // report carries the same declaration without it.
+  // A declaration the package exports is its own API, even when a core report
+  // carries the same shape: only an unexported declaration is the one the
+  // core report already gates.
+  const exported = (block: string): boolean => /^export\s/m.test(block);
   const comparable = (block: string): string =>
     block.replace(/^export\s+/m, '');
   const coreBlocks = new Set([...core].map(comparable));
@@ -204,7 +212,8 @@ export function stripCoreDeclarations(
   const flush = (): void => {
     if (current.length === 0) return;
     const block = current.join('\n').trimEnd();
-    if (!coreBlocks.has(comparable(block))) out.push(...current);
+    if (exported(block) || !coreBlocks.has(comparable(block)))
+      out.push(...current);
     current = [];
   };
   for (const line of lines.slice(start, end === -1 ? undefined : end)) {
