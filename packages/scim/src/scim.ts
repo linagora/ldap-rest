@@ -7,8 +7,7 @@
  * Exposes /scim/v2/{Users,Groups,Bulk,ServiceProviderConfig,ResourceTypes,Schemas}.
  */
 import { existsSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, RequestHandler } from 'express';
@@ -23,7 +22,7 @@ import { setChangeSource } from '@ldap-rest/core/lib/changeContext';
 import { jsonBodyParser } from '@ldap-rest/core/lib/rawBody';
 import { ScimService } from '@ldap-rest/core/lib/services/scim';
 import { staticPlugins } from '@ldap-rest/core/lib/staticFiles';
-import { schemasPath } from '@ldap-rest/schemas';
+import { schemasPath, servedSchemasPath } from '@ldap-rest/schemas';
 import {
   type BulkRequest,
   type PatchRequest,
@@ -53,24 +52,14 @@ import {
   projectResource,
 } from './projection.js';
 
-/** Where this package's own manifest sits: the search stops past it */
-const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-
 /**
- * The path of a schema this package names: the copy the deployment serves
- * when it has one, so the static plugin recognises the file, the package's
- * own otherwise. Empty when neither ships it.
+ * The path of a schema this package names: the copy the deployment serves,
+ * so the static plugin recognises the file, the package's own otherwise.
+ * Empty when neither ships it.
  */
 const schemaPath = (...parts: string[]): string => {
-  let here = dirname(fileURLToPath(import.meta.url));
-  for (;;) {
-    const candidate = join(here, 'static', 'schemas', ...parts);
-    if (existsSync(candidate)) return candidate;
-    if (existsSync(join(here, 'package.json')) && here !== packageRoot) break;
-    const parent = dirname(here);
-    if (parent === here) break;
-    here = parent;
-  }
+  const served = servedSchemasPath();
+  if (served) return join(served, ...parts);
   const packaged = join(schemasPath, ...parts);
   return existsSync(packaged) ? packaged : '';
 };

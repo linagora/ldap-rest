@@ -5,7 +5,7 @@
  * `src/options.ts` and `src/options.full.ts` both start from here so the two
  * cannot drift. See `docs/development/modularization-plan.md`.
  */
-import { existsSync, readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -16,21 +16,17 @@ import type {
 } from '@ldap-rest/core/lib/parseConfig';
 import { setShippedSchemasPath } from '@ldap-rest/core/lib/schemaFile';
 import { setServerVersion } from '@ldap-rest/core/lib/version';
-import { schemasPath } from '@ldap-rest/schemas';
 
 export const here = dirname(fileURLToPath(import.meta.url));
 export const packageRoot = join(here, '..');
 
-/** The umbrella's copy of the schemas, which its static plugin serves */
-const servedSchemas = join(packageRoot, 'static', 'schemas');
-
 /**
- * The schemas the server reads: the copy composed from `@ldap-rest/schemas`
- * when the umbrella ships one, the package's own when it does not.
+ * The schemas the server reads: the umbrella's copy, composed from
+ * `@ldap-rest/schemas` at build time. The path is the one the tarball ships,
+ * not one the working tree happens to hold, so the Dockerfile generated from
+ * it stays the same before and after a build.
  */
-export const shippedSchemas = existsSync(servedSchemas)
-  ? servedSchemas
-  : schemasPath;
+export const shippedSchemas = join(packageRoot, 'static', 'schemas');
 
 setShippedSchemasPath(shippedSchemas);
 setServerVersion(
