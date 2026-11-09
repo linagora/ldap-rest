@@ -31,16 +31,18 @@ contract shows up as a diff instead of a surprise after the release:
 - `openapi.json` is the REST API document the published reference is built
   from. Regenerate it with `npm run generate:openapi`; `npm run check:openapi`
   fails when it is stale.
-- `etc/api/*.api.md` are the API Extractor reports, one file per entry of the
-  umbrella: `ldap-rest`, `./plugin`, `./hooks`, `./ldapactions` and
-  `./expressformatedresponses`. Regenerate them with `npm run snapshot:api`;
-  `npm run check:api`, part of `npm run check`, fails when one is stale. A
-  report lists what the entry exports and the shapes of the types those
-  exports reference, including the types the entry does not export itself, so
-  a change to `RouteDefinition` or `OptionSet` shows up even though a plugin
-  cannot name them. The `@ldap-rest/*` packages ship their own declarations:
-  their `exports` is their API, and the report of the umbrella does not cover
-  them.
+- `etc/api/*.api.md` are the API Extractor reports, one file per published
+  entry: the umbrella's five — `ldap-rest`, `./plugin`, `./hooks`,
+  `./ldapactions` and `./expressformatedresponses` — and each `types` entry of
+  every package. A wildcard entry names a family of modules and is not
+  reported. Regenerate them with `npm run snapshot:api`; `npm run check:api`,
+  part of `npm run check`, fails when one is stale. A report lists what the
+  entry exports and the shapes of the types those exports reference, including
+  the types the entry does not export itself, so a change to `RouteDefinition`
+  or `OptionSet` shows up even though a plugin cannot name them. A declaration
+  a package report shares verbatim with a core report is dropped from the
+  package report: the core report already gates it, and repeating it would
+  rewrite every package report on a core change.
 
 The snapshot records what the parser reads. A narrowed `choices` list, a
 raised `min` or a lowered `max` is checked when a plugin reads its options,

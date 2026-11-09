@@ -222,9 +222,9 @@ compatible.
 
 ### Phase 3 — Contracts and finalization
 
-1. [#595], part 2: one api-extractor report per remaining public sub-path,
-   and non-additive diffs refused by `contracts`. The `./plugin-*` reports
-   and their entries go away with the shims.
+1. (**done**) [#595], part 2: one api-extractor report per published entry,
+   the umbrella's and every package's, and non-additive diffs refused by
+   `contracts`.
 2. (**done**) [#549], part 2: the modularization decision record
    ([0009](../architecture/adr/0009-one-package-per-plugin.md)), the
    `require_code_owner_review` ruleset, and the comment baseline, which only
@@ -285,10 +285,8 @@ moved the umbrella into `packages/ldap-rest` (decision 8): every published
 artefact is a package, and `packages/ldap-rest/src/pluginModules.json` maps
 each `core/…` name to its package. What remains:
 
-1. Complete the contracts: a report per package export, or the decision that
-   each package's declarations are its API ([#595], part 2).
-2. Publish the scoped packages.
-3. Close [#397].
+1. Publish the scoped packages.
+2. Close [#397].
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397
 [#549]: https://github.com/linagora/ldap-rest/issues/549
