@@ -1,4 +1,5 @@
 {
+  "name": "@ldap-rest/weblogs",
   "version": "3.0.0",
   "homepage": "https://github.com/linagora/ldap-rest",
   "bugs": {
@@ -13,7 +14,6 @@
   "engines": {
     "node": ">=22"
   },
-  "name": "@ldap-rest/weblogs",
   "description": "LDAP-Rest access log plugin",
   "peerDependencies": {
     "@ldap-rest/core": "3.0.0",
