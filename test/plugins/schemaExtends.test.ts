@@ -16,10 +16,10 @@ import {
 import LdapBulkImport from '@ldap-rest/ldap-bulkimport';
 import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 import LdapGroups from '@ldap-rest/ldap-groups';
+import ConfigApi from '@ldap-rest/config-api';
+import Static from '@ldap-rest/static';
 
-import ConfigApi from '../../src/plugins/configApi';
 import { DM } from '../helpers/dm';
-import Static from '../../src/plugins/static';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 import { waitFor } from '../helpers/waitFor';
 

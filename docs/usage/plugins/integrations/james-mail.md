@@ -450,7 +450,7 @@ Public methods available on the James plugin instance. Useful for building GDPR 
 
 ```typescript
 import type { DM } from 'ldap-rest';
-import type James from 'ldap-rest/plugin-twake-james';
+import type James from '@ldap-rest/james';
 
 // Get the James plugin instance
 const james = server.getPlugin('james') as James;
@@ -776,7 +776,7 @@ Alternative authentication methods (Basic Auth, JWT) can be configured via rever
 --plugin core/ldap/onChange \
 --plugin core/ldap/flatGeneric \
 --plugin core/ldap/groups \
---plugin core/ldap/organization \
+--plugin core/ldap/organizations \
 --plugin twake/james \
 --plugin core/static \
 --ldap-flat-schema ./schemas/twake/users.json \

@@ -376,7 +376,7 @@ The LDAP tree viewer web interface uses the static plugin:
 
 ```bash
 --plugin core/static \
---plugin core/ldap/organization \
+--plugin core/ldap/organizations \
 --static-path ./static \
 --ldap-organization-max-subnodes 50
 ```

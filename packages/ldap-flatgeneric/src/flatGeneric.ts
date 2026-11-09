@@ -56,8 +56,7 @@ export const ldapPluginCollections = [
   { plugin: 'ldapGroups', modules: ['ldap/groups'], collection: 'groups' },
   {
     plugin: 'ldapOrganizations',
-    // `core/ldap/organization` is the deprecated shim: same class, same routes.
-    modules: ['ldap/organizations', 'ldap/organization'],
+    modules: ['ldap/organizations'],
     collection: 'organizations',
   },
   { plugin: 'ldapRaw', modules: ['ldap/raw'], collection: 'raw' },

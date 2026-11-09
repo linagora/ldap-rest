@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import OnChange from '@ldap-rest/ldap-onchange';
+import AppAccountsConsistency from '@ldap-rest/twake-appaccounts/consistency';
 
 import { DM } from '../../helpers/dm';
-import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsistency';
 import { waitForEntry, waitForNoEntry } from '../../helpers/waitFor';
 
 describe('App Accounts Consistency Plugin', function () {

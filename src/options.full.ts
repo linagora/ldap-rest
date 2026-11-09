@@ -9,52 +9,48 @@
 import { toConfigEntries } from '@ldap-rest/core/config/options';
 import type { ConfigTemplate } from '@ldap-rest/core/lib/parseConfig';
 import { scimOptions } from '@ldap-rest/core/lib/scim/options';
+import { appAccountsOptions } from '@ldap-rest/twake-appaccounts/options';
+import { authzOptions } from '@ldap-rest/authz-scope/options';
+import { bclOptions } from '@ldap-rest/bcl/options';
+import { bulkImportOptions } from '@ldap-rest/ldap-bulkimport/options';
+import { calendarOptions } from '@ldap-rest/twake-calendar/options';
+import { clouderyOptions } from '@ldap-rest/twake-provisioning/cloudery-options';
+import { cozyOptions } from '@ldap-rest/twake-provisioning/cozy-options';
+import { crowdsecOptions } from '@ldap-rest/auth-crowdsec/options';
+import { driveOptions } from '@ldap-rest/twake-drive/options';
+import { dynamicOptions } from '@ldap-rest/authz-dynamic/options';
+import { enterpriseRulesOptions } from '@ldap-rest/ldap-enterpriserules/options';
+import { externalUsersOptions } from '@ldap-rest/ldap-externalusers/options';
+import { fakeOptions } from '@ldap-rest/auth-fake/options';
+import { flatGenericOptions } from '@ldap-rest/ldap-flatgeneric/options';
+import { groupsOptions } from '@ldap-rest/ldap-groups/options';
+import { hmacOptions } from '@ldap-rest/auth-hmac/options';
+import { jamesOptions } from '@ldap-rest/james/options';
+import { linid1Options } from '@ldap-rest/authz-linid1/options';
+import { llngOptions } from '@ldap-rest/auth-llng/options';
+import { metricsOptions } from '@ldap-rest/metrics/options';
+import { migrationProxyOptions } from '@ldap-rest/twake-mail-migration/options';
+import { openidconnectOptions } from '@ldap-rest/auth-openidconnect/options';
+import { organizationOptions } from '@ldap-rest/ldap-organizations/options';
+import { passwordPolicyOptions } from '@ldap-rest/ldap-passwordpolicy/options';
+import { perBranchOptions } from '@ldap-rest/authz-perbranch/options';
+import { perRouteOptions } from '@ldap-rest/authz-perroute/options';
+import { rabbitmqOptions } from '@ldap-rest/rabbitmq/options';
+import { rateLimitOptions } from '@ldap-rest/auth-ratelimit/options';
+import { rawOptions } from '@ldap-rest/ldap-raw/options';
+import { staticOptions } from '@ldap-rest/static/options';
+import { storageOptions } from '@ldap-rest/storage/options';
+import { tokenOptions } from '@ldap-rest/auth-token/options';
+import { totpOptions } from '@ldap-rest/auth-totp/options';
+import { trashOptions } from '@ldap-rest/ldap-trash/options';
+import { trustedProxyOptions } from '@ldap-rest/auth-trustedproxy/options';
+import { twakeGroupsOptions } from '@ldap-rest/twake-collaboration/groups-options';
+import { twakeInstancesOptions } from '@ldap-rest/twake-provisioning/options';
+import { twakeLifecycleOptions } from '@ldap-rest/twake-lifecycle/options';
+import { twakeSpacesOptions } from '@ldap-rest/twake-collaboration/spaces-options';
+import { twakeTombstoneOptions } from '@ldap-rest/twake-lifecycle/tombstone-options';
 
 import { coreOptions, withoutCoreDuplicates } from './coreOptions.js';
-import { bclOptions } from './plugins/bcl.options';
-import { metricsOptions } from './plugins/metrics.options';
-import { rabbitmqOptions } from './plugins/rabbitmq.options';
-import { staticOptions } from './plugins/static.options';
-import { storageOptions } from './plugins/storage.options';
-import {
-  authzOptions,
-  crowdsecOptions,
-  dynamicOptions,
-  fakeOptions,
-  hmacOptions,
-  linid1Options,
-  llngOptions,
-  openidconnectOptions,
-  perBranchOptions,
-  perRouteOptions,
-  rateLimitOptions,
-  tokenOptions,
-  totpOptions,
-  trustedProxyOptions,
-} from './plugins/auth/auth.options';
-import {
-  bulkImportOptions,
-  enterpriseRulesOptions,
-  externalUsersOptions,
-  flatGenericOptions,
-  groupsOptions,
-  organizationOptions,
-  passwordPolicyOptions,
-  rawOptions,
-  trashOptions,
-} from './plugins/ldap/ldap.options';
-import { appAccountsOptions } from './plugins/twake/appAccounts.options';
-import { calendarOptions } from './plugins/twake/calendar.options';
-import { clouderyOptions } from './plugins/twake/cloudery.options';
-import { cozyOptions } from './plugins/twake/cozy.options';
-import { driveOptions } from './plugins/twake/drive.options';
-import { jamesOptions } from './plugins/twake/james.options';
-import { migrationProxyOptions } from './plugins/twake/migrationProxy.options';
-import { twakeGroupsOptions } from './plugins/twake/twakeGroups.options';
-import { twakeInstancesOptions } from './plugins/twake/twakeInstances.options';
-import { twakeLifecycleOptions } from './plugins/twake/twakeLifecycle.options';
-import { twakeSpacesOptions } from './plugins/twake/twakeSpaces.options';
-import { twakeTombstoneOptions } from './plugins/twake/twakeTombstone.options';
 
 const configArgs: ConfigTemplate = [
   ...coreOptions,

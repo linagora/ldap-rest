@@ -1,9 +1,9 @@
 import { expect } from 'chai';
+import Calendar from '@ldap-rest/twake-calendar';
+import James from '@ldap-rest/james';
+import MigrationProxy from '@ldap-rest/twake-mail-migration';
 
 import { DM } from '../../../src/bin';
-import Calendar from '../../../src/plugins/twake/calendar';
-import James from '../../../src/plugins/twake/james';
-import MigrationProxy from '../../../src/plugins/twake/migrationProxy';
 
 /**
  * Addresses come from the directory, and James and Calendar WebAdmin URLs are

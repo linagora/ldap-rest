@@ -22,8 +22,8 @@ import type { Hooks } from '@ldap-rest/core/hooks';
 import type { ChangeContext } from '@ldap-rest/core/lib/changeContext';
 import AuthzPerBranch from '@ldap-rest/authz-perbranch';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
+import Scim from '@ldap-rest/scim';
 
-import Scim from '../../../src/plugins/scim/scim';
 import { DM } from '../../helpers/dm';
 import { waitFor } from '../../helpers/waitFor';
 

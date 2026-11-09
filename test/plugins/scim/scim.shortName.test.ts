@@ -3,9 +3,8 @@
  * `core/scim/scim`. The short-name module must expose the same class.
  */
 import { expect } from 'chai';
-
-import Scim from '../../../src/plugins/scim/scim';
-import ScimShort from '../../../src/plugins/scim';
+import Scim from '@ldap-rest/scim';
+import ScimShort from '@ldap-rest/scim';
 
 describe('SCIM plugin short name', () => {
   it('should expose the plugin from the documented core/scim module', () => {

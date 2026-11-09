@@ -150,7 +150,7 @@ the registration rules.
   - `ldapgroupvalidatechanges` - Validate group changes
 - **Notes**: Central group management plugin
 
-#### `ldapOrganizations` (core/ldap/organization)
+#### `ldapOrganizations` (core/ldap/organizations)
 
 - **Dependencies**: None
 - **Provides Hooks**:
@@ -339,7 +339,7 @@ ldapGroups (core/ldap/groups)
   └─→ provides: ldapdeleterequest hook
       └─→ checks group membership before delete
 
-ldapOrganizations (core/ldap/organization)
+ldapOrganizations (core/ldap/organizations)
   └─→ provides: ldapdeleterequest hook
       └─→ prevents deleting non-empty organizations
 ```

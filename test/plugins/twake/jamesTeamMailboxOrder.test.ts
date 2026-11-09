@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import nock from 'nock';
+import James from '@ldap-rest/james';
 
 import { DM } from '../../helpers/dm';
-import James from '../../../src/plugins/twake/james';
 
 /**
  * TMail answers 404 to the addition of a member to a team mailbox that does

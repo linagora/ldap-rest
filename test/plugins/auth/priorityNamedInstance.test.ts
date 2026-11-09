@@ -22,7 +22,7 @@ import pluginPriority from '@ldap-rest/core/config/priority.json';
 import { DM } from '../../helpers/dm';
 
 const PROBE = '../../test/fixtures/plugins/xffProbe.js';
-const TRUSTED_PROXY = '../../dist/plugins/auth/trustedProxy.js';
+const TRUSTED_PROXY = '@ldap-rest/auth-trustedproxy';
 
 describe('Priority plugins configured with a name', function () {
   const saved: Record<string, string | undefined> = {};

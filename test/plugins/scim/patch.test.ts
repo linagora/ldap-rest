@@ -1,12 +1,11 @@
 import { expect } from 'chai';
 import { DEFAULT_USER_MAPPING } from '@ldap-rest/core/lib/scim/mapping';
 import { ScimError } from '@ldap-rest/core/lib/scim/errors';
-
 import {
   patchToModifyRequest,
   applyPatchToResource,
   writePatch,
-} from '../../../src/plugins/scim/patch';
+} from '@ldap-rest/scim/patch';
 
 describe('SCIM PATCH applicator', () => {
   // The entry the operations are played against. Empty unless a case needs

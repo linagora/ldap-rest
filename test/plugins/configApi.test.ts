@@ -7,10 +7,10 @@ import supertest from 'supertest';
 import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 import LdapGroups from '@ldap-rest/ldap-groups';
 import LdapOrganization from '@ldap-rest/ldap-organizations';
+import ConfigApi, { configApiResponse } from '@ldap-rest/config-api';
+import Static from '@ldap-rest/static';
 
-import ConfigApi, { configApiResponse } from '../../src/plugins/configApi';
 import { DM } from '../helpers/dm';
-import Static from '../../src/plugins/static';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 
 describe('ConfigApi Plugin', () => {

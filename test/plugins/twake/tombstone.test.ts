@@ -14,12 +14,12 @@ import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 import LdapGroups from '@ldap-rest/ldap-groups';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
 import TrashPlugin from '@ldap-rest/ldap-trash';
+import Scim from '@ldap-rest/scim';
+import TwakeLifecycleEvents from '@ldap-rest/twake-lifecycle';
+import TwakeInstances from '@ldap-rest/twake-provisioning';
+import TwakeTombstone from '@ldap-rest/twake-lifecycle/tombstone';
 
 import { DM } from '../../helpers/dm';
-import Scim from '../../../src/plugins/scim/scim';
-import TwakeLifecycleEvents from '../../../src/plugins/twake/lifecycleEvents';
-import TwakeInstances from '../../../src/plugins/twake/instances';
-import TwakeTombstone from '../../../src/plugins/twake/tombstone';
 import { waitFor } from '../../helpers/waitFor';
 
 const LDAP_BASE = process.env.DM_LDAP_BASE as string;

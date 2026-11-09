@@ -4,8 +4,9 @@ This guide explains how to create a plugin using the API and hooks.
 
 ## Getting Started
 
-- Core-plugins: create a new file in the `plugins` directory.
-- Other: create your file where you want
+- A plugin of this repository is a package under `packages/`, with its option
+  set, build and manifest; see [Workspace packages](../../docs/development/packages.md).
+- `plugins/demo/` holds the example plugin the documentation names.
 
 ## Plugin Structure
 

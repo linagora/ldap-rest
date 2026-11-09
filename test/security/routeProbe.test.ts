@@ -57,16 +57,16 @@ import LdapRaw from '@ldap-rest/ldap-raw';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
 import LdapEnterpriseRules from '@ldap-rest/ldap-enterpriserules';
 import ExternalUsersInGroups from '@ldap-rest/ldap-externalusers';
+import Scim from '@ldap-rest/scim';
+import TwakeGroups from '@ldap-rest/twake-collaboration';
+import TwakeSpaces from '@ldap-rest/twake-collaboration/spaces';
+import AppAccountsConsistency from '@ldap-rest/twake-appaccounts/consistency';
+import AppAccountsApi from '@ldap-rest/twake-appaccounts';
+import James from '@ldap-rest/james';
+import TwakeTombstone from '@ldap-rest/twake-lifecycle/tombstone';
+import TwakeInstances from '@ldap-rest/twake-provisioning';
 
-import Scim from '../../src/plugins/scim/scim';
-import TwakeGroups from '../../src/plugins/twake/groups';
-import TwakeSpaces from '../../src/plugins/twake/spaces';
-import AppAccountsConsistency from '../../src/plugins/twake/appAccountsConsistency';
-import AppAccountsApi from '../../src/plugins/twake/appAccountsApi';
-import James from '../../src/plugins/twake/james';
 import { DM } from '../helpers/dm';
-import TwakeTombstone from '../../src/plugins/twake/tombstone';
-import TwakeInstances from '../../src/plugins/twake/instances';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 
 /** Authentication reduced to a header */

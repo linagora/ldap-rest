@@ -9,8 +9,8 @@
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
+import Scim from '@ldap-rest/scim';
 
-import Scim from '../../../src/plugins/scim/scim';
 import { DM } from '../../helpers/dm';
 
 describe('SCIM cross-tenant isolation (integration)', function () {

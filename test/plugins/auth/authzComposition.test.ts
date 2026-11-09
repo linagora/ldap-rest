@@ -607,8 +607,8 @@ describe('Authorization plugins loaded together', function () {
   });
 
   describe('through the plugin loader', () => {
-    const DYNAMIC = '../../dist/plugins/auth/authzDynamic.js';
-    const PER_BRANCH = '../../dist/plugins/auth/authzPerBranch.js';
+    const DYNAMIC = '@ldap-rest/authz-dynamic';
+    const PER_BRANCH = '@ldap-rest/authz-perbranch';
     const env: Record<string, string | undefined> = {};
 
     before(() => {
@@ -663,7 +663,7 @@ describe('Authorization plugins loaded together', function () {
     });
 
     it('should not start authzPerRoute with nothing to authenticate for it', async () => {
-      process.env.DM_PLUGINS = '../../dist/plugins/auth/authzPerRoute.js';
+      process.env.DM_PLUGINS = '@ldap-rest/authz-perroute';
       const server = new DM();
       let refused: Error | undefined;
       await server.ready.catch((err: Error) => {
@@ -674,10 +674,7 @@ describe('Authorization plugins loaded together', function () {
     });
 
     it('should start an authorization plugin beside an authentication one', async () => {
-      process.env.DM_PLUGINS = [
-        '../../dist/plugins/auth/token.js',
-        PER_BRANCH,
-      ].join(';');
+      process.env.DM_PLUGINS = ['@ldap-rest/auth-token', PER_BRANCH].join(';');
       const server = new DM();
       await server.ready;
       expect(Object.keys(server.loadedPlugins)).to.include.members([
@@ -687,7 +684,7 @@ describe('Authorization plugins loaded together', function () {
     });
 
     it('should start authentication alone, every caller holding every right', async () => {
-      process.env.DM_PLUGINS = '../../dist/plugins/auth/token.js';
+      process.env.DM_PLUGINS = '@ldap-rest/auth-token';
       const server = new DM();
       await server.ready;
       expect(Object.keys(server.loadedPlugins)).to.include('authToken');
@@ -703,7 +700,7 @@ describe('Authorization plugins loaded together', function () {
     it('should start once the branch plugin is scoped away from the tokens', async () => {
       process.env.DM_PLUGINS = [
         DYNAMIC,
-        '../../dist/plugins/auth/token.js:authOther:{"auth_path_prefix":"/api/other"}',
+        '@ldap-rest/auth-token:authOther:{"auth_path_prefix":"/api/other"}',
         `${PER_BRANCH}:authzPerBranch:{"authz_for":["authOther"]}`,
       ].join(';');
       const server = new DM();

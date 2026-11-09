@@ -29,8 +29,8 @@ describe('Authentication path scope through the plugin loader', () => {
     // `;` separates plugins, since the override JSON contains commas
     process.env.DM_PLUGINS = [
       '../../dist/plugins/demo/helloworld.js:helloAdmin:{"api_prefix":"/api/admin"}',
-      '../../dist/plugins/auth/token.js:authAdmins:{"auth_path_prefix":"/api/admin","auth_token":["admtok:admins"]}',
-      '../../dist/plugins/auth/token.js:authRest:{"auth_token":["resttok:rest"]}',
+      '@ldap-rest/auth-token:authAdmins:{"auth_path_prefix":"/api/admin","auth_token":["admtok:admins"]}',
+      '@ldap-rest/auth-token:authRest:{"auth_token":["resttok:rest"]}',
     ].join(';');
 
     dm = new DM();

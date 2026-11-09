@@ -19,6 +19,17 @@
   authorization
   ([details](docs/plugin-development/services.md#services-the-server-provides)).
 
+### Breaking Changes
+
+- The `ldap-rest/plugin-*` sub-paths are removed; a deployment installs the
+  `@ldap-rest/*` package of each plugin it loads, and imports the plugin from
+  that package
+  ([upgrading](docs/usage/upgrading.md#plugins-come-from-their-packages)).
+- The deprecated `core/ldap/organization` and `core/twake/calendarResources`
+  names no longer load a plugin; name `core/ldap/organizations` and
+  `core/twake/calendar`
+  ([upgrading](docs/usage/upgrading.md#plugins-come-from-their-packages)).
+
 ### Changed
 
 - The server reads the options of the plugins its `--plugin` entries name
@@ -27,21 +38,14 @@
   or calls `composeOptions` from `ldap-rest/options`
   ([details](docs/plugin-development/options.md#wiring-it-in)).
 - The SCIM types, the `SCHEMA_*` constants and `ChangesToNotify` are exported
-  from `ldap-rest/hooks`; the former `./plugin-scim-types` and
-  `./plugin-ldap-onchange` entries are deprecated and will be removed in
-  4.0.0.
-- The SCIM plugin ships as the `@ldap-rest/scim` package; the
-  `ldap-rest/plugin-scim-*` entries stay as compatibility shims.
-- The Twake plugins ship as the `@ldap-rest/james`, `@ldap-rest/twake-drive`,
-  `@ldap-rest/twake-calendar`, `@ldap-rest/twake-appaccounts`,
-  `@ldap-rest/twake-mail-migration`, `@ldap-rest/twake-lifecycle`,
-  `@ldap-rest/twake-provisioning` and `@ldap-rest/twake-collaboration`
-  packages; the `ldap-rest/plugin-twake-*` entries and the `core/twake/…`
-  names stay as compatibility shims.
-- The standalone plugins ship as the `@ldap-rest/bcl`,
+  from `ldap-rest/hooks`; `./plugin-scim-types` and `./plugin-ldap-onchange`
+  are removed.
+- Each plugin ships as its own package: `@ldap-rest/auth-*`,
+  `@ldap-rest/authz-*`, `@ldap-rest/ldap-*`, `@ldap-rest/scim`,
+  `@ldap-rest/twake-*`, `@ldap-rest/james`, `@ldap-rest/bcl`,
   `@ldap-rest/config-api`, `@ldap-rest/metrics`, `@ldap-rest/rabbitmq`,
-  `@ldap-rest/static` and `@ldap-rest/weblogs` packages; the former
-  `ldap-rest/plugin-*` entries stay as compatibility shims.
+  `@ldap-rest/static` and `@ldap-rest/weblogs`. The `core/…` names still
+  select a plugin at startup, now from the installed package.
 - The browser libraries and the JSON schemas ship as the
   `@ldap-rest/browser` and `@ldap-rest/schemas` packages. The umbrella
   composes the `static/` tree it serves from them at build time, so the
@@ -52,7 +56,7 @@
 
 - `--plugin core/scim`, the short name the SCIM documentation gives, now loads
   the plugin. It named a module no release shipped, so the documented form
-  failed at startup; `ldap-rest/plugin-scim` names the same module.
+  failed at startup.
 
 ## v2.2.0 (2026-11-08)
 

@@ -10,10 +10,10 @@ import { join } from 'path';
 import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Config } from '@ldap-rest/core/config/args';
+import Scim from '@ldap-rest/scim';
+import Static from '@ldap-rest/static';
 
 import { DM } from '../../helpers/dm';
-import Scim from '../../../src/plugins/scim/scim';
-import Static from '../../../src/plugins/static';
 
 const shipped = join(__dirname, '..', '..', '..', 'static', 'schemas');
 const files = ['User.json', 'Group.json', 'default-mapping.json'];

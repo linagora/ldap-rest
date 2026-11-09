@@ -32,19 +32,6 @@ import DmPlugin, { type Role } from '@ldap-rest/core/abstract/plugin';
 
 import { trustedProxyOptions } from './trustedProxy.options';
 
-// Extend Express Request to include trusted proxy info
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace Express {
-    interface Request {
-      trustedProxy?: boolean;
-      proxyAuthUser?: string;
-      /** The client address, read through the trusted proxy chain. */
-      clientIp?: string;
-    }
-  }
-}
-
 interface ParsedCIDR {
   ip: bigint;
   mask: bigint;

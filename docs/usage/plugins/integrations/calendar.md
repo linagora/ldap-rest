@@ -5,7 +5,7 @@ Plugin to keep Twake Calendar in sync with LDAP via its WebAdmin API:
 - resources (meeting rooms, equipment, etc.) stored in an LDAP branch
 - registered users, whose email, first name and last name follow LDAP
 
-> Formerly `core/twake/calendarResources`. That name still loads the plugin,
+> Formerly `core/twake/calendarResources`. That name was removed in 3.0.0,
 > registered as `calendarResources`, but logs a deprecation warning and will
 > be removed in a future major release.
 
@@ -212,7 +212,7 @@ Public methods available on the Calendar plugin instance.
 
 ```typescript
 import type { DM } from 'ldap-rest';
-import type Calendar from 'ldap-rest/plugin-twake-calendar';
+import type Calendar from '@ldap-rest/twake-calendar';
 
 // Get the plugin instance from another plugin
 // (declare `dependencies = { calendar: 'core/twake/calendar' }` so it loads first)

@@ -10,16 +10,14 @@ import { readOptions } from '@ldap-rest/core/config/options';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 import { ScimService } from '@ldap-rest/core/lib/services/scim';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
-
-import { DM } from '../../helpers/dm';
-import Scim from '../../../src/plugins/scim/scim';
-import TwakeLifecycleEvents, {
-  parseRules,
-} from '../../../src/plugins/twake/lifecycleEvents';
+import Scim from '@ldap-rest/scim';
+import TwakeLifecycleEvents, { parseRules } from '@ldap-rest/twake-lifecycle';
 import {
   lifecycleAttributes,
   parseDeletedAt,
-} from '../../../src/plugins/twake/lifecycleAttributes';
+} from '@ldap-rest/twake-lifecycle/attributes';
+
+import { DM } from '../../helpers/dm';
 import { waitFor } from '../../helpers/waitFor';
 
 const BASE = `ou=users,${process.env.DM_LDAP_BASE}`;

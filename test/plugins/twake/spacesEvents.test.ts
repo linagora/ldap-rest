@@ -5,10 +5,10 @@ import { TrashService } from '@ldap-rest/core/lib/services/trash';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
 import TrashPlugin from '@ldap-rest/ldap-trash';
+import TwakeGroups from '@ldap-rest/twake-collaboration';
+import TwakeSpaces from '@ldap-rest/twake-collaboration/spaces';
 
 import { DM } from '../../helpers/dm';
-import TwakeGroups from '../../../src/plugins/twake/groups';
-import TwakeSpaces from '../../../src/plugins/twake/spaces';
 import { waitFor } from '../../helpers/waitFor';
 
 const ORGS = `ou=tse-orgs,${process.env.DM_LDAP_BASE}`;

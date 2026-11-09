@@ -4,10 +4,10 @@ import DmPlugin from '@ldap-rest/core/abstract/plugin';
 import type { Hooks } from '@ldap-rest/core/hooks';
 import { AuthzRefusedError, ForbiddenError } from '@ldap-rest/core/lib/errors';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
+import TwakeGroups from '@ldap-rest/twake-collaboration';
+import TwakeSpaces from '@ldap-rest/twake-collaboration/spaces';
 
 import { DM } from '../../helpers/dm';
-import TwakeGroups from '../../../src/plugins/twake/groups';
-import TwakeSpaces from '../../../src/plugins/twake/spaces';
 
 /**
  * The bases of the searches made for a request, and what an authorization

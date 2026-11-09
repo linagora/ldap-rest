@@ -8,12 +8,11 @@
 import { expect } from 'chai';
 import { DEFAULT_USER_MAPPING } from '@ldap-rest/core/lib/scim/mapping';
 import { ScimError } from '@ldap-rest/core/lib/scim/errors';
-
 import {
   patchToModifyRequest,
   applyPatchToResource,
-} from '../../../src/plugins/scim/patch';
-import { scimFilterToLdap } from '../../../src/plugins/scim/filter';
+} from '@ldap-rest/scim/patch';
+import { scimFilterToLdap } from '@ldap-rest/scim/filter';
 
 describe('SCIM security hardening', () => {
   describe('prototype pollution via PATCH paths', () => {

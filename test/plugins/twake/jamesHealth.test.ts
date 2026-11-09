@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import nock from 'nock';
+import James from '@ldap-rest/james';
 
 import { DM } from '../../helpers/dm';
-import James from '../../../src/plugins/twake/james';
 import { outboundCalls } from '../../helpers/metrics';
 
 describe('James Plugin - health', () => {

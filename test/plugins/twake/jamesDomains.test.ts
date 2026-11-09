@@ -6,8 +6,8 @@ import { TrashService } from '@ldap-rest/core/lib/services/trash';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
 import LdapGroups from '@ldap-rest/ldap-groups';
 import TrashPlugin from '@ldap-rest/ldap-trash';
+import James from '@ldap-rest/james';
 
-import James from '../../../src/plugins/twake/james';
 import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';

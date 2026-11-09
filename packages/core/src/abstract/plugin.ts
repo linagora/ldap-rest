@@ -19,6 +19,24 @@ import type { EntityDeclaration } from '../lib/entities';
 import { neverReturnAttributes, withoutAttributes } from '../config/schema';
 import { readOptions, type OptionsOf, type OptionSet } from '../config/options';
 
+/**
+ * What the server's guards publish on the request: `trustedProxy` reads the
+ * client address from the proxy chain, and the rate limiter, CrowdSec and the
+ * access log read it there. Declared with the plugin base so a package that
+ * sees only this module types the request's additions.
+ */
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      trustedProxy?: boolean;
+      proxyAuthUser?: string;
+      /** The client address, read through the trusted proxy chain. */
+      clientIp?: string;
+    }
+  }
+}
+
 export {
   asyncHandler,
   escapeDnValue,

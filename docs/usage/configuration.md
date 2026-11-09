@@ -525,7 +525,7 @@ Keeps the migrated-users list of the Twake Mail migration proxy in step with the
 
 #### `core/twake/calendar`
 
-Formerly `core/twake/calendarResources`, still accepted as a deprecated alias.
+Formerly `core/twake/calendarResources`, removed in 3.0.0.
 
 | CLI                               | Env                                | Default                 | Description                   |
 | --------------------------------- | ---------------------------------- | ----------------------- | ----------------------------- |

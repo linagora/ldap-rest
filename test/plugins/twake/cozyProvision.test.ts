@@ -2,9 +2,9 @@ import nock from 'nock';
 import { expect } from 'chai';
 import type { ScimUser } from '@ldap-rest/core/lib/scim/types';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+import CozyProvision from '@ldap-rest/twake-provisioning/cozy';
 
 import { DM } from '../../helpers/dm';
-import CozyProvision from '../../../src/plugins/twake/cozyProvision';
 
 interface PublishCall {
   exchange: string;

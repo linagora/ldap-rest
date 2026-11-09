@@ -29,13 +29,13 @@ import LdapGroups from '@ldap-rest/ldap-groups';
 import LdapOrganizations from '@ldap-rest/ldap-organizations';
 import ExternalUsersInGroups from '@ldap-rest/ldap-externalusers';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
+import TwakeTombstone from '@ldap-rest/twake-lifecycle/tombstone';
+import James from '@ldap-rest/james';
+import MigrationProxy from '@ldap-rest/twake-mail-migration';
+import AppAccountsApi from '@ldap-rest/twake-appaccounts';
+import AppAccountsConsistency from '@ldap-rest/twake-appaccounts/consistency';
 
-import TwakeTombstone from '../../../src/plugins/twake/tombstone';
-import James from '../../../src/plugins/twake/james';
-import MigrationProxy from '../../../src/plugins/twake/migrationProxy';
 import { DM } from '../../helpers/dm';
-import AppAccountsApi from '../../../src/plugins/twake/appAccountsApi';
-import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsistency';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 /** Authentication reduced to a header, so the test is about authorization */

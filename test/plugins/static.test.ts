@@ -5,9 +5,9 @@ import { join, sep } from 'path';
 import supertest from 'supertest';
 import { expect } from 'chai';
 import { schemaUrl } from '@ldap-rest/core/lib/schemaFile';
+import Static from '@ldap-rest/static';
 
 import { DM } from '../helpers/dm';
-import Static from '../../src/plugins/static';
 
 const dir = './test/__plugins__/static';
 let dm: DM;

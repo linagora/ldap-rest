@@ -227,9 +227,9 @@ compatible.
    and their entries go away with the shims.
 2. [#549], part 2: the modularization decision record, a shrinking comment
    baseline, and the `require_code_owner_review` ruleset.
-3. Remove every `ldap-rest/plugin-*` entry, the `src/plugins/*.ts` shims and
-   the `./plugin-*` api-extractor reports. A plugin is imported from the
-   `@ldap-rest/*` package the deployment installs.
+3. (**done**) Remove every `ldap-rest/plugin-*` entry, the `src/plugins/*.ts`
+   shims and the `./plugin-*` api-extractor reports. A plugin is imported from
+   the `@ldap-rest/*` package the deployment installs.
 4. Publish the scoped packages. With the first published plugin package, add
    the `3.0.0` upgrade note and the CHANGELOG breaking entry: a deployment
    must add the plugin packages it loads to its `package.json`, change every
@@ -297,12 +297,16 @@ phase 1.
 
 ## First actions
 
-Phases 0 and 1 are done, and phase 2 is done: the workspaces hold the core,
-the plugin packages, `browser` and `schemas`. The next steps are phase 3:
+Phases 0 to 2 are done, and phase 3 has removed the former plugin sub-paths:
+the workspaces hold the core, the plugin packages, `browser` and `schemas`,
+and `src/pluginModules.json` maps each `core/…` name to its package. What
+remains:
 
-1. Publish the scoped packages and finalize the contracts ([#595] and [#549]
-   part 2).
-2. Move the umbrella to `packages/ldap-rest/` (decision 8) and close [#397].
+1. Complete the contracts and the review ruleset ([#549] part 2).
+2. Publish the scoped packages and write the `3.0.0` upgrade note and
+   CHANGELOG entry.
+3. Split `@ldap-rest/storage` per backend ([#651]).
+4. Move the umbrella to `packages/ldap-rest/` (decision 8) and close [#397].
 
 [#397]: https://github.com/linagora/ldap-rest/issues/397
 [#549]: https://github.com/linagora/ldap-rest/issues/549

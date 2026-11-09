@@ -21,15 +21,15 @@ import { totpOptionsOf } from '@ldap-rest/auth-totp/options';
 import { organizationOptions } from '@ldap-rest/ldap-organizations/options';
 import { passwordPolicyOptions } from '@ldap-rest/ldap-passwordpolicy/options';
 import { rawOptions } from '@ldap-rest/ldap-raw/options';
+import { jamesOptionsOf } from '@ldap-rest/james/options';
+import { calendarOptionsOf } from '@ldap-rest/twake-calendar/options';
+import { clouderyOptionsOf } from '@ldap-rest/twake-provisioning/cloudery-options';
+import { cozyOptionsOf } from '@ldap-rest/twake-provisioning/cozy-options';
+import { twakeGroupsOptionsOf } from '@ldap-rest/twake-collaboration/groups-options';
+import { twakeInstancesOptionsOf } from '@ldap-rest/twake-provisioning/options';
 
-import configArgs from '../../src/options.full';
 import { DM } from '../helpers/dm';
-import { jamesOptionsOf } from '../../src/plugins/twake/james.options';
-import { calendarOptionsOf } from '../../src/plugins/twake/calendar.options';
-import { clouderyOptionsOf } from '../../src/plugins/twake/cloudery.options';
-import { cozyOptionsOf } from '../../src/plugins/twake/cozy.options';
-import { twakeGroupsOptionsOf } from '../../src/plugins/twake/twakeGroups.options';
-import { twakeInstancesOptionsOf } from '../../src/plugins/twake/twakeInstances.options';
+import configArgs from '../../src/options.full';
 
 describe('plugin options', () => {
   const parse = (argv: string[] = ['node', 'ldap-rest']) =>

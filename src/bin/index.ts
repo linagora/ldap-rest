@@ -3,12 +3,12 @@
  * plugin tree it loads.
  *
  * The core server knows only its own options and no plugin layout. Here,
- * where every plugin family is available, `core/x` resolves beside this file,
- * and the packages the shims re-export are what answer for those entries.
- * The default template carries the core options only: `bin/index.mjs` composes
- * it with the plugins the command line names. `test/helpers/dm.ts` keeps the
- * complete set for a server a test constructs. See
- * `docs/development/modularization-plan.md`.
+ * where every plugin family is available, `core/x` resolves to the package
+ * that provides it (`src/pluginModules.json`), and the demo plugin beside
+ * this file answers for its own entry. The default template carries the core
+ * options only: `bin/index.mjs` composes it with the plugins the command line
+ * names. `test/helpers/dm.ts` keeps the complete set for a server a test
+ * constructs. See `docs/development/modularization-plan.md`.
  */
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';

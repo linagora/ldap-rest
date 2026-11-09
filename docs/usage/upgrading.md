@@ -24,6 +24,28 @@ const server = new DM(await composeOptions());
 The `ldap-rest` command does this already, so a deployment started from the
 command line needs no change.
 
+### Plugins come from their packages
+
+**Who is affected:** every deployment that installs `ldap-rest` and loads
+plugins, and code importing a plugin from a `ldap-rest/plugin-*` sub-path.
+
+Each plugin now ships in its own package (`@ldap-rest/ldap-groups`,
+`@ldap-rest/auth-token`, …). Add the packages of the plugins the server loads
+to the deployment's `package.json`; the `ldap-rest/plugin-*` sub-paths are
+gone, so import a plugin from its package:
+
+```diff
+-import LdapGroups from 'ldap-rest/plugin-ldap-groups';
++import LdapGroups from '@ldap-rest/ldap-groups';
+```
+
+The `--plugin core/…` names still select a plugin, now resolved to the
+installed package.
+
+The deprecated `core/ldap/organization` and `core/twake/calendarResources`
+names are no longer accepted: name `core/ldap/organizations` and
+`core/twake/calendar`.
+
 ## From 2.1.1
 
 ### TOTP requires the user name

@@ -26,8 +26,8 @@ import supertest from 'supertest';
 import type { Hooks } from '@ldap-rest/core/hooks';
 import AuthzDynamic from '@ldap-rest/authz-dynamic';
 import { ssha } from '@ldap-rest/authz-dynamic/hash';
+import Scim from '@ldap-rest/scim';
 
-import Scim from '../../../src/plugins/scim/scim';
 import { DM } from '../../helpers/dm';
 
 function wireHooks(server: DM, plugin: { hooks?: Hooks }): void {

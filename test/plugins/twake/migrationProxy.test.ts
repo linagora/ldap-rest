@@ -3,9 +3,9 @@ import nock from 'nock';
 import request from 'supertest';
 import type winston from 'winston';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
+import MigrationProxy from '@ldap-rest/twake-mail-migration';
 
 import { DM } from '../../helpers/dm';
-import MigrationProxy from '../../../src/plugins/twake/migrationProxy';
 import { LDAP_ENV_VARS, skipIfMissingEnvVars } from '../../helpers/env';
 import { outboundCalls } from '../../helpers/metrics';
 import { waitFor } from '../../helpers/waitFor';

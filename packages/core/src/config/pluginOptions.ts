@@ -67,16 +67,20 @@ export interface PluginRoots {
   pluginRoot?: string;
   /** Directory a relative entry resolves from */
   resolveBase: string;
+  /** The package each `core/…` entry names, when a package provides it */
+  modules?: Readonly<Record<string, string>>;
 }
 
 /**
- * Where a module name resolves, as `import()` would resolve it: an absolute
- * path for `core/x` and a relative entry, the package name otherwise.
+ * Where a module name resolves, as `import()` would resolve it: the package a
+ * `core/x` entry names, an absolute path when no package does, and a relative
+ * entry against its base.
  */
 export function resolvePluginModule(
   module: string,
-  { pluginRoot, resolveBase }: PluginRoots
+  { pluginRoot, resolveBase, modules = {} }: PluginRoots
 ): string {
+  if (module.startsWith('core/') && modules[module]) return modules[module];
   if (module.startsWith('core/')) {
     if (!pluginRoot)
       throw new Error(

@@ -3,11 +3,11 @@ import type { Request } from 'express';
 import supertest from 'supertest';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
+import TwakeGroups from '@ldap-rest/twake-collaboration';
+import TwakeSpaces from '@ldap-rest/twake-collaboration/spaces';
+import TwakeTombstone from '@ldap-rest/twake-lifecycle/tombstone';
 
 import { DM } from '../../helpers/dm';
-import TwakeGroups from '../../../src/plugins/twake/groups';
-import TwakeSpaces from '../../../src/plugins/twake/spaces';
-import TwakeTombstone from '../../../src/plugins/twake/tombstone';
 import { waitFor } from '../../helpers/waitFor';
 
 const ORGS = `ou=tsl-orgs,${process.env.DM_LDAP_BASE}`;

@@ -9,14 +9,14 @@ import supertest from 'supertest';
 import type { Response } from 'express';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
 import { isAuthzRefusal } from '@ldap-rest/core/lib/errors';
+import AuthzLinid1 from '@ldap-rest/authz-linid1';
+import AuthzScope from '@ldap-rest/authz-scope';
+import LdapGroups from '@ldap-rest/ldap-groups';
+import LdapOrganizations from '@ldap-rest/ldap-organizations';
 
-import { DM } from '../../helpers/dm';
-import type { AttributesList } from '../../../src/lib/ldapActions';
 import type { Role } from '../../../src/abstract/plugin';
-import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
-import AuthzScope from '../../../src/plugins/auth/authzScope';
-import LdapGroups from '../../../src/plugins/ldap/groups';
-import LdapOrganizations from '../../../src/plugins/ldap/organizations';
+import type { AttributesList } from '../../../src/lib/ldapActions';
+import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 

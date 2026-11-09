@@ -19,9 +19,9 @@ import {
   type LogContext,
 } from '@ldap-rest/core/lib/requestContext';
 import { recordHookOwner } from '@ldap-rest/core/lib/utils';
+import Bcl from '@ldap-rest/bcl';
+import Storage from '@ldap-rest/storage';
 
-import Bcl from '../../../src/plugins/bcl';
-import Storage from '../../../src/plugins/storage';
 import {
   BASE_URL,
   build,

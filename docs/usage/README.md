@@ -40,7 +40,7 @@ ldap-rest \
   --plugin core/auth/token \
   --plugin core/ldap/flatGeneric \
   --plugin core/ldap/groups \
-  --plugin core/ldap/organization \
+  --plugin core/ldap/organizations \
   --plugin core/ldap/bulkImport \
   --plugin core/ldap/externalUsersInGroups \
   --plugin core/static \

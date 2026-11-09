@@ -1,11 +1,10 @@
 import { expect } from 'chai';
 import { ScimError } from '@ldap-rest/core/lib/scim/errors';
-
 import {
   assertProjection,
   projectList,
   projectResource,
-} from '../../../src/plugins/scim/projection';
+} from '@ldap-rest/scim/projection';
 
 const user = {
   schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],

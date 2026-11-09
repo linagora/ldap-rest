@@ -18,10 +18,10 @@ import { expect } from 'chai';
 
 import { DM } from '../../helpers/dm';
 
-/** As the loader spells it: relative to `src/bin`, which resolves it */
-const PLUGIN = '../../dist/plugins/auth/openidconnect.js';
-/** The same file, spelled from here */
-const BUILT = '../../../dist/plugins/auth/openidconnect.js';
+/** The package as a deployment installs it, and as the loader resolves it */
+const PLUGIN = '@ldap-rest/auth-openidconnect';
+/** The same package, imported here */
+const BUILT = '@ldap-rest/auth-openidconnect';
 
 describe('OpenID Connect through the plugin loader', function () {
   const saved: Record<string, string | undefined> = {};

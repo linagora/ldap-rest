@@ -198,7 +198,7 @@ Public methods available on the Drive plugin instance:
 
 ```typescript
 import type { DM } from 'ldap-rest';
-import type Drive from 'ldap-rest/plugin-twake-drive';
+import type Drive from '@ldap-rest/twake-drive';
 
 // Get the Drive plugin instance
 const drive = server.getPlugin('drive') as Drive;

@@ -5,11 +5,7 @@
  * does not fit the branch must not cost more than reading it.
  */
 import { expect } from 'chai';
-
-import {
-  branchPattern,
-  organizationIn,
-} from '../../../src/plugins/twake/groups';
+import { branchPattern, organizationIn } from '@ldap-rest/twake-collaboration';
 
 const B = String.fromCharCode(92);
 const base = 'ou=groups,ou={org},o=gov,c=mu';

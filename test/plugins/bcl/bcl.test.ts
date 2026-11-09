@@ -15,10 +15,10 @@ import { tmpdir } from 'node:os';
 
 import { expect } from 'chai';
 import type { OidcSessionClaims } from '@ldap-rest/core/hooks';
+import Bcl from '@ldap-rest/bcl';
+import Storage from '@ldap-rest/storage';
 
 import { DM } from '../../helpers/dm';
-import Bcl from '../../../src/plugins/bcl';
-import Storage from '../../../src/plugins/storage';
 
 describe('Back-Channel Logout, over the shared store', function () {
   let server: DM;

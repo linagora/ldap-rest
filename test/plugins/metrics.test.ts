@@ -5,9 +5,9 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import { Router } from 'express';
 import DmPlugin from '@ldap-rest/core/abstract/plugin';
+import Metrics from '@ldap-rest/metrics';
 
 import { DM } from '../helpers/dm';
-import Metrics from '../../src/plugins/metrics';
 
 describe('metrics', function () {
   this.timeout(20000);

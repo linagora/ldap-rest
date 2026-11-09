@@ -8,8 +8,7 @@ import { expect } from 'chai';
 import nock from 'nock';
 import supertest from 'supertest';
 import OpenIDConnect from '@ldap-rest/auth-openidconnect';
-
-import ConfigApi from '../../src/plugins/configApi';
+import ConfigApi from '@ldap-rest/config-api';
 
 import { DM } from './dm';
 

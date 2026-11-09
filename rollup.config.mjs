@@ -13,8 +13,6 @@ import stripCssDeclarations from './scripts/stripCssDeclarations.mjs';
 
 const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
 
-const PLUGINS_SRC_DIR = 'src/plugins';
-
 const commonPlugins = dir => [
   commonjs(),
   json(),
@@ -68,10 +66,8 @@ const external = id => {
   return externalPackages.some(dep => id === dep || id.startsWith(`${dep}/`));
 };
 
-async function getPluginEntries() {
-  return (await glob('src/plugins/**/*.ts'))
-    .map(file => file.replace(/^src\/plugins\//, ''))
-    .sort();
+async function getDemoEntries() {
+  return (await glob('src/plugins/demo/**/*.ts')).sort();
 }
 
 async function getAbstractEntries() {
@@ -126,14 +122,7 @@ pkg.exports = {
 };
 
 export default async () => {
-  const p = await getPluginEntries();
-  p.forEach(plugin => {
-    const name = plugin.replace(/\.ts$/, '');
-    pkg.exports[`./plugin-${name.toLowerCase().replace(/\//g, '-')}`] = {
-      import: `./dist/plugins/${name}.js`,
-      types: `./dist/src/plugins/${name}.d.ts`,
-    };
-  });
+  const demo = await getDemoEntries();
 
   const a = await getAbstractEntries();
   a.forEach(abstract => {
@@ -171,7 +160,7 @@ export default async () => {
         'src/lib/ldapActions.ts',
         'src/lib/expressFormatedResponses.ts',
         'src/lib/parseConfig.ts',
-        ...p.map(file => `${PLUGINS_SRC_DIR}/${file}`),
+        ...demo,
         ...a.map(file => `src/abstract/${file}`),
       ],
       output: {

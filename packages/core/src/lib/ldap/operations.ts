@@ -17,6 +17,7 @@ import { extractLdapCode } from '../ldapCodes';
 import { BadRequestError, NotFoundError } from '../errors';
 import type {
   AttributesList,
+  AttributeValue,
   ModifyOptions,
   ModifyRequest,
 } from '../ldapActions';
@@ -34,6 +35,15 @@ import { membersNamed } from './searchCache';
 import type SearchCache from './searchCache';
 import type DirectorySchema from './schema';
 import type CallerView from './callerView';
+
+/**
+ * The values of one attribute as `ldapts` takes them: a single value becomes
+ * a one-element array, an array keeps its kind.
+ */
+function attributeValues(value: AttributeValue): string[] | Buffer[] {
+  if (Array.isArray(value)) return value;
+  return typeof value === 'string' ? [value] : [value];
+}
 
 export interface LdapHost {
   readonly parent: DM;
@@ -93,8 +103,7 @@ export async function add(
   const attributes: Attribute[] = [];
   for (const [key, value] of Object.entries(entry)) {
     assertHasValue(key, value);
-    const values = (Array.isArray(value) ? value : [value]) as
-      string[] | Buffer[];
+    const values = attributeValues(value);
     attributes.push(
       new Attribute({
         type: key,
@@ -186,7 +195,7 @@ async function applyModify(
           operation: 'add',
           modification: new Attribute({
             type: key,
-            values: Array.isArray(value) ? value : [value],
+            values: attributeValues(value),
           }),
         })
       );
@@ -199,7 +208,7 @@ async function applyModify(
           operation: 'replace',
           modification: new Attribute({
             type: key,
-            values: Array.isArray(value) ? value : [value],
+            values: attributeValues(value),
           }),
         })
       );
@@ -222,7 +231,7 @@ async function applyModify(
           modification: value
             ? new Attribute({
                 type: key,
-                values: Array.isArray(value) ? value : [value],
+                values: attributeValues(value),
               })
             : new Attribute({ type: key }),
         });

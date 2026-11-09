@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 import type { SearchResult } from 'ldapts';
 import supertest from 'supertest';
+import Scim from '@ldap-rest/scim';
+import TwakeGroups, { withOrg } from '@ldap-rest/twake-collaboration';
 
 import { DM } from '../../helpers/dm';
-import Scim from '../../../src/plugins/scim/scim';
-import TwakeGroups, { withOrg } from '../../../src/plugins/twake/groups';
 
 const ORGS = `ou=tg-orgs,${process.env.DM_LDAP_BASE}`;
 const orgDn = (org: string): string => `ou=${org},${ORGS}`;

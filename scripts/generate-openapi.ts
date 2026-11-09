@@ -159,7 +159,7 @@ export class OpenAPIGenerator {
   }
 
   /**
-   * Analyze all plugin files. Walks `src/plugins/` for concrete plugins
+   * Analyze all plugin files. Walks the demo plugin under `src/plugins/`
    * and every workspace package's sources, abstract bases like LdapFlat
    * included: they carry the generic per-resource CRUD routes inherited by
    * every flat plugin, which are documented too.

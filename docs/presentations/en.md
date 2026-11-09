@@ -329,7 +329,7 @@ npx ldap-rest \
   --ldap-pwd admin \
   --ldap-url ldap://localhost \
   --plugin core/ldap/groups \
-  --plugin core/ldap/organization
+  --plugin core/ldap/organizations
 ```
 
 <!-- end_slide -->
@@ -572,7 +572,7 @@ LDAP Change → onChange → Hook → James WebAdmin API
 
 ```typescript
 // 1. LDAP Group Consistency
-import groups from 'ldap-rest/plugin-ldap-groups';
+import groups from '@ldap-rest/ldap-groups';
 dm.registerPlugin('groups', groups);
 
 // User deletion:
@@ -580,7 +580,7 @@ dm.registerPlugin('groups', groups);
 // → Update member/uniqueMember attributes
 
 // 2. LDAP ↔ James Consistency
-import james from 'ldap-rest/plugin-twake-james';
+import james from '@ldap-rest/james';
 dm.registerPlugin('james', james);
 
 // LDAP mail change:

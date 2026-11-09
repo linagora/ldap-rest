@@ -14,9 +14,9 @@ import { tmpdir } from 'node:os';
 
 import { expect } from 'chai';
 import priority from '@ldap-rest/core/config/priority.json';
+import Storage from '@ldap-rest/storage';
 
 import { DM } from '../../helpers/dm';
-import Storage from '../../../src/plugins/storage';
 
 describe('Keyed storage, one instance', function () {
   let server: DM;

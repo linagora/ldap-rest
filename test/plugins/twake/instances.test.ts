@@ -12,10 +12,10 @@ import type {
   SearchResult,
 } from '@ldap-rest/core/lib/ldapActions';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
-
 import TwakeInstances, {
   type WorkplaceCreated,
-} from '../../../src/plugins/twake/instances';
+} from '@ldap-rest/twake-provisioning';
+
 import { outboundCalls } from '../../helpers/metrics';
 import { DM } from '../../helpers/dm';
 

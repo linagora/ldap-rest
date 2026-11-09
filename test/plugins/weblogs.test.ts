@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import WebLogs from '@ldap-rest/weblogs';
 
 import { DM } from '../helpers/dm';
-import WebLogs from '../../src/plugins/weblogs';
 
 describe('weblogs', () => {
   let dm: DM;

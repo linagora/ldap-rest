@@ -4,8 +4,8 @@ import { SearchResult } from 'ldapts';
 import { ConflictError } from '@ldap-rest/core/lib/errors';
 import LdapGroups from '@ldap-rest/ldap-groups';
 import ExternalUsersInGroups from '@ldap-rest/ldap-externalusers';
+import ConfigApi from '@ldap-rest/config-api';
 
-import ConfigApi from '../../../src/plugins/configApi';
 import { DM } from '../../helpers/dm';
 import { waitFor } from '../../helpers/waitFor';
 

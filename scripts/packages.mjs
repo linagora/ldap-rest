@@ -159,53 +159,6 @@ function pathsOf(target) {
 }
 
 /**
- * The module names the umbrella serves, as `core/…` to the package the shim
- * of that name re-exports. A configuration may name either spelling; the
- * server reads this table to know that they designate the same plugin.
- */
-function pluginModules() {
-  const pluginRoot = path.join(root, 'src', 'plugins');
-  const packagesByName = new Map(packages().map(pkg => [pkg.name, pkg]));
-  const modules = {};
-  for (const file of entriesUnder(pluginRoot)) {
-    if (!file.endsWith('.ts')) continue;
-    const text = readFileSync(file, 'utf8');
-    // A shim re-exports one module's default export: either through
-    // `export { default } from '…'`, or — the deprecated alias — by importing
-    // it and exporting it as the default of this file. The specifier is the
-    // package itself or one of its sub-paths: a package may hold more than one
-    // plugin (`@ldap-rest/twake-collaboration/spaces`), and a configuration
-    // naming either spelling must land on the same module. Only a sub-path the
-    // package exports counts; an option set has no default export and never
-    // matches here.
-    const reexport =
-      /export\s*\{[^}]*\bdefault\b[^}]*\}\s*from\s*'(@ldap-rest\/[^']+)'/.exec(
-        text
-      );
-    const alias =
-      /import\s+(\w+)\s+from\s*'(@ldap-rest\/[^']+)'[\s\S]*\bexport\s+default\s+\1\s*;/.exec(
-        text
-      );
-    const specifier = reexport?.[1] ?? alias?.[2];
-    if (!specifier) continue;
-    const [scope, packageName, ...sub] = specifier.split('/');
-    const pkg = packagesByName.get(`${scope}/${packageName}`);
-    if (!pkg) continue;
-    if (sub.length > 0 && !pkg.manifest.exports?.[`./${sub.join('/')}`])
-      continue;
-    const name = path
-      .relative(pluginRoot, file)
-      .replace(/\.ts$/, '')
-      .split(path.sep)
-      .join('/');
-    modules[`core/${name}`] = specifier;
-  }
-  return Object.fromEntries(
-    Object.entries(modules).sort(([a], [b]) => a.localeCompare(b))
-  );
-}
-
-/**
  * The bare modules a package's sources import, without the sub-path and
  * without Node's builtins. An optional peer loaded with `import()` counts:
  * the import is written in the sources all the same.
@@ -264,7 +217,6 @@ const GENERATED = [
           .sort(),
       ]),
   },
-  { file: 'src/pluginModules.json', build: pluginModules },
 ];
 
 /** Each generated file as `sync` writes it, beside its current text */

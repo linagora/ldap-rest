@@ -13,9 +13,9 @@ import type { Config } from '@ldap-rest/core/config/args';
 import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 import LdapGroups from '@ldap-rest/ldap-groups';
 import LdapOrganizations from '@ldap-rest/ldap-organizations';
+import Static from '@ldap-rest/static';
 
 import { DM } from '../helpers/dm';
-import Static from '../../src/plugins/static';
 
 const shipped = join(__dirname, '..', '..', 'static', 'schemas');
 const files = ['groups.json', 'organizations.json', 'positions.json'];

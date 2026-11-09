@@ -6,8 +6,8 @@ import {
 } from '@ldap-rest/core/lib/requestContext';
 import { providedService } from '@ldap-rest/core/lib/services';
 import { RabbitMqService } from '@ldap-rest/core/lib/services/rabbitmq';
+import RabbitMq from '@ldap-rest/rabbitmq';
 
-import RabbitMq from '../../src/plugins/rabbitmq';
 import { DM } from '../helpers/dm';
 
 interface PublishCall {

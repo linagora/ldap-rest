@@ -1061,6 +1061,7 @@ export class DM {
     return resolvePluginModule(module, {
       pluginRoot: this.pluginRoot,
       resolveBase: this.resolveBase,
+      modules: this.pluginModules,
     });
   }
 

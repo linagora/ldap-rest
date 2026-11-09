@@ -20,12 +20,12 @@ import LdapOrganizations from '@ldap-rest/ldap-organizations';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
 import LdapPasswordPolicy from '@ldap-rest/ldap-passwordpolicy';
 import LdapRaw from '@ldap-rest/ldap-raw';
+import AppAccountsConsistency from '@ldap-rest/twake-appaccounts/consistency';
+import AppAccountsApi from '@ldap-rest/twake-appaccounts';
+import TwakeInstances from '@ldap-rest/twake-provisioning';
+import TwakeTombstone from '@ldap-rest/twake-lifecycle/tombstone';
 
 import { DM } from '../helpers/dm';
-import AppAccountsConsistency from '../../src/plugins/twake/appAccountsConsistency';
-import AppAccountsApi from '../../src/plugins/twake/appAccountsApi';
-import TwakeInstances from '../../src/plugins/twake/instances';
-import TwakeTombstone from '../../src/plugins/twake/tombstone';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS_WITH_ORG } from '../helpers/env';
 
 /** A JSON schema, as the registry keeps it */

@@ -17,12 +17,14 @@ import {
 import type { ConfigTemplate } from '@ldap-rest/core/lib/parseConfig';
 
 import { coreOptions, here, withoutCoreDuplicates } from './coreOptions.js';
+import pluginModules from './pluginModules.json';
 
 export { coreOptions as default } from './coreOptions.js';
 
 const roots: PluginRoots = {
   pluginRoot: join(here, 'plugins'),
   resolveBase: join(here, 'bin'),
+  modules: pluginModules,
 };
 
 /**

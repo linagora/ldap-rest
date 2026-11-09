@@ -7,13 +7,13 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import type { Response } from 'express';
 import AuthBase, { type DmRequest } from '@ldap-rest/core/lib/auth/base';
+import AuthzLinid1 from '@ldap-rest/authz-linid1';
+import AuthzScope from '@ldap-rest/authz-scope';
+import LdapFlatGeneric from '@ldap-rest/ldap-flatgeneric';
 
 import { DM } from '../../helpers/dm';
 import type { AttributesList } from '../../../src/lib/ldapActions';
 import type { Role } from '../../../src/abstract/plugin';
-import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
-import AuthzScope from '../../../src/plugins/auth/authzScope';
-import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 

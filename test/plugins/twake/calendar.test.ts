@@ -2,10 +2,9 @@ import nock from 'nock';
 import { expect } from 'chai';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
 import LdapFlat from '@ldap-rest/ldap-flatgeneric';
+import Calendar from '@ldap-rest/twake-calendar';
 
 import { DM } from '../../helpers/dm';
-import Calendar from '../../../src/plugins/twake/calendar';
-import CalendarResources from '../../../src/plugins/twake/calendarResources';
 import { waitFor } from '../../helpers/waitFor';
 describe('Twake Calendar Plugin', function () {
   let resourceBase: string;
@@ -392,16 +391,6 @@ describe('Twake Calendar Plugin', function () {
         `/resources/${encodeURIComponent(String(createdId))}`
       );
       nock.cleanAll();
-    });
-  });
-
-  describe('calendarResources alias', () => {
-    it('is the same plugin, still registered under its historical name', () => {
-      const alias = new CalendarResources(dm);
-
-      expect(alias).to.be.instanceOf(Calendar);
-      expect(alias.name).to.equal('calendarResources');
-      expect(calendar.name).to.equal('calendar');
     });
   });
 

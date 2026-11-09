@@ -18,7 +18,7 @@ This plugin manages hierarchical organizations stored as `organizationalUnit` (o
 ### CLI Arguments
 
 ```bash
---plugin core/ldap/organization \
+--plugin core/ldap/organizations \
 --ldap-top-organization "dc=example,dc=com" \
 --ldap-organization-class top,organizationalUnit,twakeDepartment \
 --ldap-organization-link-attribute twakeDepartmentLink \

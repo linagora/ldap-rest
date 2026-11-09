@@ -4,8 +4,8 @@ import path from 'node:path';
 
 import { expect } from 'chai';
 import supertest from 'supertest';
+import Scim from '@ldap-rest/scim';
 
-import Scim from '../../../src/plugins/scim/scim';
 import { DM } from '../../helpers/dm';
 
 describe('SCIM mapped reference DNs', function () {

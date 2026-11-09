@@ -879,7 +879,7 @@ npx ldap-rest \
   --ldap-flat-schema ./static/schemas/twake/users.json \
   --plugin core/ldap/groups \
   --ldap-groups-schema ./static/schemas/twake/groups.json \
-  --plugin core/ldap/organization \
+  --plugin core/ldap/organizations \
   --ldap-org-schema ./static/schemas/twake/organizations.json
 ```
 
@@ -1011,7 +1011,7 @@ npx ldap-rest \
   --ldap-flat-schema ./static/schemas/standard/users.json \
   --plugin core/ldap/groups \
   --ldap-groups-schema ./static/schemas/standard/groups.json \
-  --plugin core/ldap/organization \
+  --plugin core/ldap/organizations \
   --ldap-org-schema ./static/schemas/standard/organizations.json
 ```
 

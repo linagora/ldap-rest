@@ -3,9 +3,9 @@ import request from 'supertest';
 import { expect } from 'chai';
 import OnLdapChange from '@ldap-rest/ldap-onchange';
 import LdapGroups from '@ldap-rest/ldap-groups';
+import James from '@ldap-rest/james';
 
 import { DM } from '../../helpers/dm';
-import James from '../../../src/plugins/twake/james';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 describe('James Plugin', () => {

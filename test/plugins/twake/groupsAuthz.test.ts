@@ -15,9 +15,9 @@ import type { Role } from '@ldap-rest/core/abstract/plugin';
 import AuthzPerBranch from '@ldap-rest/authz-perbranch';
 import AuthzDynamic from '@ldap-rest/authz-dynamic';
 import { ssha } from '@ldap-rest/authz-dynamic/hash';
+import TwakeGroups from '@ldap-rest/twake-collaboration';
 
 import { DM } from '../../helpers/dm';
-import TwakeGroups from '../../../src/plugins/twake/groups';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 

@@ -30,7 +30,7 @@ import { DM } from '../../helpers/dm';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 const ROUTE_PLUGIN = '../../dist/plugins/demo/helloworld.js';
-const AUTHZ_PLUGIN = '../../dist/plugins/auth/authzDynamic.js';
+const AUTHZ_PLUGIN = '@ldap-rest/authz-dynamic';
 
 describe('authzDynamic, deferred verdict and route order', function () {
   const saved: Record<string, string | undefined> = {};
