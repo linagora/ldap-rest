@@ -919,16 +919,17 @@ async function main(): Promise<void> {
     );
   }
 
-  let introducedReports = false;
+  const newReports: string[] = [];
   // The base's reports as well: dropping an entry from the snapshot list is a
   // removed sub-path, and only a report in the base can show it
-  for (const entry of new Set([
+  const compared = new Set([
     ...Object.keys(API_ENTRIES),
     ...baseApiEntries(base),
-  ])) {
+  ]);
+  for (const entry of compared) {
     const baseReport = gitShow(base, path.relative(root, reportPath(entry)));
     if (baseReport === null) {
-      introducedReports = true;
+      newReports.push(entry);
       continue;
     }
     const current = readApiReport(entry);
@@ -959,10 +960,15 @@ async function main(): Promise<void> {
         `~ changed ${entry} declaration ${declaration}: review the report diff`
       );
   }
-  if (introducedReports)
+  if (newReports.length === compared.size)
     console.log(
       `No ${path.relative(root, API_REPORT_DIR)}/ reports in ${base}: ` +
         'introducing the plugin API snapshot.'
+    );
+  else if (newReports.length > 0)
+    console.log(
+      `${newReports.length} new API reports not in ${base}: ` +
+        `${newReports.join(', ')}`
     );
 
   const nonAdditiveChanges = nonAdditive(differences);

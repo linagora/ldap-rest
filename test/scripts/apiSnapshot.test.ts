@@ -1,6 +1,9 @@
 import { expect } from 'chai';
 
-import { diffApiReports } from '../../scripts/api-snapshot';
+import {
+  diffApiReports,
+  stripCoreDeclarations,
+} from '../../scripts/api-snapshot';
 
 function reportWith(imports: string[], ...blocks: string[]): string {
   return [
@@ -151,5 +154,40 @@ describe('API reports', () => {
 
     expect(changes.removed).to.deep.equal(['f #2']);
     expect(changes.changed).to.deep.equal([]);
+  });
+});
+
+describe('Package reports', () => {
+  const coreConfig = '// @public\nexport interface Config {\n  a: string;\n}';
+  const referenced = '// @public\ninterface Config {\n  a: string;\n}';
+  const own = '// @public\nexport interface Only {\n  b: string;\n}';
+
+  it('drops a referenced block identical to one in a core report', () => {
+    const stripped = stripCoreDeclarations(
+      report(referenced, own),
+      new Set([coreConfig])
+    );
+    expect(stripped).to.not.contain('interface Config');
+    expect(stripped).to.contain('export interface Only');
+    expect(stripped.startsWith('## API Report File')).to.equal(true);
+    expect(stripped.trimEnd().endsWith('```')).to.equal(true);
+  });
+
+  it('keeps a block the package exports, even with a core shape', () => {
+    const stripped = stripCoreDeclarations(
+      report(coreConfig),
+      new Set([coreConfig])
+    );
+    expect(stripped).to.contain('export interface Config');
+  });
+
+  it('keeps a declaration sharing a core name with another shape', () => {
+    const different = '// @public\ninterface Config {\n  b: string;\n}';
+    const stripped = stripCoreDeclarations(
+      report(different),
+      new Set([coreConfig])
+    );
+    expect(stripped).to.contain('interface Config');
+    expect(stripped).to.contain('b: string');
   });
 });

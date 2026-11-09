@@ -16,6 +16,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  writeFileSync,
 } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -31,18 +32,81 @@ const declarations = path.join(root, 'temp', 'api', 'declarations');
 const reportTempDir = path.join(root, 'temp', 'api', 'reports');
 
 /**
- * The entry points of the umbrella, as `rollup.config.mjs` generates them.
- * A plugin package ships its own declarations; its `exports` is its API, and
- * no report of the umbrella covers it.
+ * Every published entry a report covers: the umbrella's own five first, then
+ * each package's `types` entries. A wildcard entry names a family of modules,
+ * not one to report.
  */
-export const API_ENTRIES: Record<string, string> = {
-  'ldap-rest': 'packages/ldap-rest/src/bin/index.d.ts',
-  expressformatedresponses:
-    'packages/ldap-rest/src/lib/expressFormatedResponses.d.ts',
-  hooks: 'packages/ldap-rest/src/hooks.d.ts',
-  ldapactions: 'packages/ldap-rest/src/lib/ldapActions.d.ts',
-  plugin: 'packages/ldap-rest/src/abstract/plugin.d.ts',
-};
+export const API_ENTRIES: Record<
+  string,
+  { entryPoint: string; manifest: string }
+> = (() => {
+  const declarationRoot = path
+    .relative(root, declarations)
+    .split(path.sep)
+    .join('/');
+  const entries: Record<string, { entryPoint: string; manifest: string }> = {
+    'ldap-rest': {
+      entryPoint: `${declarationRoot}/packages/ldap-rest/src/bin/index.d.ts`,
+      manifest: 'packages/ldap-rest/package.json',
+    },
+    expressformatedresponses: {
+      entryPoint: `${declarationRoot}/packages/ldap-rest/src/lib/expressFormatedResponses.d.ts`,
+      manifest: 'packages/ldap-rest/package.json',
+    },
+    hooks: {
+      entryPoint: `${declarationRoot}/packages/ldap-rest/src/hooks.d.ts`,
+      manifest: 'packages/ldap-rest/package.json',
+    },
+    ldapactions: {
+      entryPoint: `${declarationRoot}/packages/ldap-rest/src/lib/ldapActions.d.ts`,
+      manifest: 'packages/ldap-rest/package.json',
+    },
+    plugin: {
+      entryPoint: `${declarationRoot}/packages/ldap-rest/src/abstract/plugin.d.ts`,
+      manifest: 'packages/ldap-rest/package.json',
+    },
+  };
+  for (const directory of readdirSync(path.join(root, 'packages'), {
+    withFileTypes: true,
+  })) {
+    if (!directory.isDirectory()) continue;
+    const dir = `packages/${directory.name}`;
+    const manifestPath = path.join(root, dir, 'package.json');
+    if (!existsSync(manifestPath)) continue;
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      name?: string;
+      exports?: Record<string, string | { types?: string }>;
+    };
+    if (!manifest.name || manifest.name === 'ldap-rest') continue;
+    const short = manifest.name.replace(/^@ldap-rest\//, '');
+    for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
+      if (typeof target === 'string') continue;
+      if (!target.types || subpath.includes('*')) continue;
+      const name =
+        subpath === '.'
+          ? short
+          : `${short}-${subpath.slice(2).replace(/\//g, '-')}`;
+      if (entries[name])
+        throw new Error(
+          `api-snapshot: ${name} would name two reports: ${entries[name].entryPoint} and ${path.posix.join(dir, target.types)}`
+        );
+      entries[name] = {
+        entryPoint: path.posix.join(dir, target.types),
+        manifest: `${dir}/package.json`,
+      };
+    }
+  }
+  return entries;
+})();
+
+/** The reports whose declarations every other report may reuse */
+function isCoreReport(name: string): boolean {
+  const manifest = API_ENTRIES[name]?.manifest;
+  return (
+    manifest === 'packages/ldap-rest/package.json' ||
+    manifest === 'packages/core/package.json'
+  );
+}
 
 export function reportPath(name: string): string {
   return path.join(API_REPORT_DIR, `${name}.api.md`);
@@ -76,11 +140,15 @@ function emitDeclarations(): void {
   );
 }
 
-function extract(name: string, entryPoint: string, folder: string): void {
+function extract(
+  name: string,
+  entry: { entryPoint: string; manifest: string },
+  folder: string
+): void {
   mkdirSync(folder, { recursive: true });
   const configObject: IConfigFile = {
     projectFolder: root,
-    mainEntryPointFilePath: path.join(declarations, entryPoint),
+    mainEntryPointFilePath: path.join(root, entry.entryPoint),
     apiReport: {
       enabled: true,
       reportFileName: `${name}.api.md`,
@@ -97,12 +165,7 @@ function extract(name: string, entryPoint: string, folder: string): void {
   const config = ExtractorConfig.prepare({
     configObject,
     configObjectFullPath: path.join(root, 'api-extractor.json'),
-    packageJsonFullPath: path.join(
-      root,
-      'packages',
-      'ldap-rest',
-      'package.json'
-    ),
+    packageJsonFullPath: path.join(root, entry.manifest),
   });
   const result = Extractor.invoke(config, {
     localBuild: true,
@@ -113,6 +176,52 @@ function extract(name: string, entryPoint: string, folder: string): void {
     throw new Error(
       `api-extractor failed on ${name}: ${result.errorCount} error(s)`
     );
+}
+
+/**
+ * Drop from a package report the declaration blocks identical to one in a
+ * core report: an inlined `Config` or `DM` is already gated there, and
+ * repeating it makes every core change rewrite every package report.
+ */
+export function stripCoreDeclarations(
+  report: string,
+  core: Set<string>
+): string {
+  // A declaration the package exports is its own API, even when a core report
+  // carries the same shape: only an unexported declaration is the one the
+  // core report already gates.
+  const exported = (block: string): boolean => /^export\s/m.test(block);
+  const comparable = (block: string): string =>
+    block.replace(/^export\s+/m, '');
+  const coreBlocks = new Set([...core].map(comparable));
+  const lines = report.split('\n');
+  const fence = lines.findIndex(line => line.startsWith('```'));
+  const start = lines.findIndex(line => line.startsWith('// @'));
+  const end = lines.findIndex(
+    (line, index) => index > fence && line.startsWith('```')
+  );
+  if (start === -1) return report;
+  const out = lines.slice(0, start);
+  let current: string[] = [];
+  const flush = (): void => {
+    if (current.length === 0) return;
+    const block = current.join('\n').trimEnd();
+    if (exported(block) || !coreBlocks.has(comparable(block)))
+      out.push(...current);
+    current = [];
+  };
+  for (const line of lines.slice(start, end === -1 ? undefined : end)) {
+    if (
+      line.startsWith('// @') ||
+      line.startsWith('export {') ||
+      line.startsWith('declare namespace ')
+    )
+      flush();
+    current.push(line);
+  }
+  flush();
+  if (end !== -1) out.push(...lines.slice(end));
+  return out.join('\n');
 }
 
 export interface ApiReportChanges {
@@ -243,8 +352,21 @@ export async function buildApiReports(
           path.join(folder, `${name}.api.md`)
         );
   emitDeclarations();
-  for (const [name, entryPoint] of Object.entries(API_ENTRIES))
-    extract(name, entryPoint, folder);
+  // The core reports first: their declarations are what the others may leave
+  // out, and a report can only be stripped once they are read.
+  const names = Object.keys(API_ENTRIES).sort(
+    (left, right) => Number(isCoreReport(right)) - Number(isCoreReport(left))
+  );
+  const coreBlocks = new Set<string>();
+  for (const name of names) {
+    extract(name, API_ENTRIES[name], folder);
+    const file = path.join(folder, `${name}.api.md`);
+    const report = readFileSync(file, 'utf8');
+    if (isCoreReport(name))
+      for (const block of declarationsIn(report).values())
+        coreBlocks.add(block);
+    else writeFileSync(file, stripCoreDeclarations(report, coreBlocks));
+  }
 }
 
 function stale(name: string, folder: string): boolean {
