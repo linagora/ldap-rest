@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Security
+
+- The Twake instance slug trims leading and trailing dashes in linear time, so
+  a long uid or SCIM `userName` no longer blocks the server
+  ([GHSA-qvxx-xx29-6qrf](https://github.com/linagora/ldap-rest/security/advisories/GHSA-qvxx-xx29-6qrf)).
+
 ### Fixed
 
 - Schema hints read as help under a form field rather than as a refusal: the
