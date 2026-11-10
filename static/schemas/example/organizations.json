@@ -41,7 +41,7 @@
       "items": {
         "type": "string",
         "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
-        "hint": "Expected pattern (+99) 999 9999"
+        "hint": "A phone number such as (+99) 999 9999"
       },
       "required": false,
       "label": "Phone"
@@ -49,7 +49,7 @@
     "facsimileTelephoneNumber": {
       "type": "string",
       "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
-      "hint": "Expected pattern (+99) 999 9999",
+      "hint": "A fax number such as (+99) 999 9999",
       "required": false,
       "label": "Fax"
     },

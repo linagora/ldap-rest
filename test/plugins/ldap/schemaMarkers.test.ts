@@ -193,7 +193,7 @@ describe('Schema markers over the API', () => {
         .type('json')
         .send(body({ mail: 'not-an-address' }));
       expect(res.status).to.equal(400);
-      expect(res.body.error).to.match(/Expected an email address/);
+      expect(res.body.error).to.match(/An email address/);
     });
   });
 });

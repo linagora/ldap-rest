@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Schema hints read as help under a form field rather than as a refusal: the
+  Twake email, date, size and DN hints are worded as what to type
+  ([#704](https://github.com/linagora/ldap-rest/issues/704),
+  [#705](https://github.com/linagora/ldap-rest/issues/705)).
+
 ## v2.2.0 (2026-11-08)
 
 ### Security

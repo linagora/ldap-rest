@@ -872,7 +872,7 @@ Ensure all required fields are included:
 
 ```json
 {
-  "error": "Invalid value for attribute \"mail\": Expected an email address, e.g. jane.doe@example.org"
+  "error": "Invalid value for attribute \"mail\": An email address, e.g. jane.doe@example.org"
 }
 ```
 

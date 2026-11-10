@@ -112,7 +112,7 @@ whenever the link changes. Mark the path `generated` so a client cannot set it.
     "type": "number",
     "normalize": "byteSize",
     "default": 1000000000,
-    "hint": "Expected pattern xGB, xMB, xKB or a number of bytes"
+    "hint": "A size such as xGB, xMB, xKB or a number of bytes"
   }
 }
 ```

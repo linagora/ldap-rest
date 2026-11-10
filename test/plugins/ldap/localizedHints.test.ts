@@ -115,7 +115,7 @@ describe('Translated hints in refusals', function () {
     const res = await modify({ mail: 'nope' });
     expect(res.status, JSON.stringify(res.body)).to.equal(400);
     expect(res.body.error).to.equal(
-      'Invalid value for attribute "mail": Expected an email address, e.g. jane.doe@example.org'
+      'Invalid value for attribute "mail": An email address, e.g. jane.doe@example.org'
     );
   });
 
@@ -123,7 +123,7 @@ describe('Translated hints in refusals', function () {
     const res = await modify({ mailQuotaSize: 'lots' });
     expect(res.status, JSON.stringify(res.body)).to.equal(400);
     expect(res.body.error).to.equal(
-      'Invalid value for attribute "mailQuotaSize": Expected pattern xGB, xMB, xKB or a number of bytes'
+      'Invalid value for attribute "mailQuotaSize": A size such as xGB, xMB, xKB or a number of bytes'
     );
   });
 
@@ -131,7 +131,7 @@ describe('Translated hints in refusals', function () {
     const res = await modify({ twakeDeletionDate: 'soon' });
     expect(res.status, JSON.stringify(res.body)).to.equal(400);
     expect(res.body.error).to.equal(
-      'Invalid value for attribute "twakeDeletionDate": Expected a date not earlier than today'
+      'Invalid value for attribute "twakeDeletionDate": A date from today onwards'
     );
   });
 
@@ -153,7 +153,7 @@ describe('Translated hints in refusals', function () {
       .send({ cn: 'hint-group', mail: 'nope' });
     expect(res.status, JSON.stringify(res.body)).to.equal(400);
     expect(res.body.error).to.equal(
-      'Invalid value for attribute "mail": Expected an email address, e.g. all-staff@lists.example.org'
+      'Invalid value for attribute "mail": An email address, e.g. all-staff@lists.example.org'
     );
   });
 
@@ -177,7 +177,7 @@ describe('Translated hints in refusals', function () {
       res = await modify('nope');
       expect(res.status, JSON.stringify(res.body)).to.equal(400);
       expect(res.body.error).to.equal(
-        'Invalid value for attribute "mail": Expected an email address, e.g. all-staff@lists.example.org'
+        'Invalid value for attribute "mail": An email address, e.g. all-staff@lists.example.org'
       );
     } finally {
       await server.ldap.delete(dn).catch(() => undefined);

@@ -68,12 +68,12 @@ promise that none of them fails on its own contents.
 12632 entries read, 47 value(s) the schema would refuse:
 
   mail: does not match — 41
-    expected: Expected an address in the example.org domain, at most 64 characters before the @
+    expected: An address in the example.org domain, at most 64 characters before the @
     uid=jean.dupont,ou=users,dc=example,dc=com → "jean.dupont@old-domain.example"
     …and 36 more
 
   postalCode: does not match — 6
-    expected: Expected pattern 9999, A9999 or R9999
+    expected: A postal code such as 9999, A9999 or R9999
     uid=marie.martin,ou=users,dc=example,dc=com → "1234"
 ```
 
