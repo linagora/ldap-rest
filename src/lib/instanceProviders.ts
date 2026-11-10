@@ -22,11 +22,14 @@ import { timedOutbound } from './metrics.js';
  * @param value uid, or the slug template filled in
  * @returns the slug, empty when nothing of `value` is kept
  */
-export const instanceSlug = (value: string): string =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/^-+|-+$/g, '');
+export const instanceSlug = (value: string): string => {
+  const slug = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  let start = 0;
+  let end = slug.length;
+  while (start < end && slug[start] === '-') start++;
+  while (end > start && slug[end - 1] === '-') end--;
+  return slug.slice(start, end);
+};
 
 /**
  * The account's Matrix ID, from its mail, for cozy-stack to store as is. A
