@@ -221,7 +221,7 @@ export interface SchemaAttribute {
   maxLength?: number;
   /**
    * Plain-language description of `test`, shown to the user *before* they get
-   * a value wrong — "Expected pattern 999 9999". It travels with the
+   * a value wrong — "A phone number such as 999 9999". It travels with the
    * schema so the pattern and its explanation cannot drift apart, and so a
    * client never has to hardcode either.
    */

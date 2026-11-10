@@ -215,8 +215,8 @@ type, before they get it wrong:
     "type": "string",
     "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
     "hint": {
-      "en": "Expected pattern (+99) 999 9999",
-      "fr": "Format attendu : (+99) 999 9999"
+      "en": "A phone number such as (+99) 999 9999",
+      "fr": "Un numéro de téléphone, par ex. (+99) 999 9999"
     }
   }
 }

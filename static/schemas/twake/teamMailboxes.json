@@ -61,9 +61,9 @@
       "searchable": true,
       "test": "^[#a-zA-Z0-9_-]{1,255}@[^@\\s.]+(\\.[^@\\s.]+)+$",
       "hint": {
-        "en": "Expected an email address whose name holds only letters, digits, # - and _, e.g. support@example.org",
-        "fr": "Une adresse électronique est attendue, dont le nom ne contient que lettres, chiffres, # - et _, par ex. support@example.org",
-        "mn": "Имэйл хаяг оруулна уу, нэр нь зөвхөн үсэг, тоо, # - болон _ агуулна, жишээ нь support@example.org"
+        "en": "An email address whose name holds only letters, digits, # - and _, e.g. support@example.org",
+        "fr": "Une adresse électronique dont le nom ne contient que lettres, chiffres, # - et _, par ex. support@example.org",
+        "mn": "Имэйл хаяг, нэр нь зөвхөн үсэг, тоо, # - болон _ агуулна, жишээ нь support@example.org"
       },
       "required": true,
       "unique": {
@@ -99,9 +99,9 @@
         "type": "string",
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
         "hint": {
-          "en": "Expected the DN of an entry of this directory",
-          "fr": "Le DN d’une entrée de cet annuaire est attendu",
-          "mn": "Энэ лавлахын бичлэгийн DN оруулна уу"
+          "en": "The DN of an entry of this directory",
+          "fr": "Le DN d’une entrée de cet annuaire",
+          "mn": "Энэ лавлахын бичлэгийн DN"
         }
       },
       "required": true,
@@ -118,9 +118,9 @@
         "type": "string",
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
         "hint": {
-          "en": "Expected the DN of an entry of this directory",
-          "fr": "Le DN d’une entrée de cet annuaire est attendu",
-          "mn": "Энэ лавлахын бичлэгийн DN оруулна уу"
+          "en": "The DN of an entry of this directory",
+          "fr": "Le DN d’une entrée de cet annuaire",
+          "mn": "Энэ лавлахын бичлэгийн DN"
         }
       },
       "required": false,

@@ -158,9 +158,9 @@
       "searchable": true,
       "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
       "hint": {
-        "en": "Expected an email address, e.g. jane.doe@example.org",
-        "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org",
-        "mn": "Имэйл хаяг оруулна уу, жишээ нь jane.doe@example.org"
+        "en": "An email address, e.g. jane.doe@example.org",
+        "fr": "Une adresse électronique, par ex. jane.doe@example.org",
+        "mn": "Имэйл хаяг, жишээ нь jane.doe@example.org"
       },
       "required": true,
       "unique": {
@@ -181,9 +181,9 @@
         "type": "string",
         "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
         "hint": {
-          "en": "Expected an email address, e.g. jane.doe@example.org",
-          "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org",
-          "mn": "Имэйл хаяг оруулна уу, жишээ нь jane.doe@example.org"
+          "en": "An email address, e.g. jane.doe@example.org",
+          "fr": "Une adresse électronique, par ex. jane.doe@example.org",
+          "mn": "Имэйл хаяг, жишээ нь jane.doe@example.org"
         }
       },
       "required": false,
@@ -205,9 +205,9 @@
         "type": "string",
         "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
         "hint": {
-          "en": "Expected an email address, e.g. jane.doe@example.org",
-          "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org",
-          "mn": "Имэйл хаяг оруулна уу, жишээ нь jane.doe@example.org"
+          "en": "An email address, e.g. jane.doe@example.org",
+          "fr": "Une adresse électronique, par ex. jane.doe@example.org",
+          "mn": "Имэйл хаяг, жишээ нь jane.doe@example.org"
         }
       },
       "required": false,
@@ -228,9 +228,9 @@
       "role": "emailQuotaSize",
       "normalize": "byteSize",
       "hint": {
-        "en": "Expected pattern xGB, xMB, xKB or a number of bytes",
-        "fr": "Format attendu : xGB, xMB, xKB ou un nombre d’octets",
-        "mn": "Хэлбэр: xGB, xMB, xKB эсвэл байтын тоо"
+        "en": "A size such as xGB, xMB, xKB or a number of bytes",
+        "fr": "Une taille comme xGB, xMB, xKB ou un nombre d’octets",
+        "mn": "xGB, xMB, xKB гэх мэт хэмжээ эсвэл байтын тоо"
       },
       "group": {
         "en": "Mailbox Settings",
@@ -370,9 +370,9 @@
       "required": false,
       "role": "accountExpiry",
       "hint": {
-        "en": "Expected a date not earlier than today",
-        "fr": "Une date à partir d’aujourd’hui est attendue",
-        "mn": "Өнөөдөр эсвэл түүнээс хойших огноо оруулна уу"
+        "en": "A date from today onwards",
+        "fr": "Une date à partir d’aujourd’hui",
+        "mn": "Өнөөдөр эсвэл түүнээс хойшхи огноо"
       },
       "label": {
         "en": "Deletion date",
