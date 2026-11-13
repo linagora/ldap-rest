@@ -16,6 +16,9 @@
   points it at (`entity.base`, `attributes`) as well as the flat one, and
   demands an explicit base
   ([bulk import](docs/usage/plugins/ldap/bulk-import.md#schema-configuration-format)).
+- `core/ldap/enterpriseRules` refuses a write carrying a mail address on an
+  entry no entity covers, including the app accounts, SCIM and custom plugins
+  writing outside a branch an entity declares.
 
 ## v2.2.2 (2026-11-11)
 

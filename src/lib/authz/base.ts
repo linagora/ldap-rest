@@ -346,17 +346,17 @@ export default abstract class AuthzBase extends DmPlugin {
     const bulk = this.server.loadedPlugins['ldapBulkImport'] as
       { bases?: () => string[] } | undefined;
     if (typeof bulk?.bases === 'function')
-      // A bulk import base at the directory root, or at the top organization,
-      // is a branch of the tree itself, not a flat store holding attached
-      // entries: the same rule as the groups base above. A row imported there
-      // would be judged on its link alone.
+      // A bulk import base at the directory root, or under the top
+      // organization, is a branch of the tree itself, not a flat store
+      // holding attached entries: the same rule as the groups base above. A
+      // row imported there would be judged on its link alone.
       bases.push(
         ...bulk
           .bases()
           .filter(
             base =>
               !sameDn(base, this.config.ldap_base || '') &&
-              !sameDn(base, this.config.ldap_top_organization || '')
+              !isDnInBranch(base, this.config.ldap_top_organization || '')
           )
       );
     if (this.config.ldap_users_base) bases.push(this.config.ldap_users_base);

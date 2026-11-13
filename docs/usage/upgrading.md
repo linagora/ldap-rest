@@ -8,7 +8,8 @@ decision or a configuration change appear here; see the
 
 ### The bulk import writes below the base its schema names
 
-**Who is affected:** every deployment loading `core/ldap/bulkImport`.
+**Who is affected:** every deployment loading `core/ldap/bulkImport` or
+`core/ldap/enterpriseRules`.
 
 The schema file is now read in the format the documentation points it at: the
 entity one (`entity.base`, `entity.mainAttribute`, `attributes`), as the
@@ -21,10 +22,14 @@ there before are left where they are: delete them or move them into the
 branch, no entity covers them.
 
 A schema naming neither `base` nor `entity.base` is no longer loaded; give it
-the base to write into. With `core/ldap/enterpriseRules`, a write carrying a
-mail address on an entry no entity covers is refused with a `400`: declare the
-branch as a flat resource, or write the entry below one. See
-[bulk import](plugins/ldap/bulk-import.md#schema-configuration-format).
+the base to write into.
+
+`core/ldap/enterpriseRules` now refuses a write carrying a mail address on an
+entry no entity covers, with a `400`. That covers the bulk import, the app
+accounts (`appAccountsApi` is exempt: its accounts copy the user's address),
+SCIM and any custom plugin writing a mail address outside a branch an entity
+declares. Declare the branch as a flat resource, or write the entry below one.
+See [bulk import](plugins/ldap/bulk-import.md#schema-configuration-format).
 
 ## From 2.1.1
 

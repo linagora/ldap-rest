@@ -635,6 +635,7 @@ export default class LdapBulkImport extends DmPlugin {
 
     // 2. Add fixed fields from schema
     const fixed = new Set<string>();
+    const readOnly = new Set<string>();
     for (const [attr, def] of Object.entries(schema.properties || {})) {
       if (def.fixed === true) {
         const value = def.default || def.const;
@@ -643,6 +644,7 @@ export default class LdapBulkImport extends DmPlugin {
           fixed.add(attr.toLowerCase());
         }
       }
+      if (def.readOnly === true) readOnly.add(attr.toLowerCase());
     }
 
     // 3. Add fields from CSV. Empty cells are skipped whatever their column
@@ -657,6 +659,11 @@ export default class LdapBulkImport extends DmPlugin {
         if (fixed.has(attr.split(';')[0].toLowerCase())) {
           throw new Error(
             `Attribute "${attr}" is fixed and cannot be imported`
+          );
+        }
+        if (readOnly.has(attr.split(';')[0].toLowerCase())) {
+          throw new Error(
+            `Attribute "${attr}" is read-only and cannot be imported`
           );
         }
         // Support multi-value: "val1;val2;val3"

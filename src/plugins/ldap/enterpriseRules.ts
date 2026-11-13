@@ -508,20 +508,28 @@ export default class LdapEnterpriseRules extends DmPlugin {
    * @throws BadRequestError when one of them holds a mail address
    */
   private guardMailOutsideEntity(dn: string, values: AttributesList): void {
+    // The app accounts are copies of a user's mail, judged when the user's
+    // entry was written: the same address is not a new one.
+    const appBase = this.config.applicative_account_base;
+    if (appBase && isDnInBranch(dn, appBase)) return;
+
+    const watched = new Set<string>();
     for (const binding of this.bindings()) {
       for (const [name, attr] of Object.entries(binding.schema.attributes)) {
         if (
-          !attr.mailDomainScope &&
-          !hasRole(attr, 'primaryEmail') &&
-          !hasRole(attr, 'emailAliases')
+          attr.mailDomainScope ||
+          hasRole(attr, 'primaryEmail') ||
+          hasRole(attr, 'emailAliases')
         )
-          continue;
-        if (allValues(values, name).length === 0) continue;
-        throw new BadRequestError(
-          `"${name}" is set on ${dn}, which no entity covers: no rule checks that address. ` +
-            'Declare the branch as a flat resource, or write the entry below one'
-        );
+          watched.add(name);
       }
+    }
+    for (const name of watched) {
+      if (allValues(values, name).length === 0) continue;
+      throw new BadRequestError(
+        `"${name}" is set on ${dn}, which no entity covers: no rule checks that address. ` +
+          'Declare the branch as a flat resource, or write the entry below one'
+      );
     }
   }
 
