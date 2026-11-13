@@ -1620,10 +1620,20 @@ export default class PasswordPolicy extends DmPlugin {
         req
       );
     } catch (error) {
-      if (extractLdapCode(error) !== 32) throw error;
-      throw new NotFoundError(
-        `${this.policyBase()} does not exist: create it or change --ppolicy-base`
-      );
+      const code = extractLdapCode(error);
+      if (code === 32)
+        throw new NotFoundError(
+          `${this.policyBase()} does not exist: create it or change --ppolicy-base`
+        );
+      // A backend that cannot store the DN answers `other` (80) without a
+      // diagnostic — back-mdb's key size, for a long RDN. The name is the
+      // only part of this request that can make the DN unstorable, and a 500
+      // tells the client nothing it can fix.
+      if (code === 80)
+        throw new BadRequestError(
+          'The policy name is too long for the directory'
+        );
+      throw error;
     }
     this.forgetPolicies();
     return this.toPolicyRecord(await this.findPolicy(cn, req));

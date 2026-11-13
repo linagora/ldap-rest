@@ -36,6 +36,12 @@
   entry no entity covers, including the app accounts, SCIM and custom plugins
   writing outside a branch an entity declares.
 
+### Fixed
+
+- Creating a password policy with a name the directory cannot store answers a
+  `400` instead of a `500`
+  ([#715](https://github.com/linagora/ldap-rest/issues/715)).
+
 ## v2.2.2 (2026-11-11)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0, zlib updated to 1.4-r0.
