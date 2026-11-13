@@ -4,7 +4,6 @@ import request from 'supertest';
 import { DM } from '../../../src/bin';
 import AppAccountsApi from '../../../src/plugins/twake/appAccountsApi';
 import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsistency';
-import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import OnChange from '../../../src/plugins/ldap/onChange';
 import AuthToken from '../../../src/plugins/auth/token';
 import { waitForEntry } from '../../helpers/waitFor';
@@ -82,11 +81,6 @@ describe('App Accounts API Plugin', function () {
     // Register appAccountsConsistency plugin
     const appAccountsConsistency = new AppAccountsConsistency(dm);
     await dm.registerPlugin('appAccountsConsistency', appAccountsConsistency);
-
-    // The enterprise rules refuse a mail address outside an entity, but the
-    // app accounts copy the user's address: they must not be refused.
-    const enterpriseRules = new LdapEnterpriseRules(dm);
-    await dm.registerPlugin('ldapEnterpriseRules', enterpriseRules);
 
     // Register API plugin
     appAccountsApi = new AppAccountsApi(dm);
