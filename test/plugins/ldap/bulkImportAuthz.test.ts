@@ -59,6 +59,8 @@ describe('Bulk import and the caller', function () {
   let plain: DM;
   let request: ReturnType<typeof supertest>;
   let dir: string;
+  let userBranch: string;
+  let topOrg: string;
   const previous: Record<string, string | undefined> = {};
 
   before(function () {
@@ -68,18 +70,19 @@ describe('Bulk import and the caller', function () {
   before(async function () {
     this.timeout(20000);
     base = process.env.DM_LDAP_BASE as string;
-    const top = process.env.DM_LDAP_TOP_ORGANIZATION as string;
-    ownOrg = `ou=BiaOwnOrg,${top}`;
-    otherOrg = `ou=BiaOtherOrg,${top}`;
-    transit = `ou=BiaTransit,${top}`;
-    holderDn = `uid=${HOLDER},${base}`;
+    topOrg = process.env.DM_LDAP_TOP_ORGANIZATION as string;
+    ownOrg = `ou=BiaOwnOrg,${topOrg}`;
+    otherOrg = `ou=BiaOtherOrg,${topOrg}`;
+    transit = `ou=BiaTransit,${topOrg}`;
+    userBranch = `ou=users,${base}`;
+    holderDn = `uid=${HOLDER},${userBranch}`;
 
     dir = mkdtempSync(join(tmpdir(), 'bia-'));
     const schema = join(dir, 'schema.json');
     writeFileSync(
       schema,
       JSON.stringify({
-        base,
+        base: userBranch,
         mainAttribute: 'uid',
         properties: {
           objectClass: {
@@ -92,6 +95,44 @@ describe('Bulk import and the caller', function () {
           sn: { type: 'string', required: true },
           twakeDepartmentLink: { type: 'string', role: ['organizationLink'] },
           twakeDepartmentPath: { type: 'string', role: ['organizationPath'] },
+        },
+      })
+    );
+    // The same import written at the directory root, as a schema with no base
+    // of its own used to: the root is the tree itself, not a flat store.
+    const rootSchema = join(dir, 'root-schema.json');
+    writeFileSync(
+      rootSchema,
+      JSON.stringify({
+        base,
+        mainAttribute: 'uid',
+        properties: {
+          objectClass: {
+            type: 'array',
+            fixed: true,
+            default: ['top', 'twakeAccount', 'twakeWhitePages'],
+          },
+          uid: { type: 'string', required: true },
+          twakeDepartmentLink: { type: 'string', role: ['organizationLink'] },
+        },
+      })
+    );
+    // And one at the top organization, the branch the organizations live
+    // under: entries there are branches of the tree, not attached entries.
+    const topSchema = join(dir, 'top-schema.json');
+    writeFileSync(
+      topSchema,
+      JSON.stringify({
+        base: topOrg,
+        mainAttribute: 'cn',
+        properties: {
+          objectClass: {
+            type: 'array',
+            fixed: true,
+            default: ['top', 'organizationalUnit', 'twakeDepartment'],
+          },
+          cn: { type: 'string', required: true },
+          twakeDepartmentLink: { type: 'string', role: ['organizationLink'] },
         },
       })
     );
@@ -114,7 +155,7 @@ describe('Bulk import and the caller', function () {
       groups: {},
     });
     process.env.DM_AUTHZ_PER_BRANCH_CACHE_TTL = '60';
-    process.env.DM_BULK_IMPORT_SCHEMAS = `biausers:${schema}`;
+    process.env.DM_BULK_IMPORT_SCHEMAS = `biausers:${schema},biaroot:${rootSchema},biatop:${topSchema}`;
 
     plain = new DM();
     await plain.ready;
@@ -152,11 +193,13 @@ describe('Bulk import and the caller', function () {
   after(async () => {
     for (const dn of [
       holderDn,
-      `uid=bia-new,${base}`,
-      `uid=bia-multi,${base}`,
-      `uid=bia-empty,${base}`,
-      `uid=bia-t1,${base}`,
-      `uid=bia-mine,${base}`,
+      `uid=bia-new,${userBranch}`,
+      `uid=bia-multi,${userBranch}`,
+      `uid=bia-empty,${userBranch}`,
+      `uid=bia-t1,${userBranch}`,
+      `uid=bia-mine,${userBranch}`,
+      `uid=bia-root,${base}`,
+      `cn=bia-top,${topOrg}`,
       ownOrg,
       otherOrg,
       transit,
@@ -234,6 +277,26 @@ describe('Bulk import and the caller', function () {
     expect((res.body.errors as RowError[])[0].error).to.equal(AUTHZ_REFUSED);
   });
 
+  it('refuses an import written at the top organization', async () => {
+    // The entries there are branches of the tree, not attached entries: a
+    // bulk base naming it does not make it a flat store either.
+    const res = await request
+      .post('/api/v1/ldap/bulk-import/biatop')
+      .set('X-Test-User', OUTSIDER)
+      .attach(
+        'file',
+        Buffer.from(
+          ['cn,twakeDepartmentLink', `bia-top,"${ownOrg}"`].join('\n')
+        ),
+        'rows.csv'
+      );
+    expect(res.body, JSON.stringify(res.body)).to.include({
+      created: 0,
+      failed: 1,
+    });
+    expect((res.body.errors as RowError[])[0].error).to.equal(AUTHZ_REFUSED);
+  });
+
   it('still imports the rows of the caller own organization', async () => {
     const res = await importRows([`bia-mine,Mine,Mine,"${ownOrg}"`], {
       dryRun: 'true',
@@ -242,6 +305,26 @@ describe('Bulk import and the caller', function () {
       created: 1,
       failed: 0,
     });
+  });
+
+  it('refuses an import written at the directory root', async () => {
+    // A bulk base at the root must not exempt the row from the branch its DN
+    // lands in: the root is the tree itself, not a flat store.
+    const res = await request
+      .post('/api/v1/ldap/bulk-import/biaroot')
+      .set('X-Test-User', OUTSIDER)
+      .attach(
+        'file',
+        Buffer.from(
+          ['uid,twakeDepartmentLink', `bia-root,"${ownOrg}"`].join('\n')
+        ),
+        'rows.csv'
+      );
+    expect(res.body, JSON.stringify(res.body)).to.include({
+      created: 0,
+      failed: 1,
+    });
+    expect((res.body.errors as RowError[])[0].error).to.equal(AUTHZ_REFUSED);
   });
   // Judged by attachment: an entry is the organization's it is linked to
   describe('judged by attachment', () => {
@@ -273,7 +356,7 @@ describe('Bulk import and the caller', function () {
 
     before(async function () {
       this.timeout(20000);
-      ownDn = `uid=${OWN},${base}`;
+      ownDn = `uid=${OWN},${userBranch}`;
       await plain.ldap.delete(ownDn).catch(() => undefined);
       await plain.ldap.add(ownDn, {
         objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],

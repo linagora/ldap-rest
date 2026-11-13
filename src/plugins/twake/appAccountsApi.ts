@@ -581,9 +581,17 @@ export default class AppAccountsApi extends DmPlugin {
         newAttrs.description = name;
       }
 
-      // Create applicative account
+      // Create applicative account. Judged first, as the caller: the add is
+      // the write the caller must be allowed to make. Then written as the
+      // server, so the copy is not a request the enterprise rules judge: the
+      // mail is the user's, already checked when the user's entry was written.
       const applicativeDn = `uid=${escapeDnValue(newUid)},${this.applicativeAccountBase}`;
-      await this.server.ldap.add(applicativeDn, newAttrs, req);
+      await this.server.ldap.authorize('ldapaddrequest', [
+        applicativeDn,
+        newAttrs,
+        req,
+      ]);
+      await this.server.ldap.system.add(applicativeDn, newAttrs);
 
       this.logger.info(
         `${this.name}: Created applicative account ${applicativeDn} for user ${principal}`
@@ -611,7 +619,9 @@ export default class AppAccountsApi extends DmPlugin {
           error
         );
         try {
-          await this.server.ldap.delete(applicativeDn, req);
+          // As the server: the server created the entry, so it must be able
+          // to remove it whatever the caller's rights.
+          await this.server.ldap.system.delete(applicativeDn);
         } catch (rollbackError) {
           this.logger.error(
             `${this.name}: Failed to roll back applicative account ${applicativeDn}:`,

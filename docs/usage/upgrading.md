@@ -4,6 +4,33 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## From 2.2.2
+
+### The bulk import writes below the base its schema names
+
+**Who is affected:** every deployment loading `core/ldap/bulkImport` or
+`core/ldap/enterpriseRules`.
+
+The schema file is now read in the format the documentation points it at: the
+entity one (`entity.base`, `entity.mainAttribute`, `attributes`), as the
+shipped `static/schemas/twake/*.json` are written, or the flat import one.
+The documented
+`--bulk-import-schemas "users:./static/schemas/twake/users.json"` therefore
+imports into `ou=users,<base>` under `uid`, instead of writing `cn=…,<base>`
+at the directory root with none of the schema's attributes read. Rows written
+there before are left where they are: delete them or move them into the
+branch, no entity covers them.
+
+A schema naming neither `base` nor `entity.base` is no longer loaded; give it
+the base to write into.
+
+`core/ldap/enterpriseRules` now refuses a write carrying a mail address on an
+entry no entity covers, with a `400`. That covers the bulk import, the app
+accounts (`appAccountsApi` is exempt: its accounts copy the user's address),
+SCIM and any custom plugin writing a mail address outside a branch an entity
+declares. Declare the branch as a flat resource, or write the entry below one.
+See [bulk import](plugins/ldap/bulk-import.md#schema-configuration-format).
+
 ## From 2.1.1
 
 ### TOTP requires the user name

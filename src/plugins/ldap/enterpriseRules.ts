@@ -494,6 +494,40 @@ export default class LdapEnterpriseRules extends DmPlugin {
     return best;
   }
 
+  /**
+   * Refuse a write carrying a mail address on an entry no entity covers.
+   *
+   * The domain and uniqueness rules are declared by the entity schemas: an
+   * entry outside every entity is written with nothing to judge its
+   * addresses, and the mail server provisions the entry wherever it is. An
+   * address that no rule can check is refused rather than trusted, so the
+   * entry has to land in a branch the deployment declares.
+   *
+   * @param dn entry being written
+   * @param values attributes as submitted
+   * @throws BadRequestError when one of them holds a mail address
+   */
+  private guardMailOutsideEntity(dn: string, values: AttributesList): void {
+    const watched = new Set<string>();
+    for (const binding of this.bindings()) {
+      for (const [name, attr] of Object.entries(binding.schema.attributes)) {
+        if (
+          attr.mailDomainScope ||
+          hasRole(attr, 'primaryEmail') ||
+          hasRole(attr, 'emailAliases')
+        )
+          watched.add(name);
+      }
+    }
+    for (const name of watched) {
+      if (allValues(values, name).length === 0) continue;
+      throw new BadRequestError(
+        `"${name}" is set on ${dn}, which no entity covers: no rule checks that address. ` +
+          'Declare the branch as a flat resource, or write the entry below one'
+      );
+    }
+  }
+
   hooks: Hooks = {
     ldapaddrequest: async ([dn, entry, req]) => {
       const entity = this.resolveEntity(dn);
@@ -501,6 +535,11 @@ export default class LdapEnterpriseRules extends DmPlugin {
         respell(entity.schema, entry);
         await this.runChecks(entity, dn, entry, null);
         await this.runTransformations(entity, dn, entry, true);
+      } else if (req) {
+        // The server's own bookkeeping — the copy another plugin keeps of an
+        // account, an entry a migration writes — names no request: this rule
+        // is about what a caller writes.
+        this.guardMailOutsideEntity(dn, entry);
       }
       return req !== undefined
         ? [dn, entry, req]
@@ -509,7 +548,15 @@ export default class LdapEnterpriseRules extends DmPlugin {
 
     ldapmodifyrequest: async ([dn, changes, op, req]) => {
       const entity = this.resolveEntity(dn);
-      if (!entity) return [dn, changes, op, req];
+      if (!entity) {
+        // A change may add the address that would have it provisioned
+        if (req)
+          this.guardMailOutsideEntity(dn, {
+            ...(changes.add || {}),
+            ...(changes.replace || {}),
+          });
+        return [dn, changes, op, req];
+      }
       respell(entity.schema, changes.add);
       respell(entity.schema, changes.replace);
 

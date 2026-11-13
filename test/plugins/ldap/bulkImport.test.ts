@@ -84,7 +84,8 @@ describe('LDAP Bulk Import Plugin', function () {
     fs.writeFileSync(testSchemaPath, JSON.stringify(testSchema, null, 2));
 
     // Set config
-    process.env.DM_BULK_IMPORT_SCHEMAS = `testusers:${testSchemaPath}`;
+    // The shipped schema is the entity format the documentation points at
+    process.env.DM_BULK_IMPORT_SCHEMAS = `testusers:${testSchemaPath},shipped:./static/schemas/twake/users.json`;
     process.env.DM_BULK_IMPORT_MAX_FILE_SIZE = '1048576'; // 1MB
     process.env.DM_BULK_IMPORT_BATCH_SIZE = '50';
 
@@ -144,6 +145,9 @@ describe('LDAP Bulk Import Plugin', function () {
         // ignore
       }
     }
+    await server.ldap
+      .delete(`uid=rules.import,ou=users,${process.env.DM_LDAP_BASE}`)
+      .catch(() => undefined);
   });
 
   describe('Template Generation', () => {
@@ -209,6 +213,45 @@ describe('LDAP Bulk Import Plugin', function () {
       expect((user1 as any).searchEntries[0].twakeDepartmentPath).to.equal(
         'TestOrg1'
       );
+    });
+
+    it('should import into the branch the entity schema declares', async function () {
+      this.timeout(10000);
+
+      // What the documentation configures: the entity format names both the
+      // branch the rows land in and the attribute that names them.
+      const csvContent = [
+        'uid,employeeNumber,sn,givenName,displayName,mail,organizationDn',
+        `rules.import,RULES001,Import,Rule,Rule Import,rules.import@example.com,"${getTestOrg1Dn()}"`,
+      ].join('\n');
+
+      const res = await request
+        .post('/api/v1/ldap/bulk-import/shipped')
+        .attach('file', Buffer.from(csvContent), 'test.csv')
+        .field('dryRun', 'false');
+
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      expect(res.body).to.include({ total: 1, created: 1, failed: 0 });
+
+      const created = await server.ldap.search(
+        { paged: false, scope: 'base' },
+        `uid=rules.import,ou=users,${process.env.DM_LDAP_BASE}`
+      );
+      const entry = (created as { searchEntries: Record<string, unknown>[] })
+        .searchEntries[0];
+      expect(entry.uid).to.equal('rules.import');
+      expect(entry.twakeDepartmentLink).to.equal(getTestOrg1Dn());
+
+      const atRoot = await server.ldap
+        .search(
+          { paged: false, scope: 'base' },
+          `cn=rules.import,${process.env.DM_LDAP_BASE}`
+        )
+        .catch(() => ({ searchEntries: [] }));
+      expect(
+        (atRoot as { searchEntries: unknown[] }).searchEntries,
+        'a row written at the directory root'
+      ).to.be.empty;
     });
 
     it('should handle dry run mode', async () => {

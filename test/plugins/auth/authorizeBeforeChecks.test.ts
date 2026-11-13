@@ -58,6 +58,7 @@ describe('Authorization before the checks that read the directory', function () 
   // else; the admin may do everything, so the route's own answers show.
   const OUTSIDER = 'abc.outsider';
   const ADMIN = 'abc.admin';
+  const READER = 'abc.reader';
   const HOLDER = 'abc.holder';
   const GROUP = 'abc-group';
   let base: string;
@@ -95,6 +96,8 @@ describe('Authorization before the checks that read the directory', function () 
       users: {
         [OUTSIDER]: { [ownOrg]: { read: true, write: true, delete: true } },
         [ADMIN]: { [base]: { read: true, write: true, delete: true } },
+        // Reads the user branch, but may not write the applicative branch
+        [READER]: { [users]: { read: true, write: false, delete: false } },
       },
       groups: {},
     });
@@ -440,6 +443,24 @@ describe('Authorization before the checks that read the directory', function () 
         bodies.push(res.body);
       }
       sameAnswers(bodies);
+    });
+
+    it('refuses a read-only caller and leaves nothing in the app branch', async () => {
+      const res = await request
+        .post(`/api/v1/users/${HOLDER}@test.org/app-accounts`)
+        .set('X-Test-User', READER)
+        .set('Accept', 'application/json')
+        .send({ name: 'read-only' });
+      expect(res.status, JSON.stringify(res.body)).to.equal(403);
+      expect(res.body).to.not.have.property('pwd');
+      // The app account was not created: the caller's read of the user did
+      // not become a write of the copy.
+      const list = await request
+        .get(`/api/v1/users/${HOLDER}@test.org/app-accounts`)
+        .set('X-Test-User', ADMIN)
+        .set('Accept', 'application/json');
+      expect(list.status, JSON.stringify(list.body)).to.equal(200);
+      expect(list.body).to.be.an('array').with.lengthOf(0);
     });
 
     it('answers the app accounts of an account the caller cannot read as of none', async () => {
