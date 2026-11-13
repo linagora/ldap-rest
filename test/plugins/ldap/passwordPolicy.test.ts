@@ -532,6 +532,27 @@ describe('PasswordPolicy Plugin: policy management', () => {
     }
   });
 
+  it('blames the name from the RDN length the directory mapping uses', async () => {
+    // `cn=` and 198 letters are 201 bytes, the first the shared rule
+    // blames: the policy's own sentence holds from there, not further on
+    const add = dm.ldap.add;
+    dm.ldap.add = (() =>
+      Promise.reject(
+        Object.assign(new Error('LDAP add error'), { code: 80 })
+      )) as typeof dm.ldap.add;
+    try {
+      const long = await request.post(api).send({ cn: 'y'.repeat(198) });
+      expect(long.status, JSON.stringify(long.body)).to.equal(400);
+      expect(long.body.error).to.equal(
+        'The policy name is too long for the directory'
+      );
+      const short = await request.post(api).send({ cn: 'y'.repeat(197) });
+      expect(short.status, JSON.stringify(short.body)).to.equal(500);
+    } finally {
+      dm.ldap.add = add;
+    }
+  });
+
   it('lists the policies, marking the default one', async () => {
     const res = await request.get(api);
     expect(res.status).to.equal(200);

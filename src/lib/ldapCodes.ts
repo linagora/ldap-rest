@@ -84,3 +84,35 @@ const SCHEMA_REFUSALS: ReadonlySet<number> = new Set([
  */
 export const isSchemaRefusal = (code: number | undefined): boolean =>
   code !== undefined && SCHEMA_REFUSALS.has(code);
+
+/**
+ * Most bytes of an RDN back-mdb can key. Measured on osixia/openldap 1.5: an
+ * RDN of 245 bytes stores and one of 246 answers `other` (80), whatever its
+ * type, counted in UTF-8 bytes of the RDN as written, escaping included. The
+ * limit is on the RDN alone: a deep DN whose RDN is short stores.
+ */
+export const RDN_KEY_LIMIT = 245;
+
+/**
+ * Longest RDN whose `other` (80) stays the server's failure. A backend that
+ * cannot key an RDN answers 80 without a diagnostic, so its length is the
+ * only clue. The margin below {@link RDN_KEY_LIMIT} covers a backend or a
+ * version keying less; it is also the window where an unrelated 80 (a full
+ * database, an index failure) on an RDN that long is reported as the
+ * client's fault, the price of a 400 rather than a 500 for the common case.
+ */
+export const LONG_RDN = 200;
+
+/**
+ * Whether an LDAP result code means the directory could not key `rdn`: an
+ * `other` (80) on an RDN longer than {@link LONG_RDN} bytes. The request is
+ * at fault, as for {@link isSchemaRefusal}; each caller says it in its own
+ * words.
+ *
+ * @param rdn the RDN as written in the DN sent, escaping included
+ * @param code LDAP result code, as {@link extractLdapCode} reads it
+ */
+export const isUnstorableRdn = (
+  rdn: string,
+  code: number | undefined
+): boolean => code === 80 && Buffer.byteLength(rdn, 'utf8') > LONG_RDN;

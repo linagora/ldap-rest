@@ -115,6 +115,23 @@ describe('LdapUsersFlat validation with standard schema (via flatGeneric)', func
       expect(reason.message).to.match(/already exists/);
     });
 
+    it('should answer 400 for a uid the schema takes but the directory cannot store', async () => {
+      // The schema accepts 255 characters, past what back-mdb keys: see
+      // `isUnstorableRdn`
+      const uid = 'u'.repeat(250);
+      try {
+        await plugin.addUser(uid, {
+          cn: 'Long',
+          sn: 'User',
+          mail: 'long-uid@example.org',
+        });
+        expect.fail('Should reject a uid too long for the directory');
+      } catch (e) {
+        expect(e).to.have.property('statusCode', 400);
+        expect((e as Error).message).to.match(/RDN is too long/);
+      }
+    });
+
     it('should reject user with invalid uid format', async () => {
       try {
         await plugin.addUser('test user!', {

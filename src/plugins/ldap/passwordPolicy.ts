@@ -31,7 +31,7 @@ import {
   validateDnValue,
 } from '../../lib/utils.js';
 import { jsonBody, notFound } from '../../lib/expressFormatedResponses.js';
-import { extractLdapCode } from '../../lib/ldapCodes.js';
+import { extractLdapCode, isUnstorableRdn } from '../../lib/ldapCodes.js';
 
 // ppolicy operational attributes to read
 const PPOLICY_ATTRS = [
@@ -80,14 +80,6 @@ const READ_ONLY_POLICY_ATTRS = ['pwdAttribute', 'pwdCheckModule'];
  * back as 1.
  */
 const MAX_POLICY_INTEGER = Number.MAX_SAFE_INTEGER;
-
-/**
- * Longest RDN a policy name may make that a directory cannot store: back-mdb
- * refuses one of about 240 bytes, and the exact limit moves with the backend
- * and its version. Below it, a code `other` (80) is the server's failure, not
- * the name's.
- */
-const LONG_POLICY_NAME = 200;
 
 // Carried by the pwdPolicyChecker class, not by pwdPolicy
 const CHECKER_ATTRS = ['pwdCheckModuleArg', 'pwdUseCheckModule'];
@@ -1650,15 +1642,9 @@ export default class PasswordPolicy extends DmPlugin {
         throw new NotFoundError(
           `${this.policyBase()} does not exist: create it or change --ppolicy-base`
         );
-      // A backend that cannot key the DN answers `other` (80) without a
-      // diagnostic — back-mdb's key size, for a long RDN. Only a name that
-      // long can be the cause; any other 80 is the server's, and stays a 500
-      // rather than blaming the client. The RDN is measured as written: a
-      // comma takes two bytes once escaped.
-      if (
-        code === 80 &&
-        Buffer.byteLength(escapeDnValue(cn), 'utf8') > LONG_POLICY_NAME
-      )
+      // The directory could not key the RDN the name makes: said in the
+      // name's terms, see `isUnstorableRdn`
+      if (isUnstorableRdn(`cn=${escapeDnValue(cn)}`, code))
         throw new BadRequestError(
           'The policy name is too long for the directory'
         );

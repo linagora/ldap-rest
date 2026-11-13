@@ -12,7 +12,13 @@ import { type Config } from '../config/args.js';
 import { type DM } from '../bin/index.js';
 import type { Hooks } from '../hooks.js';
 
-import { escapeDnValue, getParentDn, hookOwner, rdnTypes } from './utils.js';
+import {
+  escapeDnValue,
+  getParentDn,
+  getRdn,
+  hookOwner,
+  rdnTypes,
+} from './utils.js';
 import { changeContext, type ChangeContext } from './changeContext.js';
 import HookBus from './hookBus.js';
 import { outsideOperation, runOperation } from './operation.js';
@@ -29,7 +35,12 @@ import SearchCache, { digestKey, membersNamed } from './ldap/searchCache.js';
 import DirectorySchema from './ldap/schema.js';
 import CallerView from './ldap/callerView.js';
 import { BadRequestError, ConflictError, NotFoundError } from './errors.js';
-import { extractLdapCode, isSchemaRefusal } from './ldapCodes.js';
+import {
+  extractLdapCode,
+  isSchemaRefusal,
+  isUnstorableRdn,
+  RDN_KEY_LIMIT,
+} from './ldapCodes.js';
 import type { SchemaIndex } from './ldapSchema.js';
 
 // Typescript interface
@@ -257,6 +268,24 @@ function assertHasValue(name: string, value: unknown): void {
 }
 
 /**
+ * A 400 for an RDN the directory could not key (see `isUnstorableRdn`),
+ * naming its type and the limit for the client to know what to shorten.
+ */
+function unstorableRdn(dn: string, code: number | undefined): Error | null {
+  const rdn = getRdn(dn);
+  if (!isUnstorableRdn(rdn, code)) return null;
+  const type = rdn.slice(0, Math.max(rdn.indexOf('='), 0)) || 'entry';
+  const bytes = Buffer.byteLength(rdn, 'utf8');
+  return withCode(
+    new BadRequestError(
+      `The ${type} RDN is too long for the directory (${bytes} bytes; ` +
+        `it keys at most about ${RDN_KEY_LIMIT})`
+    ),
+    code!
+  );
+}
+
+/**
  * Wrap a write failure, turning a refusal of the request's content (see
  * `isSchemaRefusal`) into a 400: the mistake is the client's, and a 500
  * would hide it in logs it cannot read.
@@ -310,6 +339,8 @@ function ldapAddError(dn: string, error: unknown): Error {
       new NotFoundError(`${getParentDn(dn)} does not exist`),
       code
     );
+  const tooLong = unstorableRdn(dn, code);
+  if (tooLong) return tooLong;
   // attributeOrValueExists, on an add: the request names a value twice
   if (code === 20)
     return ldapRefusal(
@@ -347,8 +378,9 @@ function ldapModifyError(dn: string, error: unknown): Error {
 
 /**
  * Wrap a rename or move failure: a new DN already taken (68) is a 409, as on
- * an add, and a refusal of the request's content a 400 naming both DNs, the
- * new one being what the directory usually refused.
+ * an add, a new RDN too long to store is a 400 (see `unstorableRdn`), and a
+ * refusal of the request's content is a 400 naming both DNs, the new one
+ * being what the directory usually refused.
  */
 function ldapRenameError(
   context: string,
@@ -359,6 +391,8 @@ function ldapRenameError(
   const code = extractLdapCode(error);
   if (code === 68)
     return withCode(new ConflictError(`Entry ${newDn} already exists`), code);
+  const tooLong = unstorableRdn(newDn, code);
+  if (tooLong) return tooLong;
   return isSchemaRefusal(code)
     ? ldapRefusal(
         `The directory refused to rename ${dn} to ${newDn}`,
