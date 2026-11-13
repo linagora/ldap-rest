@@ -28,9 +28,10 @@ gets no instance.
   separator in the form matched.
 - The address (`--twake-instance-fqdn-attribute`) and the mark
   (`--twake-instance-sent-attribute`) are this plugin's to write: an add that
-  carries them has them removed, and an address written by a modify is taken
-  only when it is the one the provider gives the account, or once the
-  provider confirms it.
+  carries them has them removed, and so has a caller's modify that sets the
+  mark. Clearing the mark stays allowed: the account is then announced again.
+  An address written by a modify is taken only when it is the one the
+  provider gives the account, or once the provider confirms it.
 - A refused, unreachable or slow provider leaves the entry written and
   without an address: it is pending, and the error is logged. The add itself
   succeeds, whatever the door (REST, SCIM, bulk import).

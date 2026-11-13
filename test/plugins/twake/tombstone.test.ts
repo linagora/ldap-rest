@@ -383,6 +383,107 @@ describe('Twake tombstone plugin', function () {
     });
   });
 
+  describe('modify', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const caller = { user: 'jdoe', headers: {} } as any as Request;
+
+    const refused = async (write: Promise<unknown>): Promise<void> => {
+      let error: unknown;
+      await write.catch((err: unknown) => (error = err));
+      expect(error).to.have.property('statusCode', 403);
+    };
+
+    it("refuses a caller's modify that marks an entry deleted", async () => {
+      await add(flat('ts-alice'));
+      await refused(
+        dm.ldap.modify(
+          flat('ts-alice'),
+          { replace: { employeeType: 'deleted' } },
+          caller
+        )
+      );
+      await refused(
+        dm.ldap.modify(
+          flat('ts-alice'),
+          { add: { 'EmployeeType;binary': ['deleted'] } },
+          caller
+        )
+      );
+      expect(await read(flat('ts-alice'))).not.to.have.property('employeeType');
+    });
+
+    it('lets a caller write these attributes on a live account', async () => {
+      await add(flat('ts-alice'));
+      await dm.ldap.modify(
+        flat('ts-alice'),
+        { replace: { employeeType: 'contractor', roomNumber: 'B12' } },
+        caller
+      );
+      expect(await read(flat('ts-alice'))).to.include({
+        employeeType: 'contractor',
+        roomNumber: 'B12',
+      });
+    });
+
+    it("refuses a caller's modify that revives a tombstone", async () => {
+      await add(flat('ts-alice'));
+      await dm.ldap.delete(flat('ts-alice'), caller);
+      await refused(
+        dm.ldap.modify(flat('ts-alice'), { delete: ['EmployeeType'] }, caller)
+      );
+      await refused(
+        dm.ldap.modify(
+          flat('ts-alice'),
+          { delete: ['employeeType;binary'] },
+          caller
+        )
+      );
+      await refused(
+        dm.ldap.modify(
+          flat('ts-alice'),
+          { delete: { businessCategory: 'deleted' } },
+          caller
+        )
+      );
+      await refused(
+        dm.ldap.modify(
+          flat('ts-alice'),
+          { replace: { roomNumber: '2020-01-01T00:00:00.000Z' } },
+          caller
+        )
+      );
+      expect(await read(flat('ts-alice'))).to.include({
+        employeeType: 'deleted',
+        businessCategory: 'deleted',
+      });
+    });
+
+    it('lets a caller lock an account and write its other attributes', async () => {
+      await add(flat('ts-alice'));
+      await dm.ldap.modify(
+        flat('ts-alice'),
+        { replace: { carLicense: 'L', sn: 'Locked' } },
+        caller
+      );
+      expect(await read(flat('ts-alice'))).to.include({
+        carLicense: 'L',
+        sn: 'Locked',
+      });
+    });
+
+    it('leaves an entry no pattern matches alone', async () => {
+      await add(flat('plain-bob'));
+      await dm.ldap.modify(
+        flat('plain-bob'),
+        { replace: { employeeType: 'deleted' } },
+        caller
+      );
+      expect(await read(flat('plain-bob'))).to.include({
+        employeeType: 'deleted',
+      });
+    });
+  });
+
   describe('erase', () => {
     beforeEach(async () => {
       await add(flat('ts-alice'));

@@ -323,6 +323,43 @@ describe('Twake instances plugin', function () {
       expect(entry).not.to.have.property('businessCategory');
     });
 
+    it("ignores a mark a caller's modify sets, and lets it clear one", async () => {
+      search('in-alice.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances')
+        .reply(202, {});
+      await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
+      await dm.ldap.modify(
+        dnOf('in-alice'),
+        {
+          replace: { businessCategory: '2026-01-01T00:00:00Z', sn: 'Renamed' },
+        },
+        rest()
+      );
+      let entry = await read(dm, dnOf('in-alice'));
+      expect(entry).to.have.property('sn', 'Renamed');
+      expect(entry).not.to.have.property('businessCategory');
+
+      await dm.ldap.modify(
+        dnOf('in-alice'),
+        { add: { 'businessCategory;binary': '2026-01-01T00:00:00Z' } },
+        rest()
+      );
+      entry = await read(dm, dnOf('in-alice'));
+      expect(entry).not.to.have.property('businessCategory');
+
+      await dm.ldap.modify(dnOf('in-alice'), {
+        replace: { businessCategory: '2026-01-01T00:00:00Z' },
+      });
+      await dm.ldap.modify(
+        dnOf('in-alice'),
+        { delete: ['businessCategory'] },
+        rest()
+      );
+      entry = await read(dm, dnOf('in-alice'));
+      expect(entry).not.to.have.property('businessCategory');
+    });
+
     it('takes an account under a respelled branch for one', async () => {
       // The directory stores this entry at its canonical DN, which the
       // expressions match; the DN as sent does not

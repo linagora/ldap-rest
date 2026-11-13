@@ -12,6 +12,8 @@
  *
  * See `docs/usage/plugins/integrations/tombstone.md`.
  */
+import { AsyncLocalStorage } from 'async_hooks';
+
 import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
@@ -21,6 +23,7 @@ import type { Hooks } from '../../hooks.js';
 import {
   BadRequestError,
   ConflictError,
+  ForbiddenError,
   NotFoundError,
 } from '../../lib/errors.js';
 import { changeContext } from '../../lib/changeContext.js';
@@ -65,6 +68,8 @@ export default class TwakeTombstone extends DmPlugin {
   roles: Role[] = ['consistency', 'api'] as const;
 
   private readonly attrs: LifecycleAttributes;
+  /** The attributes only a delete writes, lowercased. */
+  private readonly marks: string[];
   private readonly patterns: RegExp[];
   private readonly defaultReason: string;
   private readonly reasonHeader: string;
@@ -78,6 +83,8 @@ export default class TwakeTombstone extends DmPlugin {
   private readonly reasonFor = new Map<string, string>();
   /** Entries being erased: their delete must reach the directory. */
   private readonly erasing = new Set<string>();
+  /** Set while this plugin writes a tombstone: not a caller's modify. */
+  private readonly writing = new AsyncLocalStorage<true>();
 
   constructor(server: DM) {
     super(server);
@@ -87,6 +94,9 @@ export default class TwakeTombstone extends DmPlugin {
       throw new Error(
         `${this.name}: --twake-lifecycle-deleted-attribute is required`
       );
+    this.marks = [this.attrs.deleted, this.attrs.deletedAt, this.attrs.reason]
+      .filter(Boolean)
+      .map(a => a.toLowerCase());
     // Operator configuration, not request data: the option holds DN regular
     // expressions by design, see the tombstone documentation.
     this.patterns = settings.twake_tombstone_dn.map(p => new RegExp(p, 'i'));
@@ -138,6 +148,39 @@ export default class TwakeTombstone extends DmPlugin {
         kept.push(one);
       }
       return [kept, req];
+    },
+
+    // A tombstone is made by a judged delete only: a modify making one would
+    // announce a deletion without the delete right, one rewriting its marks
+    // would revive the account unannounced. The lock stays the caller's, and
+    // so do these attributes on a live account, whatever else they hold.
+    ldapmodifyrequest: async ([dn, changes, op, req]) => {
+      if (!req || this.writing.getStore()) return [dn, changes, op, req];
+      // A name may still carry `;binary`, the one option a write keeps
+      const bare = (name: string): string => name.split(';')[0];
+      const written = [changes.add, changes.replace, changes.delete].flatMap(
+        set => (Array.isArray(set) ? set : Object.keys(set ?? {}))
+      );
+      if (!written.some(a => this.marks.includes(bare(a).toLowerCase())))
+        return [dn, changes, op, req];
+      const entry = await this.read(dn);
+      if (!entry || !(this.matches(dn) || this.matches(entry.dn as string)))
+        return [dn, changes, op, req];
+      const makesOne = [changes.add, changes.replace].some(
+        set =>
+          set &&
+          isTombstone(
+            Object.fromEntries(
+              Object.entries(set).map(([name, value]) => [bare(name), value])
+            ),
+            this.attrs
+          )
+      );
+      if (makesOne || isTombstone(entry, this.attrs))
+        throw new ForbiddenError(
+          `The deletion attributes of ${dn} are written by its delete only`
+        );
+      return [dn, changes, op, req];
     },
 
     ldapaddrequest: async ([dn, entry, req]) => {
@@ -462,11 +505,13 @@ export default class TwakeTombstone extends DmPlugin {
     );
     // Announced as the deleting request, not authorized as it: the delete
     // already was, and a caller may hold delete rights without write ones.
-    await this.server.ldap.modify(
-      dn,
-      clear.length ? { replace, delete: clear } : { replace },
-      undefined,
-      { context: changeContext(req) }
+    await this.writing.run(true, () =>
+      this.server.ldap.modify(
+        dn,
+        clear.length ? { replace, delete: clear } : { replace },
+        undefined,
+        { context: changeContext(req) }
+      )
     );
     this.logger.info({ plugin: this.name, event: 'tombstone', dn, reason });
   }

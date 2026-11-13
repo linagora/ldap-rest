@@ -8,6 +8,8 @@
  *
  * See `docs/usage/plugins/integrations/instances.md`.
  */
+import { AsyncLocalStorage } from 'async_hooks';
+
 import { Type } from '@sinclair/typebox';
 import type { Express, Request } from 'express';
 
@@ -105,6 +107,8 @@ export default class TwakeInstances extends DmPlugin {
   private readonly queues = new Map<string, Promise<unknown>>();
   /** Organizations a member's add is announcing, by lowercased id */
   private readonly announcing = new Map<string, Promise<unknown>>();
+  /** Set while this plugin writes the mark for a request: not a caller's modify */
+  private readonly marking = new AsyncLocalStorage<true>();
 
   constructor(server: DM) {
     super(server);
@@ -194,6 +198,25 @@ export default class TwakeInstances extends DmPlugin {
           if (owned.includes(key.toLowerCase())) delete entry[key];
       }
       return [dn, entry, req];
+    },
+    // A caller's modify may not set the mark either: user.created would never
+    // be sent. Clearing it stays allowed, it is how an account is announced
+    // again. The address is left in: ensureInstance checks it
+    ldapmodifyrequest: ([dn, changes, op, req]) => {
+      if (
+        req &&
+        !this.marking.getStore() &&
+        (this.match(dn) || this.isOrganization(dn))
+      ) {
+        const mark = this.sentAttribute.toLowerCase();
+        // A name may still carry `;binary`, the one option a write keeps
+        const isMark = (name: string): boolean =>
+          name.split(';')[0].toLowerCase() === mark;
+        for (const set of [changes.add, changes.replace])
+          for (const key of Object.keys(set ?? {}))
+            if (isMark(key) && first(set![key])) delete set![key];
+      }
+      return [dn, changes, op, req];
     },
     ldapaddafter: async (dn, entry) => {
       const account = await this.storedAccount(dn, entry);
@@ -599,11 +622,13 @@ export default class TwakeInstances extends DmPlugin {
         ...(account.phone ? { mobile: account.phone } : {}),
       }
     );
-    await this.server.ldap.modify(
-      dn,
-      { replace: { [this.sentAttribute]: new Date().toISOString() } },
-      req,
-      options
+    await this.marking.run(true, () =>
+      this.server.ldap.modify(
+        dn,
+        { replace: { [this.sentAttribute]: new Date().toISOString() } },
+        req,
+        options
+      )
     );
   }
 

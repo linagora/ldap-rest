@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- A caller's modify can no longer make or revive a Twake tombstone: setting
+  the deleted value, or rewriting the deletion attributes of a tombstone, is
+  refused with a 403
+  ([details](docs/usage/plugins/integrations/tombstone.md#behaviour)).
+- A caller's modify can no longer set the Twake instance mark, which would
+  keep `user.created` from being sent. Clearing it is still allowed
+  ([details](docs/usage/plugins/integrations/instances.md)).
+
 ## v2.2.2 (2026-11-11)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0, zlib updated to 1.4-r0.
