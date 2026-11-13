@@ -1,5 +1,4 @@
-import { Agent, request as httpRequest } from 'http';
-import type { AddressInfo } from 'net';
+import { connect, type AddressInfo, type Socket } from 'net';
 
 import { expect } from 'chai';
 import supertest from 'supertest';
@@ -36,6 +35,36 @@ const build = (prefix = '/api'): express.Express => {
   });
   return app;
 };
+
+/**
+ * Send `request` on `socket` and read one answer back. Raw TCP rather than
+ * `http.request`, which an interceptor another suite installs may take over.
+ */
+const exchange = (socket: Socket, request: string): Promise<string> =>
+  new Promise((resolve, reject) => {
+    let data = '';
+    const onData = (chunk: Buffer): void => {
+      data += chunk.toString();
+      const head = data.indexOf('\r\n\r\n');
+      if (head === -1) return;
+      const length = /content-length: *(\d+)/i.exec(data.slice(0, head));
+      if (!length || data.length < head + 4 + Number(length[1])) return;
+      socket.off('data', onData);
+      socket.off('error', reject);
+      resolve(data);
+    };
+    socket.on('data', onData);
+    socket.once('error', reject);
+    socket.write(request);
+  });
+
+/** A connection to `server`, once open */
+const open = (server: { address(): unknown }): Promise<Socket> =>
+  new Promise((resolve, reject) => {
+    const { port } = server.address() as AddressInfo;
+    const socket = connect(port, '127.0.0.1', () => resolve(socket));
+    socket.once('error', reject);
+  });
 
 describe('API fallback', () => {
   it('answers a JSON 404 for a path no route serves under the prefix', async () => {
@@ -204,32 +233,17 @@ describe('API fallback', () => {
   it('reads the path of an absolute-form request target', async () => {
     // What a proxy may send: the router routes it by its path
     const server = build().listen(0);
+    const socket = await open(server);
     try {
-      const { port } = server.address() as AddressInfo;
-      const { status, type } = await new Promise<{
-        status?: number;
-        type?: string;
-      }>((resolve, reject) => {
-        httpRequest(
-          {
-            port,
-            method: 'PUT',
-            path: `http://localhost:${port}/api/things`,
-          },
-          res => {
-            res.resume();
-            resolve({
-              status: res.statusCode,
-              type: res.headers['content-type'],
-            });
-          }
-        )
-          .on('error', reject)
-          .end();
-      });
-      expect(status).to.equal(405);
-      expect(type).to.match(/^application\/json/);
+      const answer = await exchange(
+        socket,
+        'PUT http://localhost/api/things HTTP/1.1\r\nHost: localhost\r\n' +
+          'Content-Length: 0\r\nConnection: close\r\n\r\n'
+      );
+      expect(answer).to.match(/^HTTP\/1\.1 405 /);
+      expect(answer).to.match(/content-type: application\/json/i);
     } finally {
+      socket.destroy();
       server.close();
     }
   });
@@ -273,32 +287,19 @@ describe('API fallback', () => {
     // finalhandler leaves an ended response alone: destroying the socket
     // would drop a keep-alive connection after a complete answer
     const app = build();
-    const sockets: unknown[] = [];
-    app.get('/api/twice', (req, res, next) => {
-      sockets.push(req.socket);
+    app.get('/api/twice', (_req, res, next) => {
       res.json({ once: true });
       next();
     });
     const server = app.listen(0);
-    const agent = new Agent({ keepAlive: true, maxSockets: 1 });
+    const socket = await open(server);
     try {
-      const { port } = server.address() as AddressInfo;
-      const get = (): Promise<string> =>
-        new Promise((resolve, reject) => {
-          httpRequest({ port, agent, path: '/api/twice' }, res => {
-            let body = '';
-            res.on('data', chunk => (body += chunk));
-            res.on('end', () => resolve(body));
-          })
-            .on('error', reject)
-            .end();
-        });
-      expect(JSON.parse(await get())).to.deep.equal({ once: true });
-      expect(JSON.parse(await get())).to.deep.equal({ once: true });
-      expect(sockets).to.have.lengthOf(2);
-      expect(sockets[1], 'the same connection, kept').to.equal(sockets[0]);
+      const request = 'GET /api/twice HTTP/1.1\r\nHost: localhost\r\n\r\n';
+      expect(await exchange(socket, request)).to.match(/\{"once":true\}$/);
+      // The same connection serves the next request
+      expect(await exchange(socket, request)).to.match(/\{"once":true\}$/);
     } finally {
-      agent.destroy();
+      socket.destroy();
       server.close();
     }
   });
