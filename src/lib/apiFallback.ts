@@ -13,6 +13,12 @@
  * test calling the app directly. An app mounted in a host's app is handed
  * the host's `next`, and the request goes back to the host.
  *
+ * The 405 reads the routes registered on the app itself: a path served by a
+ * mounted `express.Router()` answers 404 to a method it lacks. It relies on
+ * internals of the `router` package (`app.router.stack`, `layer.matchers`,
+ * `route._methods()`), checked against express 5.3.0 and router 2.2.0; if
+ * one of them changes, the answer falls back to 404 rather than failing.
+ *
  * @module lib/apiFallback
  */
 import type { Express, NextFunction, Request, Response } from 'express';
@@ -22,43 +28,73 @@ import { errorResponse } from './expressFormatedResponses.js';
 /** The parts of Express's router this reads, which its types do not show */
 interface RouteLayer {
   route?: {
-    methods: Record<string, boolean>;
-    _methods(): string[];
+    /** Upper case, with HEAD added for a GET route and `_ALL` for `all()` */
+    _methods?(): string[];
   };
   /** The route path compiled by path-to-regexp, one per path it was given */
   matchers?: Array<(path: string) => unknown>;
 }
 interface AppInternal {
   handle(req: Request, res: Response, callback?: NextFunction): void;
-  router?: { stack: RouteLayer[] };
+  router?: { stack?: RouteLayer[] };
 }
 
-/** The path of a request URL, query left out, as the router reads it */
-const pathOf = (url: string): string => {
-  const query = url.indexOf('?');
-  return query === -1 ? url : url.slice(0, query);
+/**
+ * The path of a request target, query left out, as the router reads it: an
+ * absolute-form target (`PUT http://host/api/x`, which a proxy may send)
+ * gives its path.
+ */
+export const pathOf = (url: string): string => {
+  let path = url;
+  if (!path.startsWith('/')) {
+    try {
+      return new URL(path).pathname;
+    } catch {
+      return path;
+    }
+  }
+  const query = path.indexOf('?');
+  if (query !== -1) path = path.slice(0, query);
+  return path;
 };
 
-/** Whether `path` is under `prefix`, the prefix itself included */
-export const underPrefix = (path: string, prefix: string): boolean =>
-  prefix === '' ||
-  prefix === '/' ||
-  path === prefix ||
-  path.startsWith(`${prefix}/`);
+/**
+ * Whether `path` is under `prefix`, the prefix itself included, ignoring
+ * case as the routing does unless told otherwise
+ */
+export const underPrefix = (
+  path: string,
+  prefix: string,
+  caseSensitive = false
+): boolean => {
+  if (prefix === '' || prefix === '/') return true;
+  if (!caseSensitive) {
+    path = path.toLowerCase();
+    prefix = prefix.toLowerCase();
+  }
+  return path === prefix || path.startsWith(`${prefix}/`);
+};
 
 /**
- * The methods the routes matching `path` serve, HEAD with GET as Express
- * adds it. The layers' compiled matchers are called rather than
- * `layer.match`, which would store what it matched on the layer.
+ * The methods the routes registered on the app that match `path` serve,
+ * HEAD with GET as Express adds it. The layers' compiled matchers are called
+ * rather than `layer.match`, which would store what it matched on the
+ * layer. A router whose internals moved gives no method, so a 404.
  */
 export function allowedMethods(app: Express, path: string): string[] {
-  const stack = (app as unknown as AppInternal).router?.stack ?? [];
   const methods = new Set<string>();
-  for (const layer of stack) {
-    if (!layer.route || !layer.matchers?.some(matches => matches(path)))
-      continue;
-    for (const method of layer.route._methods())
-      if (method !== '_ALL') methods.add(method);
+  try {
+    const stack = (app as unknown as AppInternal).router?.stack;
+    if (!Array.isArray(stack)) return [];
+    for (const { route, matchers } of stack) {
+      if (typeof route?._methods !== 'function' || !Array.isArray(matchers))
+        continue;
+      if (!matchers.some(matches => matches(path))) continue;
+      for (const method of route._methods())
+        if (method !== '_ALL') methods.add(method);
+    }
+  } catch {
+    return [];
   }
   return [...methods].sort();
 }
@@ -73,17 +109,20 @@ export function allowedMethods(app: Express, path: string): string[] {
 const apiFallback =
   (app: Express, req: Request, res: Response, debug: () => boolean) =>
   (err?: unknown): void => {
+    // A handler that answered and still called `next()`: nothing is left to
+    // answer, and the connection stays usable, as finalhandler leaves it
+    if (res.writableEnded) return;
     if (res.headersSent) {
-      // Too late for an answer of our own: what was sent cannot be fixed
+      // An answer begun and abandoned cannot be completed or replaced
       req.socket.destroy();
       return;
     }
-    if (err && err !== 'route' && err !== 'router') {
+    if (err) {
       const { status, body } = errorResponse(err, debug());
       res.status(status).json(body);
       return;
     }
-    const allowed = allowedMethods(app, pathOf(req.url));
+    const allowed = allowedMethods(app, req.path);
     if (allowed.length > 0) {
       res.setHeader('Allow', allowed.join(', '));
       res.status(405).json({ error: 'Method Not Allowed' });
@@ -107,12 +146,16 @@ export function installApiFallback(
 ): void {
   const internal = app as unknown as AppInternal;
   const handle = internal.handle.bind(app);
-  internal.handle = (req, res, callback) =>
+  internal.handle = (req, res, callback): void =>
     handle(
       req,
       res,
       callback ??
-        (underPrefix(pathOf(req.url), prefix())
+        (underPrefix(
+          pathOf(req.url),
+          prefix(),
+          app.enabled('case sensitive routing')
+        )
           ? apiFallback(app, req, res, debug)
           : undefined)
     );

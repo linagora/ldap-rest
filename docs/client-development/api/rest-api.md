@@ -1316,7 +1316,11 @@ Content-Type: application/json
 { "error": "Method Not Allowed" }
 ```
 
-Paths outside `--api-prefix` keep Express's own answer.
+Paths outside `--api-prefix` keep Express's own answer. The `405` covers the
+routes registered on the server itself, which every route the shipped plugins
+declare is: a plugin serving its paths through a mounted `express.Router()`
+answers `404` to a method they do not take, and one serving them through its
+own middleware answers what that middleware does.
 
 #### 409 Conflict
 

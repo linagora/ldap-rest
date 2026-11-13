@@ -1,3 +1,6 @@
+import { Agent, request as httpRequest } from 'http';
+import type { AddressInfo } from 'net';
+
 import { expect } from 'chai';
 import supertest from 'supertest';
 import express from 'express';
@@ -6,6 +9,7 @@ import type { Response } from 'express';
 import {
   allowedMethods,
   installApiFallback,
+  pathOf,
   underPrefix,
 } from '../../src/lib/apiFallback';
 import { NotFoundError } from '../../src/lib/errors';
@@ -139,6 +143,11 @@ describe('API fallback', () => {
   });
 
   describe('underPrefix', () => {
+    it('ignores case unless the routing is case sensitive', () => {
+      expect(underPrefix('/API/x', '/api')).to.be.true;
+      expect(underPrefix('/API/x', '/api', true)).to.be.false;
+    });
+
     it('takes the prefix and what is under it, nothing else', () => {
       expect(underPrefix('/api', '/api')).to.be.true;
       expect(underPrefix('/api/x', '/api')).to.be.true;
@@ -151,6 +160,184 @@ describe('API fallback', () => {
   describe('allowedMethods', () => {
     it('lists nothing for a path no route matches', () => {
       expect(allowedMethods(build(), '/api/none')).to.deep.equal([]);
+    });
+
+    it('lists nothing, rather than failing, when the internals move', () => {
+      const moved = (router: unknown): express.Express =>
+        ({ router }) as unknown as express.Express;
+      expect(allowedMethods(moved(undefined), '/api/x')).to.deep.equal([]);
+      expect(allowedMethods(moved({ stack: 'x' }), '/api/x')).to.deep.equal([]);
+      expect(
+        allowedMethods(
+          moved({ stack: [{ route: {}, matchers: [() => true] }] }),
+          '/api/x'
+        )
+      ).to.deep.equal([]);
+      expect(
+        allowedMethods(
+          moved({
+            stack: [
+              {
+                route: { _methods: () => ['GET'] },
+                matchers: [
+                  () => {
+                    throw new Error('moved');
+                  },
+                ],
+              },
+            ],
+          }),
+          '/api/x'
+        )
+      ).to.deep.equal([]);
+    });
+  });
+
+  it('ignores case in the prefix, as the routing does', async () => {
+    const app = build();
+    expect((await supertest(app).get('/API/things')).status).to.equal(200);
+    const res = await supertest(app).put('/API/things');
+    expect(res.status).to.equal(405);
+    expect(res.type).to.equal('application/json');
+  });
+
+  it('reads the path of an absolute-form request target', async () => {
+    // What a proxy may send: the router routes it by its path
+    const server = build().listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      const { status, type } = await new Promise<{
+        status?: number;
+        type?: string;
+      }>((resolve, reject) => {
+        httpRequest(
+          {
+            port,
+            method: 'PUT',
+            path: `http://localhost:${port}/api/things`,
+          },
+          res => {
+            res.resume();
+            resolve({
+              status: res.statusCode,
+              type: res.headers['content-type'],
+            });
+          }
+        )
+          .on('error', reject)
+          .end();
+      });
+      expect(status).to.equal(405);
+      expect(type).to.match(/^application\/json/);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('answers JSON for a parameter the router cannot decode', async () => {
+    const res = await supertest(build()).delete('/api/things/%E0%A4%A');
+    expect(res.status).to.equal(400);
+    expect(res.type).to.equal('application/json');
+    expect(res.body.error).to.match(/Failed to decode param/);
+  });
+
+  it('answers a failure nothing handled as the error middleware does', async () => {
+    const app = build();
+    app.get('/api/crash', () => {
+      throw new Error('disk on fire');
+    });
+    const res = await supertest(app).get('/api/crash');
+    expect(res.status).to.equal(500);
+    expect(res.body).to.deep.equal({
+      error: 'Internal Server Error',
+      message: 'An error occurred',
+    });
+  });
+
+  it('names that failure under --debug', async () => {
+    const app = express();
+    installApiFallback(
+      app,
+      () => '/api',
+      () => true
+    );
+    app.get('/api/crash', () => {
+      throw new Error('disk on fire');
+    });
+    const res = await supertest(app).get('/api/crash');
+    expect(res.status).to.equal(500);
+    expect(res.body.message).to.match(/disk on fire/);
+  });
+
+  it('leaves the connection of a handler that answered, then called next', async () => {
+    // finalhandler leaves an ended response alone: destroying the socket
+    // would drop a keep-alive connection after a complete answer
+    const app = build();
+    const sockets: unknown[] = [];
+    app.get('/api/twice', (req, res, next) => {
+      sockets.push(req.socket);
+      res.json({ once: true });
+      next();
+    });
+    const server = app.listen(0);
+    const agent = new Agent({ keepAlive: true, maxSockets: 1 });
+    try {
+      const { port } = server.address() as AddressInfo;
+      const get = (): Promise<string> =>
+        new Promise((resolve, reject) => {
+          httpRequest({ port, agent, path: '/api/twice' }, res => {
+            let body = '';
+            res.on('data', chunk => (body += chunk));
+            res.on('end', () => resolve(body));
+          })
+            .on('error', reject)
+            .end();
+        });
+      expect(JSON.parse(await get())).to.deep.equal({ once: true });
+      expect(JSON.parse(await get())).to.deep.equal({ once: true });
+      expect(sockets).to.have.lengthOf(2);
+      expect(sockets[1], 'the same connection, kept').to.equal(sockets[0]);
+    } finally {
+      agent.destroy();
+      server.close();
+    }
+  });
+
+  it('cuts an answer begun and abandoned', async () => {
+    const app = build();
+    app.get('/api/half', (_req, res, next) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.write('{"half":');
+      next();
+    });
+    const failed = await supertest(app)
+      .get('/api/half')
+      .then(
+        () => false,
+        () => true
+      );
+    expect(failed).to.equal(true);
+  });
+
+  it('sees only the routes on the app, not a mounted router', async () => {
+    // The documented limit: a mounted router's paths get a 404, not a 405
+    const app = build();
+    const router = express.Router();
+    router.get('/mounted', (_req, res) => {
+      res.json({});
+    });
+    app.use('/api', router);
+    expect((await supertest(app).get('/api/mounted')).status).to.equal(200);
+    const res = await supertest(app).put('/api/mounted');
+    expect(res.status).to.equal(404);
+    expect(res.type).to.equal('application/json');
+  });
+
+  describe('pathOf', () => {
+    it('drops the query and reads an absolute-form target', () => {
+      expect(pathOf('/api/x?y=1')).to.equal('/api/x');
+      expect(pathOf('http://host:8080/api/x?y=1')).to.equal('/api/x');
+      expect(pathOf('*')).to.equal('*');
     });
   });
 
