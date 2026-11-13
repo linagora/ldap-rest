@@ -8,7 +8,6 @@ import type { Response } from 'express';
 import {
   allowedMethods,
   installApiFallback,
-  pathOf,
   underPrefix,
 } from '../../src/lib/apiFallback';
 import { NotFoundError } from '../../src/lib/errors';
@@ -42,16 +41,19 @@ const build = (prefix = '/api'): express.Express => {
  */
 const exchange = (socket: Socket, request: string): Promise<string> =>
   new Promise((resolve, reject) => {
-    let data = '';
+    // Bytes, not characters: Content-Length counts bytes
+    let data = Buffer.alloc(0);
     const onData = (chunk: Buffer): void => {
-      data += chunk.toString();
+      data = Buffer.concat([data, chunk]);
       const head = data.indexOf('\r\n\r\n');
       if (head === -1) return;
-      const length = /content-length: *(\d+)/i.exec(data.slice(0, head));
+      const length = /content-length: *(\d+)/i.exec(
+        data.subarray(0, head).toString()
+      );
       if (!length || data.length < head + 4 + Number(length[1])) return;
       socket.off('data', onData);
       socket.off('error', reject);
-      resolve(data);
+      resolve(data.toString());
     };
     socket.on('data', onData);
     socket.once('error', reject);
@@ -189,6 +191,32 @@ describe('API fallback', () => {
   describe('allowedMethods', () => {
     it('lists nothing for a path no route matches', () => {
       expect(allowedMethods(build(), '/api/none')).to.deep.equal([]);
+    });
+
+    it('says once why, through the warning it was given', async () => {
+      const warnings: string[] = [];
+      const app = express();
+      installApiFallback(
+        app,
+        () => '/api',
+        () => false,
+        message => warnings.push(message)
+      );
+      app.get('/api/things', (_req, res) => {
+        res.json([]);
+      });
+      // A route layer as a future router might shape it: the router itself
+      // passes it by, only the fallback reads what it lacks
+      (app as unknown as { router: { stack: unknown[] } }).router.stack.push({
+        route: {},
+        match: () => false,
+      });
+      for (let i = 0; i < 2; i++)
+        expect((await supertest(app).put('/api/things')).status).to.equal(405);
+      // The well-formed layer still answers; the drift is reported once
+      expect(warnings).to.have.lengthOf(1);
+      expect(warnings[0]).to.match(/404 instead of 405/);
+      expect(warnings[0]).to.match(/no matchers or _methods/);
     });
 
     it('lists nothing, rather than failing, when the internals move', () => {
@@ -332,14 +360,6 @@ describe('API fallback', () => {
     const res = await supertest(app).put('/api/mounted');
     expect(res.status).to.equal(404);
     expect(res.type).to.equal('application/json');
-  });
-
-  describe('pathOf', () => {
-    it('drops the query and reads an absolute-form target', () => {
-      expect(pathOf('/api/x?y=1')).to.equal('/api/x');
-      expect(pathOf('http://host:8080/api/x?y=1')).to.equal('/api/x');
-      expect(pathOf('*')).to.equal('*');
-    });
   });
 
   describe('on the server', function () {

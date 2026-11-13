@@ -40,22 +40,15 @@ interface AppInternal {
 }
 
 /**
- * The path of a request target, query left out, as the router reads it: an
+ * The path of a request as the router reads it — query left out, an
  * absolute-form target (`PUT http://host/api/x`, which a proxy may send)
- * gives its path.
+ * read for its path — taken from Express's own `req.path`. Its getter is
+ * called on the request before `app.handle` gives it Express's prototype,
+ * so the prefix check and the routing read the same string.
  */
-export const pathOf = (url: string): string => {
-  let path = url;
-  if (!path.startsWith('/')) {
-    try {
-      return new URL(path).pathname;
-    } catch {
-      return path;
-    }
-  }
-  const query = path.indexOf('?');
-  if (query !== -1) path = path.slice(0, query);
-  return path;
+const requestPath = (app: Express, req: Request): string => {
+  const path: unknown = Reflect.get(app.request, 'path', req);
+  return typeof path === 'string' ? path : req.url;
 };
 
 /**
@@ -79,21 +72,33 @@ export const underPrefix = (
  * The methods the routes registered on the app that match `path` serve,
  * HEAD with GET as Express adds it. The layers' compiled matchers are called
  * rather than `layer.match`, which would store what it matched on the
- * layer. A router whose internals moved gives no method, so a 404.
+ * layer. A router whose internals moved gives no method, so a 404, and
+ * `onDrift` is told why.
  */
-export function allowedMethods(app: Express, path: string): string[] {
+export function allowedMethods(
+  app: Express,
+  path: string,
+  onDrift: (why: string) => void = () => undefined
+): string[] {
   const methods = new Set<string>();
   try {
     const stack = (app as unknown as AppInternal).router?.stack;
-    if (!Array.isArray(stack)) return [];
+    if (!Array.isArray(stack)) {
+      onDrift('app.router.stack is not a list');
+      return [];
+    }
     for (const { route, matchers } of stack) {
-      if (typeof route?._methods !== 'function' || !Array.isArray(matchers))
+      if (!route) continue; // a middleware, not a route
+      if (typeof route._methods !== 'function' || !Array.isArray(matchers)) {
+        onDrift('a route layer has no matchers or _methods()');
         continue;
+      }
       if (!matchers.some(matches => matches(path))) continue;
       for (const method of route._methods())
         if (method !== '_ALL') methods.add(method);
     }
-  } catch {
+  } catch (err) {
+    onDrift(`reading the routes threw: ${String(err)}`);
     return [];
   }
   return [...methods].sort();
@@ -107,7 +112,13 @@ export function allowedMethods(app: Express, path: string): string[] {
  * here for a path a route serves: Express answers it with the methods.
  */
 const apiFallback =
-  (app: Express, req: Request, res: Response, debug: () => boolean) =>
+  (
+    app: Express,
+    req: Request,
+    res: Response,
+    debug: () => boolean,
+    onDrift: (why: string) => void
+  ) =>
   (err?: unknown): void => {
     // A handler that answered and still called `next()`: nothing is left to
     // answer, and the connection stays usable, as finalhandler leaves it
@@ -122,7 +133,7 @@ const apiFallback =
       res.status(status).json(body);
       return;
     }
-    const allowed = allowedMethods(app, req.path);
+    const allowed = allowedMethods(app, req.path, onDrift);
     if (allowed.length > 0) {
       res.setHeader('Allow', allowed.join(', '));
       res.status(405).json({ error: 'Method Not Allowed' });
@@ -138,12 +149,24 @@ const apiFallback =
  * @param app the server's Express app
  * @param prefix the API prefix, read at each request: tests change it
  * @param debug whether an unhandled error's answer carries its details
+ * @param warn told once if the router's internals are not what this reads,
+ *   so an operator learns why the 405s became 404s
  */
 export function installApiFallback(
   app: Express,
   prefix: () => string,
-  debug: () => boolean
+  debug: () => boolean,
+  warn: (message: string) => void = () => undefined
 ): void {
+  let warned = false;
+  const onDrift = (why: string): void => {
+    if (warned) return;
+    warned = true;
+    warn(
+      `The API fallback cannot read Express's routes (${why}): a method a ` +
+        'path does not take answers 404 instead of 405. See lib/apiFallback.'
+    );
+  };
   const internal = app as unknown as AppInternal;
   const handle = internal.handle.bind(app);
   internal.handle = (req, res, callback): void =>
@@ -152,11 +175,11 @@ export function installApiFallback(
       res,
       callback ??
         (underPrefix(
-          pathOf(req.url),
+          requestPath(app, req),
           prefix(),
           app.enabled('case sensitive routing')
         )
-          ? apiFallback(app, req, res, debug)
+          ? apiFallback(app, req, res, debug, onDrift)
           : undefined)
     );
 }

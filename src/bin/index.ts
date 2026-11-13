@@ -297,7 +297,8 @@ export class DM {
     installApiFallback(
       this.app,
       () => this.config.api_prefix,
-      () => this.config.debug
+      () => this.config.debug,
+      message => this.logger.warn(message)
     );
     // Nothing tells which framework answers, and no script or style is
     // read as another type than the one its response declares.
