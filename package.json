@@ -840,12 +840,9 @@
     "test:one": "mocha --config .mocharc-one.json"
   },
   "overrides": {
-    "@microsoft/api-extractor": {
-      "minimatch": "^11.0.5"
-    },
     "diff": ">=8.0.3",
     "glob": ">=11.1.0",
-    "minimatch": "^10.2.3",
+    "minimatch": "^11.0.1",
     "postcss-selector-parser": "^7.1.6",
     "serialize-javascript": ">=7.0.3"
   },
