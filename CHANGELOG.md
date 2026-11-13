@@ -1,57 +1,41 @@
 # Changelog
 
-## Unreleased
+## v2.3.0 (2026-11-13)
 
 ### Security
 
-- A caller's modify can no longer make or revive a Twake tombstone: setting
-  the deleted value, or rewriting the deletion attributes of a tombstone, is
-  refused with a 403
-  ([details](docs/usage/plugins/integrations/tombstone.md#behaviour)).
-- A caller's rename can no longer move a Twake tombstone, nor bring an entry
-  holding the deleted value under `--twake-tombstone-dn`: either would step
-  around the modify guard above
-  ([details](docs/usage/plugins/integrations/tombstone.md#behaviour)).
-- A caller's modify can no longer set the Twake instance mark, which would
-  keep `user.created` from being sent. Clearing it is still allowed
-  ([details](docs/usage/plugins/integrations/instances.md)).
-- The bulk import writes into the branch its schema declares rather than the
-  directory root, a schema naming no base is no longer loaded, and a write
-  carrying a mail address on an entry no entity covers is refused: a tenant
-  administrator could otherwise provision the mail addresses of another
-  tenant ([#711](https://github.com/linagora/ldap-rest/issues/711)).
-- `core/ldap/bulkImport` refuses a column the schema does not declare when it
-  is `strict`, and a column under an attribute the API does not let a client
-  set, the main attribute excepted: an import could otherwise write an
-  attribute the API refuses, naming the instance the Drive plugin administers
-  ([bulk import](docs/usage/plugins/ldap/bulk-import.md#declared-attributes)).
+- A caller can no longer create, revive or move a Twake tombstone, nor set
+  the Twake instance mark that keeps `user.created` from being sent
+  ([tombstones](docs/usage/plugins/integrations/tombstone.md#behaviour),
+  [instances](docs/usage/plugins/integrations/instances.md)).
+- The bulk import writes into the branch its schema declares and refuses a
+  schema without a base: a tenant administrator could otherwise provision
+  another tenant's mail addresses
+  ([GHSA-wf2m-rq3p-445g](https://github.com/linagora/ldap-rest/security/advisories/GHSA-wf2m-rq3p-445g),
+  [#711](https://github.com/linagora/ldap-rest/issues/711)).
+- The bulk import refuses the columns the API would refuse, which could point
+  the Drive plugin at another user's instance
+  ([GHSA-g8rp-345p-46f7](https://github.com/linagora/ldap-rest/security/advisories/GHSA-g8rp-345p-46f7)).
 
 ### Changed
 
-- `core/ldap/bulkImport` reads the entity schema format the documentation
-  points it at (`entity.base`, `attributes`) as well as the flat one, and
-  demands an explicit base
-  ([bulk import](docs/usage/plugins/ldap/bulk-import.md#schema-configuration-format)).
-- `core/ldap/enterpriseRules` refuses a write carrying a mail address on an
-  entry no entity covers, including the app accounts, SCIM and custom plugins
-  writing outside a branch an entity declares.
+- `core/ldap/bulkImport` also reads the entity schema format (`entity.base`,
+  `attributes`) and demands an explicit base
+  ([upgrading](docs/usage/upgrading.md#the-bulk-import-writes-below-the-base-its-schema-names)).
+- `core/ldap/enterpriseRules` refuses a mail address on an entry no entity
+  covers, SCIM, app accounts and custom plugins included
+  ([upgrading](docs/usage/upgrading.md#the-bulk-import-writes-below-the-base-its-schema-names)).
 
 ### Fixed
 
-- A request under `--api-prefix` that no route serves answers JSON instead of
-  Express's HTML page: a `405` naming the methods the path takes in `Allow`
-  when a route serves it with others, a `404` otherwise
+- A request under `--api-prefix` that no route serves answers JSON, a `405`
+  with `Allow` or a `404`, instead of Express's HTML page
   ([#718](https://github.com/linagora/ldap-rest/issues/718),
-  [#721](https://github.com/linagora/ldap-rest/issues/721); details in
-  [the REST API guide](docs/client-development/api/rest-api.md#405-method-not-allowed)).
-- Creating a password policy with a name the directory cannot store answers a
-  `400` instead of a `500`
-  ([#715](https://github.com/linagora/ldap-rest/issues/715)).
-- Creating, renaming or moving any entry to an RDN past what the directory
-  can key (about 245 bytes as written, escaping included: a long `uid` the
-  shipped schemas accept, or a shorter one of accented letters) answers a
-  `400` instead of a `500`
-  ([#719](https://github.com/linagora/ldap-rest/issues/719)).
+  [#721](https://github.com/linagora/ldap-rest/issues/721)).
+- An RDN too long for the directory to store, a password policy name
+  included, answers a `400` instead of a `500`
+  ([#715](https://github.com/linagora/ldap-rest/issues/715),
+  [#719](https://github.com/linagora/ldap-rest/issues/719)).
 
 ## v2.2.2 (2026-11-11)
 
