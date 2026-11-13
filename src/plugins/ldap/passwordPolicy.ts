@@ -82,10 +82,10 @@ const READ_ONLY_POLICY_ATTRS = ['pwdAttribute', 'pwdCheckModule'];
 const MAX_POLICY_INTEGER = Number.MAX_SAFE_INTEGER;
 
 /**
- * Longest policy name that may be what a directory cannot store: back-mdb
- * refuses an RDN of about 240 bytes, and the exact limit moves with the
- * backend and its version. Below it, a code `other` (80) is the server's
- * failure, not the name's.
+ * Longest RDN a policy name may make that a directory cannot store: back-mdb
+ * refuses one of about 240 bytes, and the exact limit moves with the backend
+ * and its version. Below it, a code `other` (80) is the server's failure, not
+ * the name's.
  */
 const LONG_POLICY_NAME = 200;
 
@@ -1636,8 +1636,12 @@ export default class PasswordPolicy extends DmPlugin {
       // A backend that cannot key the DN answers `other` (80) without a
       // diagnostic — back-mdb's key size, for a long RDN. Only a name that
       // long can be the cause; any other 80 is the server's, and stays a 500
-      // rather than blaming the client.
-      if (code === 80 && Buffer.byteLength(cn, 'utf8') > LONG_POLICY_NAME)
+      // rather than blaming the client. The RDN is measured as written: a
+      // comma takes two bytes once escaped.
+      if (
+        code === 80 &&
+        Buffer.byteLength(escapeDnValue(cn), 'utf8') > LONG_POLICY_NAME
+      )
         throw new BadRequestError(
           'The policy name is too long for the directory'
         );

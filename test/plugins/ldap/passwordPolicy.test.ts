@@ -453,6 +453,15 @@ describe('PasswordPolicy Plugin: policy management', () => {
     expect((await request.get(`${api}/${cn}`)).status).to.equal(404);
   });
 
+  it('counts the escaping the RDN needs', async () => {
+    // 150 commas are 150 bytes raw and 300 once escaped: the name is short,
+    // the RDN the directory keys is not
+    const cn = ','.repeat(150);
+    const res = await request.post(api).send({ cn });
+    expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(res.body.error).to.match(/too long/);
+  });
+
   it('leaves an `other` failure with a short name a 500', async () => {
     // 80 without a long name is the server's failure: blaming the client
     // would hide it
