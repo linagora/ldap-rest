@@ -76,10 +76,11 @@ twakeCozyDomain: john-doe.partner.cloud
 > mark it `"readOnly": true`; otherwise whoever may write an account may also
 > choose the Drive instance it updates.
 >
-> This costs no provisioning: Twake Drive creates an instance on its first
-> use, so the plugin only has to propagate changes to instances that exist. An
-> update that arrives before the instance is created is answered `404` and
-> ignored, as before.
+> This costs no provisioning: the instance is created when the account is
+> provisioned (`core/twake/cozyProvision`, `core/twake/clouderyProvision`), and
+> Twake Drive creates it on its first use when that failed. This plugin's own
+> writes only update an instance that exists: one that arrives before the
+> creation is answered `404` and ignored.
 
 ### Default domain template
 
