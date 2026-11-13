@@ -484,6 +484,54 @@ describe('Twake tombstone plugin', function () {
     });
   });
 
+  describe('rename', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const caller = { user: 'jdoe', headers: {} } as any as Request;
+
+    const refused = async (write: Promise<unknown>): Promise<void> => {
+      let error: unknown;
+      await write.catch((err: unknown) => (error = err));
+      expect(error).to.have.property('statusCode', 403);
+    };
+
+    it('refuses to rename a tombstone, in or out of the expressions', async () => {
+      await add(flat('ts-alice'));
+      await dm.ldap.delete(flat('ts-alice'), caller);
+      // Out of the expressions, a plain modify would revive it unguarded
+      await refused(
+        dm.ldap.rename(flat('ts-alice'), flat('plain-bob'), caller)
+      );
+      await refused(dm.ldap.rename(flat('ts-alice'), flat('ts-dave'), caller));
+      expect(await read(flat('ts-alice'))).to.include({
+        employeeType: 'deleted',
+      });
+      expect(await read(flat('plain-bob'))).to.equal(undefined);
+    });
+
+    it('refuses to bring the deleted value into the expressions', async () => {
+      await add(flat('plain-bob'));
+      await dm.ldap.modify(
+        flat('plain-bob'),
+        { replace: { employeeType: 'deleted' } },
+        caller
+      );
+      await refused(dm.ldap.rename(flat('plain-bob'), flat('ts-dave'), caller));
+      expect(await read(flat('ts-dave'))).to.equal(undefined);
+      expect(await read(flat('plain-bob'))).to.include({
+        employeeType: 'deleted',
+      });
+    });
+
+    it('lets a caller rename a live account', async () => {
+      await add(flat('ts-alice'), { employeeType: 'contractor' });
+      await dm.ldap.rename(flat('ts-alice'), flat('ts-dave'), caller);
+      expect(await read(flat('ts-dave'))).to.include({
+        employeeType: 'contractor',
+      });
+      expect(await read(flat('ts-alice'))).to.equal(undefined);
+    });
+  });
+
   describe('erase', () => {
     beforeEach(async () => {
       await add(flat('ts-alice'));

@@ -183,6 +183,27 @@ export default class TwakeTombstone extends DmPlugin {
       return [dn, changes, op, req];
     },
 
+    // The modify guard holds only where the expressions match, so a rename
+    // could step around it: a tombstone taken out of them is revived by a
+    // plain modify and brought back, an entry given the deleted value outside
+    // them becomes a tombstone once brought in. A tombstone is not renamed,
+    // and the deleted value does not enter a matched DN by a rename.
+    ldaprenamerequest: async ([dn, newDn, req]) => {
+      if (!req || this.patterns.length === 0) return [dn, newDn, req];
+      const entry = await this.read(dn);
+      if (
+        entry &&
+        isTombstone(entry, this.attrs) &&
+        (this.matches(dn) ||
+          this.matches(entry.dn as string) ||
+          this.matches(newDn))
+      )
+        throw new ForbiddenError(
+          `${dn} holds the deleted value: a rename may not make or move a tombstone`
+        );
+      return [dn, newDn, req];
+    },
+
     ldapaddrequest: async ([dn, entry, req]) => {
       if (this.isScim(req) && this.matches(dn)) {
         const existing = await this.read(dn);
