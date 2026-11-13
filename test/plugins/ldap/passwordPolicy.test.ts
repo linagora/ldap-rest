@@ -453,6 +453,22 @@ describe('PasswordPolicy Plugin: policy management', () => {
     expect((await request.get(`${api}/${cn}`)).status).to.equal(404);
   });
 
+  it('leaves an `other` failure with a short name a 500', async () => {
+    // 80 without a long name is the server's failure: blaming the client
+    // would hide it
+    const add = dm.ldap.add;
+    dm.ldap.add = (() =>
+      Promise.reject(
+        Object.assign(new Error('LDAP add error'), { code: 80 })
+      )) as typeof dm.ldap.add;
+    try {
+      const res = await request.post(api).send({ cn: 'short' });
+      expect(res.status, JSON.stringify(res.body)).to.equal(500);
+    } finally {
+      dm.ldap.add = add;
+    }
+  });
+
   it('lists the policies, marking the default one', async () => {
     const res = await request.get(api);
     expect(res.status).to.equal(200);
