@@ -224,6 +224,19 @@ sn: Doe
 mail: jdoe@example.com
 ```
 
+### Declared Attributes
+
+On the API path, a `"strict": true` schema is the allow-list of writable
+attributes. The import applies the same rule: a non-empty column the schema
+does not declare fails the row, so an attribute no entity declares cannot
+reach the directory through a CSV file. The flat import format
+(`properties`) declares no `strict` and keeps accepting such columns, as the
+API of a non-strict entity does.
+
+A column under an attribute marked `"generated": true` also fails: the server
+or a plugin fills it. The main attribute is the exception, since a row names
+its entry with it.
+
 ## Complete Example
 
 ### Step 1: Configure Plugin

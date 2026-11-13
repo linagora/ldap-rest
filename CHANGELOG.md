@@ -9,6 +9,11 @@
   carrying a mail address on an entry no entity covers is refused: a tenant
   administrator could otherwise provision the mail addresses of another
   tenant ([#711](https://github.com/linagora/ldap-rest/issues/711)).
+- `core/ldap/bulkImport` refuses a column the schema does not declare when it
+  is `strict`, and a column under an attribute the server computes, as the API
+  of the same entity does: an import could otherwise write an attribute the
+  API refuses, naming the instance the Drive plugin administers
+  ([bulk import](docs/usage/plugins/ldap/bulk-import.md#declared-attributes)).
 
 ### Changed
 

@@ -69,6 +69,13 @@ mail: jdoe@example.com
 twakeCozyDomain: john-doe.partner.cloud
 ```
 
+> **The attribute names the instance the server administers.** The plugin
+> sends `Email`, `PublicName` and `DiskQuota` to whatever instance the
+> attribute names, with its admin token. Leave it out of the entity schema, as
+> the shipped `static/schemas/twake/*.json` do, so no API write can set it, or
+> mark it `"readOnly": true`; otherwise whoever may write an account may also
+> choose the Drive instance it updates.
+
 ### Default domain template
 
 Configure a template for users without an explicit attribute. Use `{attribute}` placeholders:

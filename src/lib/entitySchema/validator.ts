@@ -133,6 +133,19 @@ export class EntityValidator {
   }
 
   /**
+   * Check the names a payload carries, without their values: the allow-list
+   * a strict schema is. For a path that builds an entry itself and cannot
+   * hand it to {@link validateNew} — a bulk import row, whose `a;b` value is
+   * several values under an attribute the schema may call single-valued.
+   *
+   * @param names attribute names carried by the payload
+   * @throws BadRequestError for a name a strict schema does not declare
+   */
+  assertDeclared(names: string[]): void {
+    for (const name of names) this.attribute(name);
+  }
+
+  /**
    * Name every key the schema declares as the schema does, and refuse two
    * keys naming one attribute. The conversion, the required check and the
    * defaults look a declared attribute up by its own name: a field they
