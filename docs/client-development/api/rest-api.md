@@ -1204,14 +1204,16 @@ move names both DNs:
 ```
 
 **RDN too long for the directory** — a creation, a rename or a move whose
-new RDN the directory cannot store: back-mdb refuses one of about 240 bytes,
-escaping included, which a `uid` of 255 characters the shipped schemas accept
-can reach (LDAP result code 80, on an RDN over 200 bytes; any other 80 is a
-500):
+new RDN the directory cannot store. back-mdb keys at most 245 bytes of RDN,
+counted in UTF-8 as written, escaping included: a `uid` of 255 characters the
+shipped schemas accept is past it, and so is a shorter value of accented
+letters or of characters a DN escapes. The directory answers LDAP result code
+80 without saying why; on an RDN over 200 bytes it is answered as the
+request's fault, any other 80 stays a 500:
 
 ```json
 {
-  "error": "The RDN is too long for the directory: 254 bytes"
+  "error": "The uid RDN is too long for the directory (254 bytes; it keys at most about 245)"
 }
 ```
 

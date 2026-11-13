@@ -116,8 +116,8 @@ describe('LdapUsersFlat validation with standard schema (via flatGeneric)', func
     });
 
     it('should answer 400 for a uid the schema takes but the directory cannot store', async () => {
-      // The schema accepts 255 characters; back-mdb cannot key an RDN past
-      // about 240 bytes and answers `other` (80) without a diagnostic
+      // The schema accepts 255 characters, past what back-mdb keys: see
+      // `isUnstorableRdn`
       const uid = 'u'.repeat(250);
       try {
         await plugin.addUser(uid, {

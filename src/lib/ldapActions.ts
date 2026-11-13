@@ -35,7 +35,12 @@ import SearchCache, { digestKey, membersNamed } from './ldap/searchCache.js';
 import DirectorySchema from './ldap/schema.js';
 import CallerView from './ldap/callerView.js';
 import { BadRequestError, ConflictError, NotFoundError } from './errors.js';
-import { extractLdapCode, isSchemaRefusal } from './ldapCodes.js';
+import {
+  extractLdapCode,
+  isSchemaRefusal,
+  isUnstorableRdn,
+  RDN_KEY_LIMIT,
+} from './ldapCodes.js';
 import type { SchemaIndex } from './ldapSchema.js';
 
 // Typescript interface
@@ -263,29 +268,20 @@ function assertHasValue(name: string, value: unknown): void {
 }
 
 /**
- * Longest RDN that may be what a directory cannot store: back-mdb refuses one
- * of about 240 bytes, and the exact limit moves with the backend and its
- * version. Below it, a code `other` (80) is the server's failure, not the
- * client's.
- */
-const LONG_RDN = 200;
-
-/**
- * A backend that cannot key a DN answers `other` (80) without a diagnostic —
- * back-mdb's key size, for a long RDN — while the shipped schemas accept a
- * `uid` of 255 characters. Only an RDN that long can be the cause; any other
- * 80 is the server's, and stays a 500 rather than blaming the client. The RDN
- * is measured as written: a comma takes two bytes once escaped.
+ * A 400 for an RDN the directory could not key (see `isUnstorableRdn`),
+ * naming its type and the limit for the client to know what to shorten.
  */
 function unstorableRdn(dn: string, code: number | undefined): Error | null {
-  if (code !== 80) return null;
-  const bytes = Buffer.byteLength(getRdn(dn), 'utf8');
-  if (bytes <= LONG_RDN) return null;
+  const rdn = getRdn(dn);
+  if (!isUnstorableRdn(rdn, code)) return null;
+  const type = rdn.slice(0, Math.max(rdn.indexOf('='), 0)) || 'entry';
+  const bytes = Buffer.byteLength(rdn, 'utf8');
   return withCode(
     new BadRequestError(
-      `The RDN is too long for the directory: ${bytes} bytes`
+      `The ${type} RDN is too long for the directory (${bytes} bytes; ` +
+        `it keys at most about ${RDN_KEY_LIMIT})`
     ),
-    code
+    code!
   );
 }
 
@@ -382,9 +378,9 @@ function ldapModifyError(dn: string, error: unknown): Error {
 
 /**
  * Wrap a rename or move failure: a new DN already taken (68) is a 409, as on
- * an add, a new RDN too long to store a 400 (see `unstorableRdn`), and a
- * refusal of the request's content a 400 naming both DNs, the new one being
- * what the directory usually refused.
+ * an add, a new RDN too long to store is a 400 (see `unstorableRdn`), and a
+ * refusal of the request's content is a 400 naming both DNs, the new one
+ * being what the directory usually refused.
  */
 function ldapRenameError(
   context: string,
