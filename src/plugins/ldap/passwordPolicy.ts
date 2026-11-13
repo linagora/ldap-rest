@@ -13,7 +13,7 @@
 import { isDeepStrictEqual } from 'node:util';
 
 import { Type } from '@sinclair/typebox';
-import type { Express, Request } from 'express';
+import type { Express, Request, RequestHandler } from 'express';
 
 import DmPlugin, {
   defineRoute,
@@ -1036,14 +1036,17 @@ export default class PasswordPolicy extends DmPlugin {
     // owns alone: a catch-all over the whole API prefix would sit before the
     // routes a later registration adds, and make them unreachable. OPTIONS
     // is left to Express, which lists the methods a path takes.
+    const jsonNotFound: RequestHandler = (req, res, next) =>
+      req.method === 'OPTIONS' ? next() : notFound(res);
     for (const path of [
       `${prefix}/password-policies`,
       `${prefix}/password-policy`,
-      `${prefix}/password/validate`,
     ])
-      app.use(path, (req, res, next) =>
-        req.method === 'OPTIONS' ? next() : notFound(res)
-      );
+      app.use(path, jsonNotFound);
+    // Claimed only with its route: another plugin may serve this path when
+    // the option is off
+    if (this.settings.ppolicy_validate_complexity)
+      app.use(`${prefix}/password/validate`, jsonNotFound);
   }
 
   /**

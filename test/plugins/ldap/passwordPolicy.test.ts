@@ -137,6 +137,32 @@ describe('PasswordPolicy Plugin', () => {
       expect(response.body).to.have.property('errors');
     });
 
+    it('answers a JSON 404 for a method it does not serve', async () => {
+      dm.config.ppolicy_validate_complexity = true;
+      const plugin = new PasswordPolicy(dm);
+      await dm.registerPlugin('passwordPolicy', plugin);
+
+      const response = await supertest(dm.app)
+        .put('/api/v1/password/validate')
+        .set('Accept', 'application/json');
+      expect(response.status).to.equal(404);
+      expect(response.type).to.equal('application/json');
+    });
+
+    it('leaves the path free when the option is off', async () => {
+      const plugin = new PasswordPolicy(dm);
+      await dm.registerPlugin('passwordPolicy', plugin);
+      dm.app.post('/api/v1/password/validate', (_req, res) => {
+        res.json({ mine: true });
+      });
+
+      const response = await supertest(dm.app)
+        .post('/api/v1/password/validate')
+        .set('Accept', 'application/json');
+      expect(response.status).to.equal(200);
+      expect(response.body).to.deep.equal({ mine: true });
+    });
+
     it('should answer 400 to a body that is not JSON', async () => {
       dm.config.ppolicy_validate_complexity = true;
       const plugin = new PasswordPolicy(dm);
@@ -456,7 +482,7 @@ describe('PasswordPolicy Plugin: policy management', () => {
   it('answers JSON for the other paths the plugin owns', async () => {
     for (const path of [
       '/api/v1/password-policy',
-      '/api/v1/password/validate',
+      '/api/v1/password-policy/expiring-soon',
     ]) {
       const res = await request.put(path);
       expect(res.status, path).to.equal(404);
