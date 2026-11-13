@@ -233,9 +233,10 @@ reach the directory through a CSV file. The flat import format
 (`properties`) declares no `strict` and keeps accepting such columns, as the
 API of a non-strict entity does.
 
-A column under an attribute marked `"generated": true` also fails: the server
-or a plugin fills it. The main attribute is the exception, since a row names
-its entry with it.
+A column under an attribute the API does not let a client set
+(`"generated": true` or `"readOnly": true`) also fails. The main attribute is
+the exception: the API refuses it when it is derived from another attribute,
+but a row names its entry with it.
 
 ## Complete Example
 

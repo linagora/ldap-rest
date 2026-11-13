@@ -305,6 +305,17 @@ describe('LDAP Bulk Import Plugin', function () {
       expect(res.body.errors[0].error).to.match(
         /"twakeDepartmentPath" is computed by the server/
       );
+
+      const created = await server.ldap
+        .search(
+          { paged: false, scope: 'base' },
+          `uid=rules.import,ou=users,${process.env.DM_LDAP_BASE}`
+        )
+        .catch(() => ({ searchEntries: [] }));
+      expect(
+        (created as { searchEntries: unknown[] }).searchEntries,
+        'a row the schema refused'
+      ).to.be.empty;
     });
 
     it('should handle dry run mode', async () => {

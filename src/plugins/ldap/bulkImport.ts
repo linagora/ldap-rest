@@ -11,7 +11,11 @@ import { parse as csvParse } from 'csv-parse/sync';
 
 import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
 import type { DM } from '../../bin/index.js';
-import type { Schema, SchemaAttribute } from '../../config/schema.js';
+import {
+  assertClientMaySet,
+  type Schema,
+  type SchemaAttribute,
+} from '../../config/schema.js';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions.js';
 import { badRequest, serverError } from '../../lib/expressFormatedResponses.js';
 import {
@@ -508,6 +512,7 @@ export default class LdapBulkImport extends DmPlugin {
       }) as Record<string, string>[];
 
       result.total = records.length;
+      const validator = this.validator(resource);
 
       // Process each record
       for (let i = 0; i < records.length; i++) {
@@ -515,7 +520,11 @@ export default class LdapBulkImport extends DmPlugin {
         const record = records[i];
 
         try {
-          const { dn, entry, orgDn } = this.buildRecord(record, resource);
+          const { dn, entry, orgDn } = this.buildRecord(
+            record,
+            resource,
+            validator
+          );
           // Judged before the directory is read for the row: whether the
           // entry or its organization is there is not for a caller who may
           // not write it. A dry run is judged as the import is.
@@ -636,10 +645,9 @@ export default class LdapBulkImport extends DmPlugin {
   }
 
   /**
-   * The entity schema of a resource, for the checks the API path applies to
-   * the names a write carries. Only those: a row may hold several values
-   * under an attribute the schema calls single-valued (`a;b`), which is the
-   * import's own syntax.
+   * The entity schema of a resource, for the allow-list a strict schema is.
+   * Only that: a row may hold several values under an attribute the schema
+   * calls single-valued (`a;b`), which is the import's own syntax.
    */
   private validator(resource: BulkImportResource): EntityValidator {
     return new EntityValidator(resource.schema.entity, {
@@ -655,11 +663,12 @@ export default class LdapBulkImport extends DmPlugin {
    */
   private buildRecord(
     csvLine: Record<string, string>,
-    resource: BulkImportResource
+    resource: BulkImportResource,
+    validator: EntityValidator
   ): { dn: string; entry: AttributesList; orgDn?: string } {
     const entry: AttributesList = {};
     const schema = resource.schema;
-    const validator = this.validator(resource);
+    const mainAttribute = schema.mainAttribute.toLowerCase();
 
     // 1. Extract organizationDn
     const orgDn = csvLine.organizationDn;
@@ -667,8 +676,6 @@ export default class LdapBulkImport extends DmPlugin {
 
     // 2. Add fixed fields from schema
     const fixed = new Set<string>();
-    const readOnly = new Set<string>();
-    const generated = new Set<string>();
     for (const [attr, def] of Object.entries(schema.properties || {})) {
       if (def.fixed === true) {
         const value = def.default || def.const;
@@ -677,42 +684,28 @@ export default class LdapBulkImport extends DmPlugin {
           fixed.add(attr.toLowerCase());
         }
       }
-      if (def.readOnly === true) readOnly.add(attr.toLowerCase());
-      // The main attribute names the entry: a row supplies it even when the
-      // API derives it
-      if (
-        def.generated === true &&
-        attr.toLowerCase() !== schema.mainAttribute.toLowerCase()
-      )
-        generated.add(attr.toLowerCase());
     }
 
     // 3. Add fields from CSV. Empty cells are skipped whatever their column
     // is called, so a spreadsheet's comment column or a trailing comma still
     // imports; a value under a name the schema does not declare (a strict
     // schema is the allow-list on the API path), under a fixed value written
-    // above, or under an attribute the server computes, fails.
+    // above, or under an attribute the client may not set, fails. The main
+    // attribute names the entry, so a row supplies it even when the API
+    // derives it from another attribute.
     for (const [attr, value] of Object.entries(csvLine)) {
       if (value && value.trim() !== '') {
         if (!CSV_COLUMN_NAME.test(attr)) {
           throw new Error(`Invalid column name: ${attr}`);
         }
         validator.assertDeclared([attr]);
-        if (fixed.has(attr.split(';')[0].toLowerCase())) {
+        const base = attr.split(';')[0].toLowerCase();
+        if (fixed.has(base)) {
           throw new Error(
             `Attribute "${attr}" is fixed and cannot be imported`
           );
         }
-        if (readOnly.has(attr.split(';')[0].toLowerCase())) {
-          throw new Error(
-            `Attribute "${attr}" is read-only and cannot be imported`
-          );
-        }
-        if (generated.has(attr.split(';')[0].toLowerCase())) {
-          throw new Error(
-            `Attribute "${attr}" is computed by the server and cannot be imported`
-          );
-        }
+        if (base !== mainAttribute) assertClientMaySet(schema.entity, [attr]);
         // Support multi-value: "val1;val2;val3"
         entry[attr] = value.includes(';')
           ? value.split(';').map(v => v.trim())

@@ -75,6 +75,11 @@ twakeCozyDomain: john-doe.partner.cloud
 > the shipped `static/schemas/twake/*.json` do, so no API write can set it, or
 > mark it `"readOnly": true`; otherwise whoever may write an account may also
 > choose the Drive instance it updates.
+>
+> This costs no provisioning: Twake Drive creates an instance on its first
+> use, so the plugin only has to propagate changes to instances that exist. An
+> update that arrives before the instance is created is answered `404` and
+> ignored, as before.
 
 ### Default domain template
 
