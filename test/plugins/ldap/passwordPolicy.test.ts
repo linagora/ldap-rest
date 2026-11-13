@@ -442,6 +442,17 @@ describe('PasswordPolicy Plugin: policy management', () => {
     expect((await request.get(`${api}/bad`)).status).to.equal(404);
   });
 
+  it('answers a JSON 404 for a method the endpoint does not serve', async () => {
+    for (const res of [
+      await request.put(`${api}/nonexistent`),
+      await request.patch(api),
+    ]) {
+      expect(res.status).to.equal(404);
+      expect(res.type).to.equal('application/json');
+      expect(res.body).to.deep.equal({ error: 'Not found' });
+    }
+  });
+
   it('lists the policies, marking the default one', async () => {
     const res = await request.get(api);
     expect(res.status).to.equal(200);

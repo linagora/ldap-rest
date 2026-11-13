@@ -30,7 +30,7 @@ import {
   parseDirectoryDate,
   validateDnValue,
 } from '../../lib/utils.js';
-import { jsonBody } from '../../lib/expressFormatedResponses.js';
+import { jsonBody, notFound } from '../../lib/expressFormatedResponses.js';
 import { extractLdapCode } from '../../lib/ldapCodes.js';
 
 // ppolicy operational attributes to read
@@ -1030,6 +1030,12 @@ export default class PasswordPolicy extends DmPlugin {
         },
       });
     }
+
+    // A method the collection does not serve answers JSON, not Express's
+    // "Cannot PUT /api/v1/password-policies" page. Scoped to the collection:
+    // a catch-all over the whole API prefix would sit before the routes a
+    // later registration adds, and make them unreachable.
+    app.use(`${prefix}/password-policies`, (_req, res) => notFound(res));
   }
 
   /**
