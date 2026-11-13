@@ -581,9 +581,11 @@ export default class AppAccountsApi extends DmPlugin {
         newAttrs.description = name;
       }
 
-      // Create applicative account
+      // Create applicative account. As the server: the copy is derived from
+      // the user's entry, which the caller's own request already read, and
+      // the mail address is the user's, not a new one supplied by the caller.
       const applicativeDn = `uid=${escapeDnValue(newUid)},${this.applicativeAccountBase}`;
-      await this.server.ldap.add(applicativeDn, newAttrs, req);
+      await this.server.ldap.system.add(applicativeDn, newAttrs);
 
       this.logger.info(
         `${this.name}: Created applicative account ${applicativeDn} for user ${principal}`

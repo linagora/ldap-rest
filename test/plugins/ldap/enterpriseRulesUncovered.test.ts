@@ -45,6 +45,13 @@ describe('Enterprise rules: entries no entity covers', function () {
     server.config.organization_schema =
       './static/schemas/twake/organizations.json';
     server.config.ldap_top_organization = `ou=organization,${base}`;
+    server.config.applicative_account_base = `ou=applicative,${base}`;
+    await server.ldap
+      .add(`ou=applicative,${base}`, {
+        objectClass: ['organizationalUnit', 'top'],
+        ou: 'applicative',
+      })
+      .catch(() => undefined);
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
     await server.registerPlugin(
       'ldapOrganizations',
@@ -60,6 +67,9 @@ describe('Enterprise rules: entries no entity covers', function () {
     for (const dn of [
       `cn=rules.outside,${base}`,
       `uid=rules.inside,ou=users,${base}`,
+      `uid=rules.app,ou=applicative,${base}`,
+      `uid=rules.app2,ou=applicative,${base}`,
+      `ou=applicative,${base}`,
     ])
       await server.ldap.delete(dn).catch(() => undefined);
   });
@@ -118,6 +128,44 @@ describe('Enterprise rules: entries no entity covers', function () {
     expect(res.searchEntries[0]).to.have.property(
       'mail',
       'rules.inside@example.com'
+    );
+  });
+
+  it('refuses a caller writing a mail under the app account base', async () => {
+    try {
+      await server.ldap.add(
+        `uid=rules.app,ou=applicative,${base}`,
+        {
+          objectClass: ['top', 'inetOrgPerson'],
+          uid: 'rules.app',
+          cn: 'App',
+          sn: 'Account',
+          mail: 'rules.app@example.com',
+        },
+        asCaller
+      );
+      expect.fail('a caller wrote an address under the app account base');
+    } catch (err) {
+      expect(err).to.be.instanceOf(BadRequestError);
+      expect((err as Error).message).to.match(/no entity covers/);
+    }
+  });
+
+  it('accepts the server writing the app account copy', async () => {
+    await server.ldap.system.add(`uid=rules.app2,ou=applicative,${base}`, {
+      objectClass: ['top', 'inetOrgPerson'],
+      uid: 'rules.app2',
+      cn: 'App',
+      sn: 'Account',
+      mail: 'rules.app2@example.com',
+    });
+    const res = (await server.ldap.search(
+      { paged: false, scope: 'base', attributes: ['mail'] },
+      `uid=rules.app2,ou=applicative,${base}`
+    )) as { searchEntries: Record<string, unknown>[] };
+    expect(res.searchEntries[0]).to.have.property(
+      'mail',
+      'rules.app2@example.com'
     );
   });
 });
