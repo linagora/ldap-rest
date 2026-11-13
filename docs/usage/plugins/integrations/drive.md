@@ -69,6 +69,19 @@ mail: jdoe@example.com
 twakeCozyDomain: john-doe.partner.cloud
 ```
 
+> **The attribute names the instance the server administers.** The plugin
+> sends `Email`, `PublicName` and `DiskQuota` to whatever instance the
+> attribute names, with its admin token. Leave it out of the entity schema, as
+> the shipped `static/schemas/twake/*.json` do, so no API write can set it, or
+> mark it `"readOnly": true`; otherwise whoever may write an account may also
+> choose the Drive instance it updates.
+>
+> This costs no provisioning: the instance is created when the account is
+> provisioned (`core/twake/cozyProvision`, `core/twake/clouderyProvision`), and
+> Twake Drive creates it on its first use when that failed. This plugin's own
+> writes only update an instance that exists: one that arrives before the
+> creation is answered `404` and ignored.
+
 ### Default domain template
 
 Configure a template for users without an explicit attribute. Use `{attribute}` placeholders:

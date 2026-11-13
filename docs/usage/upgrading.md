@@ -31,6 +31,20 @@ SCIM and any custom plugin writing a mail address outside a branch an entity
 declares. Declare the branch as a flat resource, or write the entry below one.
 See [bulk import](plugins/ldap/bulk-import.md#schema-configuration-format).
 
+### The bulk import refuses columns the schema does not declare
+
+**Who is affected:** deployments loading `core/ldap/bulkImport` with a schema
+that sets `"strict": true`.
+
+A non-empty column the schema does not declare fails its row, as the API of
+the same entity refuses it. So does a column under an attribute the API does
+not let a client set, `"generated": true` or `"readOnly": true`, the main
+attribute excepted. In the shipped `twake/users.json`, that covers
+`twakeAccountStatus` and `twakeDeliveryMode`, which an import may set today.
+Remove the column, or declare the attribute in the schema; the flat import
+format (`properties`) declares no `strict` and keeps accepting such columns.
+See [bulk import](plugins/ldap/bulk-import.md#declared-attributes).
+
 ## From 2.1.1
 
 ### TOTP requires the user name

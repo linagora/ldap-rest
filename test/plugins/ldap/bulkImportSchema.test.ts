@@ -39,6 +39,26 @@ describe('Bulk import schemas', () => {
     ]);
   });
 
+  it('keeps the entity rules the import applies to its columns', () => {
+    const schema = read(join('static', 'schemas', 'twake', 'users.json'));
+    expect(schema.entity.strict).to.equal(true);
+    expect(schema.entity.attributes).to.have.property('mail');
+    expect(schema.entity.attributes).to.not.have.property('twakeCozyDomain');
+  });
+
+  it('reads the flat format as a schema that declares no strict', () => {
+    const schema = readBulkImportSchema(
+      {
+        base: 'ou=people,dc=example,dc=com',
+        mainAttribute: 'uid',
+        properties: { uid: { type: 'string', required: true } },
+      },
+      'inline'
+    );
+    expect(schema.entity.strict).to.equal(false);
+    expect(schema.entity.attributes).to.have.property('uid');
+  });
+
   it('keeps reading the flat import format', () => {
     const schema = readBulkImportSchema(
       {

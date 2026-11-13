@@ -254,6 +254,70 @@ describe('LDAP Bulk Import Plugin', function () {
       ).to.be.empty;
     });
 
+    it('refuses a column the strict schema does not declare', async function () {
+      this.timeout(10000);
+
+      // `twakeCozyDomain` is not in `static/schemas/twake/users.json`: on the
+      // API path the strict schema refuses it, and the Drive plugin would
+      // otherwise administer the instance it names with its admin token.
+      const csvContent = [
+        'uid,employeeNumber,sn,givenName,displayName,mail,twakeCozyDomain,organizationDn',
+        `rules.import,RULES001,Import,Rule,Rule Import,rules.import@example.com,victim.drive.example.com,"${getTestOrg1Dn()}"`,
+      ].join('\n');
+
+      const res = await request
+        .post('/api/v1/ldap/bulk-import/shipped')
+        .attach('file', Buffer.from(csvContent), 'test.csv')
+        .field('dryRun', 'false');
+
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      expect(res.body).to.include({ total: 1, created: 0, failed: 1 });
+      expect(res.body.errors[0].error).to.match(
+        /Unknown attribute "twakeCozyDomain"/
+      );
+
+      const created = await server.ldap
+        .search(
+          { paged: false, scope: 'base' },
+          `uid=rules.import,ou=users,${process.env.DM_LDAP_BASE}`
+        )
+        .catch(() => ({ searchEntries: [] }));
+      expect(
+        (created as { searchEntries: unknown[] }).searchEntries,
+        'a row the schema refused'
+      ).to.be.empty;
+    });
+
+    it('refuses a column the server computes', async function () {
+      this.timeout(10000);
+
+      const csvContent = [
+        'uid,employeeNumber,sn,givenName,displayName,mail,twakeDepartmentPath,organizationDn',
+        `rules.import,RULES001,Import,Rule,Rule Import,rules.import@example.com,elsewhere,"${getTestOrg1Dn()}"`,
+      ].join('\n');
+
+      const res = await request
+        .post('/api/v1/ldap/bulk-import/shipped')
+        .attach('file', Buffer.from(csvContent), 'test.csv');
+
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      expect(res.body).to.include({ created: 0, failed: 1 });
+      expect(res.body.errors[0].error).to.match(
+        /"twakeDepartmentPath" is computed by the server/
+      );
+
+      const created = await server.ldap
+        .search(
+          { paged: false, scope: 'base' },
+          `uid=rules.import,ou=users,${process.env.DM_LDAP_BASE}`
+        )
+        .catch(() => ({ searchEntries: [] }));
+      expect(
+        (created as { searchEntries: unknown[] }).searchEntries,
+        'a row the schema refused'
+      ).to.be.empty;
+    });
+
     it('should handle dry run mode', async () => {
       const csvContent = [
         'uid,cn,sn,givenName,mail,userPassword,organizationDn',
