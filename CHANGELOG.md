@@ -4,6 +4,17 @@
 
 ### Security
 
+- A caller's modify can no longer make or revive a Twake tombstone: setting
+  the deleted value, or rewriting the deletion attributes of a tombstone, is
+  refused with a 403
+  ([details](docs/usage/plugins/integrations/tombstone.md#behaviour)).
+- A caller's rename can no longer move a Twake tombstone, nor bring an entry
+  holding the deleted value under `--twake-tombstone-dn`: either would step
+  around the modify guard above
+  ([details](docs/usage/plugins/integrations/tombstone.md#behaviour)).
+- A caller's modify can no longer set the Twake instance mark, which would
+  keep `user.created` from being sent. Clearing it is still allowed
+  ([details](docs/usage/plugins/integrations/instances.md)).
 - The bulk import writes into the branch its schema declares rather than the
   directory root, a schema naming no base is no longer loaded, and a write
   carrying a mail address on an entry no entity covers is refused: a tenant

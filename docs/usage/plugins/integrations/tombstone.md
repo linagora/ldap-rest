@@ -33,8 +33,18 @@ is old enough, or right away when forced.
   memberships are put back once the response is sent.
 - Erasing removes the entry, then its group memberships. It publishes
   nothing.
-- A tombstone cannot be restored. Clearing its deleted attribute by hand is
-  not a supported operation.
+- A tombstone cannot be restored, and only a delete makes one. A caller's
+  modify is refused with a 403 when it sets the deleted attribute to its
+  deleted value, or when it writes or removes the deleted attribute, the
+  deletion date or the reason of a tombstone. On a live account these
+  attributes stay writable with other values, and the lock stays writable
+  everywhere, unless it shares the deleted attribute: locking an account is
+  not deleting it.
+- A caller's rename is refused with a 403 when the entry holds the deleted
+  value and either its DN or the new one matches `--twake-tombstone-dn`. A
+  tombstone renamed out of the patterns could be revived by a plain modify,
+  and an entry given the deleted value outside them would become a tombstone
+  once renamed in.
 
 The tombstone is written after every other plugin has judged the delete, so
 a delete that an authorization plugin refuses writes nothing.
