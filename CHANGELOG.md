@@ -41,6 +41,9 @@
 - A method the password-policy paths do not serve answers a JSON `404`
   instead of Express's HTML page
   ([#718](https://github.com/linagora/ldap-rest/issues/718)).
+- Creating a password policy with a name the directory cannot store answers a
+  `400` instead of a `500`
+  ([#715](https://github.com/linagora/ldap-rest/issues/715)).
 
 ## v2.2.2 (2026-11-11)
 
