@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- The bulk import writes into the branch its schema declares rather than the
+  directory root, a schema naming no base is no longer loaded, and a write
+  carrying a mail address on an entry no entity covers is refused: a tenant
+  administrator could otherwise provision the mail addresses of another
+  tenant ([#711](https://github.com/linagora/ldap-rest/issues/711)).
+
+### Changed
+
+- `core/ldap/bulkImport` reads the entity schema format the documentation
+  points it at (`entity.base`, `attributes`) as well as the flat one, and
+  demands an explicit base
+  ([bulk import](docs/usage/plugins/ldap/bulk-import.md#schema-configuration-format)).
+
 ## v2.2.2 (2026-11-11)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0, zlib updated to 1.4-r0.

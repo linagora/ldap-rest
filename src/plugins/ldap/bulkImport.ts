@@ -23,18 +23,82 @@ import {
 import { loadSchemaFile } from '../../lib/schemaFile.js';
 import { escapeDnValue, validateDnValue } from '../../lib/utils.js';
 
-interface BulkImportSchema {
+/** One column of an import, as both schema formats spell it. */
+interface SchemaProperty {
+  type?: string;
+  fixed?: boolean;
+  default?: AttributeValue;
+  const?: AttributeValue;
+  required?: boolean;
+  /** Computed by the server or a plugin: demanded of the entry, not of a row */
+  generated?: boolean;
+  /** Derived from another attribute: refused in input, never written */
+  readOnly?: boolean;
+  role?: string | string[];
+}
+
+/**
+ * A schema file, in either format a deployment has: the flat import one
+ * (`base`, `mainAttribute`, `properties`), and the entity one
+ * `--ldap-flat-schema` reads (`entity.base`, `entity.mainAttribute`,
+ * `attributes`), so that one file can serve both plugins.
+ */
+interface SchemaFile {
   base?: string;
   mainAttribute?: string;
-  properties: {
-    [key: string]: {
-      type?: string;
-      fixed?: boolean;
-      default?: AttributeValue;
-      const?: AttributeValue;
-      required?: boolean;
-      role?: string[];
+  properties?: Record<string, SchemaProperty>;
+  entity?: { base?: string; mainAttribute?: string };
+  attributes?: Record<string, SchemaProperty>;
+}
+
+/** A schema as the import uses it, whatever format its file was written in. */
+interface BulkImportSchema {
+  base: string;
+  mainAttribute: string;
+  properties: Record<
+    string,
+    Omit<SchemaProperty, 'role'> & { role?: string[] }
+  >;
+}
+
+/**
+ * Read the schema of an import, whatever format its file uses.
+ *
+ * The base is mandatory: `--ldap-base` sits at the directory root, where no
+ * entity declares the rules that guard the entry (mail domains, uniqueness,
+ * the organization link), so a row falling back to it would be written
+ * outside every check.
+ *
+ * @param raw schema file as parsed
+ * @param file path it was read from, for the message
+ * @returns the schema, with roles as lists
+ * @throws Error when the file names no base
+ */
+export function readBulkImportSchema(
+  raw: SchemaFile,
+  file: string
+): BulkImportSchema {
+  const base = raw.base || raw.entity?.base;
+  if (!base)
+    throw new Error(`${file} names no base: set "base" or "entity.base"`);
+
+  const properties = Object.create(null) as BulkImportSchema['properties'];
+  const declared: Record<string, SchemaProperty> =
+    raw.properties || raw.attributes || {};
+  for (const [name, def] of Object.entries(declared)) {
+    const { role, ...rest } = def;
+    properties[name] = {
+      ...rest,
+      ...(role === undefined
+        ? {}
+        : { role: Array.isArray(role) ? role : [role] }),
     };
+  }
+
+  return {
+    base,
+    mainAttribute: raw.mainAttribute || raw.entity?.mainAttribute || 'cn',
+    properties,
   };
 }
 
@@ -222,15 +286,16 @@ export default class LdapBulkImport extends DmPlugin {
       }
 
       try {
-        const schema = loadSchemaFile<BulkImportSchema>(schemaPath, {
-          config: this.config,
-        });
+        const schema = readBulkImportSchema(
+          loadSchemaFile<SchemaFile>(schemaPath, { config: this.config }),
+          schemaPath
+        );
 
         this.resources.set(resourceName, {
           name: resourceName,
           schema,
-          base: (schema.base || this.config.ldap_base) as string,
-          mainAttribute: schema.mainAttribute || 'cn',
+          base: schema.base,
+          mainAttribute: schema.mainAttribute,
         });
 
         this.logger.info(
@@ -645,7 +710,9 @@ export default class LdapBulkImport extends DmPlugin {
       }
     }
     for (const [attr, def] of Object.entries(schema.properties || {})) {
-      if (def.required === true && !entry[attr]) {
+      // A generated value is the server's or a plugin's to fill: the schema
+      // demands it of the entry, not of the row.
+      if (def.required === true && def.generated !== true && !entry[attr]) {
         throw new Error(`Missing required attribute: ${attr}`);
       }
     }
@@ -659,6 +726,12 @@ export default class LdapBulkImport extends DmPlugin {
     for (const [name, def] of Object.entries(schema.properties || {})) {
       // Exclude fixed
       if (def.fixed === true) continue;
+
+      // Exclude what the directory or the plugins own: membership is driven
+      // from the group side, and a fixed or generated value is not a column.
+      // The main attribute stays: a row names its entry with it.
+      if (def.readOnly === true) continue;
+      if (def.generated === true && name !== schema.mainAttribute) continue;
 
       // Exclude organizationLink and organizationPath (calculated auto)
       if (def.role?.includes('organizationLink')) continue;
