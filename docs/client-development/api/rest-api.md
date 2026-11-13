@@ -1134,6 +1134,7 @@ curl -X DELETE \
 | 401         | Unauthorized - Authentication required |
 | 403         | Forbidden - Insufficient permissions   |
 | 404         | Not Found - Resource doesn't exist     |
+| 405         | Method Not Allowed - see below         |
 | 409         | Conflict - Resource already exists     |
 | 422         | Unprocessable - see below              |
 | 500         | Internal Server Error                  |
@@ -1291,6 +1292,35 @@ result codes 32 and 16). Removing a group member that is not one names both:
   "error": "uid=alice,ou=users,dc=example,dc=com is not a member of cn=backend-guild,ou=groups,dc=example,dc=com"
 }
 ```
+
+**Path no route serves** — any path under `--api-prefix` that no route
+answers, with any method:
+
+```json
+{
+  "error": "Not found"
+}
+```
+
+#### 405 Method Not Allowed
+
+A path a route serves, asked with a method it does not take. The `Allow`
+header lists the methods it takes, `HEAD` with `GET`; an `OPTIONS` request
+answers the same list with a `200`:
+
+```http
+HTTP/1.1 405 Method Not Allowed
+Allow: GET, HEAD, POST
+Content-Type: application/json
+
+{ "error": "Method Not Allowed" }
+```
+
+Paths outside `--api-prefix` keep Express's own answer. The `405` covers the
+routes registered on the server itself, which every route the shipped plugins
+declare is: a plugin serving its paths through a mounted `express.Router()`
+answers `404` to a method they do not take, and one serving them through its
+own middleware answers what that middleware does.
 
 #### 409 Conflict
 

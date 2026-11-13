@@ -25,6 +25,7 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { ConfigParser } from '../lib/parseConfig.js';
 import { unknownEnvironmentOptions } from '../config/options.js';
 import { keepRawBody } from '../lib/rawBody.js';
+import { installApiFallback } from '../lib/apiFallback.js';
 import configArgs, { type Config } from '../config/args.js';
 import type { Hooks } from '../hooks.js';
 import ldapActions from '../lib/ldapActions.js';
@@ -290,6 +291,15 @@ export class DM {
     this.deprecationWarnings = parser.deprecationWarnings;
 
     this.app = express();
+    // A request under the API prefix no route takes answers JSON, at the
+    // end of the stack rather than as a middleware routes added later would
+    // sit behind; see lib/apiFallback
+    installApiFallback(
+      this.app,
+      () => this.config.api_prefix,
+      () => this.config.debug,
+      message => this.logger.warn(message)
+    );
     // Nothing tells which framework answers, and no script or style is
     // read as another type than the one its response declares.
     this.app.disable('x-powered-by');
