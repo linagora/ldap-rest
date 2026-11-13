@@ -8,7 +8,7 @@ import configTemplate from '../../src/config/args';
 import { DM } from '../../src/bin';
 import type { ChangeContext } from '../../src/lib/changeContext';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
-import { NotFoundError } from '../../src/lib/errors';
+import { BadRequestError, NotFoundError } from '../../src/lib/errors';
 import type { ChainedHook } from '../../src/hooks';
 
 let ldapActions: LdapActions;
@@ -283,6 +283,54 @@ describe('ldapActions', function () {
         }
       });
 
+      it('answers 400 for an RDN too long for the directory to store', async () => {
+        // back-mdb cannot key a DN whose RDN is past about 240 bytes and
+        // answers `other` (80) without a diagnostic, while the shipped
+        // schemas accept a uid of 255 characters
+        const uid = 'u'.repeat(250);
+        try {
+          await ldapActions.add(`uid=${uid},${process.env.DM_LDAP_BASE}`, {
+            objectClass: ['inetOrgPerson', 'organizationalPerson', 'person'],
+            cn: 'Long',
+            sn: 'Long',
+            uid,
+          });
+          expect.fail('Expected error not thrown');
+        } catch (err) {
+          expect(err).to.be.instanceOf(BadRequestError);
+          expect((err as Error).message).to.match(/RDN is too long/);
+          expect(err).to.have.property('code', 80);
+        }
+      });
+
+      it('leaves an `other` failure on a short RDN to the server', async () => {
+        // 80 without a long RDN is the server's failure: blaming the client
+        // would hide it
+        (ldapActions as unknown as { pool: unknown }).pool = {
+          acquire: () =>
+            Promise.resolve({
+              client: {
+                add: () =>
+                  Promise.reject(
+                    Object.assign(new Error('other'), { code: 80 })
+                  ),
+              },
+            }),
+          release: () => undefined,
+        };
+        try {
+          await ldapActions.add(testDN, {
+            objectClass: ['inetOrgPerson', 'organizationalPerson', 'person'],
+            cn: 'Test User',
+            sn: 'User',
+            uid: 'testuser',
+          });
+          expect.fail('Expected error not thrown');
+        } catch (err) {
+          expect(err).not.to.be.instanceOf(BadRequestError);
+        }
+      });
+
       it('writes the entry an ldapaddrequest hook returns', async () => {
         const dm = new DM();
         ldapActions = new LdapActions(dm);
@@ -359,6 +407,39 @@ describe('ldapActions', function () {
         expect((result as SearchResult).searchEntries[0].uid).to.equal(
           'newtestuser'
         );
+      });
+    });
+
+    describe('rename to an RDN too long to store', () => {
+      afterEach(async () => {
+        try {
+          await ldapActions.delete(testDN);
+        } catch {
+          // Ignore errors if the entry does not exist
+        }
+      });
+
+      it('answers 400 and leaves the entry where it was', async () => {
+        await ldapActions.add(testDN, {
+          objectClass: ['inetOrgPerson', 'organizationalPerson', 'person'],
+          cn: 'Test User',
+          sn: 'User',
+          uid: 'testuser',
+        });
+        // 120 commas are 240 bytes once escaped
+        const rdn = `uid=${'\\,'.repeat(120)}`;
+        try {
+          await ldapActions.rename(testDN, rdn);
+          expect.fail('Expected error not thrown');
+        } catch (err) {
+          expect(err).to.be.instanceOf(BadRequestError);
+          expect((err as Error).message).to.match(/RDN is too long/);
+        }
+        const { searchEntries } = (await ldapActions.search(
+          { paged: false, scope: 'base' },
+          testDN
+        )) as SearchResult;
+        expect(searchEntries).to.have.lengthOf(1);
       });
     });
 

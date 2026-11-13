@@ -44,6 +44,10 @@
 - Creating a password policy with a name the directory cannot store answers a
   `400` instead of a `500`
   ([#715](https://github.com/linagora/ldap-rest/issues/715)).
+- Creating or renaming any entry with an RDN the directory cannot store — a
+  `uid` of 241 to 255 characters, which the shipped schemas accept — answers
+  a `400` instead of a `500`
+  ([#719](https://github.com/linagora/ldap-rest/issues/719)).
 
 ## v2.2.2 (2026-11-11)
 

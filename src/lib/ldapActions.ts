@@ -12,7 +12,13 @@ import { type Config } from '../config/args.js';
 import { type DM } from '../bin/index.js';
 import type { Hooks } from '../hooks.js';
 
-import { escapeDnValue, getParentDn, hookOwner, rdnTypes } from './utils.js';
+import {
+  escapeDnValue,
+  getParentDn,
+  getRdn,
+  hookOwner,
+  rdnTypes,
+} from './utils.js';
 import { changeContext, type ChangeContext } from './changeContext.js';
 import HookBus from './hookBus.js';
 import { outsideOperation, runOperation } from './operation.js';
@@ -257,6 +263,33 @@ function assertHasValue(name: string, value: unknown): void {
 }
 
 /**
+ * Longest RDN that may be what a directory cannot store: back-mdb refuses one
+ * of about 240 bytes, and the exact limit moves with the backend and its
+ * version. Below it, a code `other` (80) is the server's failure, not the
+ * client's.
+ */
+const LONG_RDN = 200;
+
+/**
+ * A backend that cannot key a DN answers `other` (80) without a diagnostic —
+ * back-mdb's key size, for a long RDN — while the shipped schemas accept a
+ * `uid` of 255 characters. Only an RDN that long can be the cause; any other
+ * 80 is the server's, and stays a 500 rather than blaming the client. The RDN
+ * is measured as written: a comma takes two bytes once escaped.
+ */
+function unstorableRdn(dn: string, code: number | undefined): Error | null {
+  if (code !== 80) return null;
+  const bytes = Buffer.byteLength(getRdn(dn), 'utf8');
+  if (bytes <= LONG_RDN) return null;
+  return withCode(
+    new BadRequestError(
+      `The RDN is too long for the directory: ${bytes} bytes`
+    ),
+    code
+  );
+}
+
+/**
  * Wrap a write failure, turning a refusal of the request's content (see
  * `isSchemaRefusal`) into a 400: the mistake is the client's, and a 500
  * would hide it in logs it cannot read.
@@ -310,6 +343,8 @@ function ldapAddError(dn: string, error: unknown): Error {
       new NotFoundError(`${getParentDn(dn)} does not exist`),
       code
     );
+  const tooLong = unstorableRdn(dn, code);
+  if (tooLong) return tooLong;
   // attributeOrValueExists, on an add: the request names a value twice
   if (code === 20)
     return ldapRefusal(
@@ -347,8 +382,9 @@ function ldapModifyError(dn: string, error: unknown): Error {
 
 /**
  * Wrap a rename or move failure: a new DN already taken (68) is a 409, as on
- * an add, and a refusal of the request's content a 400 naming both DNs, the
- * new one being what the directory usually refused.
+ * an add, a new RDN too long to store a 400 (see `unstorableRdn`), and a
+ * refusal of the request's content a 400 naming both DNs, the new one being
+ * what the directory usually refused.
  */
 function ldapRenameError(
   context: string,
@@ -359,6 +395,8 @@ function ldapRenameError(
   const code = extractLdapCode(error);
   if (code === 68)
     return withCode(new ConflictError(`Entry ${newDn} already exists`), code);
+  const tooLong = unstorableRdn(newDn, code);
+  if (tooLong) return tooLong;
   return isSchemaRefusal(code)
     ? ldapRefusal(
         `The directory refused to rename ${dn} to ${newDn}`,
