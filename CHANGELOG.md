@@ -38,8 +38,8 @@
 
 ### Fixed
 
-- A method the password-policies collection does not serve answers a JSON
-  `404` instead of Express's HTML page
+- A method the password-policy paths do not serve answers a JSON `404`
+  instead of Express's HTML page
   ([#718](https://github.com/linagora/ldap-rest/issues/718)).
 
 ## v2.2.2 (2026-11-11)

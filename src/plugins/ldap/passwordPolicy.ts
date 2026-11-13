@@ -1031,11 +1031,19 @@ export default class PasswordPolicy extends DmPlugin {
       });
     }
 
-    // A method the collection does not serve answers JSON, not Express's
-    // "Cannot PUT /api/v1/password-policies" page. Scoped to the collection:
-    // a catch-all over the whole API prefix would sit before the routes a
-    // later registration adds, and make them unreachable.
-    app.use(`${prefix}/password-policies`, (_req, res) => notFound(res));
+    // A method these paths do not serve answers JSON, not Express's "Cannot
+    // PUT /api/v1/password-policies" page. Scoped to the paths this plugin
+    // owns alone: a catch-all over the whole API prefix would sit before the
+    // routes a later registration adds, and make them unreachable. OPTIONS
+    // is left to Express, which lists the methods a path takes.
+    for (const path of [
+      `${prefix}/password-policies`,
+      `${prefix}/password-policy`,
+      `${prefix}/password/validate`,
+    ])
+      app.use(path, (req, res, next) =>
+        req.method === 'OPTIONS' ? next() : notFound(res)
+      );
   }
 
   /**

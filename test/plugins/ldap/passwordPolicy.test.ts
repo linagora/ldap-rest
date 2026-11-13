@@ -453,6 +453,23 @@ describe('PasswordPolicy Plugin: policy management', () => {
     }
   });
 
+  it('answers JSON for the other paths the plugin owns', async () => {
+    for (const path of [
+      '/api/v1/password-policy',
+      '/api/v1/password/validate',
+    ]) {
+      const res = await request.put(path);
+      expect(res.status, path).to.equal(404);
+      expect(res.type, path).to.equal('application/json');
+    }
+  });
+
+  it('leaves OPTIONS to Express, which lists the methods', async () => {
+    const res = await request.options(api);
+    expect(res.status).to.equal(200);
+    expect(res.headers.allow).to.match(/GET/);
+  });
+
   it('lists the policies, marking the default one', async () => {
     const res = await request.get(api);
     expect(res.status).to.equal(200);
