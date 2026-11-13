@@ -25,7 +25,8 @@ interface RouteLayer {
     methods: Record<string, boolean>;
     _methods(): string[];
   };
-  match(path: string): boolean;
+  /** The route path compiled by path-to-regexp, one per path it was given */
+  matchers?: Array<(path: string) => unknown>;
 }
 interface AppInternal {
   handle(req: Request, res: Response, callback?: NextFunction): void;
@@ -47,15 +48,15 @@ export const underPrefix = (path: string, prefix: string): boolean =>
 
 /**
  * The methods the routes matching `path` serve, HEAD with GET as Express
- * adds it. Matching a layer stores what it matched on it, which the router
- * does itself for every request and reads back at once: nothing is left for
- * another request to read.
+ * adds it. The layers' compiled matchers are called rather than
+ * `layer.match`, which would store what it matched on the layer.
  */
 export function allowedMethods(app: Express, path: string): string[] {
   const stack = (app as unknown as AppInternal).router?.stack ?? [];
   const methods = new Set<string>();
   for (const layer of stack) {
-    if (!layer.route || !layer.match(path)) continue;
+    if (!layer.route || !layer.matchers?.some(matches => matches(path)))
+      continue;
     for (const method of layer.route._methods())
       if (method !== '_ALL') methods.add(method);
   }
