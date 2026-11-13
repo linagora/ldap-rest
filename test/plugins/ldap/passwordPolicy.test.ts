@@ -137,7 +137,7 @@ describe('PasswordPolicy Plugin', () => {
       expect(response.body).to.have.property('errors');
     });
 
-    it('answers a JSON 404 for a method it does not serve', async () => {
+    it('answers a JSON 405 for a method it does not serve', async () => {
       dm.config.ppolicy_validate_complexity = true;
       const plugin = new PasswordPolicy(dm);
       await dm.registerPlugin('passwordPolicy', plugin);
@@ -145,7 +145,8 @@ describe('PasswordPolicy Plugin', () => {
       const response = await supertest(dm.app)
         .put('/api/v1/password/validate')
         .set('Accept', 'application/json');
-      expect(response.status).to.equal(404);
+      expect(response.status).to.equal(405);
+      expect(response.headers.allow).to.equal('POST');
       expect(response.type).to.equal('application/json');
     });
 
@@ -468,15 +469,19 @@ describe('PasswordPolicy Plugin: policy management', () => {
     expect((await request.get(`${api}/bad`)).status).to.equal(404);
   });
 
-  it('answers a JSON 404 for a method the endpoint does not serve', async () => {
+  it('answers a JSON 405 for a method the endpoint does not serve', async () => {
     for (const res of [
       await request.put(`${api}/nonexistent`),
       await request.patch(api),
     ]) {
-      expect(res.status).to.equal(404);
+      expect(res.status).to.equal(405);
+      expect(res.headers.allow).to.be.a('string');
       expect(res.type).to.equal('application/json');
-      expect(res.body).to.deep.equal({ error: 'Not found' });
+      expect(res.body).to.deep.equal({ error: 'Method Not Allowed' });
     }
+    expect((await request.patch(api)).headers.allow).to.equal(
+      'GET, HEAD, POST'
+    );
   });
 
   it('answers JSON for the other paths the plugin owns', async () => {
@@ -485,7 +490,7 @@ describe('PasswordPolicy Plugin: policy management', () => {
       '/api/v1/password-policy/expiring-soon',
     ]) {
       const res = await request.put(path);
-      expect(res.status, path).to.equal(404);
+      expect(res.status, path).to.equal(405);
       expect(res.type, path).to.equal('application/json');
     }
   });

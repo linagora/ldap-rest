@@ -38,9 +38,12 @@
 
 ### Fixed
 
-- A method the password-policy paths do not serve answers a JSON `404`
-  instead of Express's HTML page
-  ([#718](https://github.com/linagora/ldap-rest/issues/718)).
+- A request under `--api-prefix` that no route serves answers JSON instead of
+  Express's HTML page: a `405` naming the methods the path takes in `Allow`
+  when a route serves it with others, a `404` otherwise
+  ([#718](https://github.com/linagora/ldap-rest/issues/718),
+  [#721](https://github.com/linagora/ldap-rest/issues/721); details in
+  [the REST API guide](docs/client-development/api/rest-api.md#405-method-not-allowed)).
 - Creating a password policy with a name the directory cannot store answers a
   `400` instead of a `500`
   ([#715](https://github.com/linagora/ldap-rest/issues/715)).
