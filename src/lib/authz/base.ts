@@ -42,6 +42,22 @@ import {
 import { authzFor, servesRequest } from './composition.js';
 
 /**
+ * Whether two DNs name the same entry, as the directory reads them.
+ *
+ * @param a one DN
+ * @param b the other
+ * @returns true when they normalize to the same string
+ */
+function sameDn(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  try {
+    return normalizeDn(a) === normalizeDn(b);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The rule of the most specific configured branch holding `target`.
  *
  * Branches are compared as DNs, whatever the case and spacing a rule or the
@@ -329,7 +345,20 @@ export default abstract class AuthzBase extends DmPlugin {
     if (groups?.base && this.config.ldap_group_base) bases.push(groups.base);
     const bulk = this.server.loadedPlugins['ldapBulkImport'] as
       { bases?: () => string[] } | undefined;
-    if (typeof bulk?.bases === 'function') bases.push(...bulk.bases());
+    if (typeof bulk?.bases === 'function')
+      // A bulk import base at the directory root, or under the top
+      // organization, is a branch of the tree itself, not a flat store
+      // holding attached entries: the same rule as the groups base above. A
+      // row imported there would be judged on its link alone.
+      bases.push(
+        ...bulk
+          .bases()
+          .filter(
+            base =>
+              !sameDn(base, this.config.ldap_base || '') &&
+              !isDnInBranch(base, this.config.ldap_top_organization || '')
+          )
+      );
     if (this.config.ldap_users_base) bases.push(this.config.ldap_users_base);
     if (this.config.ldap_group_base) bases.push(this.config.ldap_group_base);
     if (this.config.applicative_account_base)

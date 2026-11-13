@@ -15,6 +15,26 @@
 - A caller's modify can no longer set the Twake instance mark, which would
   keep `user.created` from being sent. Clearing it is still allowed
   ([details](docs/usage/plugins/integrations/instances.md)).
+- The bulk import writes into the branch its schema declares rather than the
+  directory root, a schema naming no base is no longer loaded, and a write
+  carrying a mail address on an entry no entity covers is refused: a tenant
+  administrator could otherwise provision the mail addresses of another
+  tenant ([#711](https://github.com/linagora/ldap-rest/issues/711)).
+- `core/ldap/bulkImport` refuses a column the schema does not declare when it
+  is `strict`, and a column under an attribute the API does not let a client
+  set, the main attribute excepted: an import could otherwise write an
+  attribute the API refuses, naming the instance the Drive plugin administers
+  ([bulk import](docs/usage/plugins/ldap/bulk-import.md#declared-attributes)).
+
+### Changed
+
+- `core/ldap/bulkImport` reads the entity schema format the documentation
+  points it at (`entity.base`, `attributes`) as well as the flat one, and
+  demands an explicit base
+  ([bulk import](docs/usage/plugins/ldap/bulk-import.md#schema-configuration-format)).
+- `core/ldap/enterpriseRules` refuses a write carrying a mail address on an
+  entry no entity covers, including the app accounts, SCIM and custom plugins
+  writing outside a branch an entity declares.
 
 ## v2.2.2 (2026-11-11)
 

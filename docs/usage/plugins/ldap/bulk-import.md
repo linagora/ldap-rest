@@ -36,6 +36,16 @@ The `ldapBulkImport` plugin provides CSV import functionality for any LDAP resou
 
 Format: `"resourceName:path/to/schema.json,resourceName2:path/to/schema2.json"`
 
+The schema file is the entity schema itself, the one `--ldap-flat-schema`
+reads (`entity.base`, `entity.mainAttribute`, `attributes`), or the flat
+import format (`base`, `mainAttribute`, `properties`). Both are read, and the
+shipped `static/schemas/twake/*.json` files are the former.
+
+The base is required: a schema naming none fails to load, with an error in
+the log, rather than importing at `--ldap-base`. That is the directory root,
+which no entity covers, so the rows would be written outside the
+[enterprise rules](enterprise-rules.md) that guard their mail addresses.
+
 **Example**:
 
 ```bash
@@ -63,17 +73,19 @@ Downloads a CSV template file with headers based on the schema.
 curl -O "http://localhost:8081/api/v1/ldap/bulk-import/users/template.csv"
 ```
 
-**Generated template** (for users):
+**Generated template** (for the shipped `users` schema):
 
 ```csv
-uid,cn,sn,givenName,mail,userPassword,telephoneNumber,organizationDn
+uid,employeeNumber,cn,sn,givenName,displayName,personalTitle,title,description,mail,mailAlternateAddress,twakeOtherMailbox,mailQuotaSize,telephoneNumber,mobile,postalAddress,postalCode,l,userPassword,pwdReset,twakeDeletionDate,twakeDelegatedUsers,organizationDn
 ```
 
 **Notes**:
 
 - Excludes attributes with `"fixed": true` (auto-populated)
-- Excludes attributes with `"role": ["organizationLink"]` or `"role": ["organizationPath"]` (auto-calculated)
-- Includes special column `organizationDn` for organization assignment
+- Excludes attributes with `"generated": true`, except the main attribute naming the entry: the server or a plugin fills them
+- Excludes attributes with `"readOnly": true`
+- Excludes attributes whose `role` is `organizationLink` or `organizationPath` (auto-calculated)
+- Includes the special column `organizationDn` for organization assignment
 
 ### POST /api/v1/ldap/bulk-import/{resource}
 
@@ -212,6 +224,20 @@ sn: Doe
 mail: jdoe@example.com
 ```
 
+### Declared Attributes
+
+On the API path, a `"strict": true` schema is the allow-list of writable
+attributes. The import applies the same rule: a non-empty column the schema
+does not declare fails the row, so an attribute no entity declares cannot
+reach the directory through a CSV file. The flat import format
+(`properties`) declares no `strict` and keeps accepting such columns, as the
+API of a non-strict entity does.
+
+A column under an attribute the API does not let a client set
+(`"generated": true` or `"readOnly": true`) also fails. The main attribute is
+the exception: the API refuses it when it is derived from another attribute,
+but a row names its entry with it.
+
 ## Complete Example
 
 ### Step 1: Configure Plugin
@@ -227,22 +253,23 @@ mail: jdoe@example.com
 curl -O "http://localhost:8081/api/v1/ldap/bulk-import/users/template.csv"
 ```
 
-**Generated `users-template.csv`**:
-
-```csv
-uid,cn,sn,givenName,mail,userPassword,telephoneNumber,organizationDn
-```
+**Generated `users-template.csv`**: the header row of the template route
+above — every writable attribute of the schema, then `organizationDn`.
 
 ### Step 3: Fill CSV File
 
 **users.csv**:
 
 ```csv
-uid,cn,sn,givenName,mail,userPassword,telephoneNumber,organizationDn
-jdoe,John Doe,Doe,John,john.doe@example.com,SecurePass123,+1-555-0100,ou=Engineering,ou=organization,dc=example,dc=com
-asmith,Alice Smith,Smith,Alice,alice.smith@example.com,SecretPass456,+1-555-0101,ou=Marketing,ou=organization,dc=example,dc=com
-bwilson,Bob Wilson,Wilson,Bob,bob.wilson@example.com,MyPass789,+1-555-0102,ou=Engineering,ou=organization,dc=example,dc=com
+uid,employeeNumber,cn,sn,givenName,displayName,mail,userPassword,organizationDn
+jdoe,EMP001,John Doe,Doe,John,John Doe,john.doe@example.com,SecurePass123,"ou=Engineering,ou=organization,dc=example,dc=com"
+asmith,EMP002,Alice Smith,Smith,Alice,Alice Smith,alice.smith@example.com,SecretPass456,"ou=Marketing,ou=organization,dc=example,dc=com"
+bwilson,EMP003,Bob Wilson,Wilson,Bob,Bob Wilson,bob.wilson@example.com,MyPass789,"ou=Engineering,ou=organization,dc=example,dc=com"
 ```
+
+The columns of a row are the ones it fills: a required attribute must be
+there (here `employeeNumber`, `displayName`, `sn`, `givenName` and `mail`),
+and an empty cell is left out.
 
 ### Step 4: Test with Dry Run
 
@@ -286,17 +313,17 @@ ldapsearch -x -b "ou=users,dc=example,dc=com" "(uid=jdoe)"
 
 ```
 dn: uid=jdoe,ou=users,dc=example,dc=com
-objectClass: inetOrgPerson
-objectClass: organizationalPerson
-objectClass: person
 objectClass: top
+objectClass: twakeAccount
+objectClass: twakeWhitePages
 uid: jdoe
+employeeNumber: EMP001
 cn: John Doe
 sn: Doe
 givenName: John
+displayName: John Doe
 mail: john.doe@example.com
 userPassword: {SSHA}...
-telephoneNumber: +1-555-0100
 twakeDepartmentLink: ou=Engineering,ou=organization,dc=example,dc=com
 twakeDepartmentPath: Engineering
 ```
@@ -630,6 +657,13 @@ If user only has write permission on `ou=Engineering`:
 
 - Can import users to `ou=Engineering`
 - Cannot import users to `ou=Marketing` (fails with permission error)
+
+An entry carrying a mail address must land in a branch an entity schema
+declares, since that schema is what holds the mail-domain and uniqueness
+rules: `core/ldap/enterpriseRules` refuses one written outside every entity.
+Load the same schema with `--ldap-flat-schema`, as
+[the Twake configuration](#with-ldapflat) does, and the rows land in its base
+and are checked as the flat route checks them.
 
 ## Performance
 

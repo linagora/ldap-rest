@@ -11,6 +11,11 @@ import { parse as csvParse } from 'csv-parse/sync';
 
 import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
 import type { DM } from '../../bin/index.js';
+import {
+  assertClientMaySet,
+  type Schema,
+  type SchemaAttribute,
+} from '../../config/schema.js';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions.js';
 import { badRequest, serverError } from '../../lib/expressFormatedResponses.js';
 import {
@@ -20,21 +25,101 @@ import {
   isAuthzRefusal,
   type Refusal,
 } from '../../lib/errors.js';
+import { EntityValidator } from '../../lib/entitySchema/validator.js';
 import { loadSchemaFile } from '../../lib/schemaFile.js';
 import { escapeDnValue, validateDnValue } from '../../lib/utils.js';
 
-interface BulkImportSchema {
+/** One column of an import, as both schema formats spell it. */
+interface SchemaProperty {
+  type?: string;
+  fixed?: boolean;
+  default?: AttributeValue;
+  const?: AttributeValue;
+  required?: boolean;
+  /** Computed by the server or a plugin: demanded of the entry, not of a row */
+  generated?: boolean;
+  /** Derived from another attribute: refused in input, never written */
+  readOnly?: boolean;
+  role?: string | string[];
+}
+
+/**
+ * A schema file, in either format a deployment has: the flat import one
+ * (`base`, `mainAttribute`, `properties`), and the entity one
+ * `--ldap-flat-schema` reads (`entity.base`, `entity.mainAttribute`,
+ * `attributes`), so that one file can serve both plugins.
+ */
+interface SchemaFile {
   base?: string;
   mainAttribute?: string;
-  properties: {
-    [key: string]: {
-      type?: string;
-      fixed?: boolean;
-      default?: AttributeValue;
-      const?: AttributeValue;
-      required?: boolean;
-      role?: string[];
+  properties?: Record<string, SchemaProperty>;
+  entity?: { base?: string; mainAttribute?: string };
+  strict?: boolean;
+  attributes?: Record<string, SchemaProperty>;
+}
+
+/** A schema as the import uses it, whatever format its file was written in. */
+interface BulkImportSchema {
+  base: string;
+  mainAttribute: string;
+  properties: Record<
+    string,
+    Omit<SchemaProperty, 'role'> & { role?: string[] }
+  >;
+  /** The same file as an entity schema, for the validator */
+  entity: Schema;
+}
+
+/**
+ * Read the schema of an import, whatever format its file uses.
+ *
+ * The base is mandatory: `--ldap-base` sits at the directory root, where no
+ * entity declares the rules that guard the entry (mail domains, uniqueness,
+ * the organization link), so a row falling back to it would be written
+ * outside every check.
+ *
+ * The file is also kept as the entity schema a route serving it applies:
+ * `strict` and `attributes`. The flat import format declares fewer fields
+ * under `properties` and names no `strict`, so its rows are not refused as
+ * undeclared.
+ *
+ * @param raw schema file as parsed
+ * @param file path it was read from, for the message
+ * @returns the schema, with roles as lists
+ * @throws Error when the file names no base
+ */
+export function readBulkImportSchema(
+  raw: SchemaFile,
+  file: string
+): BulkImportSchema {
+  const base = raw.base || raw.entity?.base;
+  if (!base)
+    throw new Error(`${file} names no base: set "base" or "entity.base"`);
+
+  const properties = Object.create(null) as BulkImportSchema['properties'];
+  const declared: Record<string, SchemaProperty> =
+    raw.properties || raw.attributes || {};
+  for (const [name, def] of Object.entries(declared)) {
+    const { role, ...rest } = def;
+    properties[name] = {
+      ...rest,
+      ...(role === undefined
+        ? {}
+        : { role: Array.isArray(role) ? role : [role] }),
     };
+  }
+
+  return {
+    base,
+    mainAttribute: raw.mainAttribute || raw.entity?.mainAttribute || 'cn',
+    properties,
+    entity: {
+      strict: raw.strict === true,
+      attributes: (raw.attributes ?? raw.properties ?? {}) as unknown as Record<
+        string,
+        SchemaAttribute
+      >,
+    },
   };
 }
 
@@ -222,15 +307,16 @@ export default class LdapBulkImport extends DmPlugin {
       }
 
       try {
-        const schema = loadSchemaFile<BulkImportSchema>(schemaPath, {
-          config: this.config,
-        });
+        const schema = readBulkImportSchema(
+          loadSchemaFile<SchemaFile>(schemaPath, { config: this.config }),
+          schemaPath
+        );
 
         this.resources.set(resourceName, {
           name: resourceName,
           schema,
-          base: (schema.base || this.config.ldap_base) as string,
-          mainAttribute: schema.mainAttribute || 'cn',
+          base: schema.base,
+          mainAttribute: schema.mainAttribute,
         });
 
         this.logger.info(
@@ -426,6 +512,7 @@ export default class LdapBulkImport extends DmPlugin {
       }) as Record<string, string>[];
 
       result.total = records.length;
+      const validator = this.validator(resource);
 
       // Process each record
       for (let i = 0; i < records.length; i++) {
@@ -433,7 +520,11 @@ export default class LdapBulkImport extends DmPlugin {
         const record = records[i];
 
         try {
-          const { dn, entry, orgDn } = this.buildRecord(record, resource);
+          const { dn, entry, orgDn } = this.buildRecord(
+            record,
+            resource,
+            validator
+          );
           // Judged before the directory is read for the row: whether the
           // entry or its organization is there is not for a caller who may
           // not write it. A dry run is judged as the import is.
@@ -554,15 +645,30 @@ export default class LdapBulkImport extends DmPlugin {
   }
 
   /**
+   * The entity schema of a resource, for the allow-list a strict schema is.
+   * Only that: a row may hold several values under an attribute the schema
+   * calls single-valued (`a;b`), which is the import's own syntax.
+   */
+  private validator(resource: BulkImportResource): EntityValidator {
+    return new EntityValidator(resource.schema.entity, {
+      entryExists: dn => this.entryExists(dn),
+      loadedPlugins: this.server.loadedPlugins,
+      singularName: resource.name,
+    });
+  }
+
+  /**
    * Build the entry of a CSV record, reading nothing from the directory: the
    * write it makes is judged on it before anything is looked for.
    */
   private buildRecord(
     csvLine: Record<string, string>,
-    resource: BulkImportResource
+    resource: BulkImportResource,
+    validator: EntityValidator
   ): { dn: string; entry: AttributesList; orgDn?: string } {
     const entry: AttributesList = {};
     const schema = resource.schema;
+    const mainAttribute = schema.mainAttribute.toLowerCase();
 
     // 1. Extract organizationDn
     const orgDn = csvLine.organizationDn;
@@ -582,18 +688,24 @@ export default class LdapBulkImport extends DmPlugin {
 
     // 3. Add fields from CSV. Empty cells are skipped whatever their column
     // is called, so a spreadsheet's comment column or a trailing comma still
-    // imports; only a value under a name that is not an attribute, or that
-    // is a fixed value written above, fails.
+    // imports; a value under a name the schema does not declare (a strict
+    // schema is the allow-list on the API path), under a fixed value written
+    // above, or under an attribute the client may not set, fails. The main
+    // attribute names the entry, so a row supplies it even when the API
+    // derives it from another attribute.
     for (const [attr, value] of Object.entries(csvLine)) {
       if (value && value.trim() !== '') {
         if (!CSV_COLUMN_NAME.test(attr)) {
           throw new Error(`Invalid column name: ${attr}`);
         }
-        if (fixed.has(attr.split(';')[0].toLowerCase())) {
+        validator.assertDeclared([attr]);
+        const base = attr.split(';')[0].toLowerCase();
+        if (fixed.has(base)) {
           throw new Error(
             `Attribute "${attr}" is fixed and cannot be imported`
           );
         }
+        if (base !== mainAttribute) assertClientMaySet(schema.entity, [attr]);
         // Support multi-value: "val1;val2;val3"
         entry[attr] = value.includes(';')
           ? value.split(';').map(v => v.trim())
@@ -645,7 +757,9 @@ export default class LdapBulkImport extends DmPlugin {
       }
     }
     for (const [attr, def] of Object.entries(schema.properties || {})) {
-      if (def.required === true && !entry[attr]) {
+      // A generated value is the server's or a plugin's to fill: the schema
+      // demands it of the entry, not of the row.
+      if (def.required === true && def.generated !== true && !entry[attr]) {
         throw new Error(`Missing required attribute: ${attr}`);
       }
     }
@@ -659,6 +773,12 @@ export default class LdapBulkImport extends DmPlugin {
     for (const [name, def] of Object.entries(schema.properties || {})) {
       // Exclude fixed
       if (def.fixed === true) continue;
+
+      // Exclude what the directory or the plugins own: membership is driven
+      // from the group side, and a fixed or generated value is not a column.
+      // The main attribute stays: a row names its entry with it.
+      if (def.readOnly === true) continue;
+      if (def.generated === true && name !== schema.mainAttribute) continue;
 
       // Exclude organizationLink and organizationPath (calculated auto)
       if (def.role?.includes('organizationLink')) continue;
