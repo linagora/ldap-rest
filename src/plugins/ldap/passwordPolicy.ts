@@ -13,7 +13,7 @@
 import { isDeepStrictEqual } from 'node:util';
 
 import { Type } from '@sinclair/typebox';
-import type { Express, Request } from 'express';
+import type { Express, Request, RequestHandler } from 'express';
 
 import DmPlugin, {
   defineRoute,
@@ -30,7 +30,7 @@ import {
   parseDirectoryDate,
   validateDnValue,
 } from '../../lib/utils.js';
-import { jsonBody } from '../../lib/expressFormatedResponses.js';
+import { jsonBody, notFound } from '../../lib/expressFormatedResponses.js';
 import { extractLdapCode } from '../../lib/ldapCodes.js';
 
 // ppolicy operational attributes to read
@@ -1038,6 +1038,23 @@ export default class PasswordPolicy extends DmPlugin {
         },
       });
     }
+
+    // A method these paths do not serve answers JSON, not Express's "Cannot
+    // PUT /api/v1/password-policies" page. Scoped to the paths this plugin
+    // owns alone: a catch-all over the whole API prefix would sit before the
+    // routes a later registration adds, and make them unreachable. OPTIONS
+    // is left to Express, which lists the methods a path takes.
+    const jsonNotFound: RequestHandler = (req, res, next) =>
+      req.method === 'OPTIONS' ? next() : notFound(res);
+    for (const path of [
+      `${prefix}/password-policies`,
+      `${prefix}/password-policy`,
+    ])
+      app.use(path, jsonNotFound);
+    // Claimed only with its route: another plugin may serve this path when
+    // the option is off
+    if (this.settings.ppolicy_validate_complexity)
+      app.use(`${prefix}/password/validate`, jsonNotFound);
   }
 
   /**

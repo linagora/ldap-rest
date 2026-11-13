@@ -137,6 +137,32 @@ describe('PasswordPolicy Plugin', () => {
       expect(response.body).to.have.property('errors');
     });
 
+    it('answers a JSON 404 for a method it does not serve', async () => {
+      dm.config.ppolicy_validate_complexity = true;
+      const plugin = new PasswordPolicy(dm);
+      await dm.registerPlugin('passwordPolicy', plugin);
+
+      const response = await supertest(dm.app)
+        .put('/api/v1/password/validate')
+        .set('Accept', 'application/json');
+      expect(response.status).to.equal(404);
+      expect(response.type).to.equal('application/json');
+    });
+
+    it('leaves the path free when the option is off', async () => {
+      const plugin = new PasswordPolicy(dm);
+      await dm.registerPlugin('passwordPolicy', plugin);
+      dm.app.post('/api/v1/password/validate', (_req, res) => {
+        res.json({ mine: true });
+      });
+
+      const response = await supertest(dm.app)
+        .post('/api/v1/password/validate')
+        .set('Accept', 'application/json');
+      expect(response.status).to.equal(200);
+      expect(response.body).to.deep.equal({ mine: true });
+    });
+
     it('should answer 400 to a body that is not JSON', async () => {
       dm.config.ppolicy_validate_complexity = true;
       const plugin = new PasswordPolicy(dm);
@@ -440,6 +466,34 @@ describe('PasswordPolicy Plugin: policy management', () => {
       expect(res.status, JSON.stringify(body)).to.equal(400);
     }
     expect((await request.get(`${api}/bad`)).status).to.equal(404);
+  });
+
+  it('answers a JSON 404 for a method the endpoint does not serve', async () => {
+    for (const res of [
+      await request.put(`${api}/nonexistent`),
+      await request.patch(api),
+    ]) {
+      expect(res.status).to.equal(404);
+      expect(res.type).to.equal('application/json');
+      expect(res.body).to.deep.equal({ error: 'Not found' });
+    }
+  });
+
+  it('answers JSON for the other paths the plugin owns', async () => {
+    for (const path of [
+      '/api/v1/password-policy',
+      '/api/v1/password-policy/expiring-soon',
+    ]) {
+      const res = await request.put(path);
+      expect(res.status, path).to.equal(404);
+      expect(res.type, path).to.equal('application/json');
+    }
+  });
+
+  it('leaves OPTIONS to Express, which lists the methods', async () => {
+    const res = await request.options(api);
+    expect(res.status).to.equal(200);
+    expect(res.headers.allow).to.match(/GET/);
   });
 
   it('answers 400, not 500, for a name too long for the directory', async () => {
