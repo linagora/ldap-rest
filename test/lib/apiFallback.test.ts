@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import express from 'express';
+import type { Response } from 'express';
 
 import {
   allowedMethods,
@@ -8,6 +9,10 @@ import {
   underPrefix,
 } from '../../src/lib/apiFallback';
 import { NotFoundError } from '../../src/lib/errors';
+import { DM } from '../../src/bin';
+import type { Role } from '../../src/abstract/plugin';
+import AuthBase, { type DmRequest } from '../../src/lib/auth/base';
+import { LDAP_ENV_VARS, skipIfMissingEnvVars } from '../helpers/env';
 
 const build = (prefix = '/api'): express.Express => {
   const app = express();
@@ -146,6 +151,50 @@ describe('API fallback', () => {
   describe('allowedMethods', () => {
     it('lists nothing for a path no route matches', () => {
       expect(allowedMethods(build(), '/api/none')).to.deep.equal([]);
+    });
+  });
+
+  describe('on the server', function () {
+    let server: DM;
+
+    before(function () {
+      skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+      server = new DM();
+      server.app.get('/api/v1/known', (_req, res) => {
+        res.json({ known: true });
+      });
+      server.setupErrorMiddleware();
+    });
+
+    it('answers JSON under --api-prefix', async () => {
+      const missing = await supertest(server.app).get('/api/v1/nope');
+      expect(missing.status).to.equal(404);
+      expect(missing.type).to.equal('application/json');
+      const wrong = await supertest(server.app).put('/api/v1/known');
+      expect(wrong.status).to.equal(405);
+      expect(wrong.headers.allow).to.equal('GET, HEAD');
+    });
+
+    it('lets authentication answer first', async () => {
+      // An anonymous caller is not told which paths exist
+      class Refusing extends AuthBase {
+        name = 'refusing';
+        roles: Role[] = ['auth'];
+        authMethod(_req: DmRequest, res: Response): void {
+          res.status(401).json({ error: 'Unauthorized' });
+        }
+      }
+      await server.registerPlugin('refusing', new Refusing(server));
+      try {
+        expect(
+          (await supertest(server.app).get('/api/v1/nope')).status
+        ).to.equal(401);
+        expect(
+          (await supertest(server.app).put('/api/v1/known')).status
+        ).to.equal(401);
+      } finally {
+        delete server.loadedPlugins.refusing;
+      }
     });
   });
 });
