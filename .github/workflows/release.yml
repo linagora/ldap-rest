@@ -137,6 +137,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # See docs/usage/operations.md
+          no-cache-filters: runtime
 
   # Build the arm64 image (slow; runs in parallel with the helm job).
   docker-arm64:
@@ -178,6 +180,8 @@ jobs:
             ${{ env.IMAGE_DOCKER }}:${{ needs.docker-amd64.outputs.version }}-arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # See docs/usage/operations.md
+          no-cache-filters: runtime
 
   # Assemble the multi-arch manifests once both arch builds are pushed.
   docker-manifest:
