@@ -8,8 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const moduleDir = path.resolve(__dirname, '..');
 const dockerFile = path.resolve(__dirname, '..', 'Dockerfile');
 
-// The base image is read from the committed Dockerfile, where Dependabot
-// moves its digest. See docs/usage/operations.md.
+// See docs/usage/operations.md
 function baseImage(): string {
   const current = fs.readFileSync(dockerFile, 'utf8');
   const images = new Set(
