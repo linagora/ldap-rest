@@ -1,17 +1,11 @@
 # Changelog
 
-## Unreleased
+## v2.3.2 (2026-11-16)
 
-### Changed
-
-- The Docker image runs Node.js 26 on Alpine 3.24, instead of Node.js 25,
-  which no longer receives security fixes.
-
-### Fixed
-
-- The Docker image really carries the Alpine updates published since its
-  base image: the release build reused a cached `apk upgrade`, so 2.3.1
-  shipped without the updates its entry lists
+- The Docker image runs Node.js 26 on Alpine 3.24: Node.js 25 no longer
+  receives security fixes.
+- The Docker image carries the Alpine updates again: the images of 2.2.0 to
+  2.3.1 reused a cached `apk upgrade` from 2026-11-02
   ([operations](docs/usage/operations.md#health-and-readiness)).
 
 ## v2.3.1 (2026-11-14)
