@@ -26,8 +26,14 @@ dockers:
 
           Rebuild with updated Alpine packages: {packages}.
       bump:
-        - { file: package.json, match: '^  "version": "([^"]+)"', value: '{version}' }
-        - { file: package-lock.json, match: '^  "version": "([^"]+)"', value: '{version}' }
-        - { file: package-lock.json, match: '^      "name": "ldap-rest",\n      "version": "([^"]+)"', value: '{version}' }
+        - file: package.json
+          match: '^  "version": "([^"]+)"'
+          value: '{version}'
+        - file: package-lock.json
+          match: '^  "version": "([^"]+)"'
+          value: '{version}'
+        - file: package-lock.json
+          match: '^      "name": "ldap-rest",\n      "version": "([^"]+)"'
+          value: '{version}'
     policies:
       - pr: { draft: false }
