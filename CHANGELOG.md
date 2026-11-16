@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+
+- The Docker image runs Node.js 26 on Alpine 3.24, instead of Node.js 25,
+  which no longer receives security fixes.
+
 ### Fixed
 
 - The Docker image really carries the Alpine updates published since its
