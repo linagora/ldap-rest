@@ -66,10 +66,10 @@ The base image is pinned by digest, so the image built is the one reviewed
 even if the tag moves. The pin lives in the `FROM` lines of the committed
 `Dockerfile`, the only part of it `scripts/buildDockerfile.ts` does not
 write: the generator reads it back, refusing `FROM` lines that differ or carry
-no digest. Dependabot opens a pull request when the tag
+no digest. When the tag
 ([`26-alpine`](https://hub.docker.com/_/node/tags?name=26-alpine)) moves to a
-new digest, which brings the Node.js and npm releases `apk` does not see. A new
-major version of Node.js is set by hand, in every `FROM` line.
+new digest, an edit of the `FROM` lines alone brings the Node.js and npm
+releases `apk` does not see; Dependabot ignores the image.
 
 ### What the shipped plugins report
 
