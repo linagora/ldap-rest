@@ -58,7 +58,9 @@ its production dependencies, the runtime stage copies them and carries no
 compiler nor package manager cache. The runtime stage upgrades the Alpine
 packages of its base image with `apk upgrade --no-cache`, so a security fix
 published after the base image was built still reaches the image: two builds
-from the same digest may differ in those packages. Its base image is pinned by
+from the same digest may differ in those packages. The release builds never
+take that stage from the build cache, whose key would not change with the
+packages and would keep the first upgrade forever. Its base image is pinned by
 digest in `scripts/buildDockerfile.ts`, so the image built is the one reviewed
 even if the tag moves; the digest follows the tag it names, taken from the
 [Docker Hub tag page](https://hub.docker.com/_/node/tags?name=25-alpine) and

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- The Docker image really carries the Alpine updates published since its
+  base image: the release build reused a cached `apk upgrade`, so 2.3.1
+  shipped without the updates its entry lists
+  ([operations](docs/usage/operations.md#health-and-readiness)).
+
 ## v2.3.1 (2026-11-14)
 
 Rebuild with updated Alpine packages: alpine-release updated to 3.23.8-r0, apk-tools updated to 3.0.9-r0, libapk updated to 3.0.9-r0, zlib updated to 1.4-r0.
