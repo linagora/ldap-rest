@@ -8,8 +8,16 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - 'lsc-plugin/**'
+      - .github/workflows/lsc-plugin.yml
+      - .github/workflows/dependency-review.yml
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore:
+      - 'lsc-plugin/**'
+      - .github/workflows/lsc-plugin.yml
+      - .github/workflows/dependency-review.yml
 
 permissions:
   contents: read
@@ -19,22 +27,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # GitHub's dependency review judges what a pull request adds or changes
-  # before a runner installs it. Its severity and allowlist are in
-  # .github/dependency-review-config.yml.
-  dependency-review:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Review dependency changes
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
-        with:
-          config-file: ./.github/dependency-review-config.yml
-
   test:
     runs-on: ubuntu-latest
 
@@ -147,59 +139,6 @@ jobs:
           DM_TEST_POSTGRES_URL: postgres://postgres:postgres@localhost:5432/postgres
           DM_TEST_VALKEY_URL: redis://localhost:6379
           DM_TEST_LDAP_IMAGE: mirror.gcr.io/osixia/openldap:1.5.0
-
-  lsc-plugin-test:
-    runs-on: ubuntu-latest
-    name: LSC ldap-rest plugin (Java)
-    env:
-      LSC_CORE_TAG: v2.2
-      # Bump when the tag moves without changing its name, or delete the
-      # cache in the Actions page, to rebuild lsc-core from the new commit.
-      LSC_CORE_CACHE_REVISION: '1'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Java 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: maven
-
-      # lsc-core is not on Maven Central: build it once per tag and keep the
-      # artifacts Maven installs under org/lsc. The local repository is
-      # restored only on an exact key, so bumping the revision rebuilds it
-      # rather than reusing the previous build.
-      - name: Cache LSC core (${{ env.LSC_CORE_TAG }})
-        id: lsc-core
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.m2/repository/org/lsc
-          key: lsc-core-${{ env.LSC_CORE_TAG }}-${{ env.LSC_CORE_CACHE_REVISION }}
-
-      - name: Build and install LSC core (${{ env.LSC_CORE_TAG }})
-        if: steps.lsc-core.outputs.cache-hit != 'true'
-        run: |
-          git clone --depth 1 --branch "$LSC_CORE_TAG" https://github.com/lsc-project/lsc.git /tmp/lsc
-          cd /tmp/lsc
-          mvn -B -DskipTests install
-
-      - name: Run plugin unit tests
-        working-directory: lsc-plugin
-        run: mvn -B test
-
-      - name: Build shaded jar
-        working-directory: lsc-plugin
-        run: mvn -B -DskipTests package
-
-      - name: Upload jar artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: lsc-ldaprest-plugin-jar
-          path: lsc-plugin/target/lsc-ldaprest-plugin-*-with-deps.jar
-          if-no-files-found: error
 
   # What the release publishes, checked on every pull request: the chart
   # release.yml lints after the image is pushed, and the image it builds,

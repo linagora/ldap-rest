@@ -8,6 +8,10 @@ name: Published contracts
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths-ignore:
+      - 'lsc-plugin/**'
+      - .github/workflows/lsc-plugin.yml
+      - .github/workflows/dependency-review.yml
 
 permissions:
   contents: read
