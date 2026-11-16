@@ -4,6 +4,7 @@ import nock from 'nock';
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
 import { outboundCalls } from '../../helpers/metrics';
+import { answerAfter } from '../../helpers/nock';
 
 describe('James Plugin - health', () => {
   const url = 'http://james.health.test:8000';
@@ -46,7 +47,7 @@ describe('James Plugin - health', () => {
   });
 
   it('is degraded when James takes too long', async () => {
-    nock(url).get('/healthcheck').delay(2500).reply(200);
+    nock(url).get('/healthcheck').reply(answerAfter(2500, 200));
     const started = Date.now();
     expect(await james.health()).to.equal('degraded');
     expect(Date.now() - started).to.be.below(2000);

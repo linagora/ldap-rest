@@ -7,6 +7,7 @@ import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
+import { bodyOf, FetchRequest, pathOf } from '../../helpers/nock';
 
 /**
  * James's rename leaves the identities under the old address, and a forward
@@ -28,7 +29,9 @@ describe('James Plugin - rename leftovers', () => {
     for (const method of ['GET', 'PUT', 'POST', 'DELETE'])
       scope
         .intercept(() => true, method)
-        .reply(function (uri: string, body: unknown) {
+        .reply(async (req: FetchRequest) => {
+          const uri = pathOf(req);
+          const body = await bodyOf(req);
           calls.push({ call: `${method} ${uri}`, body });
           if (method !== 'GET') return [204, ''];
           return james[uri] ?? [404, { statusCode: 404 }];

@@ -6,6 +6,7 @@ import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
 import { outboundRequestDuration } from '../../../src/lib/metrics';
 import { outboundCalls } from '../../helpers/metrics';
+import { answerAfter } from '../../helpers/nock';
 
 /**
  * James reads its users from an LDAP replica that can lag behind the write
@@ -35,6 +36,11 @@ describe('James Plugin - replication lag', () => {
     dm.config.james_retry_attempts = 3;
     dm.config.james_retry_delay = 10;
     james = new James(dm);
+    // A rename or an alias also drops the forwards James holds: there are none
+    nock(url)
+      .get(/^\/address\/forwards\//)
+      .reply(200, [])
+      .persist();
     logs = [];
     const capture =
       (level: string) =>
@@ -309,8 +315,7 @@ describe('James Plugin - replication lag', () => {
     james = Object.assign(new James(dm), { logger: james.logger });
     nock(url)
       .put('/quota/users/slow@test.org/size')
-      .delay(300)
-      .reply(204)
+      .reply(answerAfter(300, 204))
       .put('/quota/users/other@test.org/size')
       .reply(204);
     const slow = james.hooks.onLdapQuotaChange!(dn, 'slow@test.org', 0, 1);

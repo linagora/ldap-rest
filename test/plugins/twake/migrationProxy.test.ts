@@ -9,6 +9,7 @@ import MigrationProxy from '../../../src/plugins/twake/migrationProxy';
 import { LDAP_ENV_VARS, skipIfMissingEnvVars } from '../../helpers/env';
 import { outboundCalls } from '../../helpers/metrics';
 import { waitFor } from '../../helpers/waitFor';
+import { answerAfter, FetchRequest, pathOf } from '../../helpers/nock';
 
 type Log = { level: string; entry: Record<string, unknown> };
 
@@ -74,7 +75,9 @@ describe('Migration proxy plugin', () => {
   const at = (level: string): Log[] => logs.filter(l => l.level === level);
   const proxy = (): nock.Scope => {
     const scope = nock(url, { reqheaders: { authorization: 'Bearer secret' } });
-    scope.on('request', req => calls.push(`${req.method} ${req.path}`));
+    scope.on('request', (req: FetchRequest) =>
+      calls.push(`${req.method} ${pathOf(req)}`)
+    );
     return scope;
   };
   const change = (
@@ -333,8 +336,7 @@ describe('Migration proxy plugin', () => {
       // The add's PUT is slow: the rename's HEAD must still come after it
       proxy()
         .put('/migratedUsers/alice%40example.com')
-        .delay(50)
-        .reply(204)
+        .reply(answerAfter(50, 204))
         .head('/migratedUsers/alice%40example.com')
         .reply(204)
         .put('/migratedUsers/alice%40new.example.com')
@@ -402,7 +404,7 @@ describe('Migration proxy plugin', () => {
     });
 
     it('is degraded when the proxy takes too long', async () => {
-      nock(url).get('/healthcheck').delay(2500).reply(200);
+      nock(url).get('/healthcheck').reply(answerAfter(2500, 200));
       const started = Date.now();
       expect(await plugin.health()).to.equal('degraded');
       expect(Date.now() - started).to.be.below(2000);

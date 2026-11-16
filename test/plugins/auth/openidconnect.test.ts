@@ -8,6 +8,7 @@ import type { Hooks } from '../../../src/hooks';
 import { DM } from '../../../src/bin';
 import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
 import DmPlugin from '../../../src/abstract/plugin';
+import { FetchRequest, pathOf } from '../../helpers/nock';
 
 // Simple test plugin to verify auth flow
 class TestProtectedResource extends DmPlugin {
@@ -584,7 +585,8 @@ describe('OpenID Connect Plugin', () => {
       nock(oidcServer)
         .get('/authorize')
         .query(true) // Match any query parameters
-        .reply((uri: string) => {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           const url = new URL(uri, oidcServer);
           capturedState = url.searchParams.get('state') || '';
 

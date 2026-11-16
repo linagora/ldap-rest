@@ -8,6 +8,7 @@ import Drive from '../../../src/plugins/twake/drive';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
+import { FetchRequest, pathOf } from '../../helpers/nock';
 // Default Drive webadmin URL for tests (using nock for mocking)
 const TWAKE_DRIVE_WEBADMIN_URL = 'http://localhost:6060';
 
@@ -201,7 +202,8 @@ describe('Drive Plugin', () => {
           return query.FromCloudery === 'true' && !!query.PublicName;
         })
         .times(2) // Allow up to 2 calls (creation + modification)
-        .reply(200, function (uri: string) {
+        .reply(200, (req: FetchRequest) => {
+          const uri = pathOf(req);
           callCount++;
           const url = new URL(uri, 'http://localhost');
           lastPublicName = url.searchParams.get('PublicName') || '';

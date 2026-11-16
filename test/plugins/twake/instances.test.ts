@@ -1,3 +1,6 @@
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+
 import { expect } from 'chai';
 import type { Request } from 'express';
 import nock from 'nock';
@@ -6,6 +9,7 @@ import supertest from 'supertest';
 import { DM } from '../../../src/bin';
 import { ForbiddenError } from '../../../src/lib/errors';
 import { outboundCalls } from '../../helpers/metrics';
+import { answerAfter } from '../../helpers/nock';
 import {
   ClouderyProvider,
   CozyStackProvider,
@@ -721,8 +725,8 @@ describe('Twake instances plugin', function () {
         nock(CLOUDERY)
           .post('/api/v1/instances')
           .twice()
-          .delay(100)
-          .reply(202, () => {
+          .reply(202, async () => {
+            await new Promise(resolve => setTimeout(resolve, 100));
             created = true;
             return {};
           });
@@ -1747,23 +1751,10 @@ describe('Twake instances plugin', function () {
           .reply(200, {})
           .persist();
         clouderyOrg('acme1-instance');
-        // nock 15 no longer types the reply callback: its parameters are
-        // named here rather than read from the overload nock 14 carried
-        search('acme1.example.org').reply(
-          (
-            _uri: string,
-            _body: string | Record<string, unknown>,
-            answer: (
-              err: NodeJS.ErrnoException | null,
-              result: [number, string | Record<string, unknown>]
-            ) => void
-          ) => {
-            rabbit.handler!(orgWorkplace).then(
-              () => answer(null, [200, { items: [PLATFORM_ORG_INSTANCE] }]),
-              (err: Error) => answer(err, [500, {}])
-            );
-          }
-        );
+        search('acme1.example.org').reply(async () => {
+          await rabbit.handler!(orgWorkplace);
+          return [200, { items: [PLATFORM_ORG_INSTANCE] }];
+        });
         try {
           expect(await plugin(dm).ensureInstance(erin, rest())).to.equal(
             'pending'
@@ -2281,8 +2272,7 @@ describe('Twake instances plugin', function () {
       nock(CLOUDERY)
         .get('/api/v2/instances')
         .query(true)
-        .delay(500)
-        .reply(200, { items: [] });
+        .reply(answerAfter(500, 200, { items: [] }));
       const cloudery = new ClouderyProvider(
         CLOUDERY,
         't',
@@ -2300,7 +2290,9 @@ describe('Twake instances plugin', function () {
         'statusCode',
         504
       );
-      nock(COZY).get('/instances/in-alice.example.org').delay(500).reply(404);
+      nock(COZY)
+        .get('/instances/in-alice.example.org')
+        .reply(answerAfter(500, 404));
       const cozy = new CozyStackProvider(
         COZY,
         'admin',
@@ -2317,28 +2309,38 @@ describe('Twake instances plugin', function () {
     });
 
     it('give up on an answer whose body does not come in time', async () => {
-      nock(CLOUDERY)
-        .get('/api/v2/instances')
-        .query(true)
-        .delay(500)
-        .reply(200, { items: [] });
-      const cloudery = new ClouderyProvider(
-        CLOUDERY,
-        't',
-        'example.org',
-        '',
-        50
+      // A real server: undici asserts on a nock body cut by the abort
+      const server = http.createServer((_req, res) => {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.write('{"items":');
+        setTimeout(() => res.end('[]}'), 500);
+      });
+      await new Promise<void>(resolve =>
+        server.listen(0, '127.0.0.1', resolve)
       );
-      expect(
-        await refusal(
-          cloudery.find({
-            id: 'in-alice',
-            email: 'in-alice@example.org',
-            publicName: 'Alice',
-            locale: 'en',
-          })
-        )
-      ).to.have.property('statusCode', 504);
+      try {
+        const { port } = server.address() as AddressInfo;
+        const cloudery = new ClouderyProvider(
+          `http://127.0.0.1:${port}`,
+          't',
+          'example.org',
+          '',
+          50
+        );
+        expect(
+          await refusal(
+            cloudery.find({
+              id: 'in-alice',
+              email: 'in-alice@example.org',
+              publicName: 'Alice',
+              locale: 'en',
+            })
+          )
+        ).to.have.property('statusCode', 504);
+      } finally {
+        server.closeAllConnections();
+        server.close();
+      }
     });
   });
 });

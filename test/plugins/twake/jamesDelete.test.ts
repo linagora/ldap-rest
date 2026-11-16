@@ -7,6 +7,7 @@ import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
+import { FetchRequest, pathOf } from '../../helpers/nock';
 
 /**
  * Deleting a user leaves its James data alone: James purges it later.
@@ -26,7 +27,8 @@ describe('James Plugin - user deletion', () => {
     for (const method of ['GET', 'PUT', 'POST', 'DELETE'])
       scope
         .intercept(() => true, method)
-        .reply(function (uri: string) {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           calls.push(`${method} ${uri}`);
           return method === 'GET' ? [200, []] : [204, ''];
         });

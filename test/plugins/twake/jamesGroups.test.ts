@@ -9,6 +9,7 @@ import { BadRequestError, ConflictError } from '../../../src/lib/errors';
 import type { SearchResult } from '../../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
+import { FetchRequest, pathOf } from '../../helpers/nock';
 
 describe('James and groups', () => {
   const timestamp = Date.now();
@@ -108,7 +109,8 @@ describe('James and groups', () => {
       process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
     ).persist();
     for (const method of ['GET', 'PUT', 'POST', 'DELETE'])
-      scope.intercept(/.*/, method).reply((uri: string) => {
+      scope.intercept(/.*/, method).reply((req: FetchRequest) => {
+        const uri = pathOf(req);
         calls.push(`${method} ${decodeURIComponent(uri)}`);
         return method === 'GET' ? [200, []] : [204];
       });

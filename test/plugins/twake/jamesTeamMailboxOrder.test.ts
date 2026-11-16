@@ -45,8 +45,8 @@ describe('James Plugin - team mailbox creation order', () => {
     const events: string[] = [];
     nock(url)
       .put('/domains/test.org/team-mailboxes/team')
-      .delay(100)
-      .reply(204, () => {
+      .reply(204, async () => {
+        await new Promise(resolve => setTimeout(resolve, 100));
         events.push('created');
       });
     for (const member of ['a@test.org', 'b@test.org']) {

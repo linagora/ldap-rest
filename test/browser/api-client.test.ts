@@ -235,7 +235,7 @@ describe('Browser LDAP API Client', () => {
     it('should not include Authorization header when no token', async () => {
       nock(baseUrl)
         .get('/api/v1/ldap/organizations/top')
-        .matchHeader('Authorization', val => val === undefined)
+        .matchHeader('Authorization', val => val === null)
         .reply(200, { dn: 'ou=org,dc=example,dc=com' });
 
       await client.getTopOrganization();

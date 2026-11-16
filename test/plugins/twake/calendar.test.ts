@@ -7,6 +7,7 @@ import CalendarResources from '../../../src/plugins/twake/calendarResources';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapFlat from '../../../src/plugins/ldap/flatGeneric';
 import { waitFor } from '../../helpers/waitFor';
+import { FetchRequest, pathOf } from '../../helpers/nock';
 describe('Twake Calendar Plugin', function () {
   let resourceBase: string;
   let testResourceDN: string;
@@ -293,7 +294,8 @@ describe('Twake Calendar Plugin', function () {
       let patchPath = '';
       const apiScope = nock(calendarUrl)
         .patch(/^\/resources\//)
-        .reply(function (uri: string) {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           patchPath = uri;
           return [204];
         });
@@ -313,7 +315,8 @@ describe('Twake Calendar Plugin', function () {
       let deletePath = '';
       const apiScope = nock(calendarUrl)
         .delete(/^\/resources\//)
-        .reply(function (uri: string) {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           deletePath = uri;
           return [204];
         });
@@ -331,7 +334,8 @@ describe('Twake Calendar Plugin', function () {
       let patchPath = '';
       const apiScope = nock(calendarUrl)
         .patch(/^\/resources\//)
-        .reply(function (uri: string) {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           patchPath = uri;
           return [204];
         });
@@ -361,12 +365,14 @@ describe('Twake Calendar Plugin', function () {
         })
         .reply(201)
         .patch(/^\/resources\//)
-        .reply(function (uri: string) {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           patchPath = uri;
           return [204];
         })
         .delete(/^\/resources\//)
-        .reply(function (uri: string) {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           deletePath = uri;
           return [204];
         });
@@ -490,7 +496,8 @@ describe('Twake Calendar Plugin', function () {
           return true;
         })
         .query(true)
-        .reply(function (uri: string) {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           patchUri = uri;
           return [204];
         });
@@ -523,7 +530,8 @@ describe('Twake Calendar Plugin', function () {
           return true;
         })
         .query(true)
-        .reply(function (uri: string) {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           patchUri = uri;
           return [204];
         });
@@ -637,7 +645,8 @@ describe('Twake Calendar Plugin', function () {
         ])
         .patch('/registeredUsers')
         .query(true)
-        .reply(function (uri: string) {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           patchUri = uri;
           return [204];
         });
@@ -697,7 +706,8 @@ describe('Twake Calendar Plugin', function () {
           return true;
         })
         .query(true)
-        .reply(function (uri: string) {
+        .reply((req: FetchRequest) => {
+          const uri = pathOf(req);
           patchUri = uri;
           return [204];
         });

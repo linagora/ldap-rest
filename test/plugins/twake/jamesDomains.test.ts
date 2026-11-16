@@ -9,6 +9,7 @@ import LdapGroups from '../../../src/plugins/ldap/groups';
 import TrashPlugin from '../../../src/plugins/ldap/trash';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
+import { FetchRequest, pathOf } from '../../helpers/nock';
 
 /**
  * A server with the James plugin, its WebAdmin calls recorded, and the
@@ -38,7 +39,8 @@ const jamesServer = async (
   for (const method of ['GET', 'PUT', 'POST', 'DELETE'])
     scope
       .intercept(() => true, method)
-      .reply(function (uri: string) {
+      .reply((req: FetchRequest) => {
+        const uri = pathOf(req);
         calls.push(`${method} ${uri}`);
         return method === 'GET' ? [200, []] : [204, ''];
       });
