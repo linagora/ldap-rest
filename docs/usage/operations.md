@@ -60,12 +60,16 @@ packages of its base image with `apk upgrade --no-cache`, so a security fix
 published after the base image was built still reaches the image: two builds
 from the same digest may differ in those packages. The release builds never
 take that stage from the build cache, whose key would not change with the
-packages and would keep the first upgrade forever. Its base image is pinned by
-digest in `scripts/buildDockerfile.ts`, so the image built is the one reviewed
-even if the tag moves; the digest follows the tag it names, taken from the
-[Docker Hub tag page](https://hub.docker.com/_/node/tags?name=26-alpine) and
-updated by hand with it. Dependabot ignores the image: it would open a change
-to the generated `Dockerfile`, which the drift check refuses.
+packages and would keep the first upgrade forever.
+
+The base image is pinned by digest, so the image built is the one reviewed
+even if the tag moves. The pin lives in the `FROM` lines of the committed
+`Dockerfile`, the only part of it `scripts/buildDockerfile.ts` does not
+write: the generator reads it back, refusing `FROM` lines that differ or carry
+no digest. Dependabot opens a pull request when the tag
+([`26-alpine`](https://hub.docker.com/_/node/tags?name=26-alpine)) moves to a
+new digest, which brings the Node.js and npm releases `apk` does not see. A new
+major version of Node.js is set by hand, in every `FROM` line.
 
 ### What the shipped plugins report
 
