@@ -1,0 +1,33 @@
+# Opts this repository in to the auto-docker-check bot: it rebuilds the
+# published image when its packages or its base image have updates.
+#
+# The bot's App cannot push to master nor create v* tags (see the rulesets),
+# so a release comes as a pull request: merge it, then push the tag.
+assignee: guimard
+# The bot's default adds `security`, which this repository has no label for:
+# gh would then open the pull request without any label.
+labels: [docker]
+
+dockers:
+  - name: ldap-rest
+    branch: master
+    tagRegex: '^v\d+\.\d+\.\d+$'
+    image: yadd/ldap-rest:{version}
+    # The FROM lines pin node by digest: see docs/usage/operations.md
+    baseDigests: [Dockerfile]
+    release:
+      tagBump: last
+      annotated: true
+      changelog:
+        file: CHANGELOG.md
+        insertBefore: '^## v'
+        entry: |
+          ## {tag} ({date})
+
+          Rebuild with updated Alpine packages: {packages}.
+      bump:
+        - { file: package.json, match: '^  "version": "([^"]+)"', value: '{version}' }
+        - { file: package-lock.json, match: '^  "version": "([^"]+)"', value: '{version}' }
+        - { file: package-lock.json, match: '^      "name": "ldap-rest",\n      "version": "([^"]+)"', value: '{version}' }
+    policies:
+      - pr: { draft: false }
