@@ -3,8 +3,9 @@
  *
  * Gives every account this server creates its workplace instance, once its
  * entry is written, from the Cloudery or from the cozy-stack admin API. The
- * address is written once the instance exists, then `user.created` is
- * published and the entry marked. The event is sent at least once.
+ * address is reserved on the entry when the instance is asked for; once the
+ * instance exists, `user.created` is published and the entry marked. The
+ * event is sent at least once.
  *
  * See `docs/usage/plugins/integrations/instances.md`.
  */
@@ -31,7 +32,11 @@ import {
   matrixId,
   numberedSlug,
 } from '../../lib/instanceProviders.js';
-import type { AttributesList, SearchResult } from '../../lib/ldapActions.js';
+import type {
+  AttributesList,
+  ModifyOptions,
+  SearchResult,
+} from '../../lib/ldapActions.js';
 import { extractLdapCode } from '../../lib/ldapCodes.js';
 import { currentOperation } from '../../lib/operation.js';
 import {
@@ -426,20 +431,25 @@ export default class TwakeInstances extends DmPlugin {
           req
         );
       const known = first(this.value(entry, this.fqdnAttribute));
-      if (known) {
-        const confirmed = await this.confirm(dn, account, known);
-        if (confirmed.found?.ready) {
-          await this.ready(
-            dn,
-            entry,
-            confirmed.account,
-            confirmed.found.fqdn,
-            req
-          );
-          return 'ready';
-        }
+      // The address may be a reservation: only the provider says it is built
+      const confirmed = known && (await this.confirm(dn, account, known));
+      if (confirmed && confirmed.found?.ready) {
+        await this.ready(
+          dn,
+          entry,
+          confirmed.account,
+          confirmed.found.fqdn,
+          req
+        );
+        return 'ready';
       }
-      return this.provide(dn, entry, account, req);
+      return this.provide(
+        dn,
+        entry,
+        account,
+        req,
+        confirmed && confirmed.found ? confirmed : undefined
+      );
     });
     // Outside the account's queue: the announce releases its members
     if (orgId) await this.announcing.get(orgId.toLowerCase());
@@ -469,12 +479,12 @@ export default class TwakeInstances extends DmPlugin {
         entry[this.organizationName] = org.name;
       }
       const known =
-        this.organizationFqdn &&
-        first(this.value(entry, this.organizationFqdn));
+        (this.organizationFqdn &&
+          first(this.value(entry, this.organizationFqdn))) ||
+        undefined;
       const request = this.organizationRequest(org);
-      const found = known
-        ? { fqdn: known, ready: true }
-        : await this.find(entry.dn as string, request);
+      // The address may be a reservation: only the provider says it is built
+      const found = await this.find(entry.dn as string, request, known);
       // Marked: link it again (idempotent) and release what is still held
       if (first(this.value(entry, this.sentAttribute))) {
         if (found?.ready) await this.organizationReady(entry, found.fqdn);
@@ -482,11 +492,12 @@ export default class TwakeInstances extends DmPlugin {
         return 'ready';
       }
       let fqdn = found?.ready && found.fqdn;
-      if (!found) {
-        if (this.provider instanceof ClouderyProvider)
-          await this.provider.createOrganization(org);
-        fqdn = await this.provider.create(request);
-      }
+      if (!found)
+        fqdn = await this.createOrganizationInstance(
+          entry.dn as string,
+          org,
+          request
+        );
       if (!fqdn) return 'pending';
       await this.organizationReady(entry, fqdn);
       return 'ready';
@@ -554,12 +565,42 @@ export default class TwakeInstances extends DmPlugin {
         );
       return;
     }
-    await this.provider.createOrganization({ id, name, domain });
     try {
-      await this.provider.create(request);
+      await this.createOrganizationInstance(
+        entry.dn as string,
+        { id, name, domain },
+        request
+      );
     } catch (err) {
       // Another member of the same new organization may have asked first
       if (!(await this.provider.find(request))) throw err;
+    }
+  }
+
+  /**
+   * Ask for an organization's instance, and for the Cloudery organization
+   * first. With an organization address attribute, the address is reserved
+   * on the organization entry while the instance is built, as an account's.
+   */
+  private async createOrganizationInstance(
+    dn: string,
+    org: { id: string; name: string; domain: string },
+    request: InstanceRequest
+  ): Promise<string | undefined> {
+    const address = this.provider.address(request);
+    if (
+      this.organizationFqdn &&
+      !(await this.reserve(dn, this.organizationFqdn, address))
+    )
+      throw new ConflictError(`${address} belongs to another user`);
+    try {
+      if (this.provider instanceof ClouderyProvider)
+        await this.provider.createOrganization(org);
+      return await this.provider.create(request);
+    } catch (err) {
+      if (this.organizationFqdn)
+        await this.unreserve(dn, this.organizationFqdn, address);
+      throw err;
     }
   }
 
@@ -602,18 +643,30 @@ export default class TwakeInstances extends DmPlugin {
     });
   }
 
-  /** Find the instance, or ask for it; write it down once it exists. */
+  /**
+   * Find the instance, or ask for it, from the instance its written address
+   * names when there is one. Its address is reserved while it is built, and
+   * written down for good once it exists.
+   */
   private async provide(
     dn: string,
     entry: AttributesList,
     account: Account,
-    req?: Request
+    req?: Request,
+    known?: { account: Account; found?: FoundInstance }
   ): Promise<'ready' | 'pending'> {
     if (account.orgId) await this.requestOrganization(account.orgId, req);
-    const claimed = await this.claim(dn, account);
-    const fqdn = claimed.found
-      ? claimed.found.ready && claimed.found.fqdn
-      : await this.provider.create(claimed.account);
+    const claimed = known ?? (await this.claim(dn, account));
+    let fqdn = claimed.found?.ready && claimed.found.fqdn;
+    if (!claimed.found) {
+      const address = this.provider.address(claimed.account);
+      try {
+        fqdn = await this.provider.create(claimed.account);
+      } catch (err) {
+        await this.unreserve(dn, this.fqdnAttribute, address);
+        throw err;
+      }
+    }
     if (!fqdn) return 'pending';
     await this.ready(dn, entry, claimed.account, fqdn, req);
     return 'ready';
@@ -623,28 +676,92 @@ export default class TwakeInstances extends DmPlugin {
    * The account's slug, or, with `twake_instance_slug_numbered`, its first
    * numbered form (`slug2`, `slug3`…) when another account holds it: distinct
    * uids can reduce to one slug, and the directory tells them apart. The first
-   * one that is the account's own instance, or free, is the account's; the
-   * instance's address, written down once it exists, is the one later logins
-   * go to. Without the setting, a slug another account holds refuses the
-   * instance.
+   * one that is the account's own instance, or free, is the account's. Unless
+   * its instance is built, its address is reserved on the entry, so that no
+   * other account takes the instance while it is built. Without the setting,
+   * a slug another account holds refuses the instance.
    */
   private async claim(
     dn: string,
     account: Account
   ): Promise<{ account: Account; found?: FoundInstance }> {
-    if (!this.settings.twake_instance_slug_numbered)
-      return { account, found: await this.find(dn, account) };
-    for (let n = 1; n <= MAX_SLUG_NUMBER; n++) {
+    const last = this.settings.twake_instance_slug_numbered
+      ? MAX_SLUG_NUMBER
+      : 1;
+    let refused: unknown;
+    for (let n = 1; n <= last; n++) {
       const candidate = n === 1 ? account : this.numbered(account, n);
       try {
-        return { account: candidate, found: await this.find(dn, candidate) };
+        const found = await this.find(dn, candidate);
+        if (
+          !found?.ready &&
+          !(await this.reserve(
+            dn,
+            this.fqdnAttribute,
+            this.provider.address(candidate),
+            { declaredClasses: this.config.user_class }
+          ))
+        )
+          throw new ConflictError(
+            `${this.provider.address(candidate)} belongs to another user`
+          );
+        return { account: candidate, found };
       } catch (err) {
         if (!(err instanceof ConflictError)) throw err;
+        refused = err;
       }
     }
+    if (last === 1) throw refused;
     throw new ConflictError(
       `${account.id}: held by other accounts up to ${this.numbered(account, MAX_SLUG_NUMBER).id}`
     );
+  }
+
+  /**
+   * Write this address on the entry at `dn`, as the instance being built
+   * there, unless another entry holds it. Two entries may write one address
+   * at once: within this replica the writes of one address wait for each
+   * other, and across replicas the entry whose DN sorts first keeps it, the
+   * other taking its own back.
+   *
+   * @returns whether the entry holds the address
+   */
+  private async reserve(
+    dn: string,
+    attribute: string,
+    address: string,
+    options: ModifyOptions = {}
+  ): Promise<boolean> {
+    const lower = address.toLowerCase();
+    return this.serialized(`address:${lower}`, async () => {
+      if (await this.holder(dn, lower)) return false;
+      // As the server: the instance provisioning records its own progress, whoever's write started it
+      await this.server.ldap.system.modify(
+        dn,
+        { replace: { [attribute]: lower } },
+        undefined,
+        options
+      );
+      const self = this.key(dn);
+      if (
+        (await this.holders(dn, lower)).every(other => self < this.key(other))
+      )
+        return true;
+      await this.unreserve(dn, attribute, lower);
+      return false;
+    });
+  }
+
+  /** Take back a reservation, when the entry still holds that address */
+  private async unreserve(
+    dn: string,
+    attribute: string,
+    address: string
+  ): Promise<void> {
+    // As the server: the instance provisioning records its own progress, whoever's write started it
+    await this.server.ldap.system
+      .modify(dn, { delete: { [attribute]: address.toLowerCase() } })
+      .catch(() => undefined);
   }
 
   /** The account under the `n`th form of its slug, `slug2` for 2 */
@@ -659,10 +776,10 @@ export default class TwakeInstances extends DmPlugin {
    * The instance at the address written on the account at `dn`. A modify can
    * write it, so it is the account's only at its slug's address or at a
    * numbered form of it, whatever `twake_instance_slug_numbered` says now, and
-   * only when no other entry holds it. The slug's address is then taken as is,
-   * the directory having said it is the account's; a numbered one is asked
-   * about as that form, the instance's OIDC id with the Cloudery. Any other
-   * address is not the account's.
+   * only when no other entry holds it. It may be a reservation, so the
+   * provider is asked about it as that slug, the instance's OIDC id with the
+   * Cloudery, and says whether it is built. Any other address is not the
+   * account's.
    */
   private async confirm(
     dn: string,
@@ -670,13 +787,12 @@ export default class TwakeInstances extends DmPlugin {
     known: string
   ): Promise<{ account: Account; found?: FoundInstance }> {
     const address = known.toLowerCase();
-    if (address === this.provider.address(account)) {
-      await this.unheld(dn, address);
-      return { account, found: { fqdn: known, ready: true } };
-    }
-    const id = this.numberedAt(account.id, address);
+    const id =
+      address === this.provider.address(account)
+        ? account.id
+        : this.numberedAt(account.id, address);
     if (!id) return { account };
-    const asked = { ...account, id };
+    const asked = id === account.id ? account : { ...account, id };
     return { account: asked, found: await this.find(dn, asked, known) };
   }
 
@@ -702,13 +818,18 @@ export default class TwakeInstances extends DmPlugin {
 
   /**
    * The entry other than `dn` whose address attribute, or organization
-   * address attribute, holds this address. A tombstone keeps its address, so
-   * a deleted account's instance stays its own.
+   * address attribute, holds this address, built or being built. A tombstone
+   * keeps its address, so a deleted account's instance stays its own.
    */
   private async holder(
     dn: string,
     address: string
   ): Promise<string | undefined> {
+    return (await this.holders(dn, address))[0];
+  }
+
+  /** The entries other than `dn` that hold this address */
+  private async holders(dn: string, address: string): Promise<string[]> {
     const value = escapeLdapFilter(address.toLowerCase());
     const attributes = [
       ...new Set(
@@ -729,7 +850,7 @@ export default class TwakeInstances extends DmPlugin {
     const self = this.key(dn);
     return res.searchEntries
       .map(e => e.dn)
-      .find(other => this.key(other) !== self);
+      .filter(other => this.key(other) !== self);
   }
 
   /** The numbered form of slug `id` whose instance is at this address */
@@ -823,7 +944,7 @@ export default class TwakeInstances extends DmPlugin {
       return this.releaseMembers(dn);
     if (
       this.organizationFqdn &&
-      !first(this.value(entry, this.organizationFqdn))
+      first(this.value(entry, this.organizationFqdn)) !== fqdn
     )
       // As the server: the instance provisioning records its own progress, whoever's write started it
       await this.server.ldap.system.modify(dn, {
@@ -885,6 +1006,8 @@ export default class TwakeInstances extends DmPlugin {
     if (!account || !known) return;
     const { found } = await this.confirm(dn, account, known);
     if (found?.ready) return this.settle(dn, found.fqdn);
+    // A reservation: workplace.created sends it once the instance is built
+    if (found) return;
     this.logger.warn(
       `${this.name}: ${dn} stays held, its address ${known} is not confirmed; ensureInstance sends it once it is`
     );

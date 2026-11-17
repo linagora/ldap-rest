@@ -30,6 +30,14 @@
   same slug
   ([instances](docs/usage/plugins/integrations/instances.md#which-account-an-instance-is),
   [upgrading](docs/usage/upgrading.md#an-instance-is-the-account-whose-address-names-it)).
+- The address attribute of `twake/instances` and `twake/clouderyProvision` is
+  written when the instance is asked for, before it is built: it reserves the
+  instance, so that another uid reducing to the same slug does not take it
+  while it is built. The mark and the provider say the instance is built, not
+  the address: what reads it, a LemonLDAP login or `core/twake/drive`, may
+  meet an instance still being built
+  ([instances](docs/usage/plugins/integrations/instances.md#which-account-an-instance-is),
+  [upgrading](docs/usage/upgrading.md#the-address-is-written-before-the-instance-is-built)).
 
 ### Fixed
 

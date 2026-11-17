@@ -30,18 +30,27 @@ gets no instance.
   (`--twake-instance-sent-attribute`) are this plugin's to write: an add that
   carries them has them removed, and so has a caller's modify that sets the
   mark. Clearing the mark stays allowed: the account is then announced again.
-  An address written by a modify is taken only when it is the one the
-  provider gives the account, or once the provider confirms it.
+  An address written by a modify is taken only as
+  [below](#which-account-an-instance-is).
+- The address is written when the instance is asked for, before it is built:
+  it reserves the instance for the account (see
+  [which account an instance is](#which-account-an-instance-is)). It does not
+  say the instance is built; the mark and the provider do. Whatever reads the
+  address, a LemonLDAP login sending the user to it or
+  [`core/twake/drive`](drive.md) when they read the same attribute, may meet
+  an instance still being built; the drive plugin takes the `404` it then
+  gets for a missing instance.
 - A refused, unreachable or slow provider leaves the entry written and
-  without an address: it is pending, and the error is logged. The add itself
-  succeeds, whatever the door (REST, SCIM, bulk import).
-  `--twake-instance-timeout` bounds each call, so a lookup, a creation and,
-  with cozy-stack, the onboarding can hold an add up to three times as long.
-- Once the instance exists, its address is written, `user.created` is
-  published on the auth exchange, without a password hash, and the entry is
-  marked with the date. The event is sent at least once: a failure between
-  the publication and the mark sends it again on the next attempt, and two
-  replicas handling the same account at once may both send it. Within one
+  without an address, the reservation taken back: it is pending, and the
+  error is logged. The add itself succeeds, whatever the door (REST, SCIM,
+  bulk import). `--twake-instance-timeout` bounds each call, so a lookup, a
+  creation and, with cozy-stack, the onboarding can hold an add up to three
+  times as long.
+- Once the instance exists, its address is written if the provider gave another,
+  `user.created` is published on the auth exchange, without a password hash, and
+  the entry is marked with the date. The event is sent at least once: a failure
+  between the publication and the mark sends it again on the next attempt, and
+  two replicas handling the same account at once may both send it. Within one
   replica, the work on one account is done one step at a time.
 - An entry another tool created, whose classes do not allow the address or
   the mark, is given the auxiliary class of `--user-class` that allows it,
@@ -68,8 +77,9 @@ the caller cannot read answers `404`, as a missing one does, and one it
 cannot write is refused before the provider or the broker hear of it.
 
 Pending accounts are the entries under the `--twake-instance-dn` branches
-with a mail and no address, for instance
-`(&(mail=*)(!(twakeWorkspaceUrl=*)))`, technical accounts aside. The route
+with a mail and no mark, for instance
+`(&(mail=*)(!(twakeCreatedEventAt=*)))`, technical accounts aside: an address
+alone may be a reservation. The route
 can be called for each of them: an account already announced answers
 `ready` and is left as it is.
 
@@ -183,15 +193,24 @@ instance whose OIDC id is another.
   instance stays its own.
 - An address written on the account, which a caller's modify can do, is
   taken only when it is the address of the account's slug, or of a numbered
-  form of it, and no other entry holds it. The slug's address is then taken as
-  is; a numbered one is asked about first. Any other address is not the
-  account's: the instance is looked for, or asked for, again.
+  form of it, no other entry holds it, and the provider confirms it. It may
+  be a reservation, so the provider also says whether the instance is built:
+  a held member whose instance is still built stays held, with no warning,
+  until its `workplace.created`. Any other address is not the account's: the
+  instance is looked for, or asked for, again.
 - An instance no entry holds is the account's whose slug gives its address:
   without [`core/twake/tombstone`](tombstone.md), an instance a deleted
   account left on the Cloudery, whose address no entry holds any more, is
-  given to a new account with the same slug. Until its address is written,
-  with the Cloudery once `workplace.created` arrives, an account's new
-  instance is no entry's either.
+  given to a new account with the same slug.
+- An instance being built is reserved: its address is written on the account
+  before the provider is asked for it, so another `uid` reducing to the same
+  slug finds it held, and is numbered or refused. Two entries reserving one
+  address at once each check again after writing it: within one replica the
+  reservations of an address wait for each other, and across replicas the
+  entry whose DN sorts first keeps it, the other taking its own back. A
+  refused creation takes the reservation back. An organization's instance is
+  reserved the same way on its entry, when
+  `--twake-instance-organization-fqdn-attribute` names where.
 
 The instance's email is not changed to the account's `mail`;
 [`core/twake/drive`](drive.md) sends it to cozy-stack when the `mail`

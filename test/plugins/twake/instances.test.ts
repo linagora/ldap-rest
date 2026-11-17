@@ -310,6 +310,135 @@ describe('Twake instances plugin', function () {
       }
     });
 
+    describe('while an instance is built', () => {
+      const settings = (): { twake_instance_slug_numbered: boolean } =>
+        (
+          plugin(dm) as unknown as {
+            settings: { twake_instance_slug_numbered: boolean };
+          }
+        ).settings;
+      const reserve = (dn: string, address: string): Promise<boolean> =>
+        (
+          plugin(dm) as unknown as {
+            reserve: (
+              dn: string,
+              attribute: string,
+              address: string
+            ) => Promise<boolean>;
+          }
+        ).reserve(dn, 'description', address);
+      // The instance the first account asked for, accepted, not built
+      const pending = (optionally = false): nock.Scope => {
+        const asked = search('in-janedoe.example.org');
+        return (optionally ? asked.optionally() : asked).reply(200, {
+          items: [
+            {
+              fqdn: 'in-janedoe.example.org',
+              oidc: 'in-janedoe',
+              instantiated_at: null,
+            },
+          ],
+        });
+      };
+
+      beforeEach(async () => {
+        search('in-janedoe.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => body.slug === 'in-janedoe')
+          .reply(202, {});
+        await dm.ldap.add(dnOf('in-jane.doe'), person('in-jane.doe'), rest());
+      });
+
+      afterEach(async () => {
+        settings().twake_instance_slug_numbered = false;
+        nock.cleanAll();
+        for (const uid of ['in-jane_doe', 'in-jane.doe'])
+          await dm.ldap.delete(dnOf(uid)).catch(() => undefined);
+      });
+
+      it('reserves its address: not ready, nothing announced', async () => {
+        expect(await read(dm, dnOf('in-jane.doe'))).to.include({
+          description: 'in-janedoe.example.org',
+        });
+        const asked = pending();
+        const create = nock(CLOUDERY)
+          .post('/api/v1/instances')
+          .optionally()
+          .reply(202, {});
+        expect(await plugin(dm).ensureInstance(dnOf('in-jane.doe'))).to.equal(
+          'pending'
+        );
+        expect(asked.isDone()).to.equal(true);
+        expect(create.activeMocks()).to.have.lengthOf(1);
+        expect(rabbit.published).to.deep.equal([]);
+      });
+
+      it('gives another uid reducing to its slug a number, not that instance', async () => {
+        settings().twake_instance_slug_numbered = true;
+        const taken = pending(true);
+        const numbered = search('in-janedoe2.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => body.slug === 'in-janedoe2')
+          .reply(202, {});
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(taken.activeMocks()).to.have.lengthOf(1);
+        expect(numbered.isDone()).to.equal(true);
+        expect(await read(dm, dnOf('in-jane_doe'))).to.include({
+          description: 'in-janedoe2.example.org',
+        });
+      });
+
+      it('refuses that instance to another uid reducing to its slug', async () => {
+        const taken = pending(true);
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(
+          String(await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe'))))
+        ).to.match(/belongs to another user/);
+        expect(taken.activeMocks()).to.have.lengthOf(1);
+        expect(await read(dm, dnOf('in-jane_doe'))).not.to.have.property(
+          'description'
+        );
+        expect(rabbit.published).to.deep.equal([]);
+      });
+
+      for (const [first, second, kept] of [
+        ['in-jane.doe', 'in-jane_doe', true],
+        ['in-jane_doe', 'in-jane.doe', false],
+      ] as [string, string, boolean][])
+        it(`keeps a reservation two entries write at once for the DN sorting first (${first} against ${second})`, async () => {
+          // Both reserve a free address: the other entry writes it between
+          // this entry's check and its write
+          await dm.ldap.delete(dnOf('in-jane.doe'));
+          for (const uid of ['in-jane.doe', 'in-jane_doe'])
+            await dm.ldap.add(dnOf(uid), {
+              ...person(uid),
+              employeeType: 'technical',
+            });
+          const address = 'in-race.example.org';
+          const meanwhile = async (args: unknown[]): Promise<unknown[]> => {
+            const changes = args[1] as { replace?: Record<string, unknown> };
+            if (
+              args[0] === dnOf(first) &&
+              changes.replace?.description === address
+            )
+              await dm.ldap.system.modify(dnOf(second), {
+                replace: { description: address },
+              });
+            return args;
+          };
+          dm.hookBus.subscribe('ldapmodifyrequest', meanwhile as never);
+          try {
+            expect(await reserve(dnOf(first), address)).to.equal(kept);
+          } finally {
+            dm.hookBus.unsubscribe('ldapmodifyrequest', meanwhile as never);
+          }
+          const holds = async (uid: string): Promise<boolean> =>
+            (await read(dm, dnOf(uid)))?.description === address;
+          expect(await holds(first)).to.equal(kept);
+          expect(await holds(second)).to.equal(true);
+        });
+    });
+
     describe('with a numbered address', () => {
       const settings = (): { twake_instance_slug_numbered: boolean } =>
         (
@@ -430,9 +559,10 @@ describe('Twake instances plugin', function () {
         offer: 'standard',
         domain: 'example.org',
       });
-      expect(await read(dm, dnOf('in-alice'))).not.to.have.property(
-        'description'
-      );
+      // Reserved while it is built: no mark, no event
+      const entry = await read(dm, dnOf('in-alice'));
+      expect(entry).to.have.property('description', 'in-alice.example.org');
+      expect(entry).not.to.have.property('businessCategory');
       expect(rabbit.published).to.deep.equal([]);
     });
 
@@ -477,7 +607,7 @@ describe('Twake instances plugin', function () {
       expect(rabbit.published[0].message).not.to.have.property('matrixId');
     });
 
-    it('answers the add when the Cloudery refuses, the entry left pending', async () => {
+    it('answers the add when the Cloudery refuses, the entry left pending and its reservation taken back', async () => {
       const refusals = await outboundCalls('cloudery', '500');
       search('in-alice.example.org').reply(200, { items: [] });
       nock(CLOUDERY).post('/api/v1/instances').reply(500, 'down');
@@ -504,7 +634,8 @@ describe('Twake instances plugin', function () {
       );
       expect(scope.isDone()).to.equal(true);
       const entry = await read(dm, dnOf('in-alice'));
-      expect(entry).not.to.have.property('description');
+      // The reservation, not the address supplied
+      expect(entry).to.have.property('description', 'in-alice.example.org');
       expect(entry).not.to.have.property('businessCategory');
     });
 
@@ -564,7 +695,7 @@ describe('Twake instances plugin', function () {
         );
         expect(scope.isDone()).to.equal(true);
         const entry = await read(dm, dnOf('in-q2'));
-        expect(entry).not.to.have.property('description');
+        expect(entry).to.have.property('description', 'in-q2.example.org');
         expect(entry).not.to.have.property('businessCategory');
       } finally {
         await dm.ldap.delete(dnOf('in-q2')).catch(() => undefined);
@@ -636,6 +767,11 @@ describe('Twake instances plugin', function () {
         person('in-alice', { mobile: '+33600000000' }),
         rest()
       );
+      // Reserved, not announced, until the instance is built
+      expect(await read(dm, dnOf('in-alice'))).to.include({
+        description: 'in-alice.example.org',
+      });
+      expect(rabbit.published).to.deep.equal([]);
       const created: WorkplaceCreated = {
         twakeId: 'in-alice',
         internalEmail: 'in-alice@example.org',
@@ -1016,7 +1152,9 @@ describe('Twake instances plugin', function () {
         } finally {
           dm.hookBus.unsubscribe('ldapmodifyrequest', refuseMark as never);
         }
-        // At least once: the next call announces again, then marks
+        // At least once: the next call announces again, then marks. The
+        // address written may be a reservation, so the Cloudery is asked
+        built();
         expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
           'ready'
         );
@@ -1044,13 +1182,24 @@ describe('Twake instances plugin', function () {
         expect(asked.isDone()).to.equal(true);
         expect(rabbit.published).to.deep.equal([]);
 
-        // The address the provider gives this account needs no asking
+        // The address the provider gives this account is taken once the
+        // Cloudery says it is built: it may be a reservation
         await dm.ldap.modify(dnOf('in-alice'), {
           replace: { description: 'in-alice.example.org' },
+        });
+        const confirmed = search('in-alice.example.org').reply(200, {
+          items: [
+            {
+              fqdn: 'in-alice.example.org',
+              oidc: 'in-alice',
+              instantiated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
         });
         expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
           'ready'
         );
+        expect(confirmed.isDone()).to.equal(true);
         expect(rabbit.published.map(p => p.key)).to.deep.equal([
           'user.created',
         ]);
@@ -1450,6 +1599,39 @@ describe('Twake instances plugin', function () {
           offer: 'organization',
           org_id: 'acme1',
         });
+        // Reserved while it is built, and not announced on the reservation
+        expect(await read(dm, orgDn)).to.include({
+          description: 'acme1.example.org',
+        });
+        search('acme1.example.org').reply(200, { items: [ORG_INSTANCE] });
+        expect(
+          await plugin(dm).ensureOrganization({
+            id: 'acme1',
+            name: 'Acme',
+            domain: 'acme.example',
+          })
+        ).to.equal('pending');
+        expect(rabbit.published).to.deep.equal([]);
+        expect(await read(dm, orgDn)).not.to.have.property('businessCategory');
+      });
+
+      it('takes back the organization’s reservation when the Cloudery refuses its instance', async () => {
+        search('acme1.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v2/organizations')
+          .reply(201, {})
+          .post('/api/v1/instances')
+          .reply(500, 'down');
+        expect(
+          await refusal(
+            plugin(dm).ensureOrganization({
+              id: 'acme1',
+              name: 'Acme',
+              domain: 'acme.example',
+            })
+          )
+        ).to.be.an('error');
+        expect(await read(dm, orgDn)).not.to.have.property('description');
       });
 
       it('knows an organization by its id and own mail without a domain on its entry', async () => {
@@ -1535,6 +1717,21 @@ describe('Twake instances plugin', function () {
         );
       };
 
+      // Asked again whenever her address is read: it may be a reservation
+      const erinBuilt = (optionally = false): nock.Scope => {
+        const asked = search('inerinacme1.example.org');
+        return (optionally ? asked.optionally() : asked).reply(200, {
+          items: [
+            {
+              fqdn: 'inerinacme1.example.org',
+              internal_email: 'in.erin@acme.example',
+              oidc: 'inerinacme1',
+              instantiated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+        });
+      };
+
       afterEach(async () => {
         await dm.ldap.delete(erin).catch(() => undefined);
       });
@@ -1565,10 +1762,12 @@ describe('Twake instances plugin', function () {
           description: 'inerinacme1.example.org',
         });
         expect(await read(dm, erin)).not.to.have.property('businessCategory');
+        erinBuilt();
         expect(await plugin(dm).ensureInstance(erin, rest())).to.equal('ready');
         expect(rabbit.published).to.deep.equal([]);
 
         link('acme1', 'acme1.example.org');
+        erinBuilt();
         await rabbit.handler!(orgWorkplace);
         expect(rabbit.published).to.deep.equal([ORG_CREATED, ERIN_CREATED]);
         expect(await read(dm, erin)).to.have.property('businessCategory');
@@ -1584,6 +1783,7 @@ describe('Twake instances plugin', function () {
         await rabbit.handler!(erinWorkplace);
         expect(rabbit.published).to.deep.equal([]);
         const respelled = erin.replace(/,/g, ' , ');
+        erinBuilt();
         expect(await plugin(dm).ensureInstance(respelled, rest())).to.equal(
           'ready'
         );
@@ -1593,6 +1793,8 @@ describe('Twake instances plugin', function () {
       it('sends each event once, the organization’s first, when both instances arrive together', async () => {
         await addErin();
         link('acme1', 'acme1.example.org');
+        // Released before her workplace.created settles her, or not
+        erinBuilt(true);
         await Promise.all([
           rabbit.handler!(erinWorkplace),
           rabbit.handler!(orgWorkplace),
@@ -1607,6 +1809,7 @@ describe('Twake instances plugin', function () {
           replace: { businessCategory: '2026-01-01T00:00:00.000Z' },
         });
         const linked = link('acme1', 'acme1.example.org');
+        erinBuilt();
         await rabbit.handler!(orgWorkplace);
         expect(linked.isDone()).to.equal(true);
         expect(rabbit.published).to.deep.equal([ERIN_CREATED]);
@@ -1630,6 +1833,7 @@ describe('Twake instances plugin', function () {
             replace: { description: 'infrankacme12.example.org' },
           });
           link('acme1', 'acme1.example.org');
+          erinBuilt();
           search('infrankacme12.example.org').reply(500, 'down');
           expect(await refusal(rabbit.handler!(orgWorkplace))).to.match(
             /1 member\(s\) of .* not released/
@@ -1683,6 +1887,30 @@ describe('Twake instances plugin', function () {
             },
           },
         ]);
+      });
+
+      it('keeps a member whose instance is still built held, without a warning', async () => {
+        await addErin();
+        link('acme1', 'acme1.example.org');
+        const asked = search('inerinacme1.example.org').reply(200, {
+          items: [
+            {
+              fqdn: 'inerinacme1.example.org',
+              oidc: 'inerinacme1',
+              instantiated_at: null,
+            },
+          ],
+        });
+        const { warned, restore } = warnings();
+        try {
+          await rabbit.handler!(orgWorkplace);
+        } finally {
+          restore();
+        }
+        expect(asked.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([ORG_CREATED]);
+        expect(warned.join('\n')).not.to.match(/in\.erin/);
+        expect(await read(dm, erin)).not.to.have.property('businessCategory');
       });
 
       it('warns when a member stays held for an address it cannot confirm', async () => {
@@ -1926,7 +2154,9 @@ describe('Twake instances plugin', function () {
         search('acme1.example.org')
           .times(2)
           .reply(200, { items: [PLATFORM_ORG_INSTANCE] });
+        // Her reservation is asked about first: the Cloudery lost it
         const asked = search('inerinacme1.example.org')
+          .times(2)
           .reply(200, { items: [] })
           .post('/api/v1/instances')
           .reply(202, {});
@@ -2001,6 +2231,16 @@ describe('Twake instances plugin', function () {
         await memberOnlyCaller(async caller => {
           search('acme1.example.org').reply(200, {
             items: [PLATFORM_ORG_INSTANCE],
+          });
+          // Her reservation: still being built
+          search('inerinacme1.example.org').reply(200, {
+            items: [
+              {
+                fqdn: 'inerinacme1.example.org',
+                oidc: 'inerinacme1',
+                instantiated_at: null,
+              },
+            ],
           });
           const linked = link('acme1', 'acme1.example.org');
           expect(
@@ -2131,7 +2371,10 @@ describe('Twake instances plugin', function () {
         .reply(202, {});
       await dm.ldap.add(his, person('in-his'), rest());
       expect(scope.isDone()).to.equal(true);
-      expect(await read(dm, his)).not.to.have.property('description');
+      expect(await read(dm, his)).to.have.property(
+        'description',
+        'in-his.example.org'
+      );
     });
 
     it('does not take an escaped comma for a branch separator', async () => {

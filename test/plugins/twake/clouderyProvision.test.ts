@@ -48,13 +48,25 @@ class StubLdap {
   // entries a filtered search answers: those holding an address
   holders: Record<string, unknown>[] = [];
   holderLookupFails = false;
+  // The address reserved while an instance is built, and taken back, apart
+  // from the account's writes
+  reservations: ModifyCall[] = [];
   async modify(
     dn: string,
     changes: Record<string, unknown>,
     _req?: unknown,
     options?: Record<string, unknown>
   ): Promise<boolean> {
-    this.modifyCalls.push({ dn, changes, options });
+    const replace = changes.replace as Record<string, unknown> | undefined;
+    const reservation =
+      changes.delete !== undefined ||
+      (replace !== undefined &&
+        Object.keys(replace).join() === 'twakeWorkspaceUrl');
+    (reservation ? this.reservations : this.modifyCalls).push({
+      dn,
+      changes,
+      options,
+    });
     return true;
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -772,6 +784,72 @@ describe('ClouderyProvision plugin', () => {
       await create(user, makeReq('acme123'));
 
       expect(scope.isDone()).to.equal(true);
+      expect(ldap.modifyCalls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
+      // Its reservation is taken back
+      expect(ldap.reservations.map(r => r.changes)).to.deep.equal([
+        { replace: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
+        { delete: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
+      ]);
+    });
+
+    it('reserves the address before asking for the instance', async () => {
+      let reserved: ModifyCall[] = [];
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances', () => {
+          reserved = [...ldap.reservations];
+          return true;
+        })
+        .reply(200, { id: 'inst-1', fqdn: 'johndoeacme123.twake.app' });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(reserved).to.deep.equal([
+        {
+          dn: `uid=john.doe,${USER_BASE}`,
+          changes: {
+            replace: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' },
+          },
+          options: { declaredClasses: dm.config.user_class },
+        },
+      ]);
+      expect(ldap.modifyCalls).to.have.length(1);
+      expect(rabbit.calls).to.have.length(1);
+    });
+
+    it('takes the reservation back when the Cloudery refuses the instance', async () => {
+      const scope = nock(CLOUDERY).post('/api/v1/instances').reply(500, 'down');
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.reservations.map(r => r.changes)).to.deep.equal([
+        { replace: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
+        { delete: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
+      ]);
+      expect(ldap.modifyCalls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    it('asks for no instance at an address another entry holds, built or being built', async () => {
+      // `john_doe`'s instance is still being built: no instance to find yet,
+      // but its entry holds the address
+      ldap.holders = [{ dn: `uid=john_doe,${USER_BASE}` }];
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, { items: [] });
+      const asked = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .optionally()
+        .reply(200, { id: 'inst-1', fqdn: 'johndoeacme123.twake.app' });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(asked.activeMocks()).to.have.length(1);
+      expect(ldap.reservations).to.have.length(0);
       expect(ldap.modifyCalls).to.have.length(0);
       expect(rabbit.calls).to.have.length(0);
     });

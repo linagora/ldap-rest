@@ -19,6 +19,20 @@ any more, is given to the next account with the same slug. Load
 and its instance, or remove such instances from the Cloudery
 ([details](plugins/integrations/instances.md#which-account-an-instance-is)).
 
+### The address is written before the instance is built
+
+**Who is affected:** a deployment that loads `twake/instances` or
+`twake/clouderyProvision`, and whatever reads its address attribute
+(`twakeWorkspaceUrl`, or `--twake-instance-fqdn-attribute`).
+
+The address is written when the instance is asked for, as a reservation, no
+longer once it is built. An entry with an address may have no instance yet:
+the mark (`twakeCreatedEventAt`, or `--twake-instance-sent-attribute`) says it
+was announced. A LemonLDAP login that sends the user to the address may land
+on an instance still being built; `core/twake/drive` takes the `404` it then
+gets. The pending accounts to make sure of are those without the mark,
+`(&(mail=*)(!(twakeCreatedEventAt=*)))`, no longer those without an address.
+
 ## From 2.2.2
 
 ### The bulk import writes below the base its schema names

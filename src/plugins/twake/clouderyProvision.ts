@@ -4,9 +4,10 @@
  * B2B sibling of `cozyProvision`. For SCIM users created under a configured
  * B2B LDAP branch, it provisions a Twake/Cozy instance via the Cloudery
  * (manager) API, writes the returned FQDN to the `twakeWorkspaceUrl` attribute
- * (bare FQDN) and the org id to `twakeOrganizationId` (the org id arrives in a
- * header, so the SCIM body cannot carry it), and publishes the same lifecycle
- * messages cozyProvision does.
+ * (bare FQDN, reserved there while the instance is built, as
+ * `core/twake/instances` does) and the org id to `twakeOrganizationId` (the
+ * org id arrives in a header, so the SCIM body cannot carry it), and publishes
+ * the same lifecycle messages cozyProvision does.
  *
  * The org id is carried per-request in a header (single shared B2B token), so
  * onboarding a new org needs no config change; the org branch is selected by
@@ -71,6 +72,15 @@ interface DeleteContext {
   fqdn: string;
   domain: string;
 }
+
+/** A DN as the directory compares it */
+const dnKey = (dn: string): string => {
+  try {
+    return normalizeDn(dn);
+  } catch {
+    return dn.toLowerCase();
+  }
+};
 
 // A create that fails between the pre- and post-create hooks would otherwise
 // leak its captured context; prune anything older than this.
@@ -457,6 +467,12 @@ export default class ClouderyProvision extends DmPlugin {
       });
       fqdn = expectedFqdn;
     } else {
+      // Reserved while it is built, so that another userName reducing to the
+      // slug does not take it meanwhile
+      if (!(await this.reserve(dn, expectedFqdn, log))) {
+        this.logger.error({ ...log, result: 'slug_taken', fqdn: expectedFqdn });
+        return;
+      }
       let instance: ClouderyInstanceResponse;
       try {
         this.logger.info({
@@ -488,6 +504,7 @@ export default class ClouderyProvision extends DmPlugin {
           // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
           error: `${err}`,
         });
+        await this.unreserve(dn, expectedFqdn);
         return;
       }
 
@@ -500,6 +517,7 @@ export default class ClouderyProvision extends DmPlugin {
           result: 'workflow_failed',
           workflow: instance.workflow,
         });
+        await this.unreserve(dn, expectedFqdn);
         return;
       }
 
@@ -867,6 +885,54 @@ export default class ClouderyProvision extends DmPlugin {
     fqdn: string,
     log: Record<string, unknown>
   ): Promise<boolean> {
+    const others = await this.holders(dn, fqdn, log);
+    return !others || others.length > 0;
+  }
+
+  /**
+   * Write this address on the entry at `dn` while its instance is built,
+   * unless another entry holds it. Two entries writing it at once: the one
+   * whose DN sorts first keeps it, the other takes its own back.
+   *
+   * @returns whether the entry holds the address
+   */
+  private async reserve(
+    dn: string,
+    fqdn: string,
+    log: Record<string, unknown>
+  ): Promise<boolean> {
+    if (await this.heldElsewhere(dn, fqdn, log)) return false;
+    // As the server: the provisioned instance is recorded on the account, whoever created it
+    await this.server.ldap.system.modify(
+      dn,
+      { replace: { [this.fqdnAttribute]: fqdn } },
+      undefined,
+      { declaredClasses: this.config.user_class }
+    );
+    const others = await this.holders(dn, fqdn, log);
+    const self = dnKey(dn);
+    if (others && others.every(other => self < other)) return true;
+    await this.unreserve(dn, fqdn);
+    return false;
+  }
+
+  /** Take back a reservation, when the entry still holds that address */
+  private async unreserve(dn: string, fqdn: string): Promise<void> {
+    // As the server: the provisioned instance is recorded on the account, whoever created it
+    await this.server.ldap.system
+      .modify(dn, { delete: { [this.fqdnAttribute]: fqdn } })
+      .catch(() => undefined);
+  }
+
+  /**
+   * The DNs, normalized, of the entries other than `dn` that hold this
+   * address; undefined when the directory cannot say.
+   */
+  private async holders(
+    dn: string,
+    fqdn: string,
+    log: Record<string, unknown>
+  ): Promise<string[] | undefined> {
     try {
       // As the server: who holds an address is read whoever imports the user
       const res = (await this.server.ldap.system.search(
@@ -878,15 +944,10 @@ export default class ClouderyProvision extends DmPlugin {
         },
         this.config.ldap_base
       )) as { searchEntries?: Record<string, unknown>[] };
-      const key = (one: string): string => {
-        try {
-          return normalizeDn(one);
-        } catch {
-          return one.toLowerCase();
-        }
-      };
-      const self = key(dn);
-      return (res.searchEntries ?? []).some(e => key(String(e.dn)) !== self);
+      const self = dnKey(dn);
+      return (res.searchEntries ?? [])
+        .map(e => dnKey(String(e.dn)))
+        .filter(other => other !== self);
     } catch (err) {
       this.logger.error({
         ...log,
@@ -895,7 +956,7 @@ export default class ClouderyProvision extends DmPlugin {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
         error: `${err}`,
       });
-      return true;
+      return undefined;
     }
   }
 
