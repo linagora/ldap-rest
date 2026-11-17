@@ -329,6 +329,62 @@ describe('ClouderyProvision plugin', () => {
       expect(body.oidc).to.equal('janedoestgacme123');
     });
 
+    it('drops every dash from the slug under --twake-instance-slug-dashes false', async () => {
+      Object.assign(dm.config, { twake_instance_slug_dashes: false });
+      plugin = new ClouderyProvision(dm);
+      let body: Record<string, unknown> = {};
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'jeanclaudedusseacme123.twake.app')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', b => {
+          body = b as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, { id: 'inst-3', fqdn: 'jeanclaudedusseacme123.twake.app' });
+
+      await create(
+        {
+          ...user,
+          userName: 'jean-claude.dusse',
+          emails: [{ value: 'jean-claude@acme.com', primary: true }],
+        },
+        makeReq('acme123')
+      );
+
+      expect(scope.isDone()).to.equal(true);
+      expect(body).to.include({
+        slug: 'jeanclaudedusseacme123',
+        oidc: 'jeanclaudedusseacme123',
+      });
+    });
+
+    it('cuts the slug to the 30 characters the Cloudery takes', async () => {
+      let body: Record<string, unknown> = {};
+      const slug = `${'a'.repeat(23)}-bbbbbb`;
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === `${slug}.twake.app`)
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', b => {
+          body = b as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, { id: 'inst-4', fqdn: `${slug}.twake.app` });
+
+      await create(
+        {
+          ...user,
+          userName: `${'a'.repeat(23)}-bbbbbb`,
+          emails: [{ value: 'long@acme.com', primary: true }],
+        },
+        makeReq('acme123')
+      );
+
+      expect(scope.isDone()).to.equal(true);
+      expect(body).to.include({ slug, oidc: slug });
+    });
+
     it('refuses an instance another account holds under the same slug', async () => {
       // `john_doe` and `john.doe` reduce to one slug. No POST is registered:
       // a create attempt fails the test, as handing the instance over would.

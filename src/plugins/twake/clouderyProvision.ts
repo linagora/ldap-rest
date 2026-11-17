@@ -12,7 +12,9 @@
  * onboarding a new org needs no config change; the org branch is selected by
  * the core `BaseResolver` (also from a header). The operator supplies the email
  * in the SCIM body, `org_domain` is its domain, and `slug` = `oidc` =
- * instanceSlug(userName + orgId).
+ * instanceSlug(userName + orgId), cut to the Cloudery's 30 characters and
+ * without `-` under `--twake-instance-slug-dashes false`, as
+ * `core/twake/instances` builds it.
  *
  * Alongside the FQDN, the post-create write stamps two attributes the admin
  * panel reads off the user entry: `twakeOrganizationRole` and (when present)
@@ -41,6 +43,7 @@ import type { ScimUser } from '../scim/types.js';
 
 import { clouderyOptions, clouderyOptionsOf } from './cloudery.options.js';
 import { cozyOptionsOf } from './cozy.options.js';
+import { twakeInstancesOptionsOf } from './twakeInstances.options.js';
 
 type ReqWithUser = Request & { user?: string };
 
@@ -112,6 +115,7 @@ export default class ClouderyProvision extends DmPlugin {
   private readonly userDeletedRoutingKey: string;
   private readonly pollIntervalMs: number;
   private readonly maxPollAttempts: number;
+  private readonly slugDashes: boolean;
 
   private readonly baseResolver: BaseResolver;
 
@@ -165,6 +169,10 @@ export default class ClouderyProvision extends DmPlugin {
     this.userDeletedRoutingKey = cozy.cozy_user_deleted_routing_key;
     this.pollIntervalMs = settings.cloudery_workflow_poll_interval_ms;
     this.maxPollAttempts = settings.cloudery_workflow_max_attempts;
+    // The Cloudery takes the slug core/twake/instances would give it
+    this.slugDashes = twakeInstancesOptionsOf(
+      server.config
+    ).twake_instance_slug_dashes;
 
     this.baseResolver = new BaseResolver(this.config);
 
@@ -375,6 +383,7 @@ export default class ClouderyProvision extends DmPlugin {
     const orgDomain = emailDomain(email);
     const slug = instanceSlug(userName + ctx.orgId, {
       maxLength: CLOUDERY_SLUG_MAX_LENGTH,
+      dashes: this.slugDashes,
     });
     if (!slug) {
       this.logger.error({
