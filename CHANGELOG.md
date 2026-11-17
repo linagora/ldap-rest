@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `--twake-instance-slug-dashes false` keeps no `-` inside an instance slug,
+  for a Cloudery taking `[a-z0-9]` only and a cozy-stack with flat
+  subdomains, which refuses a `-` in an instance's first label: a uid like
+  `jean-claude.dusse` got no instance ("Slug is invalid").
+- `--twake-instance-slug-numbered` numbers a slug another account holds
+  (`slug2`, `slug3`…) rather than refuse the instance: distinct uids can
+  reduce to one slug.
+
+### Fixed
+
+- An instance slug is cut to the 30 characters the Cloudery takes.
+
 ## v2.3.2 (2026-11-16)
 
 - The Docker image runs Node.js 26 on Alpine 3.24: Node.js 25 no longer

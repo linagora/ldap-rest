@@ -16,14 +16,20 @@ import type { Express, Request } from 'express';
 import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
 import type { DM } from '../../bin/index.js';
 import type { Hooks } from '../../hooks.js';
-import { BadRequestError, NotFoundError } from '../../lib/errors.js';
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from '../../lib/errors.js';
 import {
   ClouderyProvider,
   CozyStackProvider,
+  type FoundInstance,
   type InstanceProvider,
   instanceSlug,
   type InstanceRequest,
   matrixId,
+  numberedSlug,
 } from '../../lib/instanceProviders.js';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions.js';
 import { extractLdapCode } from '../../lib/ldapCodes.js';
@@ -67,6 +73,9 @@ interface PatternMatch {
   exec: RegExpExecArray;
   index: number;
 }
+
+/** The highest number a slug held by other accounts takes. */
+const MAX_SLUG_NUMBER = 99;
 
 const first = (value: unknown): string | undefined => {
   const one = (Array.isArray(value) ? value[0] : value) as
@@ -559,13 +568,43 @@ export default class TwakeInstances extends DmPlugin {
     req?: Request
   ): Promise<'ready' | 'pending'> {
     if (account.orgId) await this.requestOrganization(account.orgId, req);
-    const found = await this.provider.find(account);
-    const fqdn = found
-      ? found.ready && found.fqdn
-      : await this.provider.create(account);
+    const claimed = await this.claim(account);
+    const fqdn = claimed.found
+      ? claimed.found.ready && claimed.found.fqdn
+      : await this.provider.create(claimed.account);
     if (!fqdn) return 'pending';
-    await this.ready(dn, entry, account, fqdn, req);
+    await this.ready(dn, entry, claimed.account, fqdn, req);
     return 'ready';
+  }
+
+  /**
+   * The account's slug, or, with `twake_instance_slug_numbered`, its first
+   * numbered form (`slug2`, `slug3`…) when another account holds it: distinct
+   * uids can reduce to one slug. The first one that is the account's own
+   * instance, or free, is the account's; the instance's address, written down
+   * once it exists, is the one later logins go to. Without the setting, a slug
+   * another account holds refuses the instance.
+   */
+  private async claim(
+    account: Account
+  ): Promise<{ account: Account; found?: FoundInstance }> {
+    if (!this.settings.twake_instance_slug_numbered)
+      return { account, found: await this.provider.find(account) };
+    for (let n = 1; n <= MAX_SLUG_NUMBER; n++) {
+      const candidate =
+        n === 1 ? account : { ...account, id: numberedSlug(account.id, n) };
+      try {
+        return {
+          account: candidate,
+          found: await this.provider.find(candidate),
+        };
+      } catch (err) {
+        if (!(err instanceof ConflictError)) throw err;
+      }
+    }
+    throw new ConflictError(
+      `${account.id}: held by other accounts up to ${numberedSlug(account.id, MAX_SLUG_NUMBER)}`
+    );
   }
 
   protected async ready(
@@ -965,7 +1004,8 @@ export default class TwakeInstances extends DmPlugin {
       this.settings.twake_instance_id.replace(
         /\{(\w+)\}/g,
         (_, name: string) => groups[name] ?? ''
-      )
+      ),
+      this.settings.twake_instance_slug_dashes
     );
   }
 

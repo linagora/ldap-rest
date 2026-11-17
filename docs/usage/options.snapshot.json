@@ -1678,6 +1678,18 @@
     "env": "DM_TWAKE_INSTANCE_SKIP_VALUE"
   },
   {
+    "cli": "--twake-instance-slug-dashes",
+    "type": "boolean",
+    "default": true,
+    "env": "DM_TWAKE_INSTANCE_SLUG_DASHES"
+  },
+  {
+    "cli": "--twake-instance-slug-numbered",
+    "type": "boolean",
+    "default": false,
+    "env": "DM_TWAKE_INSTANCE_SLUG_NUMBERED"
+  },
+  {
     "cli": "--twake-instance-timeout",
     "type": "number",
     "default": 30000,

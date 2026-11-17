@@ -31,6 +31,18 @@ export const twakeInstancesOptions = defineOptions({
     env: 'DM_TWAKE_INSTANCE_ID',
     default: '{uid}',
   }),
+  // `-` inside an instance slug: off for a Cloudery or a cozy-stack with flat
+  // subdomains, which refuse it
+  twake_instance_slug_dashes: opt.boolean({
+    env: 'DM_TWAKE_INSTANCE_SLUG_DASHES',
+    default: true,
+  }),
+  // A slug another account holds: number this one (`slug2`, `slug3`…) rather
+  // than refuse the instance
+  twake_instance_slug_numbered: opt.boolean({
+    env: 'DM_TWAKE_INSTANCE_SLUG_NUMBERED',
+    default: false,
+  }),
   twake_instance_fqdn_attribute: opt.string({
     env: 'DM_TWAKE_INSTANCE_FQDN_ATTRIBUTE',
     default: 'twakeWorkspaceUrl',

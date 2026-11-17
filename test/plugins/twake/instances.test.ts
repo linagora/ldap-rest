@@ -231,6 +231,44 @@ describe('Twake instances plugin', function () {
       }
     });
 
+    it('numbers the slug another uid holds, with twake_instance_slug_numbered', async () => {
+      const settings = (
+        plugin(dm) as unknown as {
+          settings: { twake_instance_slug_numbered: boolean };
+        }
+      ).settings;
+      settings.twake_instance_slug_numbered = true;
+      let asked: Record<string, unknown> = {};
+      const taken = search('in-janedoe.example.org').reply(200, {
+        items: [
+          {
+            _id: 'taken',
+            fqdn: 'in-janedoe.example.org',
+            internal_email: 'in-janedoe@example.org',
+            oidc: 'in-janedoe',
+            instantiated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      const free = search('in-janedoe2.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', body => {
+          asked = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(202, {});
+      try {
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(taken.isDone()).to.equal(true);
+        expect(free.isDone()).to.equal(true);
+        expect(asked).to.include({ oidc: 'in-janedoe2', slug: 'in-janedoe2' });
+      } finally {
+        settings.twake_instance_slug_numbered = false;
+        nock.cleanAll();
+        await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
+      }
+    });
+
     it('looks the instance up, asks for it, and waits for its address', async () => {
       let asked: Record<string, unknown> = {};
       const scope = search('in-alice.example.org')

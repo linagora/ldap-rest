@@ -598,6 +598,8 @@ See [lifecycle events](plugins/integrations/lifecycle-events.md).
 | `--twake-instance-skip-value`                    | `DM_TWAKE_INSTANCE_SKIP_VALUE`                    |                                       | Its value                                                 |
 | `--twake-instance-provider`                      | `DM_TWAKE_INSTANCE_PROVIDER`                      | `cloudery`                            | `cloudery` or `cozy-stack`                                |
 | `--twake-instance-id`                            | `DM_TWAKE_INSTANCE_ID`                            | `{uid}`                               | Instance id template                                      |
+| `--twake-instance-slug-dashes`                   | `DM_TWAKE_INSTANCE_SLUG_DASHES`                   | `true`                                | Keep `-` inside a slug; `false` for a Cloudery or cozy-stack with flat subdomains |
+| `--twake-instance-slug-numbered`                 | `DM_TWAKE_INSTANCE_SLUG_NUMBERED`                 | `false`                               | Number a slug another account holds (`slug2`…) rather than refuse |
 | `--twake-instance-fqdn-attribute`                | `DM_TWAKE_INSTANCE_FQDN_ATTRIBUTE`                | `twakeWorkspaceUrl`                   | Address attribute                                         |
 | `--twake-instance-sent-attribute`                | `DM_TWAKE_INSTANCE_SENT_ATTRIBUTE`                | `twakeCreatedEventAt`                 | Date the creation event was sent                          |
 | `--twake-instance-locale`                        | `DM_TWAKE_INSTANCE_LOCALE`                        | `en`, `fr` with cozy-stack            | Locale when the entry has none                            |

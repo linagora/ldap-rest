@@ -12,23 +12,50 @@ import {
 } from './errors.js';
 import { timedOutbound } from './metrics.js';
 
+/** The longest slug the Cloudery takes. */
+export const SLUG_MAX_LENGTH = 30;
+
 /**
  * Reduce a name to what the Cloudery takes in a slug; it refused `_` or `@`
- * with "Slug is invalid". `-` is kept, except at either end where no host
- * name takes it: an instance already created with one would otherwise change
- * address. Distinct uids can reduce to one slug, so a creation first checks
- * that an instance already there is the account's own.
+ * with "Slug is invalid", and a slug longer than {@link SLUG_MAX_LENGTH}.
+ * `-` is kept, except at either end where no host name takes it: an instance
+ * already created with one would otherwise change address. Without `dashes`,
+ * none is kept: a Cloudery taking `/\A[a-z0-9]{0,30}\z/` only, and
+ * cozy-stack serving apps at `<slug>-<app>.<domain>` (flat subdomains),
+ * refuse a `-` in an instance's first label. Distinct uids can reduce to one
+ * slug, so a creation first checks that an instance already there is the
+ * account's own.
  *
  * @param value uid, or the slug template filled in
+ * @param dashes whether `-` is kept inside the slug
  * @returns the slug, empty when nothing of `value` is kept
  */
-export const instanceSlug = (value: string): string => {
-  const slug = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+export const instanceSlug = (value: string, dashes = true): string => {
+  const slug = value
+    .toLowerCase()
+    .replace(dashes ? /[^a-z0-9-]/g : /[^a-z0-9]/g, '');
   let start = 0;
   let end = slug.length;
   while (start < end && slug[start] === '-') start++;
   while (end > start && slug[end - 1] === '-') end--;
-  return slug.slice(start, end);
+  const kept = slug.slice(
+    start,
+    start + Math.min(end - start, SLUG_MAX_LENGTH)
+  );
+  // Shortened, it may end on a dash again
+  return kept.replace(/-+$/, '');
+};
+
+/**
+ * The `n`th form of a slug another account holds: the slug with `n` at its
+ * end, shortened so that the whole still fits {@link SLUG_MAX_LENGTH}.
+ *
+ * @param slug the account's slug
+ * @param n 2 for the first number, 3 for the next…
+ */
+export const numberedSlug = (slug: string, n: number): string => {
+  const suffix = String(n);
+  return slug.slice(0, SLUG_MAX_LENGTH - suffix.length) + suffix;
 };
 
 /**
