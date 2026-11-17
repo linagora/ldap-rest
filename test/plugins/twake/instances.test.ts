@@ -2351,6 +2351,81 @@ describe('Twake instances plugin', function () {
       expect(kept.isDone()).to.equal(false);
     });
 
+    describe('with twake_instance_slug_numbered', () => {
+      const settings = (): { twake_instance_slug_numbered: boolean } =>
+        (
+          plugin(dm) as unknown as {
+            settings: { twake_instance_slug_numbered: boolean };
+          }
+        ).settings;
+      const settled = async (scope: nock.Scope): Promise<void> => {
+        // ldapdeletedone is not awaited by the delete
+        for (let i = 0; i < 50 && !scope.isDone(); i++)
+          await new Promise(r => setTimeout(r, 10));
+      };
+
+      beforeEach(() => (settings().twake_instance_slug_numbered = true));
+      afterEach(async () => {
+        settings().twake_instance_slug_numbered = false;
+        await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
+      });
+
+      it('destroys the numbered instance of a deleted account, not the one its slug names', async () => {
+        nock(COZY)
+          .get('/instances/in-janedoe.example.org')
+          .reply(200, instance('in-janedoe@example.org', 'in-janedoe'))
+          .get('/instances/in-janedoe2.example.org')
+          .reply(200, instance('in-jane_doe@example.org', 'in-jane_doe'));
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(await read(dm, dnOf('in-jane_doe'))).to.have.property(
+          'description',
+          'in-janedoe2.example.org'
+        );
+        const other = nock(COZY)
+          .get('/instances/in-janedoe.example.org')
+          .optionally()
+          .reply(200, instance('in-janedoe@example.org', 'in-janedoe'))
+          .delete('/instances/in-janedoe.example.org')
+          .optionally()
+          .reply(204);
+        const destroyed = nock(COZY)
+          .get('/instances/in-janedoe2.example.org')
+          .reply(200, instance('in-jane_doe@example.org', 'in-jane_doe'))
+          .delete('/instances/in-janedoe2.example.org')
+          .reply(204);
+        await dm.ldap.delete(dnOf('in-jane_doe'));
+        await settled(destroyed);
+        expect(destroyed.isDone()).to.equal(true);
+        expect(other.activeMocks()).to.have.lengthOf(2);
+      });
+
+      it('destroys at the address its slug names when the entry holds another', async () => {
+        nock(COZY)
+          .get('/instances/in-alice.example.org')
+          .reply(200, instance('in-alice@example.org', 'in-alice'));
+        await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
+        await dm.ldap.modify(dnOf('in-alice'), {
+          replace: { description: 'in-bob2.example.org' },
+        });
+        const elsewhere = nock(COZY)
+          .get('/instances/in-bob2.example.org')
+          .optionally()
+          .reply(200, instance('in-bob@example.org', 'in-alice'))
+          .delete('/instances/in-bob2.example.org')
+          .optionally()
+          .reply(204);
+        const destroyed = nock(COZY)
+          .get('/instances/in-alice.example.org')
+          .reply(200, instance('in-alice@example.org', 'in-alice'))
+          .delete('/instances/in-alice.example.org')
+          .reply(204);
+        await dm.ldap.delete(dnOf('in-alice'));
+        await settled(destroyed);
+        expect(destroyed.isDone()).to.equal(true);
+        expect(elsewhere.activeMocks()).to.have.lengthOf(2);
+      });
+    });
+
     it('destroys the instance of an account deleted under another spelling', async () => {
       nock(COZY)
         .get('/instances/in-alice.example.org')

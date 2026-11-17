@@ -33,6 +33,7 @@ import {
 } from '../../lib/instanceProviders.js';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions.js';
 import { extractLdapCode } from '../../lib/ldapCodes.js';
+import { currentOperation } from '../../lib/operation.js';
 import {
   canonicalDn,
   escapeLdapFilter,
@@ -118,6 +119,8 @@ export default class TwakeInstances extends DmPlugin {
   private readonly announcing = new Map<string, Promise<unknown>>();
   /** Set while this plugin writes the mark for a request: not a caller's modify */
   private readonly marking = new AsyncLocalStorage<true>();
+  /** The address of each account a delete takes, by operation and DN key */
+  private readonly deleting = new Map<number, Map<string, string>>();
 
   constructor(server: DM) {
     super(server);
@@ -244,17 +247,51 @@ export default class TwakeInstances extends DmPlugin {
       });
       if (account.orgId) await this.announcing.get(account.orgId.toLowerCase());
     },
+    // A numbered slug is not the one the DN gives: the address is read
+    // before the entry goes
+    ldapdeleterequest: async ([dns, req]) => {
+      const op = currentOperation();
+      if (
+        op === undefined ||
+        !(this.provider instanceof CozyStackProvider) ||
+        !this.settings.twake_instance_slug_numbered
+      )
+        return [dns, req];
+      for (const dn of [dns].flat()) {
+        if (!this.match(dn)) continue;
+        // As the server: the address is read whoever deletes the account
+        const res = (await this.server.ldap.system
+          .search(
+            { paged: false, scope: 'base', attributes: [this.fqdnAttribute] },
+            dn
+          )
+          .catch(() => undefined)) as SearchResult | undefined;
+        const entry = res?.searchEntries[0];
+        const known = entry && first(this.value(entry, this.fqdnAttribute));
+        if (!known) continue;
+        if (!this.deleting.has(op)) this.deleting.set(op, new Map());
+        this.deleting.get(op)!.set(this.key(dn), known);
+      }
+      return [dns, req];
+    },
     ldapdeletedone: async dns => {
       const provider = this.provider;
       if (!(provider instanceof CozyStackProvider)) return;
+      const op = currentOperation();
+      const known = op === undefined ? undefined : this.deleting.get(op);
       for (const dn of Array.isArray(dns) ? dns : [dns]) {
         const match = this.match(dn);
         const uid = this.uid(dn);
         if (!match || !uid) continue;
+        const id = this.id(uid, match.exec);
+        const address = known?.get(this.key(dn));
+        // Only a numbered form of the account's own slug: a caller may have
+        // written the address. destroy() still checks the OIDC id
+        const slug = (address && this.numberedAt(id, address)) || id;
         // Queued before a re-create of the same DN, whose add comes after
         await this.serialized(this.key(dn), async () => {
           try {
-            await provider.destroy(this.id(uid, match.exec), uid);
+            await provider.destroy(slug, uid);
           } catch (err) {
             this.logger.error({
               plugin: this.name,
@@ -265,6 +302,9 @@ export default class TwakeInstances extends DmPlugin {
           }
         });
       }
+    },
+    ldapdeleteend: op => {
+      this.deleting.delete(op);
     },
   };
 
@@ -630,16 +670,22 @@ export default class TwakeInstances extends DmPlugin {
     const address = known.toLowerCase();
     if (address === this.provider.address(account))
       return { account, found: { fqdn: known, ready: true } };
-    const asked = this.numberedAt(account, address) ?? account;
+    const id = this.numberedAt(account.id, address);
+    const asked = id ? { ...account, id } : account;
     return { account: asked, found: await this.provider.find(asked, known) };
   }
 
-  /** The numbered form of the account's slug whose address this is, if any */
-  private numberedAt(account: Account, address: string): Account | undefined {
+  /**
+   * The numbered form of slug `id` whose instance is at this address, with
+   * `twake_instance_slug_numbered`
+   */
+  private numberedAt(id: string, address: string): string | undefined {
     if (!this.settings.twake_instance_slug_numbered) return undefined;
+    const lower = address.toLowerCase();
     for (let n = 2; n <= MAX_SLUG_NUMBER; n++) {
-      const candidate = this.numbered(account, n);
-      if (this.provider.address(candidate) === address) return candidate;
+      const numbered = numberedSlug(id, n, this.provider.slugMaxLength);
+      if (this.provider.address({ id: numbered } as InstanceRequest) === lower)
+        return numbered;
     }
     return undefined;
   }
