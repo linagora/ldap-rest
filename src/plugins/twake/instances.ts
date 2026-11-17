@@ -251,11 +251,7 @@ export default class TwakeInstances extends DmPlugin {
     // before the entry goes
     ldapdeleterequest: async ([dns, req]) => {
       const op = currentOperation();
-      if (
-        op === undefined ||
-        !(this.provider instanceof CozyStackProvider) ||
-        !this.settings.twake_instance_slug_numbered
-      )
+      if (op === undefined || !(this.provider instanceof CozyStackProvider))
         return [dns, req];
       for (const dn of [dns].flat()) {
         if (!this.match(dn)) continue;
@@ -661,12 +657,12 @@ export default class TwakeInstances extends DmPlugin {
 
   /**
    * The instance at the address written on the account at `dn`. A modify can
-   * write it, so it is the account's only at its slug's address or, with
-   * `twake_instance_slug_numbered`, at a numbered form of it, and only when no
-   * other entry holds it. The slug's address is then taken as is, as it was
-   * before the directory was asked; a numbered one is asked about as that
-   * form, the instance's OIDC id with the Cloudery. Any other address is not
-   * the account's.
+   * write it, so it is the account's only at its slug's address or at a
+   * numbered form of it, whatever `twake_instance_slug_numbered` says now, and
+   * only when no other entry holds it. The slug's address is then taken as is,
+   * the directory having said it is the account's; a numbered one is asked
+   * about as that form, the instance's OIDC id with the Cloudery. Any other
+   * address is not the account's.
    */
   private async confirm(
     dn: string,
@@ -736,12 +732,8 @@ export default class TwakeInstances extends DmPlugin {
       .find(other => this.key(other) !== self);
   }
 
-  /**
-   * The numbered form of slug `id` whose instance is at this address, with
-   * `twake_instance_slug_numbered`
-   */
+  /** The numbered form of slug `id` whose instance is at this address */
   private numberedAt(id: string, address: string): string | undefined {
-    if (!this.settings.twake_instance_slug_numbered) return undefined;
     const lower = address.toLowerCase();
     for (let n = 2; n <= MAX_SLUG_NUMBER; n++) {
       const numbered = numberedSlug(id, n, this.provider.slugMaxLength);

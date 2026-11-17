@@ -395,19 +395,20 @@ describe('Twake instances plugin', function () {
         }
       });
 
-      it('does not take it for the account’s without twake_instance_slug_numbered', async () => {
+      it('takes it once the Cloudery confirms it, twake_instance_slug_numbered turned off since', async () => {
         settings().twake_instance_slug_numbered = false;
-        const asked = numbered({ oidc: 'in-janedoe2' }, true);
+        const asked = numbered({ oidc: 'in-janedoe2' });
         const plain = search('in-janedoe.example.org')
-          .reply(200, { items: [] })
-          .post('/api/v1/instances', body => body.slug === 'in-janedoe')
-          .reply(202, {});
+          .optionally()
+          .reply(200, { items: [] });
         expect(await plugin(dm).ensureInstance(dnOf('in-jane_doe'))).to.equal(
-          'pending'
+          'ready'
         );
-        expect(asked.activeMocks()).to.have.lengthOf(1);
-        expect(plain.isDone()).to.equal(true);
-        expect(rabbit.published).to.deep.equal([]);
+        expect(asked.isDone()).to.equal(true);
+        expect(plain.activeMocks()).to.have.lengthOf(1);
+        expect(rabbit.published.map(p => p.key)).to.deep.equal([
+          'user.created',
+        ]);
       });
     });
 
@@ -1624,12 +1625,6 @@ describe('Twake instances plugin', function () {
           { ...person('in.frank'), mail: 'in.frank@acme.example' },
           rest()
         );
-        const settings = (
-          plugin(dm) as unknown as {
-            settings: { twake_instance_slug_numbered: boolean };
-          }
-        ).settings;
-        settings.twake_instance_slug_numbered = true;
         try {
           await dm.ldap.modify(frank, {
             replace: { description: 'infrankacme12.example.org' },
@@ -1644,7 +1639,6 @@ describe('Twake instances plugin', function () {
             'businessCategory'
           );
         } finally {
-          settings.twake_instance_slug_numbered = false;
           await dm.ldap.delete(frank).catch(() => undefined);
         }
       });
@@ -1660,45 +1654,35 @@ describe('Twake instances plugin', function () {
         return { warned, restore: () => (logger.warn = warn) };
       };
 
-      it('releases a member at a numbered address once the Cloudery confirms it', async () => {
-        const settings = (
-          plugin(dm) as unknown as {
-            settings: { twake_instance_slug_numbered: boolean };
-          }
-        ).settings;
-        settings.twake_instance_slug_numbered = true;
-        try {
-          await addErin();
-          await rabbit.handler!({
-            ...erinWorkplace,
-            workplaceFqdn: 'inerinacme12.example.org',
-          });
-          link('acme1', 'acme1.example.org');
-          const asked = search('inerinacme12.example.org').reply(200, {
-            items: [
-              {
-                fqdn: 'inerinacme12.example.org',
-                internal_email: 'in.erin@acme.example',
-                oidc: 'inerinacme12',
-                instantiated_at: '2026-01-01T00:00:00Z',
-              },
-            ],
-          });
-          await rabbit.handler!(orgWorkplace);
-          expect(asked.isDone()).to.equal(true);
-          expect(rabbit.published).to.deep.equal([
-            ORG_CREATED,
+      it('releases a member at a numbered address once the Cloudery confirms it, without twake_instance_slug_numbered', async () => {
+        await addErin();
+        await rabbit.handler!({
+          ...erinWorkplace,
+          workplaceFqdn: 'inerinacme12.example.org',
+        });
+        link('acme1', 'acme1.example.org');
+        const asked = search('inerinacme12.example.org').reply(200, {
+          items: [
             {
-              ...ERIN_CREATED,
-              message: {
-                ...ERIN_CREATED.message,
-                workplaceFqdn: 'inerinacme12.example.org',
-              },
+              fqdn: 'inerinacme12.example.org',
+              internal_email: 'in.erin@acme.example',
+              oidc: 'inerinacme12',
+              instantiated_at: '2026-01-01T00:00:00Z',
             },
-          ]);
-        } finally {
-          settings.twake_instance_slug_numbered = false;
-        }
+          ],
+        });
+        await rabbit.handler!(orgWorkplace);
+        expect(asked.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([
+          ORG_CREATED,
+          {
+            ...ERIN_CREATED,
+            message: {
+              ...ERIN_CREATED.message,
+              workplaceFqdn: 'inerinacme12.example.org',
+            },
+          },
+        ]);
       });
 
       it('warns when a member stays held for an address it cannot confirm', async () => {
@@ -2414,34 +2398,39 @@ describe('Twake instances plugin', function () {
         await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
       });
 
-      it('destroys the numbered instance of a deleted account, not the one its slug names', async () => {
-        nock(COZY)
-          .get('/instances/in-janedoe.example.org')
-          .reply(200, instance('in-janedoe@example.org', 'in-janedoe'))
-          .get('/instances/in-janedoe2.example.org')
-          .reply(200, instance('in-jane_doe@example.org', 'in-jane_doe'));
-        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
-        expect(await read(dm, dnOf('in-jane_doe'))).to.have.property(
-          'description',
-          'in-janedoe2.example.org'
-        );
-        const other = nock(COZY)
-          .get('/instances/in-janedoe.example.org')
-          .optionally()
-          .reply(200, instance('in-janedoe@example.org', 'in-janedoe'))
-          .delete('/instances/in-janedoe.example.org')
-          .optionally()
-          .reply(204);
-        const destroyed = nock(COZY)
-          .get('/instances/in-janedoe2.example.org')
-          .reply(200, instance('in-jane_doe@example.org', 'in-jane_doe'))
-          .delete('/instances/in-janedoe2.example.org')
-          .reply(204);
-        await dm.ldap.delete(dnOf('in-jane_doe'));
-        await settled(destroyed);
-        expect(destroyed.isDone()).to.equal(true);
-        expect(other.activeMocks()).to.have.lengthOf(2);
-      });
+      for (const [when, numberedAtDelete] of [
+        ['', true],
+        [', twake_instance_slug_numbered turned off since', false],
+      ] as [string, boolean][])
+        it(`destroys the numbered instance of a deleted account, not the one its slug names${when}`, async () => {
+          nock(COZY)
+            .get('/instances/in-janedoe.example.org')
+            .reply(200, instance('in-janedoe@example.org', 'in-janedoe'))
+            .get('/instances/in-janedoe2.example.org')
+            .reply(200, instance('in-jane_doe@example.org', 'in-jane_doe'));
+          await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+          expect(await read(dm, dnOf('in-jane_doe'))).to.have.property(
+            'description',
+            'in-janedoe2.example.org'
+          );
+          const other = nock(COZY)
+            .get('/instances/in-janedoe.example.org')
+            .optionally()
+            .reply(200, instance('in-janedoe@example.org', 'in-janedoe'))
+            .delete('/instances/in-janedoe.example.org')
+            .optionally()
+            .reply(204);
+          const destroyed = nock(COZY)
+            .get('/instances/in-janedoe2.example.org')
+            .reply(200, instance('in-jane_doe@example.org', 'in-jane_doe'))
+            .delete('/instances/in-janedoe2.example.org')
+            .reply(204);
+          settings().twake_instance_slug_numbered = numberedAtDelete;
+          await dm.ldap.delete(dnOf('in-jane_doe'));
+          await settled(destroyed);
+          expect(destroyed.isDone()).to.equal(true);
+          expect(other.activeMocks()).to.have.lengthOf(2);
+        });
 
       it('destroys at the address its slug names when the entry holds another', async () => {
         nock(COZY)

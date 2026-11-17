@@ -14,8 +14,9 @@
   `core/twake/clouderyProvision` reads it too.
 - `--twake-instance-slug-numbered` numbers a slug another account holds
   (`slug2`, `slug3`…) rather than refuse the instance: distinct uids can
-  reduce to one slug. With cozy-stack, the delete of a numbered account
-  destroys its numbered instance.
+  reduce to one slug. A numbered address stays the account's when the setting
+  is turned off, and with cozy-stack the delete of a numbered account destroys
+  its numbered instance.
 
 ### Changed
 

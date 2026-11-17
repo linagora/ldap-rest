@@ -642,9 +642,10 @@ is meant for a new deployment, or one whose instances have no `-`;
 `--twake-instance-slug-numbered` gives an account whose slug another account
 holds `slug2`, or the first of `slug3` to `slug99` free or already its own,
 rather than refuse it the instance. An address at such a slug is always asked
-about, never taken as is. Turned off later, the numbered accounts are no longer
-recognised at their address: with the Cloudery, announcing one again is refused,
-and with cozy-stack its delete leaves its instance in place.
+about, never taken as is, and only when no other entry holds it. It is
+recognised whatever the setting says, so turning it off later strands no
+numbered account: its address is still confirmed, and with cozy-stack its delete
+destroys its numbered instance.
 
 See [instances](plugins/integrations/instances.md).
 

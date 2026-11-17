@@ -52,9 +52,8 @@ gets no instance.
 - The server does not start without a reachable broker, and an event that
   cannot be published fails its attempt rather than being marked as sent.
 - With cozy-stack, deleting an account destroys its instance, when that
-  instance's OIDC id is this account's: the one its slug names, or with
-  `--twake-instance-slug-numbered` the numbered one its entry holds the
-  address of.
+  instance's OIDC id is this account's and no other entry holds its address:
+  the one its slug names, or the numbered one its entry holds the address of.
 
 ## Making sure an account has its instance
 
