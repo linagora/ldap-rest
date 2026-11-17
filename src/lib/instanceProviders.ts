@@ -104,12 +104,6 @@ export interface InstanceRequest {
   orgId?: string;
   orgDomain?: string;
   offer?: string;
-  /**
-   * An organization's own instance. It may be owned at the platform domain,
-   * as a personal account's is; with the Cloudery, the organization's link
-   * tells them apart
-   */
-  organization?: boolean;
 }
 
 export interface FoundInstance {
@@ -125,8 +119,10 @@ export interface InstanceProvider {
    */
   create(request: InstanceRequest): Promise<string | undefined>;
   /**
-   * The instance at this request's address, if any. One that belongs to
-   * another account is a conflict, not an answer.
+   * The instance at this request's address, if any. One whose OIDC id is
+   * another is a conflict, not an answer. The email is not compared: the
+   * account's mail is the one that counts, and which account an instance
+   * belongs to is the directory's to say.
    */
   find(
     request: InstanceRequest,
@@ -253,46 +249,19 @@ export class ClouderyProvider extends HttpProvider implements InstanceProvider {
     if (!res.ok) throw await refused('Cloudery instance search failed', res);
     const { items } = await this.json<{
       items?: {
-        _id?: string;
         fqdn: string;
-        internal_email?: string;
         oidc?: string;
         instantiated_at?: string | null;
       }[];
     }>(res);
     const found = items?.[0];
     if (!found) return undefined;
-    // Only the fields the instance holds are compared
-    if (
-      (found.internal_email &&
-        found.internal_email.toLowerCase() !== request.email.toLowerCase() &&
-        !(
-          request.organization &&
-          (await this.organizationHolds(request.id, found._id))
-        )) ||
-      (found.oidc && found.oidc !== request.id)
-    )
+    // Only an OIDC id the instance holds is compared
+    if (found.oidc && found.oidc !== request.id)
       throw new ConflictError(
         `${fqdn} already exists and belongs to another user`
       );
     return { fqdn: found.fqdn, ready: Boolean(found.instantiated_at) };
-  }
-
-  /** Whether the Cloudery holds this instance as the organization's own */
-  private async organizationHolds(
-    id: string,
-    instanceId?: string
-  ): Promise<boolean> {
-    if (!instanceId) return false;
-    const res = await this.call(
-      `${this.url}/api/v2/organizations/${encodeURIComponent(id)}`,
-      { headers: this.headers() }
-    );
-    if (res.status === 404) return false;
-    if (!res.ok)
-      throw await refused('Cloudery organization lookup failed', res);
-    const org = await this.json<{ instance_id?: string | null }>(res);
-    return org.instance_id === instanceId;
   }
 
   async createOrganization(org: {
@@ -392,10 +361,7 @@ export class CozyStackProvider
     const found = await this.read(fqdn);
     if (!found) return undefined;
     // Strict here: an instance cozy-stack holds with no owner is not ours
-    if (
-      found.email?.toLowerCase() !== request.email.toLowerCase() ||
-      found.oidc_id !== (request.oidc ?? request.id)
-    )
+    if (found.oidc_id !== (request.oidc ?? request.id))
       throw new ConflictError(
         `${fqdn} already exists and belongs to another user`
       );
@@ -423,10 +389,7 @@ export class CozyStackProvider
 
   private async read(
     fqdn: string
-  ): Promise<
-    | { email?: string; oidc_id?: string; onboarding_finished?: boolean }
-    | undefined
-  > {
+  ): Promise<{ oidc_id?: string; onboarding_finished?: boolean } | undefined> {
     const res = await this.call(
       `${this.url}/instances/${encodeURIComponent(fqdn)}`,
       { headers: this.headers() }
@@ -436,7 +399,6 @@ export class CozyStackProvider
     const { data } = await this.json<{
       data?: {
         attributes?: {
-          email?: string;
           oidc_id?: string;
           onboarding_finished?: boolean;
         };

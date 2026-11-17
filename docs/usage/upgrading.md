@@ -4,6 +4,21 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### An instance is the account whose address names it
+
+**Who is affected:** a deployment that loads `twake/instances` or
+`twake/clouderyProvision`.
+
+An instance whose email is not the account's `mail` is no longer refused:
+the instance is the account's whose address attribute names it. An instance
+that a deleted account left on the Cloudery, and whose address no entry holds
+any more, is given to the next account with the same slug. Load
+`core/twake/tombstone` to keep a deleted account's entry, hence its address
+and its instance, or remove such instances from the Cloudery
+([details](plugins/integrations/instances.md#which-account-an-instance-is)).
+
 ## From 2.2.2
 
 ### The bulk import writes below the base its schema names

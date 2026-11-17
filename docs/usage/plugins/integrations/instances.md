@@ -95,20 +95,20 @@ one exists, so the case a caller spells the branch in is not sent. The mark,
 not the address, says the organization is done.
 
 With the Cloudery, a member's `user.created` waits for its organization's: a
-member under an organization entry that is not marked yet gets its address
-but no event and no mark. A member outside its organization entry is not
-held, since nothing would find it to release it: it is announced with a
-warning, and needs sending again once the organization is linked. A stored
-address the provider does not confirm keeps a member held, with a warning,
-until `ensureInstance` sends it. Once the organization is
-marked, every member under its entry with an address and no mark gets its
-`user.created`, each on its own: one that fails is logged, the others are
-still sent, and the message is redelivered. A stored address is sent only
-if it is the one the provider gives the account, or once the provider
-confirms it. Nothing of this is kept in memory: the organization's
-`workplace.created` again, or `ensureOrganization` on a marked organization,
-links the organization again and sends whatever is still held, from any
-replica. That also links an organization marked before the link existed.
+member under an organization entry that is not marked yet gets its address but
+no event and no mark. A member outside its organization entry is not held, since
+nothing would find it to release it: it is announced with a warning, and needs
+sending again once the organization is linked. A stored address the provider
+does not confirm keeps a member held, with a warning, until `ensureInstance`
+sends it. Once the organization is marked, every member under its entry with an
+address and no mark gets its `user.created`, each on its own: one that fails is
+logged, the others are still sent, and the message is redelivered. A stored
+address is sent only if it is the account's, as
+[below](#which-account-an-instance-is). Nothing of this is kept in memory: the
+organization's `workplace.created` again, or `ensureOrganization` on a marked
+organization, links the organization again and sends whatever is still held,
+from any replica. That also links an organization marked before the link
+existed.
 
 The Cloudery builds no member instance for an organization it does not
 have. Before asking for a member's instance, the plugin asks for its
@@ -119,8 +119,9 @@ failed.
 An organization created before 0.13.0 has a built instance but was never
 announced, and that instance is owned at the platform domain rather than
 `<id>@<domain>`, as a personal account's is. The plugin takes it as the
-organization's only when the Cloudery organization is linked to it, and
-announces the organization when one of its members is added or made sure of.
+organization's whatever its email, as any instance (see
+[which account an instance is](#which-account-an-instance-is)), and announces
+the organization when one of its members is added or made sure of.
 Announcing writes the organization with the plugin's rights, so making sure
 of a member through the API announces it only for a caller who may write the
 organization entry, and is refused with a `403` otherwise.
@@ -129,7 +130,9 @@ organization entry, and is refused with a `403` otherwise.
 
 - `cloudery`: the Cloudery accepts the request and builds the instance
   afterwards. An instance already at the account's address is taken when it
-  is this account's, so a re-created account keeps its instance. The address
+  is this account's (see
+  [which account an instance is](#which-account-an-instance-is)), so a
+  re-created account keeps its instance. The address
   arrives with `workplace.created`, consumed on `--twake-instance-queue`,
   with a dead-letter queue. The message goes to an organization when its
   `twakeId` is an organization id and its `internalEmail` that
@@ -138,7 +141,8 @@ organization entry, and is refused with a `403` otherwise.
 - `cozy-stack`: the admin API builds the instance before answering, and the
   address is written in the request. The instance's onboarding is marked as
   finished, so its first login does not open the setup wizard. An instance
-  already there is taken only when its email and OIDC id are this account's.
+  already there is taken only when it is this account's, its OIDC id the
+  account's `uid`.
 
 The instance id is `--twake-instance-id`, a template of the account's `uid`
 and the named groups of the matching DN expression, for example `{uid}{org}`.
@@ -150,18 +154,49 @@ whose slug holds one (see
 [configuration](../../configuration.md#coretwakeinstances)). The slug is cut
 to the 30 characters the Cloudery takes, or to a DNS label's 63 with
 cozy-stack. Two `uid`s that reduce to the same slug cannot both have an
-instance: the second is refused, as an instance already there that is not its
-own. With `--twake-instance-slug-numbered` it gets `slug2`, or the next number
-free or already its own, up to `slug99`. A name no expression captures stops
+instance at it: the second is refused, as the address is the first one's. With
+`--twake-instance-slug-numbered` it gets `slug2`, or the next number free or
+already its own, up to `slug99`. A name no expression captures stops
 the server at startup. It is the slug of the instance's address; the OIDC id is
 this slug with the Cloudery, and the `uid` with cozy-stack. `user.created`
 names the account by its `uid` (`twakeId`), and gives its Matrix ID as
-`matrixId`, `@local:domain` from its lowercased `mail`; a mail that gives no valid Matrix ID sends none, and
+`matrixId`, `@local:domain` from its lowercased `mail`; a mail that gives no
+valid Matrix ID sends none, and
 [cozy-stack](https://github.com/cozy/cozy-stack/blob/3c05972703d8f6c1fe71c9cf1b7a747607a4b395/model/settings/common/common.go#L321-L329)
 derives one from the instance's email. A group named `org` is the organization
 id sent to the provider and in `user.created`, with the mail's domain as its
 domain; with cozy-stack and no such group, `--twake-instance-cozy-org-id` and
 `--twake-instance-cozy-org-domain` stand for them.
+
+## Which account an instance is
+
+An instance is the one of the entry whose address attribute
+(`--twake-instance-fqdn-attribute`, or for an organization
+`--twake-instance-organization-fqdn-attribute`) names it. The account's
+`mail`, the one OpenID Connect gives, is the one that counts: an instance
+whose email differs is never refused for it. With the Cloudery the OIDC id is
+the slug, so two `uid`s that reduce to one slug cannot be told apart by the
+provider; the directory tells them apart. The provider still refuses an
+instance whose OIDC id is another.
+
+- An instance at an address another entry holds is not taken, nor asked
+  about. A tombstone keeps its entry and its address, so a deleted account's
+  instance stays its own.
+- An address written on the account, which a caller's modify can do, is
+  taken only when it is the address of the account's slug, or of a numbered
+  form of it, and no other entry holds it. The slug's address is then taken as
+  is; a numbered one is asked about first. Any other address is not the
+  account's: the instance is looked for, or asked for, again.
+- An instance no entry holds is the account's whose slug gives its address:
+  without [`core/twake/tombstone`](tombstone.md), an instance a deleted
+  account left on the Cloudery, whose address no entry holds any more, is
+  given to a new account with the same slug. Until its address is written,
+  with the Cloudery once `workplace.created` arrives, an account's new
+  instance is no entry's either.
+
+The instance's email is not changed to the account's `mail`;
+[`core/twake/drive`](drive.md) sends it to cozy-stack when the `mail`
+changes.
 
 ## Configuration
 

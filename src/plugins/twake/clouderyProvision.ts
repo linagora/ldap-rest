@@ -35,7 +35,7 @@ import {
   CLOUDERY_SLUG_MAX_LENGTH,
   instanceSlug,
 } from '../../lib/instanceProviders.js';
-import { isChildOf } from '../../lib/utils.js';
+import { escapeLdapFilter, isChildOf, normalizeDn } from '../../lib/utils.js';
 import type RabbitMq from '../rabbitmq.js';
 import { BaseResolver } from '../scim/baseResolver.js';
 import { scimOptionsOf } from '../scim/scim.options.js';
@@ -56,7 +56,6 @@ interface ClouderyInstanceResponse {
 /** An instance as the Cloudery's search lists it */
 interface ClouderyInstanceSummary {
   _id: string;
-  internal_email?: string;
   oidc?: string;
 }
 
@@ -413,12 +412,14 @@ export default class ClouderyProvision extends DmPlugin {
     // Cloudery mint a numbered duplicate (slug2). Fail open: if the lookup
     // errors, fall through to create rather than block provisioning.
     //
-    // Reused only when its email and OIDC id, where it carries them, are the
-    // account's, as `ClouderyProvider.find` does: distinct userNames can
-    // reduce to one slug (`jane_doe`, `janedoe`), sharing the OIDC id, and
-    // the email is what tells them apart. A re-import whose mail changed
-    // since is refused too.
+    // Reused only when its OIDC id, where it carries one, is the account's, as
+    // `ClouderyProvider.find` does, and no other entry holds its address: an
+    // instance is the account's whose address attribute names it. Distinct
+    // userNames can reduce to one slug (`jane_doe`, `janedoe`), sharing the
+    // OIDC id, and the directory tells them apart. The email is not compared:
+    // the account's mail is the one that counts.
     const expectedFqdn = `${slug}.${this.clouderyDomain}`.toLowerCase();
+    const dn = `${this.rdnAttribute}=${escapeDnValue(userName)},${ctx.base}`;
     let existing: ClouderyInstanceSummary | null = null;
     try {
       existing = await this.findInstanceByFqdn(expectedFqdn);
@@ -433,9 +434,8 @@ export default class ClouderyProvision extends DmPlugin {
     }
     if (
       existing &&
-      ((existing.internal_email &&
-        existing.internal_email.toLowerCase() !== email.toLowerCase()) ||
-        (existing.oidc && existing.oidc.toLowerCase() !== slug))
+      ((existing.oidc && existing.oidc.toLowerCase() !== slug) ||
+        (await this.heldElsewhere(dn, expectedFqdn, log)))
     ) {
       this.logger.error({
         ...log,
@@ -505,7 +505,6 @@ export default class ClouderyProvision extends DmPlugin {
 
       fqdn = instance.fqdn;
     }
-    const dn = `${this.rdnAttribute}=${escapeDnValue(userName)},${ctx.base}`;
     // Role and phones live on the user entry for the admin panel to read; they
     // are not part of the Cloudery create payload. Phones are stored as the JSON
     // the panel expects ([{ number, primary }]) and only when present.
@@ -859,6 +858,47 @@ export default class ClouderyProvision extends DmPlugin {
    * @param fqdn instance address
    * @param only the one field to ask for, when the others are not needed
    */
+  /**
+   * Whether an entry other than `dn` holds this address. A failed lookup
+   * counts as held: the instance would otherwise be handed over unchecked.
+   */
+  private async heldElsewhere(
+    dn: string,
+    fqdn: string,
+    log: Record<string, unknown>
+  ): Promise<boolean> {
+    try {
+      // As the server: who holds an address is read whoever imports the user
+      const res = (await this.server.ldap.system.search(
+        {
+          paged: false,
+          scope: 'sub',
+          filter: `(${this.fqdnAttribute}=${escapeLdapFilter(fqdn)})`,
+          attributes: [this.fqdnAttribute],
+        },
+        this.config.ldap_base
+      )) as { searchEntries?: Record<string, unknown>[] };
+      const key = (one: string): string => {
+        try {
+          return normalizeDn(one);
+        } catch {
+          return one.toLowerCase();
+        }
+      };
+      const self = key(dn);
+      return (res.searchEntries ?? []).some(e => key(String(e.dn)) !== self);
+    } catch (err) {
+      this.logger.error({
+        ...log,
+        result: 'holder_lookup_failed',
+        fqdn,
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        error: `${err}`,
+      });
+      return true;
+    }
+  }
+
   private async findInstanceByFqdn(
     fqdn: string,
     only?: string

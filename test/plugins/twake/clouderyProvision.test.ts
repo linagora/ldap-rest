@@ -45,6 +45,9 @@ class StubLdap {
   }
   // entry returned by a base-scope search keyed by dn
   entries: Record<string, Record<string, unknown>> = {};
+  // entries a filtered search answers: those holding an address
+  holders: Record<string, unknown>[] = [];
+  holderLookupFails = false;
   async modify(
     dn: string,
     changes: Record<string, unknown>,
@@ -55,7 +58,11 @@ class StubLdap {
     return true;
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async search(_opts: any, base: string): Promise<any> {
+  async search(opts: any, base: string): Promise<any> {
+    if (opts?.filter) {
+      if (this.holderLookupFails) throw new Error('directory down');
+      return { searchEntries: this.holders };
+    }
     const entry = this.entries[base];
     return { searchEntries: entry ? [entry] : [] };
   }
@@ -282,7 +289,9 @@ describe('ClouderyProvision plugin', () => {
       );
     });
 
-    it('reuses an existing instance whose email and OIDC id are the account’s', async () => {
+    it('reuses an existing instance whose OIDC id is the account’s, whatever its email', async () => {
+      // Its own entry may hold the address already: it is not another's
+      ldap.holders = [{ dn: `uid=john.doe,${USER_BASE}` }];
       const scope = nock(CLOUDERY)
         .get('/api/v2/instances')
         .query(q => q.fqdn === 'johndoeacme123.twake.app')
@@ -290,7 +299,7 @@ describe('ClouderyProvision plugin', () => {
           items: [
             {
               _id: 'existing-uuid',
-              internal_email: 'John.Doe@acme.com',
+              internal_email: 'old.john@acme.com',
               oidc: 'johndoeacme123',
             },
           ],
@@ -301,6 +310,9 @@ describe('ClouderyProvision plugin', () => {
       expect(scope.isDone()).to.equal(true);
       expect(ldap.modifyCalls).to.have.length(1);
       expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].message.internalEmail).to.equal(
+        'john.doe@acme.com'
+      );
     });
 
     it('reduces the slug to what the Cloudery takes', async () => {
@@ -385,9 +397,11 @@ describe('ClouderyProvision plugin', () => {
       expect(body).to.include({ slug, oidc: slug });
     });
 
-    it('refuses an instance another account holds under the same slug', async () => {
-      // `john_doe` and `john.doe` reduce to one slug. No POST is registered:
-      // a create attempt fails the test, as handing the instance over would.
+    it('refuses an instance whose address another account holds under the same slug', async () => {
+      // `john_doe` and `john.doe` reduce to one slug and share the OIDC id:
+      // the directory tells them apart. No POST is registered: a create
+      // attempt fails the test, as handing the instance over would.
+      ldap.holders = [{ dn: `uid=john.doe,${USER_BASE}` }];
       const scope = nock(CLOUDERY)
         .get('/api/v2/instances')
         .query(q => q.fqdn === 'johndoeacme123.twake.app')
@@ -409,6 +423,22 @@ describe('ClouderyProvision plugin', () => {
         },
         makeReq('acme123')
       );
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.modifyCalls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    it('refuses an existing instance when the directory cannot say who holds it', async () => {
+      ldap.holderLookupFails = true;
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, {
+          items: [{ _id: 'existing-uuid', oidc: 'johndoeacme123' }],
+        });
+
+      await create(user, makeReq('acme123'));
 
       expect(scope.isDone()).to.equal(true);
       expect(ldap.modifyCalls).to.have.length(0);

@@ -17,6 +17,19 @@
   reduce to one slug. With cozy-stack, the delete of a numbered account
   destroys its numbered instance.
 
+### Changed
+
+- `twake/instances` and `twake/clouderyProvision` no longer refuse an
+  instance because its email is not the account's `mail`, the one OpenID
+  Connect gives and the one that counts. An instance is the account's whose
+  address attribute names it: distinct uids that reduce to one slug, which the
+  Cloudery gives one OIDC id, are told apart by the directory. Without
+  `core/twake/tombstone`, an instance a deleted account left on the Cloudery,
+  whose address no entry holds any more, is given to a new account with the
+  same slug
+  ([instances](docs/usage/plugins/integrations/instances.md#which-account-an-instance-is),
+  [upgrading](docs/usage/upgrading.md#an-instance-is-the-account-whose-address-names-it)).
+
 ### Fixed
 
 - An instance slug is cut to the 30 characters the Cloudery takes, with the
