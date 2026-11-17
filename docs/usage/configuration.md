@@ -598,8 +598,8 @@ See [lifecycle events](plugins/integrations/lifecycle-events.md).
 | `--twake-instance-skip-value`                    | `DM_TWAKE_INSTANCE_SKIP_VALUE`                    |                                       | Its value                                                 |
 | `--twake-instance-provider`                      | `DM_TWAKE_INSTANCE_PROVIDER`                      | `cloudery`                            | `cloudery` or `cozy-stack`                                |
 | `--twake-instance-id`                            | `DM_TWAKE_INSTANCE_ID`                            | `{uid}`                               | Instance id template                                      |
-| `--twake-instance-slug-dashes`                   | `DM_TWAKE_INSTANCE_SLUG_DASHES`                   | `true`                                | Keep `-` inside a slug; `false` for a Cloudery or cozy-stack with flat subdomains |
-| `--twake-instance-slug-numbered`                 | `DM_TWAKE_INSTANCE_SLUG_NUMBERED`                 | `false`                               | Number a slug another account holds (`slug2`…) rather than refuse |
+| `--twake-instance-slug-dashes`                   | `DM_TWAKE_INSTANCE_SLUG_DASHES`                   | `true`                                | Keep `-` inside a slug, see below                         |
+| `--twake-instance-slug-numbered`                 | `DM_TWAKE_INSTANCE_SLUG_NUMBERED`                 | `false`                               | Number a slug another account holds, see below            |
 | `--twake-instance-fqdn-attribute`                | `DM_TWAKE_INSTANCE_FQDN_ATTRIBUTE`                | `twakeWorkspaceUrl`                   | Address attribute                                         |
 | `--twake-instance-sent-attribute`                | `DM_TWAKE_INSTANCE_SENT_ATTRIBUTE`                | `twakeCreatedEventAt`                 | Date the creation event was sent                          |
 | `--twake-instance-locale`                        | `DM_TWAKE_INSTANCE_LOCALE`                        | `en`, `fr` with cozy-stack            | Locale when the entry has none                            |
@@ -628,6 +628,23 @@ See [lifecycle events](plugins/integrations/lifecycle-events.md).
 | `--twake-instance-organization-domain-attribute` | `DM_TWAKE_INSTANCE_ORGANIZATION_DOMAIN_ATTRIBUTE` | `twakeDomain`                         | Attribute holding an organization's domain                |
 | `--twake-instance-organization-name-attribute`   | `DM_TWAKE_INSTANCE_ORGANIZATION_NAME_ATTRIBUTE`   | `description`                         | Attribute holding an organization's name                  |
 | `--twake-instance-organization-fqdn-attribute`   | `DM_TWAKE_INSTANCE_ORGANIZATION_FQDN_ATTRIBUTE`   |                                       | Address attribute of an organization (empty: not written) |
+
+A slug is cut to the 30 characters the Cloudery takes, or to a DNS label's 63
+with cozy-stack. `--twake-instance-slug-dashes false` keeps no `-` in it, for a
+Cloudery that takes `[a-z0-9]` only and a cozy-stack with flat subdomains: a uid
+like `jean-claude.dusse` gets an instance. It changes the slug, hence the
+address, of an existing account whose slug holds a `-`: with the Cloudery, the
+instance at the address it holds is no longer taken for its own when it is
+announced again, and with cozy-stack its delete leaves its instance in place. It
+is meant for a new deployment, or one whose instances have no `-`;
+`core/twake/clouderyProvision` reads it too.
+
+`--twake-instance-slug-numbered` gives an account whose slug another account
+holds `slug2`, or the first of `slug3` to `slug99` free or already its own,
+rather than refuse it the instance. An address at such a slug is always asked
+about, never taken as is. Turned off later, the numbered accounts are no longer
+recognised at their address: with the Cloudery, announcing one again is refused,
+and with cozy-stack its delete leaves its instance in place.
 
 See [instances](plugins/integrations/instances.md).
 

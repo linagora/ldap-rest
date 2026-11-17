@@ -52,7 +52,9 @@ gets no instance.
 - The server does not start without a reachable broker, and an event that
   cannot be published fails its attempt rather than being marked as sent.
 - With cozy-stack, deleting an account destroys its instance, when that
-  instance's OIDC id is this account's.
+  instance's OIDC id is this account's: the one its slug names, or with
+  `--twake-instance-slug-numbered` the numbered one its entry holds the
+  address of.
 
 ## Making sure an account has its instance
 
@@ -142,13 +144,19 @@ The instance id is `--twake-instance-id`, a template of the account's `uid`
 and the named groups of the matching DN expression, for example `{uid}{org}`.
 It is lowercased and reduced to `[a-z0-9-]`: the Cloudery refuses other
 characters in a slug, such as `_` or `@`, so `jane.doe_stg` gives
-`janedoestg`. Two `uid`s that reduce to the same slug cannot both have an
+`janedoestg`. With `--twake-instance-slug-dashes false` no `-` is kept, so
+`jean-claude.dusse` gives `jeanclaudedusse`; this moves an existing account
+whose slug holds one (see
+[configuration](../../configuration.md#coretwakeinstances)). The slug is cut
+to the 30 characters the Cloudery takes, or to a DNS label's 63 with
+cozy-stack. Two `uid`s that reduce to the same slug cannot both have an
 instance: the second is refused, as an instance already there that is not its
-own. A name no expression captures stops the server at startup. It is the slug
-of the instance's address; the OIDC id is this slug with the Cloudery, and the
-`uid` with cozy-stack. `user.created` names the account by its `uid`
-(`twakeId`), and gives its Matrix ID as `matrixId`, `@local:domain` from
-its lowercased `mail`; a mail that gives no valid Matrix ID sends none, and
+own. With `--twake-instance-slug-numbered` it gets `slug2`, or the next number
+free or already its own, up to `slug99`. A name no expression captures stops
+the server at startup. It is the slug of the instance's address; the OIDC id is
+this slug with the Cloudery, and the `uid` with cozy-stack. `user.created`
+names the account by its `uid` (`twakeId`), and gives its Matrix ID as
+`matrixId`, `@local:domain` from its lowercased `mail`; a mail that gives no valid Matrix ID sends none, and
 [cozy-stack](https://github.com/cozy/cozy-stack/blob/3c05972703d8f6c1fe71c9cf1b7a747607a4b395/model/settings/common/common.go#L321-L329)
 derives one from the instance's email. A group named `org` is the organization
 id sent to the provider and in `user.created`, with the mail's domain as its

@@ -7,10 +7,15 @@
 - `--twake-instance-slug-dashes false` keeps no `-` inside an instance slug,
   for a Cloudery taking `[a-z0-9]` only and a cozy-stack with flat
   subdomains, which refuses a `-` in an instance's first label: a uid like
-  `jean-claude.dusse` got no instance ("Slug is invalid").
+  `jean-claude.dusse` got no instance ("Slug is invalid"). It changes the
+  slug, hence the address, of an existing account whose slug holds a `-`: it
+  is meant for a new deployment, or one whose instances have no `-`
+  ([configuration](docs/usage/configuration.md#coretwakeinstances)).
+  `core/twake/clouderyProvision` reads it too.
 - `--twake-instance-slug-numbered` numbers a slug another account holds
   (`slug2`, `slug3`…) rather than refuse the instance: distinct uids can
-  reduce to one slug.
+  reduce to one slug. With cozy-stack, the delete of a numbered account
+  destroys its numbered instance.
 
 ### Fixed
 
