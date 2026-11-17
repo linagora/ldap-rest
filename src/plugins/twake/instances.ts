@@ -383,16 +383,17 @@ export default class TwakeInstances extends DmPlugin {
           { replace: { [this.sentAttribute]: [] } },
           req
         );
-      // A modify can write the address: taken as is only when it is the one
-      // the provider gives this account, otherwise asked about
       const known = first(this.value(entry, this.fqdnAttribute));
       if (known) {
-        const confirmed =
-          known.toLowerCase() === this.provider.address(account)
-            ? { fqdn: known, ready: true }
-            : await this.provider.find(account, known);
-        if (confirmed?.ready) {
-          await this.ready(dn, entry, account, confirmed.fqdn, req);
+        const confirmed = await this.confirm(account, known);
+        if (confirmed.found?.ready) {
+          await this.ready(
+            dn,
+            entry,
+            confirmed.account,
+            confirmed.found.fqdn,
+            req
+          );
           return 'ready';
         }
       }
@@ -591,8 +592,7 @@ export default class TwakeInstances extends DmPlugin {
     if (!this.settings.twake_instance_slug_numbered)
       return { account, found: await this.provider.find(account) };
     for (let n = 1; n <= MAX_SLUG_NUMBER; n++) {
-      const candidate =
-        n === 1 ? account : { ...account, id: numberedSlug(account.id, n) };
+      const candidate = n === 1 ? account : this.numbered(account, n);
       try {
         return {
           account: candidate,
@@ -603,8 +603,42 @@ export default class TwakeInstances extends DmPlugin {
       }
     }
     throw new ConflictError(
-      `${account.id}: held by other accounts up to ${numberedSlug(account.id, MAX_SLUG_NUMBER)}`
+      `${account.id}: held by other accounts up to ${this.numbered(account, MAX_SLUG_NUMBER).id}`
     );
+  }
+
+  /** The account under the `n`th form of its slug, `slug2` for 2 */
+  private numbered(account: Account, n: number): Account {
+    return { ...account, id: numberedSlug(account.id, n) };
+  }
+
+  /**
+   * The instance at the address written on the account. A modify can write
+   * it: taken as is only when it is the one the provider gives this account,
+   * otherwise asked about. With `twake_instance_slug_numbered`, an address at
+   * a numbered form of the account's slug is asked about as that form, the
+   * instance's OIDC id with the Cloudery; never taken as is, as the account
+   * that form was numbered for may be another one.
+   */
+  private async confirm(
+    account: Account,
+    known: string
+  ): Promise<{ account: Account; found?: FoundInstance }> {
+    const address = known.toLowerCase();
+    if (address === this.provider.address(account))
+      return { account, found: { fqdn: known, ready: true } };
+    const asked = this.numberedAt(account, address) ?? account;
+    return { account: asked, found: await this.provider.find(asked, known) };
+  }
+
+  /** The numbered form of the account's slug whose address this is, if any */
+  private numberedAt(account: Account, address: string): Account | undefined {
+    if (!this.settings.twake_instance_slug_numbered) return undefined;
+    for (let n = 2; n <= MAX_SLUG_NUMBER; n++) {
+      const candidate = this.numbered(account, n);
+      if (this.provider.address(candidate) === address) return candidate;
+    }
+    return undefined;
   }
 
   protected async ready(
@@ -747,11 +781,8 @@ export default class TwakeInstances extends DmPlugin {
     const account = this.account(dn, member);
     const known = first(this.value(member, this.fqdnAttribute));
     if (!account || !known) return;
-    const confirmed =
-      known.toLowerCase() === this.provider.address(account)
-        ? { fqdn: known, ready: true }
-        : await this.provider.find(account, known);
-    if (confirmed?.ready) return this.settle(dn, confirmed.fqdn);
+    const { found } = await this.confirm(account, known);
+    if (found?.ready) return this.settle(dn, found.fqdn);
     this.logger.warn(
       `${this.name}: ${dn} stays held, its address ${known} is not confirmed; ensureInstance sends it once it is`
     );

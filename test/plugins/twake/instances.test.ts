@@ -269,6 +269,95 @@ describe('Twake instances plugin', function () {
       }
     });
 
+    describe('with a numbered address', () => {
+      const settings = (): { twake_instance_slug_numbered: boolean } =>
+        (
+          plugin(dm) as unknown as {
+            settings: { twake_instance_slug_numbered: boolean };
+          }
+        ).settings;
+      const numbered = (owner: Record<string, string>): nock.Scope =>
+        search('in-janedoe2.example.org').reply(200, {
+          items: [
+            {
+              _id: 'numbered',
+              fqdn: 'in-janedoe2.example.org',
+              instantiated_at: '2026-01-01T00:00:00Z',
+              ...owner,
+            },
+          ],
+        });
+
+      beforeEach(async () => {
+        settings().twake_instance_slug_numbered = true;
+        search('in-janedoe.example.org').reply(200, { items: [] });
+        nock(CLOUDERY).post('/api/v1/instances').reply(500, 'down');
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        // As workplace.created writes it, the announce having failed
+        await dm.ldap.modify(dnOf('in-jane_doe'), {
+          replace: { description: 'in-janedoe2.example.org' },
+        });
+      });
+
+      afterEach(async () => {
+        settings().twake_instance_slug_numbered = false;
+        await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
+      });
+
+      it('asks the Cloudery about it as the numbered slug, and announces the account', async () => {
+        const asked = numbered({
+          internal_email: 'in-jane_doe@example.org',
+          oidc: 'in-janedoe2',
+        });
+        expect(await plugin(dm).ensureInstance(dnOf('in-jane_doe'))).to.equal(
+          'ready'
+        );
+        expect(asked.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([
+          {
+            key: 'user.created',
+            message: {
+              twakeId: 'in-jane_doe',
+              internalEmail: 'in-jane_doe@example.org',
+              workplaceFqdn: 'in-janedoe2.example.org',
+              matrixId: '@in-jane_doe:example.org',
+            },
+          },
+        ]);
+      });
+
+      for (const [whose, owner] of [
+        [
+          'another mail',
+          { internal_email: 'mallory@example.org', oidc: 'in-janedoe2' },
+        ],
+        [
+          'another OIDC id',
+          { internal_email: 'in-jane_doe@example.org', oidc: 'in-janedoe3' },
+        ],
+      ] as [string, Record<string, string>][])
+        it(`refuses it when its instance has ${whose}`, async () => {
+          const asked = numbered(owner);
+          expect(
+            await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe')))
+          ).to.have.property('statusCode', 409);
+          expect(asked.isDone()).to.equal(true);
+          expect(rabbit.published).to.deep.equal([]);
+        });
+
+      it('asks about it as the plain slug without twake_instance_slug_numbered', async () => {
+        settings().twake_instance_slug_numbered = false;
+        numbered({
+          internal_email: 'in-jane_doe@example.org',
+          oidc: 'in-janedoe2',
+        });
+        expect(
+          await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe')))
+        ).to.have.property('statusCode', 409);
+        expect(rabbit.published).to.deep.equal([]);
+      });
+    });
+
     it('looks the instance up, asks for it, and waits for its address', async () => {
       let asked: Record<string, unknown> = {};
       const scope = search('in-alice.example.org')
@@ -1501,6 +1590,47 @@ describe('Twake instances plugin', function () {
         }) as typeof warn;
         return { warned, restore: () => (logger.warn = warn) };
       };
+
+      it('releases a member at a numbered address once the Cloudery confirms it', async () => {
+        const settings = (
+          plugin(dm) as unknown as {
+            settings: { twake_instance_slug_numbered: boolean };
+          }
+        ).settings;
+        settings.twake_instance_slug_numbered = true;
+        try {
+          await addErin();
+          await rabbit.handler!({
+            ...erinWorkplace,
+            workplaceFqdn: 'inerinacme12.example.org',
+          });
+          link('acme1', 'acme1.example.org');
+          const asked = search('inerinacme12.example.org').reply(200, {
+            items: [
+              {
+                fqdn: 'inerinacme12.example.org',
+                internal_email: 'in.erin@acme.example',
+                oidc: 'inerinacme12',
+                instantiated_at: '2026-01-01T00:00:00Z',
+              },
+            ],
+          });
+          await rabbit.handler!(orgWorkplace);
+          expect(asked.isDone()).to.equal(true);
+          expect(rabbit.published).to.deep.equal([
+            ORG_CREATED,
+            {
+              ...ERIN_CREATED,
+              message: {
+                ...ERIN_CREATED.message,
+                workplaceFqdn: 'inerinacme12.example.org',
+              },
+            },
+          ]);
+        } finally {
+          settings.twake_instance_slug_numbered = false;
+        }
+      });
 
       it('warns when a member stays held for an address it cannot confirm', async () => {
         await addErin();
