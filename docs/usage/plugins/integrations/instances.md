@@ -41,11 +41,10 @@ gets no instance.
   an instance still being built; the drive plugin takes the `404` it then
   gets for a missing instance.
 - A refused, unreachable or slow provider leaves the entry written and
-  without an address, the reservation taken back: it is pending, and the
-  error is logged. The add itself succeeds, whatever the door (REST, SCIM,
-  bulk import). `--twake-instance-timeout` bounds each call, so a lookup, a
-  creation and, with cozy-stack, the onboarding can hold an add up to three
-  times as long.
+  pending, and the error is logged; only a refusal takes the reservation
+  back. The add itself succeeds, whatever the door (REST, SCIM, bulk import).
+  `--twake-instance-timeout` bounds each call, so a lookup, a creation and,
+  with cozy-stack, the onboarding can hold an add up to three times as long.
 - Once the instance exists, its address is written if the provider gave another,
   `user.created` is published on the auth exchange, without a password hash, and
   the entry is marked with the date. The event is sent at least once: a failure
@@ -208,7 +207,9 @@ instance whose OIDC id is another.
   address at once each check again after writing it: within one replica the
   reservations of an address wait for each other, and across replicas the
   entry whose DN sorts first keeps it, the other taking its own back. A
-  refused creation takes the reservation back. An organization's instance is
+  creation the provider refuses takes the reservation back; one that times
+  out or fails on the way keeps it, since the provider may have accepted it,
+  and the next attempt finds the instance or asks for it again. An organization's instance is
   reserved the same way on its entry, when
   `--twake-instance-organization-fqdn-attribute` names where.
 

@@ -27,6 +27,7 @@ import {
   CozyStackProvider,
   type FoundInstance,
   type InstanceProvider,
+  InstanceRefusedError,
   instanceSlug,
   type InstanceRequest,
   matrixId,
@@ -82,6 +83,14 @@ interface PatternMatch {
 
 /** The highest number a slug held by other accounts takes. */
 const MAX_SLUG_NUMBER = 99;
+
+/**
+ * The provider refused the instance. A call that timed out or failed on the
+ * way may have been accepted, so its reservation is kept: the next attempt
+ * finds the instance, or asks for it again.
+ */
+const refusal = (err: unknown): boolean =>
+  err instanceof InstanceRefusedError || err instanceof ConflictError;
 
 const first = (value: unknown): string | undefined => {
   const one = (Array.isArray(value) ? value[0] : value) as
@@ -593,13 +602,22 @@ export default class TwakeInstances extends DmPlugin {
       !(await this.reserve(dn, this.organizationFqdn, address))
     )
       throw new ConflictError(`${address} belongs to another user`);
-    try {
-      if (this.provider instanceof ClouderyProvider)
-        await this.provider.createOrganization(org);
-      return await this.provider.create(request);
-    } catch (err) {
+    const takeBack = async (): Promise<void> => {
       if (this.organizationFqdn)
         await this.unreserve(dn, this.organizationFqdn, address);
+    };
+    try {
+      // No instance is asked for yet
+      if (this.provider instanceof ClouderyProvider)
+        await this.provider.createOrganization(org);
+    } catch (err) {
+      await takeBack();
+      throw err;
+    }
+    try {
+      return await this.provider.create(request);
+    } catch (err) {
+      if (refusal(err)) await takeBack();
       throw err;
     }
   }
@@ -663,7 +681,7 @@ export default class TwakeInstances extends DmPlugin {
       try {
         fqdn = await this.provider.create(claimed.account);
       } catch (err) {
-        await this.unreserve(dn, this.fqdnAttribute, address);
+        if (refusal(err)) await this.unreserve(dn, this.fqdnAttribute, address);
         throw err;
       }
     }

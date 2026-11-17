@@ -73,6 +73,9 @@ interface DeleteContext {
   domain: string;
 }
 
+/** The Cloudery answered the create with a refusal: no instance accepted */
+class CreateRefusedError extends Error {}
+
 /** A DN as the directory compares it */
 const dnKey = (dn: string): string => {
   try {
@@ -504,7 +507,10 @@ export default class ClouderyProvision extends DmPlugin {
           // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
           error: `${err}`,
         });
-        await this.unreserve(dn, expectedFqdn);
+        // Kept when the request may have been accepted: a re-import finds
+        // its own reservation and the instance, or asks again
+        if (err instanceof CreateRefusedError)
+          await this.unreserve(dn, expectedFqdn);
         return;
       }
 
@@ -512,12 +518,13 @@ export default class ClouderyProvision extends DmPlugin {
         ? await this.waitForWorkflow(instance.workflow)
         : true;
       if (!ready) {
+        // Kept: the Cloudery accepted the instance, which may stay at its
+        // address, and a re-import of this user finds its own reservation
         this.logger.error({
           ...log,
           result: 'workflow_failed',
           workflow: instance.workflow,
         });
-        await this.unreserve(dn, expectedFqdn);
         return;
       }
 
@@ -762,7 +769,9 @@ export default class ClouderyProvision extends DmPlugin {
         http_status_text: res.statusText,
         body: body || undefined,
       });
-      throw new Error(`Cloudery createInstance HTTP ${res.status}`);
+      throw new CreateRefusedError(
+        `Cloudery createInstance HTTP ${res.status}`
+      );
     }
     const data = (await res.json()) as ClouderyInstanceResponse;
     this.logger.info({

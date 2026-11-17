@@ -136,11 +136,19 @@ export interface InstanceProvider {
 
 const MAX_BODY = 500;
 
-async function refused(what: string, res: Response): Promise<Error> {
+/**
+ * A provider's answer refusing an instance: unlike a call that timed out or
+ * failed on the way, no instance was accepted.
+ */
+export class InstanceRefusedError extends BadGatewayError {}
+
+async function refused(
+  what: string,
+  res: Response,
+  Refusal: typeof BadGatewayError = BadGatewayError
+): Promise<Error> {
   const body = (await res.text().catch(() => '')).slice(0, MAX_BODY);
-  return new BadGatewayError(
-    `${what}: HTTP ${res.status}${body ? ` ${body}` : ''}`
-  );
+  return new Refusal(`${what}: HTTP ${res.status}${body ? ` ${body}` : ''}`);
 }
 
 /**
@@ -233,7 +241,12 @@ export class ClouderyProvider extends HttpProvider implements InstanceProvider {
         ...(request.orgDomain ? { org_domain: request.orgDomain } : {}),
       }),
     });
-    if (!res.ok) throw await refused('Cloudery refused the instance', res);
+    if (!res.ok)
+      throw await refused(
+        'Cloudery refused the instance',
+        res,
+        InstanceRefusedError
+      );
     return undefined;
   }
 
@@ -347,7 +360,12 @@ export class CozyStackProvider
         throw new ConflictError(`${fqdn} already exists`);
       return fqdn;
     }
-    if (!res.ok) throw await refused('cozy-stack refused the instance', res);
+    if (!res.ok)
+      throw await refused(
+        'cozy-stack refused the instance',
+        res,
+        InstanceRefusedError
+      );
     await this.finishOnboarding(fqdn);
     return fqdn;
   }

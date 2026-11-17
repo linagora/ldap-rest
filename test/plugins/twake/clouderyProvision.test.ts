@@ -786,11 +786,42 @@ describe('ClouderyProvision plugin', () => {
       expect(scope.isDone()).to.equal(true);
       expect(ldap.modifyCalls).to.have.length(0);
       expect(rabbit.calls).to.have.length(0);
-      // Its reservation is taken back
+      // Its reservation is kept: the Cloudery accepted the instance
       expect(ldap.reservations.map(r => r.changes)).to.deep.equal([
         { replace: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
-        { delete: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
       ]);
+    });
+
+    it('keeps the reservation when the Cloudery cannot be reached', async () => {
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .replyWithError('socket hang up');
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.reservations.map(r => r.changes)).to.deep.equal([
+        { replace: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
+      ]);
+      expect(ldap.modifyCalls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    it('reserves again over its own reservation on a re-import', async () => {
+      ldap.holders = [{ dn: `uid=john.doe,${USER_BASE}` }];
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances')
+        .reply(200, { id: 'inst-1', fqdn: 'johndoeacme123.twake.app' });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.reservations).to.have.length(1);
+      expect(ldap.modifyCalls).to.have.length(1);
+      expect(rabbit.calls).to.have.length(1);
     });
 
     it('reserves the address before asking for the instance', async () => {

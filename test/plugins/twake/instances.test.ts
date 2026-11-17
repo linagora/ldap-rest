@@ -607,6 +607,54 @@ describe('Twake instances plugin', function () {
       expect(rabbit.published[0].message).not.to.have.property('matrixId');
     });
 
+    for (const [what, unanswered] of [
+      [
+        'does not answer it in time',
+        (scope: nock.Interceptor): nock.Scope =>
+          scope.reply(answerAfter(300, 202, {})),
+      ],
+      [
+        'cannot be reached',
+        (scope: nock.Interceptor): nock.Scope =>
+          scope.replyWithError('socket hang up'),
+      ],
+    ] as [string, (scope: nock.Interceptor) => nock.Scope][])
+      it(`keeps the reservation when the Cloudery ${what}, and asks again on the next ensure`, async () => {
+        // It may have accepted the instance: the address stays the account's
+        const provider = (plugin(dm) as unknown as { provider: object })
+          .provider as { timeout: number };
+        const timeout = provider.timeout;
+        provider.timeout = 50;
+        try {
+          search('in-alice.example.org').reply(200, { items: [] });
+          unanswered(nock(CLOUDERY).post('/api/v1/instances'));
+          await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
+        } finally {
+          provider.timeout = timeout;
+        }
+        const kept = await read(dm, dnOf('in-alice'));
+        expect(kept).to.have.property('description', 'in-alice.example.org');
+        expect(kept).not.to.have.property('businessCategory');
+        expect(rabbit.published).to.deep.equal([]);
+
+        // It had not: the reservation is the account's own, so the next
+        // ensure finds no instance and asks for it again
+        const again = search('in-alice.example.org')
+          .times(2)
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => body.slug === 'in-alice')
+          .reply(202, {});
+        expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
+          'pending'
+        );
+        expect(again.isDone()).to.equal(true);
+        expect(await read(dm, dnOf('in-alice'))).to.have.property(
+          'description',
+          'in-alice.example.org'
+        );
+        expect(rabbit.published).to.deep.equal([]);
+      });
+
     it('answers the add when the Cloudery refuses, the entry left pending and its reservation taken back', async () => {
       const refusals = await outboundCalls('cloudery', '500');
       search('in-alice.example.org').reply(200, { items: [] });
