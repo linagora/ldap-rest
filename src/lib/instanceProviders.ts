@@ -13,49 +13,61 @@ import {
 import { timedOutbound } from './metrics.js';
 
 /** The longest slug the Cloudery takes. */
-export const SLUG_MAX_LENGTH = 30;
+export const CLOUDERY_SLUG_MAX_LENGTH = 30;
 
 /**
- * Reduce a name to what the Cloudery takes in a slug; it refused `_` or `@`
- * with "Slug is invalid", and a slug longer than {@link SLUG_MAX_LENGTH}.
- * `-` is kept, except at either end where no host name takes it: an instance
- * already created with one would otherwise change address. Without `dashes`,
- * none is kept: a Cloudery taking `/\A[a-z0-9]{0,30}\z/` only, and
- * cozy-stack serving apps at `<slug>-<app>.<domain>` (flat subdomains),
- * refuse a `-` in an instance's first label. Distinct uids can reduce to one
- * slug, so a creation first checks that an instance already there is the
- * account's own.
+ * The longest slug given to cozy-stack: a DNS label's (RFC 1035). No longer
+ * one can be an address, so an instance cozy-stack already holds keeps its
+ * own; the Cloudery's 30 would move the longer ones.
+ */
+export const COZY_SLUG_MAX_LENGTH = 63;
+
+/**
+ * Reduce a name to what the provider takes in a slug; the Cloudery refused
+ * `_` or `@` with "Slug is invalid", and a slug longer than
+ * {@link CLOUDERY_SLUG_MAX_LENGTH}. `-` is kept, except at either end where
+ * no host name takes it: an instance already created with one would
+ * otherwise change address. Without `dashes`, none is kept: a Cloudery taking
+ * `/\A[a-z0-9]{0,30}\z/` only, and cozy-stack serving apps at
+ * `<slug>-<app>.<domain>` (flat subdomains), refuse a `-` in an instance's
+ * first label. Distinct uids can reduce to one slug, so a creation first
+ * checks that an instance already there is the account's own.
  *
  * @param value uid, or the slug template filled in
- * @param dashes whether `-` is kept inside the slug
+ * @param rules.maxLength the provider's longest slug
+ * @param rules.dashes whether `-` is kept inside the slug
  * @returns the slug, empty when nothing of `value` is kept
  */
-export const instanceSlug = (value: string, dashes = true): string => {
+export const instanceSlug = (
+  value: string,
+  { maxLength, dashes = true }: { maxLength: number; dashes?: boolean }
+): string => {
   const slug = value
     .toLowerCase()
     .replace(dashes ? /[^a-z0-9-]/g : /[^a-z0-9]/g, '');
   let start = 0;
-  let end = slug.length;
-  while (start < end && slug[start] === '-') start++;
+  while (start < slug.length && slug[start] === '-') start++;
+  // Cut first: a cut slug may end on a dash too
+  let end = Math.min(slug.length, start + maxLength);
   while (end > start && slug[end - 1] === '-') end--;
-  const kept = slug.slice(
-    start,
-    start + Math.min(end - start, SLUG_MAX_LENGTH)
-  );
-  // Shortened, it may end on a dash again
-  return kept.replace(/-+$/, '');
+  return slug.slice(start, end);
 };
 
 /**
  * The `n`th form of a slug another account holds: the slug with `n` at its
- * end, shortened so that the whole still fits {@link SLUG_MAX_LENGTH}.
+ * end, shortened so that the whole still fits `maxLength`.
  *
  * @param slug the account's slug
  * @param n 2 for the first number, 3 for the next…
+ * @param maxLength the provider's longest slug
  */
-export const numberedSlug = (slug: string, n: number): string => {
+export const numberedSlug = (
+  slug: string,
+  n: number,
+  maxLength: number
+): string => {
   const suffix = String(n);
-  return slug.slice(0, SLUG_MAX_LENGTH - suffix.length) + suffix;
+  return slug.slice(0, maxLength - suffix.length) + suffix;
 };
 
 /**
@@ -122,6 +134,8 @@ export interface InstanceProvider {
   ): Promise<FoundInstance | undefined>;
   /** The address this request's instance gets. */
   address(request: InstanceRequest): string;
+  /** The longest slug this provider takes */
+  readonly slugMaxLength: number;
 }
 
 const MAX_BODY = 500;
@@ -184,6 +198,7 @@ abstract class HttpProvider {
 
 export class ClouderyProvider extends HttpProvider implements InstanceProvider {
   protected readonly target = 'cloudery';
+  readonly slugMaxLength = CLOUDERY_SLUG_MAX_LENGTH;
 
   constructor(
     private readonly url: string,
@@ -319,6 +334,7 @@ export class CozyStackProvider
   implements InstanceProvider
 {
   protected readonly target = 'cozy-stack';
+  readonly slugMaxLength = COZY_SLUG_MAX_LENGTH;
   private readonly auth: string;
 
   constructor(

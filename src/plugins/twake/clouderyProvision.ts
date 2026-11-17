@@ -29,7 +29,10 @@ import type { Request } from 'express';
 import DmPlugin, { type Role, escapeDnValue } from '../../abstract/plugin.js';
 import type { DM } from '../../bin/index.js';
 import { Hooks } from '../../hooks.js';
-import { instanceSlug } from '../../lib/instanceProviders.js';
+import {
+  CLOUDERY_SLUG_MAX_LENGTH,
+  instanceSlug,
+} from '../../lib/instanceProviders.js';
 import { isChildOf } from '../../lib/utils.js';
 import type RabbitMq from '../rabbitmq.js';
 import { BaseResolver } from '../scim/baseResolver.js';
@@ -370,7 +373,9 @@ export default class ClouderyProvision extends DmPlugin {
 
     const email = ctx.email;
     const orgDomain = emailDomain(email);
-    const slug = instanceSlug(userName + ctx.orgId);
+    const slug = instanceSlug(userName + ctx.orgId, {
+      maxLength: CLOUDERY_SLUG_MAX_LENGTH,
+    });
     if (!slug) {
       this.logger.error({
         plugin: this.name,

@@ -2223,6 +2223,22 @@ describe('Twake instances plugin', function () {
       expect(rabbit.published[0]?.message).to.include({ twakeId: 'in-Bob.X' });
     });
 
+    it('keeps a slug longer than the Cloudery takes, a DNS label’s at most', async () => {
+      const uid = `in-${'x'.repeat(40)}`;
+      nock(COZY)
+        .get(`/instances/${uid}.example.org`)
+        .reply(200, instance(`${uid}@example.org`, uid));
+      try {
+        await dm.ldap.add(dnOf(uid), person(uid), rest());
+        expect(await read(dm, dnOf(uid))).to.have.property(
+          'description',
+          `${uid}.example.org`
+        );
+      } finally {
+        await dm.ldap.delete(dnOf(uid)).catch(() => undefined);
+      }
+    });
+
     it('finishes the onboarding of an instance found unfinished', async () => {
       const answered = await outboundCalls('cozy-stack', '200');
       const scope = nock(COZY)

@@ -609,7 +609,10 @@ export default class TwakeInstances extends DmPlugin {
 
   /** The account under the `n`th form of its slug, `slug2` for 2 */
   private numbered(account: Account, n: number): Account {
-    return { ...account, id: numberedSlug(account.id, n) };
+    return {
+      ...account,
+      id: numberedSlug(account.id, n, this.provider.slugMaxLength),
+    };
   }
 
   /**
@@ -1036,7 +1039,10 @@ export default class TwakeInstances extends DmPlugin {
         /\{(\w+)\}/g,
         (_, name: string) => groups[name] ?? ''
       ),
-      this.settings.twake_instance_slug_dashes
+      {
+        maxLength: this.provider.slugMaxLength,
+        dashes: this.settings.twake_instance_slug_dashes,
+      }
     );
   }
 

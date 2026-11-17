@@ -14,7 +14,8 @@
 
 ### Fixed
 
-- An instance slug is cut to the 30 characters the Cloudery takes.
+- An instance slug is cut to the 30 characters the Cloudery takes, with the
+  Cloudery; to a DNS label's 63 with cozy-stack.
 
 ## v2.3.2 (2026-11-16)
 
