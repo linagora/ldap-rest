@@ -339,6 +339,9 @@ function reportWarning(
  * is given: for an option the parser knew, it reads the configuration entry
  * and nothing else, so the environment and the aliases are not compared.
  *
+ * An entry absent from the configuration and one set to `undefined` are the
+ * same value here, as they are for `readOptions` once defaults are applied.
+ *
  * @param options the declared options
  * @param config the parsed configuration
  * @param parsedKeys the options the parser knew, if the caller knows them
