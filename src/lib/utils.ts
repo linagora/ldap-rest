@@ -874,6 +874,20 @@ const attributeTypeNames = new Map<string, string>();
 const attributeTypeSpellings = new Map<string, string>();
 
 /**
+ * Normalized DNs, least recently used first. A request compares the same
+ * branch bases — constants from the configuration — against every entry it
+ * answers, and the same entry against every branch: both sides of
+ * {@link isDnInBranch} are read again and again.
+ *
+ * Bounded, and cleared whenever a new attribute type is registered, since a
+ * DN's normalization depends on it: see {@link registerAttributeTypes}.
+ */
+const normalizedRdnsCache = new Map<string, readonly string[]>();
+const NORMALIZED_RDNS_CACHE_SIZE = 1000;
+/** Longer DNs are answered without being kept: see {@link normalizedRdns} */
+const NORMALIZED_RDNS_CACHE_MAX_LENGTH = 1024;
+
+/**
  * Teach {@link normalizeDn} the names and OIDs of attribute types: each is
  * read as the type's first name.
  *
@@ -882,6 +896,9 @@ const attributeTypeSpellings = new Map<string, string>();
 export function registerAttributeTypes(
   types: Iterable<{ oid: string; names: string[] }>
 ): void {
+  // A DN normalized before knows the types registered so far: its spelling
+  // would no longer be the one a later comparison computes.
+  normalizedRdnsCache.clear();
   for (const { oid, names } of types) {
     const canonical = (names[0] ?? oid).toLowerCase();
     for (const alias of [oid, ...names]) {
@@ -1015,7 +1032,34 @@ export function canonicalDn(dn: string): string {
  * The RDNs of {@link normalizeDn}, kept apart: joined, an escaped separator
  * the directory spelled `\2C` would read as one that was not escaped.
  */
-function normalizedRdns(dn: string, foldCase = true): string[] {
+function normalizedRdns(dn: string, foldCase = true): readonly string[] {
+  // The key is read from the value as text, so a value that is not a string
+  // would take the answer of the DN it spells instead of {@link parseDn}'s
+  // refusal of it: see the CWE-834 note there.
+  if (typeof dn !== 'string') throw new BadRequestError('DN must be a string');
+  const key = `${foldCase ? '1' : '0'}${dn}`;
+  const cached = normalizedRdnsCache.get(key);
+  if (cached !== undefined) {
+    // Back in last place: the bases stay while a page's entries leave
+    normalizedRdnsCache.delete(key);
+    normalizedRdnsCache.set(key, cached);
+    return cached;
+  }
+  const rdns = Object.freeze(computeRdns(dn, foldCase));
+  // A very long DN would hold its place, and the memory, for the life of the
+  // process: the answers worth keeping are branch bases and entry DNs
+  if (dn.length <= NORMALIZED_RDNS_CACHE_MAX_LENGTH) {
+    if (normalizedRdnsCache.size >= NORMALIZED_RDNS_CACHE_SIZE) {
+      const oldest = normalizedRdnsCache.keys().next();
+      if (!oldest.done) normalizedRdnsCache.delete(oldest.value);
+    }
+    normalizedRdnsCache.set(key, rdns);
+  }
+  return rdns;
+}
+
+/** {@link normalizedRdns} without the cache. */
+function computeRdns(dn: string, foldCase: boolean): string[] {
   return parseDn(dn)
     .map(rdn =>
       splitRdn(rdn)
