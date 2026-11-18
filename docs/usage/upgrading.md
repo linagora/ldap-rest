@@ -25,13 +25,20 @@ and its instance, or remove such instances from the Cloudery
 `twake/clouderyProvision`, and whatever reads its address attribute
 (`twakeWorkspaceUrl`, or `--twake-instance-fqdn-attribute`).
 
-The address is written when the instance is asked for, as a reservation, no
-longer once it is built. An entry with an address may have no instance yet:
-the mark (`twakeCreatedEventAt`, or `--twake-instance-sent-attribute`) says it
-was announced. A LemonLDAP login that sends the user to the address may land
-on an instance still being built; `core/twake/drive` takes the `404` it then
-gets. The pending accounts to make sure of are those without the mark,
+The address attribute now means the address of the account's instance, built
+or being built: it is written when the instance is asked for, as a
+reservation, no longer once the instance is built. The mark
+(`twakeCreatedEventAt`, or `--twake-instance-sent-attribute`) says the
+instance is built and announced, `(twakeCreatedEventAt=*)`. An address without
+the mark, `(&(twakeWorkspaceUrl=*)(!(twakeCreatedEventAt=*)))`, is reserved,
+being built, or, with the Cloudery, built and waiting for its organization.
+A LemonLDAP login that sends the user to the address may land on an instance
+still being built; `core/twake/drive` takes the `404` it then gets. The
+pending accounts to make sure of are those without the mark,
 `(&(mail=*)(!(twakeCreatedEventAt=*)))`, no longer those without an address.
+With `twake/clouderyProvision`, which writes no mark, a reservation is an
+address without `twakeOrganizationId`
+([details](plugins/integrations/instances.md#what-the-address-and-the-mark-say)).
 
 ## From 2.2.2
 

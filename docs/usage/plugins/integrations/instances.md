@@ -220,6 +220,37 @@ The instance's email is not changed to the account's `mail`;
 [`core/twake/drive`](drive.md) sends it to cozy-stack when the `mail`
 changes.
 
+## What the address and the mark say
+
+The address attribute (`--twake-instance-fqdn-attribute`, `twakeWorkspaceUrl`
+by default) is the address of the account's instance, built or being built:
+it is written when the instance is asked for. The mark
+(`--twake-instance-sent-attribute`, `twakeCreatedEventAt` by default) is
+written once the instance is built and `user.created` sent; a caller clears it
+to have the account announced again. With the default attributes, under the
+`--twake-instance-dn` branches:
+
+| The account                        | Filter                                                          |
+| ---------------------------------- | --------------------------------------------------------------- |
+| Built and announced                | `(twakeCreatedEventAt=*)`                                       |
+| Its address, not announced yet     | `(&(twakeWorkspaceUrl=*)(!(twakeCreatedEventAt=*)))`            |
+| Neither: nothing asked, or refused | `(&(mail=*)(!(twakeWorkspaceUrl=*))(!(twakeCreatedEventAt=*)))` |
+
+An address without the mark is one of: a reservation, the instance being
+built or its creation not answered; with the Cloudery, a built instance whose
+member waits for its organization, found under an organization entry that has
+no mark yet with the same filter; or a built instance whose `user.created`
+could not be sent or marked. Only the provider tells them apart, which making
+sure of the account asks. Technical accounts aside, every account without the
+mark is pending, and making sure of it is safe.
+
+`core/twake/clouderyProvision` writes no mark: it writes the address as a
+reservation too, then, once the instance is built, the address with
+`twakeOrganizationId` and `twakeInvited` (`--cloudery-org-id-attribute`,
+`--cloudery-invited-attribute`). An entry with the address and without
+`twakeOrganizationId` is a reservation, for instance
+`(&(twakeWorkspaceUrl=*)(!(twakeOrganizationId=*)))`.
+
 ## Configuration
 
 ```bash
