@@ -1,1 +1,7 @@
-[]
+[
+  {
+    "id": "GHSA-fc5q-39xc-vjpf",
+    "until": "2026-12-18",
+    "reason": "No picomatch release fixes it (<= 4.0.7). It reaches production only through re2's install-time build (re2 > node-gyp > tinyglobby); the server never matches a caller's glob."
+  }
+]
