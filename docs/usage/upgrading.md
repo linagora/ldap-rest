@@ -4,6 +4,56 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### An instance is the account whose address names it
+
+**Who is affected:** a deployment that loads `twake/instances` or
+`twake/clouderyProvision`.
+
+An instance whose email is not the account's `mail` is no longer refused:
+the instance is the account's whose address attribute names it. An instance
+that a deleted account left on the Cloudery, and whose address no entry holds
+any more, is given to the next account with the same slug. Load
+`core/twake/tombstone` to keep a deleted account's entry, hence its address
+and its instance, or remove such instances from the Cloudery
+([details](plugins/integrations/instances.md#which-account-an-instance-is)).
+
+### The address is written before the instance is built
+
+**Who is affected:** a deployment that loads `twake/instances` or
+`twake/clouderyProvision`, and whatever reads its address attribute
+(`twakeWorkspaceUrl`, or `--twake-instance-fqdn-attribute`).
+
+The address attribute now means the address of the account's instance, built
+or being built: it is written when the instance is asked for, as a
+reservation, no longer once the instance is built. The mark
+(`twakeCreatedEventAt`, or `--twake-instance-sent-attribute`) says the
+instance is built and announced, `(twakeCreatedEventAt=*)`. An address without
+the mark, `(&(twakeWorkspaceUrl=*)(!(twakeCreatedEventAt=*)))`, is reserved,
+being built, or, with the Cloudery, built and waiting for its organization.
+A LemonLDAP login that sends the user to the address may land on an instance
+still being built; `core/twake/drive` takes the `404` it then gets. The
+pending accounts to make sure of are those without the mark,
+`(&(mail=*)(!(twakeCreatedEventAt=*)))`, no longer those without an address.
+With `twake/clouderyProvision`, which writes no mark, a reservation is an
+address without `twakeOrganizationId`
+([details](plugins/integrations/instances.md#what-the-address-and-the-mark-say)).
+
+### Slugs keep no dash with the Cloudery
+
+**Who is affected:** a deployment that loads `twake/instances` or
+`twake/clouderyProvision` with the Cloudery, and whose uids hold a `-`.
+
+`--twake-instance-slug-dashes` defaults to `auto`: no `-` in a slug with the
+Cloudery, which refuses it, and kept with cozy-stack. A uid like
+`jean-claude.dusse` now gets `jeanclaudedusse`. An account whose address holds
+the dashed slug, or a numbered form of it, keeps its instance there: the
+address is asked about as before. An account with no address yet gets the new
+slug. `twake/clouderyProvision` provisions on a SCIM create only, so only its
+new accounts are concerned. Give `--twake-instance-slug-dashes true` to keep
+the former slugs ([configuration](configuration.md#coretwakeinstances)).
+
 ## From 2.2.2
 
 ### The bulk import writes below the base its schema names

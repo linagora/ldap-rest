@@ -7,7 +7,7 @@ import nock from 'nock';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
-import { ForbiddenError } from '../../../src/lib/errors';
+import { ConflictError, ForbiddenError } from '../../../src/lib/errors';
 import { outboundCalls } from '../../helpers/metrics';
 import { answerAfter } from '../../helpers/nock';
 import {
@@ -66,6 +66,8 @@ const BASE_CONFIG = {
   twake_instance_skip_attribute: 'employeeType',
   twake_instance_skip_value: 'technical',
   twake_lifecycle_deleted_attribute: 'carLicense',
+  // The accounts' uids start with `in-`, kept in their slugs here
+  twake_instance_slug_dashes: 'true',
 };
 
 async function server(
@@ -203,32 +205,505 @@ describe('Twake instances plugin', function () {
       }
     });
 
-    it('refuses an instance another uid reducing to the same slug holds', async () => {
-      // Asked by the creation, then by the ensure
-      search('in-janedoe.example.org')
-        .times(2)
-        .reply(200, {
-          items: [
-            {
-              _id: 'taken',
-              fqdn: 'in-janedoe.example.org',
-              internal_email: 'in-janedoe@example.org',
-              oidc: 'in-janedoe',
-              instantiated_at: '2026-01-01T00:00:00Z',
-            },
-          ],
+    // `in-jane.doe` and `in-jane_doe` reduce to one slug: the Cloudery gives
+    // both the same OIDC id, the directory tells them apart
+    const holdJaneDoe = async (
+      address: string,
+      extra: Record<string, string> = {}
+    ): Promise<void> => {
+      await dm.ldap.add(dnOf('in-jane.doe'), {
+        ...person('in-jane.doe'),
+        employeeType: 'technical',
+        ...extra,
+      });
+      await dm.ldap.modify(dnOf('in-jane.doe'), {
+        replace: { description: address },
+      });
+    };
+
+    for (const [whose, extra] of [
+      ['another account', {}],
+      ['a tombstone', { carLicense: 'TRUE' }],
+    ] as [string, Record<string, string>][])
+      it(`refuses an instance whose address ${whose} reducing to the same slug holds`, async () => {
+        await holdJaneDoe('in-janedoe.example.org', extra);
+        const asked = search('in-janedoe.example.org')
+          .optionally()
+          .reply(200, { items: [] });
+        const create = nock(CLOUDERY)
+          .post('/api/v1/instances')
+          .optionally()
+          .reply(202, {});
+        try {
+          await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'));
+          expect(
+            String(
+              await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe')))
+            )
+          ).to.match(/belongs to another user/);
+          expect(asked.activeMocks()).to.have.lengthOf(1);
+          expect(create.activeMocks()).to.have.lengthOf(1);
+        } finally {
+          nock.cleanAll();
+          for (const uid of ['in-jane_doe', 'in-jane.doe'])
+            await dm.ldap.delete(dnOf(uid)).catch(() => undefined);
+        }
+      });
+
+    describe('with the other dashes setting than its address', () => {
+      const self = (): { dashes: boolean } =>
+        plugin(dm) as unknown as { dashes: boolean };
+
+      beforeEach(async () => {
+        search('in-alice.example.org').reply(200, { items: [] });
+        nock(CLOUDERY).post('/api/v1/instances').reply(202, {});
+        await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
+        // A deployment whose default changed: its slugs are now `inalice`
+        self().dashes = false;
+      });
+
+      afterEach(() => {
+        self().dashes = true;
+      });
+
+      for (const address of ['in-alice.example.org', 'in-alice2.example.org'])
+        it(`takes its instance at ${address} rather than ask for a second one`, async () => {
+          await dm.ldap.modify(dnOf('in-alice'), {
+            replace: { description: address },
+          });
+          const asked = search(address).reply(200, {
+            items: [
+              {
+                fqdn: address,
+                oidc: address.split('.')[0],
+                instantiated_at: '2026-01-01T00:00:00Z',
+              },
+            ],
+          });
+          const second = search('inalice.example.org')
+            .optionally()
+            .reply(200, { items: [] })
+            .post('/api/v1/instances')
+            .optionally()
+            .reply(202, {});
+          expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
+            'ready'
+          );
+          expect(asked.isDone()).to.equal(true);
+          expect(second.activeMocks()).to.have.lengthOf(2);
+          expect(
+            rabbit.published.map(p => p.message.workplaceFqdn)
+          ).to.deep.equal([address]);
         });
-      const create = nock(CLOUDERY).post('/api/v1/instances').reply(202, {});
+
+      it('still refuses that address when another entry holds it', async () => {
+        await dm.ldap.add(dnOf('out-carol'), person('out-carol'));
+        await dm.ldap.modify(dnOf('out-carol'), {
+          replace: { description: 'in-alice.example.org' },
+        });
+        const asked = search('in-alice.example.org')
+          .optionally()
+          .reply(200, { items: [] });
+        expect(
+          String(await refusal(plugin(dm).ensureInstance(dnOf('in-alice'))))
+        ).to.match(/belongs to another user/);
+        expect(asked.activeMocks()).to.have.lengthOf(1);
+        expect(rabbit.published).to.deep.equal([]);
+      });
+    });
+
+    it('logs the account when every numbered form of its slug is taken', async () => {
+      const self = plugin(dm) as unknown as {
+        settings: { twake_instance_slug_numbered: boolean };
+        find: () => Promise<unknown>;
+      };
+      const logged: unknown[] = [];
+      const logger = plugin(dm).logger;
+      const { error } = logger;
+      logger.error = ((m: unknown) => {
+        logged.push(m);
+        return logger;
+      }) as typeof error;
+      self.settings.twake_instance_slug_numbered = true;
+      // Every form held, as by other accounts
+      self.find = async (): Promise<never> => {
+        throw new ConflictError('belongs to another user');
+      };
       try {
-        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'));
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(
+          String(await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe'))))
+        ).to.match(/held by other accounts up to in-janedoe99/);
+      } finally {
+        delete (self as { find?: unknown }).find;
+        self.settings.twake_instance_slug_numbered = false;
+        logger.error = error;
+        await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
+      }
+      expect(logged).to.deep.include({
+        plugin: 'twakeInstances',
+        event: 'slug',
+        dn: dnOf('in-jane_doe'),
+        uid: 'in-jane_doe',
+        slug: 'in-janedoe',
+        error: "every form of the slug up to in-janedoe99 is another account's",
+      });
+    });
+
+    describe('with --twake-instance-cloudery-oidc uid', () => {
+      const settings = (): { twake_instance_cloudery_oidc: string } =>
+        (
+          plugin(dm) as unknown as {
+            settings: { twake_instance_cloudery_oidc: string };
+          }
+        ).settings;
+
+      beforeEach(() => {
+        // The default keeps the slug, as the instances created so far have it
+        expect(settings().twake_instance_cloudery_oidc).to.equal('slug');
+        settings().twake_instance_cloudery_oidc = 'uid';
+      });
+
+      afterEach(async () => {
+        settings().twake_instance_cloudery_oidc = 'slug';
+        nock.cleanAll();
+        await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
+      });
+
+      it('asks for the instance with the uid as OIDC id', async () => {
+        let asked: Record<string, unknown> = {};
+        const scope = search('in-janedoe.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => {
+            asked = body as Record<string, unknown>;
+            return true;
+          })
+          .reply(202, {});
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(scope.isDone()).to.equal(true);
+        expect(asked).to.include({ oidc: 'in-jane_doe', slug: 'in-janedoe' });
+      });
+
+      it('takes the instance whose OIDC id is the uid, and refuses another uid’s', async () => {
+        const built = (oidc: string): nock.Scope =>
+          search('in-janedoe.example.org').reply(200, {
+            items: [
+              {
+                fqdn: 'in-janedoe.example.org',
+                oidc,
+                instantiated_at: '2026-01-01T00:00:00Z',
+              },
+            ],
+          });
+        built('in-jane.doe');
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        built('in-jane.doe');
         expect(
           String(await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe'))))
         ).to.match(/belongs to another user/);
-        expect(create.isDone()).to.equal(false);
+        expect(rabbit.published).to.deep.equal([]);
+
+        built('in-jane_doe');
+        expect(await plugin(dm).ensureInstance(dnOf('in-jane_doe'))).to.equal(
+          'ready'
+        );
+        expect(
+          rabbit.published.map(p => p.message.workplaceFqdn)
+        ).to.deep.equal(['in-janedoe.example.org']);
+      });
+    });
+
+    it('numbers the slug another uid holds, with twake_instance_slug_numbered', async () => {
+      const settings = (
+        plugin(dm) as unknown as {
+          settings: { twake_instance_slug_numbered: boolean };
+        }
+      ).settings;
+      settings.twake_instance_slug_numbered = true;
+      await holdJaneDoe('in-janedoe.example.org');
+      let asked: Record<string, unknown> = {};
+      const taken = search('in-janedoe.example.org')
+        .optionally()
+        .reply(200, { items: [] });
+      const free = search('in-janedoe2.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', body => {
+          asked = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(202, {});
+      try {
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(taken.activeMocks()).to.have.lengthOf(1);
+        expect(free.isDone()).to.equal(true);
+        expect(asked).to.include({ oidc: 'in-janedoe2', slug: 'in-janedoe2' });
       } finally {
+        settings.twake_instance_slug_numbered = false;
+        nock.cleanAll();
+        for (const uid of ['in-jane_doe', 'in-jane.doe'])
+          await dm.ldap.delete(dnOf(uid)).catch(() => undefined);
+      }
+    });
+
+    it('numbers the slug whose instance has another OIDC id, with twake_instance_slug_numbered', async () => {
+      const settings = (
+        plugin(dm) as unknown as {
+          settings: { twake_instance_slug_numbered: boolean };
+        }
+      ).settings;
+      settings.twake_instance_slug_numbered = true;
+      search('in-janedoe.example.org').reply(200, {
+        items: [
+          {
+            fqdn: 'in-janedoe.example.org',
+            oidc: 'someone-else',
+            instantiated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      const free = search('in-janedoe2.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', body => body.oidc === 'in-janedoe2')
+        .reply(202, {});
+      try {
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(free.isDone()).to.equal(true);
+      } finally {
+        settings.twake_instance_slug_numbered = false;
         nock.cleanAll();
         await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
       }
+    });
+
+    describe('while an instance is built', () => {
+      const settings = (): { twake_instance_slug_numbered: boolean } =>
+        (
+          plugin(dm) as unknown as {
+            settings: { twake_instance_slug_numbered: boolean };
+          }
+        ).settings;
+      const reserve = (dn: string, address: string): Promise<boolean> =>
+        (
+          plugin(dm) as unknown as {
+            reserve: (
+              dn: string,
+              attribute: string,
+              address: string
+            ) => Promise<boolean>;
+          }
+        ).reserve(dn, 'description', address);
+      // The instance the first account asked for, accepted, not built
+      const pending = (optionally = false): nock.Scope => {
+        const asked = search('in-janedoe.example.org');
+        return (optionally ? asked.optionally() : asked).reply(200, {
+          items: [
+            {
+              fqdn: 'in-janedoe.example.org',
+              oidc: 'in-janedoe',
+              instantiated_at: null,
+            },
+          ],
+        });
+      };
+
+      beforeEach(async () => {
+        search('in-janedoe.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => body.slug === 'in-janedoe')
+          .reply(202, {});
+        await dm.ldap.add(dnOf('in-jane.doe'), person('in-jane.doe'), rest());
+      });
+
+      afterEach(async () => {
+        settings().twake_instance_slug_numbered = false;
+        nock.cleanAll();
+        for (const uid of ['in-jane_doe', 'in-jane.doe'])
+          await dm.ldap.delete(dnOf(uid)).catch(() => undefined);
+      });
+
+      it('reserves its address: not ready, nothing announced', async () => {
+        expect(await read(dm, dnOf('in-jane.doe'))).to.include({
+          description: 'in-janedoe.example.org',
+        });
+        const asked = pending();
+        const create = nock(CLOUDERY)
+          .post('/api/v1/instances')
+          .optionally()
+          .reply(202, {});
+        expect(await plugin(dm).ensureInstance(dnOf('in-jane.doe'))).to.equal(
+          'pending'
+        );
+        expect(asked.isDone()).to.equal(true);
+        expect(create.activeMocks()).to.have.lengthOf(1);
+        expect(rabbit.published).to.deep.equal([]);
+      });
+
+      it('gives another uid reducing to its slug a number, not that instance', async () => {
+        settings().twake_instance_slug_numbered = true;
+        const taken = pending(true);
+        const numbered = search('in-janedoe2.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => body.slug === 'in-janedoe2')
+          .reply(202, {});
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(taken.activeMocks()).to.have.lengthOf(1);
+        expect(numbered.isDone()).to.equal(true);
+        expect(await read(dm, dnOf('in-jane_doe'))).to.include({
+          description: 'in-janedoe2.example.org',
+        });
+      });
+
+      it('refuses that instance to another uid reducing to its slug', async () => {
+        const taken = pending(true);
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(
+          String(await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe'))))
+        ).to.match(/belongs to another user/);
+        expect(taken.activeMocks()).to.have.lengthOf(1);
+        expect(await read(dm, dnOf('in-jane_doe'))).not.to.have.property(
+          'description'
+        );
+        expect(rabbit.published).to.deep.equal([]);
+      });
+
+      for (const [first, second, kept] of [
+        ['in-jane.doe', 'in-jane_doe', true],
+        ['in-jane_doe', 'in-jane.doe', false],
+      ] as [string, string, boolean][])
+        it(`keeps a reservation two entries write at once for the DN sorting first (${first} against ${second})`, async () => {
+          // Both reserve a free address: the other entry writes it between
+          // this entry's check and its write
+          await dm.ldap.delete(dnOf('in-jane.doe'));
+          for (const uid of ['in-jane.doe', 'in-jane_doe'])
+            await dm.ldap.add(dnOf(uid), {
+              ...person(uid),
+              employeeType: 'technical',
+            });
+          const address = 'in-race.example.org';
+          const meanwhile = async (args: unknown[]): Promise<unknown[]> => {
+            const changes = args[1] as { replace?: Record<string, unknown> };
+            if (
+              args[0] === dnOf(first) &&
+              changes.replace?.description === address
+            )
+              await dm.ldap.system.modify(dnOf(second), {
+                replace: { description: address },
+              });
+            return args;
+          };
+          dm.hookBus.subscribe('ldapmodifyrequest', meanwhile as never);
+          try {
+            expect(await reserve(dnOf(first), address)).to.equal(kept);
+          } finally {
+            dm.hookBus.unsubscribe('ldapmodifyrequest', meanwhile as never);
+          }
+          const holds = async (uid: string): Promise<boolean> =>
+            (await read(dm, dnOf(uid)))?.description === address;
+          expect(await holds(first)).to.equal(kept);
+          expect(await holds(second)).to.equal(true);
+        });
+    });
+
+    describe('with a numbered address', () => {
+      const settings = (): { twake_instance_slug_numbered: boolean } =>
+        (
+          plugin(dm) as unknown as {
+            settings: { twake_instance_slug_numbered: boolean };
+          }
+        ).settings;
+      const numbered = (
+        owner: Record<string, string>,
+        optionally = false
+      ): nock.Scope => {
+        const asked = search('in-janedoe2.example.org');
+        return (optionally ? asked.optionally() : asked).reply(200, {
+          items: [
+            {
+              _id: 'numbered',
+              fqdn: 'in-janedoe2.example.org',
+              instantiated_at: '2026-01-01T00:00:00Z',
+              ...owner,
+            },
+          ],
+        });
+      };
+
+      beforeEach(async () => {
+        settings().twake_instance_slug_numbered = true;
+        search('in-janedoe.example.org').reply(200, { items: [] });
+        nock(CLOUDERY).post('/api/v1/instances').reply(500, 'down');
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        // As workplace.created writes it, the announce having failed
+        await dm.ldap.modify(dnOf('in-jane_doe'), {
+          replace: { description: 'in-janedoe2.example.org' },
+        });
+      });
+
+      afterEach(async () => {
+        settings().twake_instance_slug_numbered = false;
+        await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
+      });
+
+      it('asks the Cloudery about it as the numbered slug, and announces the account whatever its email', async () => {
+        const asked = numbered({
+          internal_email: 'someone-else@example.org',
+          oidc: 'in-janedoe2',
+        });
+        expect(await plugin(dm).ensureInstance(dnOf('in-jane_doe'))).to.equal(
+          'ready'
+        );
+        expect(asked.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([
+          {
+            key: 'user.created',
+            message: {
+              twakeId: 'in-jane_doe',
+              internalEmail: 'in-jane_doe@example.org',
+              workplaceFqdn: 'in-janedoe2.example.org',
+              matrixId: '@in-jane_doe:example.org',
+            },
+          },
+        ]);
+      });
+
+      it('refuses it when its instance has another OIDC id', async () => {
+        const asked = numbered({ oidc: 'in-janedoe3' });
+        expect(
+          await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe')))
+        ).to.have.property('statusCode', 409);
+        expect(asked.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([]);
+      });
+
+      it('refuses it, without asking the Cloudery, when another entry holds it', async () => {
+        await holdJaneDoe('in-janedoe2.example.org');
+        try {
+          const asked = numbered({ oidc: 'in-janedoe2' }, true);
+          expect(
+            await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe')))
+          ).to.have.property('statusCode', 409);
+          expect(asked.activeMocks()).to.have.lengthOf(1);
+          expect(rabbit.published).to.deep.equal([]);
+        } finally {
+          await dm.ldap.delete(dnOf('in-jane.doe')).catch(() => undefined);
+        }
+      });
+
+      it('takes it once the Cloudery confirms it, twake_instance_slug_numbered turned off since', async () => {
+        settings().twake_instance_slug_numbered = false;
+        const asked = numbered({ oidc: 'in-janedoe2' });
+        const plain = search('in-janedoe.example.org')
+          .optionally()
+          .reply(200, { items: [] });
+        expect(await plugin(dm).ensureInstance(dnOf('in-jane_doe'))).to.equal(
+          'ready'
+        );
+        expect(asked.isDone()).to.equal(true);
+        expect(plain.activeMocks()).to.have.lengthOf(1);
+        expect(rabbit.published.map(p => p.key)).to.deep.equal([
+          'user.created',
+        ]);
+      });
     });
 
     it('looks the instance up, asks for it, and waits for its address', async () => {
@@ -249,9 +724,10 @@ describe('Twake instances plugin', function () {
         offer: 'standard',
         domain: 'example.org',
       });
-      expect(await read(dm, dnOf('in-alice'))).not.to.have.property(
-        'description'
-      );
+      // Reserved while it is built: no mark, no event
+      const entry = await read(dm, dnOf('in-alice'));
+      expect(entry).to.have.property('description', 'in-alice.example.org');
+      expect(entry).not.to.have.property('businessCategory');
       expect(rabbit.published).to.deep.equal([]);
     });
 
@@ -296,7 +772,55 @@ describe('Twake instances plugin', function () {
       expect(rabbit.published[0].message).not.to.have.property('matrixId');
     });
 
-    it('answers the add when the Cloudery refuses, the entry left pending', async () => {
+    for (const [what, unanswered] of [
+      [
+        'does not answer it in time',
+        (scope: nock.Interceptor): nock.Scope =>
+          scope.reply(answerAfter(300, 202, {})),
+      ],
+      [
+        'cannot be reached',
+        (scope: nock.Interceptor): nock.Scope =>
+          scope.replyWithError('socket hang up'),
+      ],
+    ] as [string, (scope: nock.Interceptor) => nock.Scope][])
+      it(`keeps the reservation when the Cloudery ${what}, and asks again on the next ensure`, async () => {
+        // It may have accepted the instance: the address stays the account's
+        const provider = (plugin(dm) as unknown as { provider: object })
+          .provider as { timeout: number };
+        const timeout = provider.timeout;
+        provider.timeout = 50;
+        try {
+          search('in-alice.example.org').reply(200, { items: [] });
+          unanswered(nock(CLOUDERY).post('/api/v1/instances'));
+          await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
+        } finally {
+          provider.timeout = timeout;
+        }
+        const kept = await read(dm, dnOf('in-alice'));
+        expect(kept).to.have.property('description', 'in-alice.example.org');
+        expect(kept).not.to.have.property('businessCategory');
+        expect(rabbit.published).to.deep.equal([]);
+
+        // It had not: the reservation is the account's own, so the next
+        // ensure finds no instance and asks for it again
+        const again = search('in-alice.example.org')
+          .times(2)
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => body.slug === 'in-alice')
+          .reply(202, {});
+        expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
+          'pending'
+        );
+        expect(again.isDone()).to.equal(true);
+        expect(await read(dm, dnOf('in-alice'))).to.have.property(
+          'description',
+          'in-alice.example.org'
+        );
+        expect(rabbit.published).to.deep.equal([]);
+      });
+
+    it('answers the add when the Cloudery refuses, the entry left pending and its reservation taken back', async () => {
       const refusals = await outboundCalls('cloudery', '500');
       search('in-alice.example.org').reply(200, { items: [] });
       nock(CLOUDERY).post('/api/v1/instances').reply(500, 'down');
@@ -323,7 +847,8 @@ describe('Twake instances plugin', function () {
       );
       expect(scope.isDone()).to.equal(true);
       const entry = await read(dm, dnOf('in-alice'));
-      expect(entry).not.to.have.property('description');
+      // The reservation, not the address supplied
+      expect(entry).to.have.property('description', 'in-alice.example.org');
       expect(entry).not.to.have.property('businessCategory');
     });
 
@@ -383,7 +908,7 @@ describe('Twake instances plugin', function () {
         );
         expect(scope.isDone()).to.equal(true);
         const entry = await read(dm, dnOf('in-q2'));
-        expect(entry).not.to.have.property('description');
+        expect(entry).to.have.property('description', 'in-q2.example.org');
         expect(entry).not.to.have.property('businessCategory');
       } finally {
         await dm.ldap.delete(dnOf('in-q2')).catch(() => undefined);
@@ -455,6 +980,11 @@ describe('Twake instances plugin', function () {
         person('in-alice', { mobile: '+33600000000' }),
         rest()
       );
+      // Reserved, not announced, until the instance is built
+      expect(await read(dm, dnOf('in-alice'))).to.include({
+        description: 'in-alice.example.org',
+      });
+      expect(rabbit.published).to.deep.equal([]);
       const created: WorkplaceCreated = {
         twakeId: 'in-alice',
         internalEmail: 'in-alice@example.org',
@@ -739,32 +1269,6 @@ describe('Twake instances plugin', function () {
         expect(readsAfterCreate).to.equal(1);
       });
 
-      it('asks no organization about an instance at another address than the account’s', async () => {
-        search('in-alice.example.org').reply(200, {
-          items: [
-            {
-              _id: 'taken',
-              fqdn: 'in-alice.example.org',
-              internal_email: 'someone@example.org',
-              instantiated_at: '2026-01-01T00:00:00Z',
-            },
-          ],
-        });
-        let asked = false;
-        nock(CLOUDERY)
-          .get('/api/v2/organizations/in-alice')
-          .optionally()
-          .reply(200, () => {
-            asked = true;
-            return { instance_id: 'taken' };
-          });
-        expect(
-          String(await refusal(plugin(dm).ensureInstance(dnOf('in-alice'))))
-        ).to.match(/belongs to another user/);
-        expect(asked).to.equal(false);
-        nock.cleanAll();
-      });
-
       it('finds the account by mail', async () => {
         search('in-alice.example.org').reply(200, { items: [] });
         nock(CLOUDERY).post('/api/v1/instances').reply(202, {});
@@ -861,7 +1365,9 @@ describe('Twake instances plugin', function () {
         } finally {
           dm.hookBus.unsubscribe('ldapmodifyrequest', refuseMark as never);
         }
-        // At least once: the next call announces again, then marks
+        // At least once: the next call announces again, then marks. The
+        // address written may be a reservation, so the Cloudery is asked
+        built();
         expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
           'ready'
         );
@@ -871,30 +1377,42 @@ describe('Twake instances plugin', function () {
         );
       });
 
-      it('takes an address a modify wrote only once the provider confirms it', async () => {
+      it('takes an address a modify wrote only when it is the account’s', async () => {
         await dm.ldap.modify(dnOf('in-alice'), {
           replace: { description: 'evil.example.net' },
         });
-        const asked = search('evil.example.net')
-          .reply(200, { items: [] })
-          .get('/api/v2/instances')
-          .query({ fqdn: 'in-alice.example.org', limit: '1' })
+        const evil = search('evil.example.net')
+          .optionally()
+          .reply(200, { items: [] });
+        const asked = search('in-alice.example.org')
           .reply(200, { items: [] })
           .post('/api/v1/instances')
           .reply(202, {});
         expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
           'pending'
         );
+        expect(evil.activeMocks()).to.have.lengthOf(1);
         expect(asked.isDone()).to.equal(true);
         expect(rabbit.published).to.deep.equal([]);
 
-        // The address the provider gives this account needs no asking
+        // The address the provider gives this account is taken once the
+        // Cloudery says it is built: it may be a reservation
         await dm.ldap.modify(dnOf('in-alice'), {
           replace: { description: 'in-alice.example.org' },
+        });
+        const confirmed = search('in-alice.example.org').reply(200, {
+          items: [
+            {
+              fqdn: 'in-alice.example.org',
+              oidc: 'in-alice',
+              instantiated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
         });
         expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
           'ready'
         );
+        expect(confirmed.isDone()).to.equal(true);
         expect(rabbit.published.map(p => p.key)).to.deep.equal([
           'user.created',
         ]);
@@ -910,12 +1428,13 @@ describe('Twake instances plugin', function () {
         expect(rabbit.published).to.deep.equal([]);
       });
 
-      it('refuses an instance at its address that is someone else’s', async () => {
+      it('refuses an instance at its address whose OIDC id is another', async () => {
         search('in-alice.example.org').reply(200, {
           items: [
             {
               fqdn: 'in-alice.example.org',
-              internal_email: 'mallory@example.org',
+              internal_email: 'in-alice@example.org',
+              oidc: 'mallory',
               instantiated_at: '2026-01-01T00:00:00Z',
             },
           ],
@@ -923,6 +1442,39 @@ describe('Twake instances plugin', function () {
         expect(
           await refusal(plugin(dm).ensureInstance(dnOf('in-alice')))
         ).to.have.property('statusCode', 409);
+        expect(rabbit.published).to.deep.equal([]);
+      });
+
+      it('takes the instance at its address whatever its email, and announces the account’s mail', async () => {
+        search('in-alice.example.org').reply(200, {
+          items: [
+            {
+              fqdn: 'in-alice.example.org',
+              internal_email: 'old-alice@example.org',
+              oidc: 'in-alice',
+              instantiated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+        });
+        expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
+          'ready'
+        );
+        expect(
+          rabbit.published.map(p => p.message.internalEmail)
+        ).to.deep.equal(['in-alice@example.org']);
+      });
+
+      it('refuses the address of its slug when another entry holds it', async () => {
+        await dm.ldap.add(dnOf('out-carol'), person('out-carol'));
+        await dm.ldap.modify(dnOf('out-carol'), {
+          replace: { description: 'in-alice.example.org' },
+        });
+        await dm.ldap.modify(dnOf('in-alice'), {
+          replace: { description: 'in-alice.example.org' },
+        });
+        expect(
+          String(await refusal(plugin(dm).ensureInstance(dnOf('in-alice'))))
+        ).to.match(/belongs to another user/);
         expect(rabbit.published).to.deep.equal([]);
       });
 
@@ -1260,6 +1812,39 @@ describe('Twake instances plugin', function () {
           offer: 'organization',
           org_id: 'acme1',
         });
+        // Reserved while it is built, and not announced on the reservation
+        expect(await read(dm, orgDn)).to.include({
+          description: 'acme1.example.org',
+        });
+        search('acme1.example.org').reply(200, { items: [ORG_INSTANCE] });
+        expect(
+          await plugin(dm).ensureOrganization({
+            id: 'acme1',
+            name: 'Acme',
+            domain: 'acme.example',
+          })
+        ).to.equal('pending');
+        expect(rabbit.published).to.deep.equal([]);
+        expect(await read(dm, orgDn)).not.to.have.property('businessCategory');
+      });
+
+      it('takes back the organization’s reservation when the Cloudery refuses its instance', async () => {
+        search('acme1.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v2/organizations')
+          .reply(201, {})
+          .post('/api/v1/instances')
+          .reply(500, 'down');
+        expect(
+          await refusal(
+            plugin(dm).ensureOrganization({
+              id: 'acme1',
+              name: 'Acme',
+              domain: 'acme.example',
+            })
+          )
+        ).to.be.an('error');
+        expect(await read(dm, orgDn)).not.to.have.property('description');
       });
 
       it('knows an organization by its id and own mail without a domain on its entry', async () => {
@@ -1345,6 +1930,21 @@ describe('Twake instances plugin', function () {
         );
       };
 
+      // Asked again whenever her address is read: it may be a reservation
+      const erinBuilt = (optionally = false): nock.Scope => {
+        const asked = search('inerinacme1.example.org');
+        return (optionally ? asked.optionally() : asked).reply(200, {
+          items: [
+            {
+              fqdn: 'inerinacme1.example.org',
+              internal_email: 'in.erin@acme.example',
+              oidc: 'inerinacme1',
+              instantiated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+        });
+      };
+
       afterEach(async () => {
         await dm.ldap.delete(erin).catch(() => undefined);
       });
@@ -1375,10 +1975,12 @@ describe('Twake instances plugin', function () {
           description: 'inerinacme1.example.org',
         });
         expect(await read(dm, erin)).not.to.have.property('businessCategory');
+        erinBuilt();
         expect(await plugin(dm).ensureInstance(erin, rest())).to.equal('ready');
         expect(rabbit.published).to.deep.equal([]);
 
         link('acme1', 'acme1.example.org');
+        erinBuilt();
         await rabbit.handler!(orgWorkplace);
         expect(rabbit.published).to.deep.equal([ORG_CREATED, ERIN_CREATED]);
         expect(await read(dm, erin)).to.have.property('businessCategory');
@@ -1394,6 +1996,7 @@ describe('Twake instances plugin', function () {
         await rabbit.handler!(erinWorkplace);
         expect(rabbit.published).to.deep.equal([]);
         const respelled = erin.replace(/,/g, ' , ');
+        erinBuilt();
         expect(await plugin(dm).ensureInstance(respelled, rest())).to.equal(
           'ready'
         );
@@ -1403,6 +2006,8 @@ describe('Twake instances plugin', function () {
       it('sends each event once, the organization’s first, when both instances arrive together', async () => {
         await addErin();
         link('acme1', 'acme1.example.org');
+        // Released before her workplace.created settles her, or not
+        erinBuilt(true);
         await Promise.all([
           rabbit.handler!(erinWorkplace),
           rabbit.handler!(orgWorkplace),
@@ -1417,6 +2022,7 @@ describe('Twake instances plugin', function () {
           replace: { businessCategory: '2026-01-01T00:00:00.000Z' },
         });
         const linked = link('acme1', 'acme1.example.org');
+        erinBuilt();
         await rabbit.handler!(orgWorkplace);
         expect(linked.isDone()).to.equal(true);
         expect(rabbit.published).to.deep.equal([ERIN_CREATED]);
@@ -1437,10 +2043,11 @@ describe('Twake instances plugin', function () {
         );
         try {
           await dm.ldap.modify(frank, {
-            replace: { description: 'elsewhere.example.org' },
+            replace: { description: 'infrankacme12.example.org' },
           });
           link('acme1', 'acme1.example.org');
-          search('elsewhere.example.org').reply(500, 'down');
+          erinBuilt();
+          search('infrankacme12.example.org').reply(500, 'down');
           expect(await refusal(rabbit.handler!(orgWorkplace))).to.match(
             /1 member\(s\) of .* not released/
           );
@@ -1464,6 +2071,61 @@ describe('Twake instances plugin', function () {
         return { warned, restore: () => (logger.warn = warn) };
       };
 
+      it('releases a member at a numbered address once the Cloudery confirms it, without twake_instance_slug_numbered', async () => {
+        await addErin();
+        await rabbit.handler!({
+          ...erinWorkplace,
+          workplaceFqdn: 'inerinacme12.example.org',
+        });
+        link('acme1', 'acme1.example.org');
+        const asked = search('inerinacme12.example.org').reply(200, {
+          items: [
+            {
+              fqdn: 'inerinacme12.example.org',
+              internal_email: 'in.erin@acme.example',
+              oidc: 'inerinacme12',
+              instantiated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+        });
+        await rabbit.handler!(orgWorkplace);
+        expect(asked.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([
+          ORG_CREATED,
+          {
+            ...ERIN_CREATED,
+            message: {
+              ...ERIN_CREATED.message,
+              workplaceFqdn: 'inerinacme12.example.org',
+            },
+          },
+        ]);
+      });
+
+      it('keeps a member whose instance is still built held, without a warning', async () => {
+        await addErin();
+        link('acme1', 'acme1.example.org');
+        const asked = search('inerinacme1.example.org').reply(200, {
+          items: [
+            {
+              fqdn: 'inerinacme1.example.org',
+              oidc: 'inerinacme1',
+              instantiated_at: null,
+            },
+          ],
+        });
+        const { warned, restore } = warnings();
+        try {
+          await rabbit.handler!(orgWorkplace);
+        } finally {
+          restore();
+        }
+        expect(asked.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([ORG_CREATED]);
+        expect(warned.join('\n')).not.to.match(/in\.erin/);
+        expect(await read(dm, erin)).not.to.have.property('businessCategory');
+      });
+
       it('warns when a member stays held for an address it cannot confirm', async () => {
         await addErin();
         await rabbit.handler!(erinWorkplace);
@@ -1471,7 +2133,6 @@ describe('Twake instances plugin', function () {
           replace: { description: 'elsewhere.example.org' },
         });
         link('acme1', 'acme1.example.org');
-        search('elsewhere.example.org').reply(200, { items: [] });
         const { warned, restore } = warnings();
         try {
           await rabbit.handler!(orgWorkplace);
@@ -1653,11 +2314,6 @@ describe('Twake instances plugin', function () {
         internal_email: 'acme1@example.org',
         instantiated_at: '2026-03-13T12:33:17Z',
       };
-      const clouderyOrg = (instanceId: string, times = 1) =>
-        nock(CLOUDERY)
-          .get('/api/v2/organizations/acme1')
-          .times(times)
-          .reply(200, { ldap_branch: 'acme1', instance_id: instanceId });
       const addUsersOu = () =>
         dm.ldap.add(`ou=users,${orgDn}`, {
           objectClass: ['top', 'organizationalUnit'],
@@ -1669,7 +2325,6 @@ describe('Twake instances plugin', function () {
         search('acme1.example.org')
           .times(2)
           .reply(200, { items: [PLATFORM_ORG_INSTANCE] });
-        clouderyOrg('acme1-instance', 2);
         const asked = search('inerinacme1.example.org')
           .reply(200, { items: [] })
           .post('/api/v1/instances', body => body.slug === 'inerinacme1')
@@ -1695,7 +2350,6 @@ describe('Twake instances plugin', function () {
         search('acme1.example.org').reply(200, {
           items: [{ ...PLATFORM_ORG_INSTANCE, instantiated_at: null }],
         });
-        clouderyOrg('acme1-instance');
         search('inerinacme1.example.org')
           .reply(200, { items: [] })
           .post('/api/v1/instances')
@@ -1713,8 +2367,9 @@ describe('Twake instances plugin', function () {
         search('acme1.example.org')
           .times(2)
           .reply(200, { items: [PLATFORM_ORG_INSTANCE] });
-        clouderyOrg('acme1-instance', 2);
+        // Her reservation is asked about first: the Cloudery lost it
         const asked = search('inerinacme1.example.org')
+          .times(2)
           .reply(200, { items: [] })
           .post('/api/v1/instances')
           .reply(202, {});
@@ -1750,7 +2405,6 @@ describe('Twake instances plugin', function () {
           })
           .reply(200, {})
           .persist();
-        clouderyOrg('acme1-instance');
         search('acme1.example.org').reply(async () => {
           await rabbit.handler!(orgWorkplace);
           return [200, { items: [PLATFORM_ORG_INSTANCE] }];
@@ -1791,7 +2445,16 @@ describe('Twake instances plugin', function () {
           search('acme1.example.org').reply(200, {
             items: [PLATFORM_ORG_INSTANCE],
           });
-          clouderyOrg('acme1-instance');
+          // Her reservation: still being built
+          search('inerinacme1.example.org').reply(200, {
+            items: [
+              {
+                fqdn: 'inerinacme1.example.org',
+                oidc: 'inerinacme1',
+                instantiated_at: null,
+              },
+            ],
+          });
           const linked = link('acme1', 'acme1.example.org');
           expect(
             await refusal(plugin(dm).ensureInstance(erin, caller))
@@ -1810,7 +2473,6 @@ describe('Twake instances plugin', function () {
           search('acme1.example.org').reply(200, {
             items: [{ ...PLATFORM_ORG_INSTANCE, instantiated_at: null }],
           });
-          clouderyOrg('acme1-instance');
           search('inerinacme1.example.org').reply(200, {
             items: [
               {
@@ -1838,42 +2500,29 @@ describe('Twake instances plugin', function () {
           )
         );
 
-      it('takes no instance without an id for the organization’s, though the organization is linked to none', async () => {
-        const { _id: _ignored, ...withoutId } = PLATFORM_ORG_INSTANCE;
-        search('acme1.example.org').reply(200, { items: [withoutId] });
-        nock(CLOUDERY)
-          .get('/api/v2/organizations/acme1')
-          .optionally()
-          .reply(200, { ldap_branch: 'acme1' });
-        expect(await refusedAsTaken()).to.match(/belongs to another user/);
-        nock.cleanAll();
-      });
-
-      it('takes no instance for the organization’s when the Cloudery has no such organization', async () => {
-        search('acme1.example.org').reply(200, {
-          items: [PLATFORM_ORG_INSTANCE],
-        });
-        nock(CLOUDERY).get('/api/v2/organizations/acme1').reply(404, {});
-        expect(await refusedAsTaken()).to.match(/belongs to another user/);
-      });
-
-      it('takes no personal instance at its address for the organization’s', async () => {
+      it('takes no instance at its address another entry holds for the organization’s', async () => {
         await addUsersOu();
-        search('acme1.example.org').reply(200, {
-          items: [{ ...PLATFORM_ORG_INSTANCE, _id: 'someone-else' }],
+        await dm.ldap.add(dnOf('out-carol'), person('out-carol'));
+        await dm.ldap.modify(dnOf('out-carol'), {
+          replace: { description: 'acme1.example.org' },
         });
-        const looked = clouderyOrg('acme1-instance');
-        const member = search('inerinacme1.example.org').reply(200, {
-          items: [],
-        });
+        const looked = search('acme1.example.org')
+          .optionally()
+          .reply(200, { items: [PLATFORM_ORG_INSTANCE] });
+        const member = search('inerinacme1.example.org')
+          .optionally()
+          .reply(200, { items: [] });
         await dm.ldap.add(
           erin,
           { ...person('in.erin'), mail: ERIN_CREATED.message.internalEmail },
           rest()
         );
-        expect(looked.isDone()).to.equal(true);
-        expect(member.isDone()).to.equal(false);
+        expect(looked.activeMocks()).to.have.lengthOf(1);
+        expect(member.activeMocks()).to.have.lengthOf(1);
         expect(rabbit.published).to.deep.equal([]);
+        expect(String(await refusedAsTaken())).to.match(
+          /belongs to another user/
+        );
         nock.cleanAll();
       });
     });
@@ -1935,7 +2584,10 @@ describe('Twake instances plugin', function () {
         .reply(202, {});
       await dm.ldap.add(his, person('in-his'), rest());
       expect(scope.isDone()).to.equal(true);
-      expect(await read(dm, his)).not.to.have.property('description');
+      expect(await read(dm, his)).to.have.property(
+        'description',
+        'in-his.example.org'
+      );
     });
 
     it('does not take an escaped comma for a branch separator', async () => {
@@ -2055,6 +2707,22 @@ describe('Twake instances plugin', function () {
       expect(rabbit.published[0]?.message).to.include({ twakeId: 'in-Bob.X' });
     });
 
+    it('keeps a slug longer than the Cloudery takes, a DNS label’s at most', async () => {
+      const uid = `in-${'x'.repeat(40)}`;
+      nock(COZY)
+        .get(`/instances/${uid}.example.org`)
+        .reply(200, instance(`${uid}@example.org`, uid));
+      try {
+        await dm.ldap.add(dnOf(uid), person(uid), rest());
+        expect(await read(dm, dnOf(uid))).to.have.property(
+          'description',
+          `${uid}.example.org`
+        );
+      } finally {
+        await dm.ldap.delete(dnOf(uid)).catch(() => undefined);
+      }
+    });
+
     it('finishes the onboarding of an instance found unfinished', async () => {
       const answered = await outboundCalls('cozy-stack', '200');
       const scope = nock(COZY)
@@ -2167,6 +2835,114 @@ describe('Twake instances plugin', function () {
       expect(kept.isDone()).to.equal(false);
     });
 
+    describe('with twake_instance_slug_numbered', () => {
+      const settings = (): { twake_instance_slug_numbered: boolean } =>
+        (
+          plugin(dm) as unknown as {
+            settings: { twake_instance_slug_numbered: boolean };
+          }
+        ).settings;
+      const settled = async (scope: nock.Scope): Promise<void> => {
+        // ldapdeletedone is not awaited by the delete
+        for (let i = 0; i < 50 && !scope.isDone(); i++)
+          await new Promise(r => setTimeout(r, 10));
+      };
+
+      beforeEach(() => (settings().twake_instance_slug_numbered = true));
+      afterEach(async () => {
+        settings().twake_instance_slug_numbered = false;
+        await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
+      });
+
+      for (const [when, numberedAtDelete] of [
+        ['', true],
+        [', twake_instance_slug_numbered turned off since', false],
+      ] as [string, boolean][])
+        it(`destroys the numbered instance of a deleted account, not the one its slug names${when}`, async () => {
+          nock(COZY)
+            .get('/instances/in-janedoe.example.org')
+            .reply(200, instance('in-janedoe@example.org', 'in-janedoe'))
+            .get('/instances/in-janedoe2.example.org')
+            .reply(200, instance('in-jane_doe@example.org', 'in-jane_doe'));
+          await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+          expect(await read(dm, dnOf('in-jane_doe'))).to.have.property(
+            'description',
+            'in-janedoe2.example.org'
+          );
+          const other = nock(COZY)
+            .get('/instances/in-janedoe.example.org')
+            .optionally()
+            .reply(200, instance('in-janedoe@example.org', 'in-janedoe'))
+            .delete('/instances/in-janedoe.example.org')
+            .optionally()
+            .reply(204);
+          const destroyed = nock(COZY)
+            .get('/instances/in-janedoe2.example.org')
+            .reply(200, instance('in-jane_doe@example.org', 'in-jane_doe'))
+            .delete('/instances/in-janedoe2.example.org')
+            .reply(204);
+          settings().twake_instance_slug_numbered = numberedAtDelete;
+          await dm.ldap.delete(dnOf('in-jane_doe'));
+          await settled(destroyed);
+          expect(destroyed.isDone()).to.equal(true);
+          expect(other.activeMocks()).to.have.lengthOf(2);
+        });
+
+      it('destroys at the address its slug names when the entry holds another', async () => {
+        nock(COZY)
+          .get('/instances/in-alice.example.org')
+          .reply(200, instance('in-alice@example.org', 'in-alice'));
+        await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
+        await dm.ldap.modify(dnOf('in-alice'), {
+          replace: { description: 'in-bob2.example.org' },
+        });
+        const elsewhere = nock(COZY)
+          .get('/instances/in-bob2.example.org')
+          .optionally()
+          .reply(200, instance('in-bob@example.org', 'in-alice'))
+          .delete('/instances/in-bob2.example.org')
+          .optionally()
+          .reply(204);
+        const destroyed = nock(COZY)
+          .get('/instances/in-alice.example.org')
+          .reply(200, instance('in-alice@example.org', 'in-alice'))
+          .delete('/instances/in-alice.example.org')
+          .reply(204);
+        await dm.ldap.delete(dnOf('in-alice'));
+        await settled(destroyed);
+        expect(destroyed.isDone()).to.equal(true);
+        expect(elsewhere.activeMocks()).to.have.lengthOf(2);
+      });
+    });
+
+    it('destroys the instance at the address the other dashes setting gave', async () => {
+      nock(COZY)
+        .get('/instances/in-alice.example.org')
+        .reply(200, instance('in-alice@example.org', 'in-alice'));
+      await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
+      // Its slug is now `inalice`: the instance stays at its address
+      const self = plugin(dm) as unknown as { dashes: boolean };
+      self.dashes = false;
+      try {
+        const elsewhere = nock(COZY)
+          .get('/instances/inalice.example.org')
+          .optionally()
+          .reply(404);
+        const destroyed = nock(COZY)
+          .get('/instances/in-alice.example.org')
+          .reply(200, instance('in-alice@example.org', 'in-alice'))
+          .delete('/instances/in-alice.example.org')
+          .reply(204);
+        await dm.ldap.delete(dnOf('in-alice'));
+        for (let i = 0; i < 50 && !destroyed.isDone(); i++)
+          await new Promise(r => setTimeout(r, 10));
+        expect(destroyed.isDone()).to.equal(true);
+        expect(elsewhere.activeMocks()).to.have.lengthOf(1);
+      } finally {
+        self.dashes = true;
+      }
+    });
+
     it('destroys the instance of an account deleted under another spelling', async () => {
       nock(COZY)
         .get('/instances/in-alice.example.org')
@@ -2222,6 +2998,42 @@ describe('Twake instances plugin', function () {
         'core/twake/clouderyProvision',
       ])
         expect(await construct({ plugin: [old] })).to.throw(/load one of them/);
+    });
+
+    it('keeps no dash in a slug with the Cloudery, and keeps it with cozy-stack, unless told', async () => {
+      const slugOf = async (
+        config: Record<string, unknown>
+      ): Promise<string | undefined> => {
+        const instances = (
+          await construct({ twake_instance_dn: ['ou=a$'], ...config })
+        )() as unknown as {
+          account: (dn: string, entry: AttributesList) => { id: string };
+        };
+        return instances.account('uid=jean-claude,ou=a', {
+          uid: 'jean-claude',
+          mail: 'jean-claude@example.org',
+        }).id;
+      };
+      const cozy = {
+        twake_instance_provider: 'cozy-stack',
+        twake_instance_cozy_url: COZY,
+        twake_instance_cozy_domain: 'example.org',
+      };
+      expect(await slugOf({ twake_instance_slug_dashes: 'auto' })).to.equal(
+        'jeanclaude'
+      );
+      expect(await slugOf({ twake_instance_slug_dashes: 'true' })).to.equal(
+        'jean-claude'
+      );
+      expect(
+        await slugOf({ ...cozy, twake_instance_slug_dashes: 'auto' })
+      ).to.equal('jean-claude');
+      expect(
+        await slugOf({ ...cozy, twake_instance_slug_dashes: 'false' })
+      ).to.equal('jeanclaude');
+      expect(await construct({ twake_instance_slug_dashes: 'yes' })).to.throw(
+        /must be one of auto, true, false/
+      );
     });
 
     it('refuses more Cloudery offers than DN expressions', async () => {

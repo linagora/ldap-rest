@@ -1521,6 +1521,12 @@
     "env": "DM_TWAKE_INSTANCE_CLOUDERY_OFFER"
   },
   {
+    "cli": "--twake-instance-cloudery-oidc",
+    "type": "string",
+    "default": "slug",
+    "env": "DM_TWAKE_INSTANCE_CLOUDERY_OIDC"
+  },
+  {
     "cli": "--twake-instance-cloudery-organization-offer",
     "type": "string",
     "default": "",
@@ -1676,6 +1682,18 @@
     "type": "string",
     "default": "",
     "env": "DM_TWAKE_INSTANCE_SKIP_VALUE"
+  },
+  {
+    "cli": "--twake-instance-slug-dashes",
+    "type": "string",
+    "default": "auto",
+    "env": "DM_TWAKE_INSTANCE_SLUG_DASHES"
+  },
+  {
+    "cli": "--twake-instance-slug-numbered",
+    "type": "boolean",
+    "default": false,
+    "env": "DM_TWAKE_INSTANCE_SLUG_NUMBERED"
   },
   {
     "cli": "--twake-instance-timeout",
