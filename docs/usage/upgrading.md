@@ -40,6 +40,20 @@ With `twake/clouderyProvision`, which writes no mark, a reservation is an
 address without `twakeOrganizationId`
 ([details](plugins/integrations/instances.md#what-the-address-and-the-mark-say)).
 
+### Slugs keep no dash with the Cloudery
+
+**Who is affected:** a deployment that loads `twake/instances` or
+`twake/clouderyProvision` with the Cloudery, and whose uids hold a `-`.
+
+`--twake-instance-slug-dashes` defaults to `auto`: no `-` in a slug with the
+Cloudery, which refuses it, and kept with cozy-stack. A uid like
+`jean-claude.dusse` now gets `jeanclaudedusse`. An account whose address holds
+the dashed slug, or a numbered form of it, keeps its instance there: the
+address is asked about as before. An account with no address yet gets the new
+slug. `twake/clouderyProvision` provisions on a SCIM create only, so only its
+new accounts are concerned. Give `--twake-instance-slug-dashes true` to keep
+the former slugs ([configuration](configuration.md#coretwakeinstances)).
+
 ## From 2.2.2
 
 ### The bulk import writes below the base its schema names

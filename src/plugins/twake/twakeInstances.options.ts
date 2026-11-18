@@ -31,11 +31,13 @@ export const twakeInstancesOptions = defineOptions({
     env: 'DM_TWAKE_INSTANCE_ID',
     default: '{uid}',
   }),
-  // `-` inside an instance slug: off for a Cloudery or a cozy-stack with flat
-  // subdomains, which refuse it
-  twake_instance_slug_dashes: opt.boolean({
+  // `-` inside an instance slug: `auto` keeps none with the Cloudery, which
+  // refuses it, and keeps it with cozy-stack; `false` for a cozy-stack with
+  // flat subdomains too
+  twake_instance_slug_dashes: opt.string({
     env: 'DM_TWAKE_INSTANCE_SLUG_DASHES',
-    default: true,
+    default: 'auto',
+    choices: ['auto', 'true', 'false'],
   }),
   // A slug another account holds: number this one (`slug2`, `slug3`…) rather
   // than refuse the instance
@@ -173,4 +175,16 @@ export type TwakeInstancesOptions = OptionsOf<typeof twakeInstancesOptions>;
 /** The checked values for a caller that holds a Config instead of the plugin */
 export function twakeInstancesOptionsOf(config: Config): TwakeInstancesOptions {
   return readOptions(twakeInstancesOptions, config);
+}
+
+/**
+ * Whether an instance slug keeps its `-`: as `--twake-instance-slug-dashes`
+ * says, or with `auto` as the provider takes it, the Cloudery refusing it.
+ */
+export function slugDashes(
+  settings: Pick<TwakeInstancesOptions, 'twake_instance_slug_dashes'>,
+  provider: 'cloudery' | 'cozy-stack'
+): boolean {
+  const value = settings.twake_instance_slug_dashes;
+  return value === 'auto' ? provider === 'cozy-stack' : value === 'true';
 }

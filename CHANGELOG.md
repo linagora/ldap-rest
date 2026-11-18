@@ -4,20 +4,21 @@
 
 ### Added
 
-- `--twake-instance-slug-dashes false` keeps no `-` inside an instance slug,
-  for a Cloudery taking `[a-z0-9]` only and a cozy-stack with flat
-  subdomains, which refuses a `-` in an instance's first label: a uid like
-  `jean-claude.dusse` got no instance ("Slug is invalid"). It changes the
-  slug, hence the address, of an existing account whose slug holds a `-`: it
-  is meant for a new deployment, or one whose instances have no `-`
-  ([configuration](docs/usage/configuration.md#coretwakeinstances)).
+- A Cloudery deployment keeps no `-` inside an instance slug, the default of
+  `--twake-instance-slug-dashes` (`auto`) with `cloudery`: the Cloudery takes
+  `[a-z0-9]` only, so a uid like `jean-claude.dusse` got no instance ("Slug is
+  invalid"). With cozy-stack `auto` keeps it; `false` drops it for a
+  cozy-stack with flat subdomains, which refuses a `-` in an instance's first
+  label, and `true` keeps it whatever the provider. An account whose address
+  was given by the other setting keeps its instance there
+  ([configuration](docs/usage/configuration.md#coretwakeinstances),
+  [upgrading](docs/usage/upgrading.md#slugs-keep-no-dash-with-the-cloudery)).
   `core/twake/clouderyProvision` reads it too.
 - `--twake-instance-slug-numbered` numbers a slug another account holds
   (`slug2`, `slug3`…) rather than refuse the instance: distinct uids can
   reduce to one slug. A numbered address stays the account's when the setting
   is turned off, and with cozy-stack the delete of a numbered account destroys
   its numbered instance.
-
 - `--twake-instance-cloudery-oidc uid` gives a Cloudery instance the
   account's `uid` as OIDC id, the `sub` an OpenID Provider gives, rather than
   its slug, which may be cleaned or numbered (`jeanclaudedusse2`). The

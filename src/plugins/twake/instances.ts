@@ -58,6 +58,7 @@ import {
   type LifecycleAttributes,
 } from './lifecycleAttributes.js';
 import {
+  slugDashes,
   twakeInstancesOptions,
   type TwakeInstancesOptions,
 } from './twakeInstances.options.js';
@@ -73,6 +74,11 @@ interface Account extends InstanceRequest {
   twakeId: string;
   /** The organization id came from the DN, not from the provider settings */
   fromDn?: boolean;
+  /**
+   * The slug the other `--twake-instance-slug-dashes` value gives, when it
+   * differs: an account may have its instance there from before
+   */
+  otherId?: string;
 }
 
 /** A `--twake-instance-dn` expression that read a DN, and where it sits. */
@@ -124,6 +130,8 @@ export default class TwakeInstances extends DmPlugin {
   protected readonly fqdnAttribute: string;
   protected readonly sentAttribute: string;
   private readonly locale: string;
+  /** Whether a slug keeps its `-` */
+  private readonly dashes: boolean;
   private readonly lifecycle: LifecycleAttributes;
   /** The Cloudery offer of each `--twake-instance-dn` expression, when several */
   private readonly offers: string[] = [];
@@ -177,6 +185,7 @@ export default class TwakeInstances extends DmPlugin {
         timeout
       );
       this.locale = settings.twake_instance_locale || 'fr';
+      this.dashes = slugDashes(settings, 'cozy-stack');
     } else if (settings.twake_instance_provider === 'cloudery') {
       if (
         !settings.twake_instance_cloudery_url ||
@@ -203,6 +212,7 @@ export default class TwakeInstances extends DmPlugin {
         timeout
       );
       this.locale = settings.twake_instance_locale || 'en';
+      this.dashes = slugDashes(settings, 'cloudery');
     } else {
       throw new Error(
         `${this.name}: --twake-instance-provider must be cloudery or cozy-stack`
@@ -294,10 +304,11 @@ export default class TwakeInstances extends DmPlugin {
         const uid = this.uid(dn);
         if (!match || !uid) continue;
         const id = this.id(uid, match.exec);
+        const otherId = this.id(uid, match.exec, !this.dashes);
         const address = known?.get(this.key(dn));
         // Only a numbered form of the account's own slug: a caller may have
         // written the address. destroy() still checks the OIDC id
-        const slug = (address && this.numberedAt(id, address)) || id;
+        const slug = (address && this.slugAt([id, otherId], address)) || id;
         // Queued before a re-create of the same DN, whose add comes after
         await this.serialized(this.key(dn), async () => {
           try {
@@ -805,10 +816,10 @@ export default class TwakeInstances extends DmPlugin {
     known: string
   ): Promise<{ account: Account; found?: FoundInstance }> {
     const address = known.toLowerCase();
-    const id =
-      address === this.provider.address(account)
-        ? account.id
-        : this.numberedAt(account.id, address);
+    const id = this.slugAt(
+      account.otherId ? [account.id, account.otherId] : [account.id],
+      address
+    );
     if (!id) return { account };
     const asked = id === account.id ? account : { ...account, id };
     return { account: asked, found: await this.find(dn, asked, known) };
@@ -869,6 +880,20 @@ export default class TwakeInstances extends DmPlugin {
     return res.searchEntries
       .map(e => e.dn)
       .filter(other => this.key(other) !== self);
+  }
+
+  /**
+   * The slug among `ids`, or the numbered form of one, whose instance is at
+   * this address
+   */
+  private slugAt(ids: string[], address: string): string | undefined {
+    const lower = address.toLowerCase();
+    const at = (id: string): string =>
+      this.provider.address({ id } as InstanceRequest);
+    return (
+      ids.find(id => at(id) === lower) ??
+      ids.map(id => this.numberedAt(id, lower)).find(Boolean)
+    );
   }
 
   /** The numbered form of slug `id` whose instance is at this address */
@@ -1174,6 +1199,7 @@ export default class TwakeInstances extends DmPlugin {
       : (cozy && this.settings.twake_instance_cozy_org_domain) || undefined;
     const offer = this.offers[matched.index];
     const id = this.id(uid, match);
+    const otherId = this.id(uid, match, !this.dashes);
     if (!id) {
       this.logger.warn(
         `${this.name}: ${dn} gives no instance slug, no instance`
@@ -1182,6 +1208,7 @@ export default class TwakeInstances extends DmPlugin {
     }
     return {
       id,
+      ...(otherId && otherId !== id ? { otherId } : {}),
       // cozyProvision's OIDC id, the uid; the Cloudery's is the slug unless
       // --twake-instance-cloudery-oidc says uid
       ...(cozy || this.settings.twake_instance_cloudery_oidc === 'uid'
@@ -1275,7 +1302,11 @@ export default class TwakeInstances extends DmPlugin {
     }
   }
 
-  private id(uid: string, match: RegExpExecArray): string {
+  private id(
+    uid: string,
+    match: RegExpExecArray,
+    dashes = this.dashes
+  ): string {
     const groups: Record<string, string> = { uid, ...match.groups };
     return instanceSlug(
       this.settings.twake_instance_id.replace(
@@ -1284,7 +1315,7 @@ export default class TwakeInstances extends DmPlugin {
       ),
       {
         maxLength: this.provider.slugMaxLength,
-        dashes: this.settings.twake_instance_slug_dashes,
+        dashes,
       }
     );
   }

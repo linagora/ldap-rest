@@ -156,9 +156,10 @@ The instance id is `--twake-instance-id`, a template of the account's `uid`
 and the named groups of the matching DN expression, for example `{uid}{org}`.
 It is lowercased and reduced to `[a-z0-9-]`: the Cloudery refuses other
 characters in a slug, such as `_` or `@`, so `jane.doe_stg` gives
-`janedoestg`. With `--twake-instance-slug-dashes false` no `-` is kept, so
-`jean-claude.dusse` gives `jeanclaudedusse`; this moves an existing account
-whose slug holds one (see
+`janedoestg`. With the Cloudery no `-` is kept by default
+(`--twake-instance-slug-dashes auto`), so `jean-claude.dusse` gives
+`jeanclaudedusse`; cozy-stack keeps it, unless the setting says `false`. An
+account at the address the other setting gives keeps its instance there (see
 [configuration](../../configuration.md#coretwakeinstances)). The slug is cut
 to the 30 characters the Cloudery takes, or to a DNS label's 63 with
 cozy-stack. Two `uid`s that reduce to the same slug cannot both have an

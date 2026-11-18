@@ -353,9 +353,7 @@ describe('ClouderyProvision plugin', () => {
       expect(body.oidc).to.equal('janedoestgacme123');
     });
 
-    it('drops every dash from the slug under --twake-instance-slug-dashes false', async () => {
-      Object.assign(dm.config, { twake_instance_slug_dashes: false });
-      plugin = new ClouderyProvision(dm);
+    it('drops every dash from the slug by default, the Cloudery refusing it', async () => {
       let body: Record<string, unknown> = {};
       const scope = nock(CLOUDERY)
         .get('/api/v2/instances')
@@ -383,7 +381,9 @@ describe('ClouderyProvision plugin', () => {
       });
     });
 
-    it('cuts the slug to the 30 characters the Cloudery takes', async () => {
+    it('keeps the dashes in the slug under --twake-instance-slug-dashes true, cut to the 30 characters the Cloudery takes', async () => {
+      Object.assign(dm.config, { twake_instance_slug_dashes: 'true' });
+      plugin = new ClouderyProvision(dm);
       let body: Record<string, unknown> = {};
       const slug = `${'a'.repeat(23)}-bbbbbb`;
       const scope = nock(CLOUDERY)

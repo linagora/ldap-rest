@@ -66,6 +66,8 @@ const BASE_CONFIG = {
   twake_instance_skip_attribute: 'employeeType',
   twake_instance_skip_value: 'technical',
   twake_lifecycle_deleted_attribute: 'carLicense',
+  // The accounts' uids start with `in-`, kept in their slugs here
+  twake_instance_slug_dashes: 'true',
 };
 
 async function server(
@@ -247,6 +249,68 @@ describe('Twake instances plugin', function () {
             await dm.ldap.delete(dnOf(uid)).catch(() => undefined);
         }
       });
+
+    describe('with the other dashes setting than its address', () => {
+      const self = (): { dashes: boolean } =>
+        plugin(dm) as unknown as { dashes: boolean };
+
+      beforeEach(async () => {
+        search('in-alice.example.org').reply(200, { items: [] });
+        nock(CLOUDERY).post('/api/v1/instances').reply(202, {});
+        await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
+        // A deployment whose default changed: its slugs are now `inalice`
+        self().dashes = false;
+      });
+
+      afterEach(() => {
+        self().dashes = true;
+      });
+
+      for (const address of ['in-alice.example.org', 'in-alice2.example.org'])
+        it(`takes its instance at ${address} rather than ask for a second one`, async () => {
+          await dm.ldap.modify(dnOf('in-alice'), {
+            replace: { description: address },
+          });
+          const asked = search(address).reply(200, {
+            items: [
+              {
+                fqdn: address,
+                oidc: address.split('.')[0],
+                instantiated_at: '2026-01-01T00:00:00Z',
+              },
+            ],
+          });
+          const second = search('inalice.example.org')
+            .optionally()
+            .reply(200, { items: [] })
+            .post('/api/v1/instances')
+            .optionally()
+            .reply(202, {});
+          expect(await plugin(dm).ensureInstance(dnOf('in-alice'))).to.equal(
+            'ready'
+          );
+          expect(asked.isDone()).to.equal(true);
+          expect(second.activeMocks()).to.have.lengthOf(2);
+          expect(
+            rabbit.published.map(p => p.message.workplaceFqdn)
+          ).to.deep.equal([address]);
+        });
+
+      it('still refuses that address when another entry holds it', async () => {
+        await dm.ldap.add(dnOf('out-carol'), person('out-carol'));
+        await dm.ldap.modify(dnOf('out-carol'), {
+          replace: { description: 'in-alice.example.org' },
+        });
+        const asked = search('in-alice.example.org')
+          .optionally()
+          .reply(200, { items: [] });
+        expect(
+          String(await refusal(plugin(dm).ensureInstance(dnOf('in-alice'))))
+        ).to.match(/belongs to another user/);
+        expect(asked.activeMocks()).to.have.lengthOf(1);
+        expect(rabbit.published).to.deep.equal([]);
+      });
+    });
 
     describe('with --twake-instance-cloudery-oidc uid', () => {
       const settings = (): { twake_instance_cloudery_oidc: string } =>
@@ -2813,6 +2877,34 @@ describe('Twake instances plugin', function () {
       });
     });
 
+    it('destroys the instance at the address the other dashes setting gave', async () => {
+      nock(COZY)
+        .get('/instances/in-alice.example.org')
+        .reply(200, instance('in-alice@example.org', 'in-alice'));
+      await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
+      // Its slug is now `inalice`: the instance stays at its address
+      const self = plugin(dm) as unknown as { dashes: boolean };
+      self.dashes = false;
+      try {
+        const elsewhere = nock(COZY)
+          .get('/instances/inalice.example.org')
+          .optionally()
+          .reply(404);
+        const destroyed = nock(COZY)
+          .get('/instances/in-alice.example.org')
+          .reply(200, instance('in-alice@example.org', 'in-alice'))
+          .delete('/instances/in-alice.example.org')
+          .reply(204);
+        await dm.ldap.delete(dnOf('in-alice'));
+        for (let i = 0; i < 50 && !destroyed.isDone(); i++)
+          await new Promise(r => setTimeout(r, 10));
+        expect(destroyed.isDone()).to.equal(true);
+        expect(elsewhere.activeMocks()).to.have.lengthOf(1);
+      } finally {
+        self.dashes = true;
+      }
+    });
+
     it('destroys the instance of an account deleted under another spelling', async () => {
       nock(COZY)
         .get('/instances/in-alice.example.org')
@@ -2868,6 +2960,42 @@ describe('Twake instances plugin', function () {
         'core/twake/clouderyProvision',
       ])
         expect(await construct({ plugin: [old] })).to.throw(/load one of them/);
+    });
+
+    it('keeps no dash in a slug with the Cloudery, and keeps it with cozy-stack, unless told', async () => {
+      const slugOf = async (
+        config: Record<string, unknown>
+      ): Promise<string | undefined> => {
+        const instances = (
+          await construct({ twake_instance_dn: ['ou=a$'], ...config })
+        )() as unknown as {
+          account: (dn: string, entry: AttributesList) => { id: string };
+        };
+        return instances.account('uid=jean-claude,ou=a', {
+          uid: 'jean-claude',
+          mail: 'jean-claude@example.org',
+        }).id;
+      };
+      const cozy = {
+        twake_instance_provider: 'cozy-stack',
+        twake_instance_cozy_url: COZY,
+        twake_instance_cozy_domain: 'example.org',
+      };
+      expect(await slugOf({ twake_instance_slug_dashes: 'auto' })).to.equal(
+        'jeanclaude'
+      );
+      expect(await slugOf({ twake_instance_slug_dashes: 'true' })).to.equal(
+        'jean-claude'
+      );
+      expect(
+        await slugOf({ ...cozy, twake_instance_slug_dashes: 'auto' })
+      ).to.equal('jean-claude');
+      expect(
+        await slugOf({ ...cozy, twake_instance_slug_dashes: 'false' })
+      ).to.equal('jeanclaude');
+      expect(await construct({ twake_instance_slug_dashes: 'yes' })).to.throw(
+        /must be one of auto, true, false/
+      );
     });
 
     it('refuses more Cloudery offers than DN expressions', async () => {

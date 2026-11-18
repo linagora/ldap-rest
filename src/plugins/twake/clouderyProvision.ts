@@ -44,7 +44,10 @@ import type { ScimUser } from '../scim/types.js';
 
 import { clouderyOptions, clouderyOptionsOf } from './cloudery.options.js';
 import { cozyOptionsOf } from './cozy.options.js';
-import { twakeInstancesOptionsOf } from './twakeInstances.options.js';
+import {
+  slugDashes,
+  twakeInstancesOptionsOf,
+} from './twakeInstances.options.js';
 
 type ReqWithUser = Request & { user?: string };
 
@@ -182,9 +185,10 @@ export default class ClouderyProvision extends DmPlugin {
     this.pollIntervalMs = settings.cloudery_workflow_poll_interval_ms;
     this.maxPollAttempts = settings.cloudery_workflow_max_attempts;
     // The Cloudery takes the slug core/twake/instances would give it
-    this.slugDashes = twakeInstancesOptionsOf(
-      server.config
-    ).twake_instance_slug_dashes;
+    this.slugDashes = slugDashes(
+      twakeInstancesOptionsOf(server.config),
+      'cloudery'
+    );
 
     this.baseResolver = new BaseResolver(this.config);
 

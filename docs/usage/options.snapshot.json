@@ -1685,8 +1685,8 @@
   },
   {
     "cli": "--twake-instance-slug-dashes",
-    "type": "boolean",
-    "default": true,
+    "type": "string",
+    "default": "auto",
     "env": "DM_TWAKE_INSTANCE_SLUG_DASHES"
   },
   {
