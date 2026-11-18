@@ -12,6 +12,8 @@ import {
   isChildOf,
   rdnValue,
   normalizeDn,
+  canonicalDn,
+  registerAttributeTypes,
   isDnInBranch,
   isDirectChildOf,
   organizationLink,
@@ -623,6 +625,44 @@ describe('LDAP Utils', () => {
       // One assertion: its value holds the `+` and the `=`
       expect(normalizeDn('cn=a\\+sn=b,dc=x')).to.equal('cn=a\\+sn\\=b,dc=x');
       expect(normalizeDn('sn=b+cn=a,dc=x')).to.equal('cn=a+sn=b,dc=x');
+    });
+  });
+
+  // Normalizations are memoized: each answer here is also a check that a
+  // later reading of the same DN, or of one near it, is not the earlier one.
+  describe('memoized normalization', () => {
+    it('keeps the values of canonicalDn in their case after normalizeDn', () => {
+      expect(normalizeDn('CN=Smith,DC=Example')).to.equal(
+        'cn=smith,dc=example'
+      );
+      expect(canonicalDn('CN=Smith,DC=Example')).to.equal(
+        'cn=Smith,dc=Example'
+      );
+      expect(normalizeDn('CN=Smith,DC=Example')).to.equal(
+        'cn=smith,dc=example'
+      );
+    });
+
+    it('recomputes a DN once an attribute type is registered', () => {
+      expect(normalizeDn('1.2.3.4.5=x')).to.equal('1.2.3.4.5=x');
+      registerAttributeTypes([{ oid: '1.2.3.4.5', names: ['memoTestType'] }]);
+      expect(normalizeDn('1.2.3.4.5=x')).to.equal('memotesttype=x');
+      expect(normalizeDn('memoTestType=x')).to.equal('memotesttype=x');
+    });
+
+    it('still answers a DN it had to evict', () => {
+      const first = 'uid=first,ou=users,dc=example,dc=com';
+      expect(normalizeDn(first)).to.equal(
+        'uid=first,ou=users,dc=example,dc=com'
+      );
+      for (let i = 0; i < 2000; i++)
+        expect(normalizeDn(`uid=u${i},ou=users,dc=example,dc=com`)).to.equal(
+          `uid=u${i},ou=users,dc=example,dc=com`
+        );
+      expect(normalizeDn(first)).to.equal(
+        'uid=first,ou=users,dc=example,dc=com'
+      );
+      expect(isDnInBranch(first, 'ou=users,dc=example,dc=com')).to.equal(true);
     });
   });
 
