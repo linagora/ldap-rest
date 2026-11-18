@@ -3,8 +3,9 @@
  *
  * Gives every account this server creates its workplace instance, once its
  * entry is written, from the Cloudery or from the cozy-stack admin API. The
- * address is written once the instance exists, then `user.created` is
- * published and the entry marked. The event is sent at least once.
+ * address is reserved on the entry when the instance is asked for; once the
+ * instance exists, `user.created` is published and the entry marked. The
+ * event is sent at least once.
  *
  * See `docs/usage/plugins/integrations/instances.md`.
  */
@@ -16,17 +17,29 @@ import type { Express, Request } from 'express';
 import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
 import type { DM } from '../../bin/index.js';
 import type { Hooks } from '../../hooks.js';
-import { BadRequestError, NotFoundError } from '../../lib/errors.js';
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from '../../lib/errors.js';
 import {
   ClouderyProvider,
   CozyStackProvider,
+  type FoundInstance,
   type InstanceProvider,
+  InstanceRefusedError,
   instanceSlug,
   type InstanceRequest,
   matrixId,
+  numberedSlug,
 } from '../../lib/instanceProviders.js';
-import type { AttributesList, SearchResult } from '../../lib/ldapActions.js';
+import type {
+  AttributesList,
+  ModifyOptions,
+  SearchResult,
+} from '../../lib/ldapActions.js';
 import { extractLdapCode } from '../../lib/ldapCodes.js';
+import { currentOperation } from '../../lib/operation.js';
 import {
   canonicalDn,
   escapeLdapFilter,
@@ -45,6 +58,7 @@ import {
   type LifecycleAttributes,
 } from './lifecycleAttributes.js';
 import {
+  slugDashes,
   twakeInstancesOptions,
   type TwakeInstancesOptions,
 } from './twakeInstances.options.js';
@@ -60,6 +74,11 @@ interface Account extends InstanceRequest {
   twakeId: string;
   /** The organization id came from the DN, not from the provider settings */
   fromDn?: boolean;
+  /**
+   * The slug the other `--twake-instance-slug-dashes` value gives, when it
+   * differs: an account may have its instance there from before
+   */
+  otherId?: string;
 }
 
 /** A `--twake-instance-dn` expression that read a DN, and where it sits. */
@@ -67,6 +86,17 @@ interface PatternMatch {
   exec: RegExpExecArray;
   index: number;
 }
+
+/** The highest number a slug held by other accounts takes. */
+const MAX_SLUG_NUMBER = 99;
+
+/**
+ * The provider refused the instance. A call that timed out or failed on the
+ * way may have been accepted, so its reservation is kept: the next attempt
+ * finds the instance, or asks for it again.
+ */
+const refusal = (err: unknown): boolean =>
+  err instanceof InstanceRefusedError || err instanceof ConflictError;
 
 const first = (value: unknown): string | undefined => {
   const one = (Array.isArray(value) ? value[0] : value) as
@@ -100,6 +130,8 @@ export default class TwakeInstances extends DmPlugin {
   protected readonly fqdnAttribute: string;
   protected readonly sentAttribute: string;
   private readonly locale: string;
+  /** Whether a slug keeps its `-` */
+  private readonly dashes: boolean;
   private readonly lifecycle: LifecycleAttributes;
   /** The Cloudery offer of each `--twake-instance-dn` expression, when several */
   private readonly offers: string[] = [];
@@ -109,6 +141,8 @@ export default class TwakeInstances extends DmPlugin {
   private readonly announcing = new Map<string, Promise<unknown>>();
   /** Set while this plugin writes the mark for a request: not a caller's modify */
   private readonly marking = new AsyncLocalStorage<true>();
+  /** The address of each account a delete takes, by operation and DN key */
+  private readonly deleting = new Map<number, Map<string, string>>();
 
   constructor(server: DM) {
     super(server);
@@ -151,6 +185,7 @@ export default class TwakeInstances extends DmPlugin {
         timeout
       );
       this.locale = settings.twake_instance_locale || 'fr';
+      this.dashes = slugDashes(settings, 'cozy-stack');
     } else if (settings.twake_instance_provider === 'cloudery') {
       if (
         !settings.twake_instance_cloudery_url ||
@@ -177,6 +212,7 @@ export default class TwakeInstances extends DmPlugin {
         timeout
       );
       this.locale = settings.twake_instance_locale || 'en';
+      this.dashes = slugDashes(settings, 'cloudery');
     } else {
       throw new Error(
         `${this.name}: --twake-instance-provider must be cloudery or cozy-stack`
@@ -235,17 +271,54 @@ export default class TwakeInstances extends DmPlugin {
       });
       if (account.orgId) await this.announcing.get(account.orgId.toLowerCase());
     },
+    // A numbered slug is not the one the DN gives: the address is read
+    // before the entry goes
+    ldapdeleterequest: async ([dns, req]) => {
+      const op = currentOperation();
+      if (op === undefined || !(this.provider instanceof CozyStackProvider))
+        return [dns, req];
+      for (const dn of [dns].flat()) {
+        if (!this.match(dn)) continue;
+        // As the server: the address is read whoever deletes the account
+        const res = (await this.server.ldap.system
+          .search(
+            { paged: false, scope: 'base', attributes: [this.fqdnAttribute] },
+            dn
+          )
+          .catch(() => undefined)) as SearchResult | undefined;
+        const entry = res?.searchEntries[0];
+        const known = entry && first(this.value(entry, this.fqdnAttribute));
+        if (!known) continue;
+        if (!this.deleting.has(op)) this.deleting.set(op, new Map());
+        this.deleting.get(op)!.set(this.key(dn), known);
+      }
+      return [dns, req];
+    },
     ldapdeletedone: async dns => {
       const provider = this.provider;
       if (!(provider instanceof CozyStackProvider)) return;
+      const op = currentOperation();
+      const known = op === undefined ? undefined : this.deleting.get(op);
       for (const dn of Array.isArray(dns) ? dns : [dns]) {
         const match = this.match(dn);
         const uid = this.uid(dn);
         if (!match || !uid) continue;
+        const id = this.id(uid, match.exec);
+        const otherId = this.id(uid, match.exec, !this.dashes);
+        const address = known?.get(this.key(dn));
+        // Only a numbered form of the account's own slug: a caller may have
+        // written the address. destroy() still checks the OIDC id
+        const slug = (address && this.slugAt([id, otherId], address)) || id;
         // Queued before a re-create of the same DN, whose add comes after
         await this.serialized(this.key(dn), async () => {
           try {
-            await provider.destroy(this.id(uid, match.exec), uid);
+            // An instance another entry holds the address of is its own
+            const at = provider.address({ id: slug } as InstanceRequest);
+            if (await this.holder(dn, at))
+              throw new ConflictError(
+                `${at} belongs to another user, left in place`
+              );
+            await provider.destroy(slug, uid);
           } catch (err) {
             this.logger.error({
               plugin: this.name,
@@ -256,6 +329,9 @@ export default class TwakeInstances extends DmPlugin {
           }
         });
       }
+    },
+    ldapdeleteend: op => {
+      this.deleting.delete(op);
     },
   };
 
@@ -374,20 +450,26 @@ export default class TwakeInstances extends DmPlugin {
           { replace: { [this.sentAttribute]: [] } },
           req
         );
-      // A modify can write the address: taken as is only when it is the one
-      // the provider gives this account, otherwise asked about
       const known = first(this.value(entry, this.fqdnAttribute));
-      if (known) {
-        const confirmed =
-          known.toLowerCase() === this.provider.address(account)
-            ? { fqdn: known, ready: true }
-            : await this.provider.find(account, known);
-        if (confirmed?.ready) {
-          await this.ready(dn, entry, account, confirmed.fqdn, req);
-          return 'ready';
-        }
+      // The address may be a reservation: only the provider says it is built
+      const confirmed = known && (await this.confirm(dn, account, known));
+      if (confirmed && confirmed.found?.ready) {
+        await this.ready(
+          dn,
+          entry,
+          confirmed.account,
+          confirmed.found.fqdn,
+          req
+        );
+        return 'ready';
       }
-      return this.provide(dn, entry, account, req);
+      return this.provide(
+        dn,
+        entry,
+        account,
+        req,
+        confirmed && confirmed.found ? confirmed : undefined
+      );
     });
     // Outside the account's queue: the announce releases its members
     if (orgId) await this.announcing.get(orgId.toLowerCase());
@@ -417,12 +499,12 @@ export default class TwakeInstances extends DmPlugin {
         entry[this.organizationName] = org.name;
       }
       const known =
-        this.organizationFqdn &&
-        first(this.value(entry, this.organizationFqdn));
+        (this.organizationFqdn &&
+          first(this.value(entry, this.organizationFqdn))) ||
+        undefined;
       const request = this.organizationRequest(org);
-      const found = known
-        ? { fqdn: known, ready: true }
-        : await this.provider.find(request);
+      // The address may be a reservation: only the provider says it is built
+      const found = await this.find(entry.dn as string, request, known);
       // Marked: link it again (idempotent) and release what is still held
       if (first(this.value(entry, this.sentAttribute))) {
         if (found?.ready) await this.organizationReady(entry, found.fqdn);
@@ -430,11 +512,12 @@ export default class TwakeInstances extends DmPlugin {
         return 'ready';
       }
       let fqdn = found?.ready && found.fqdn;
-      if (!found) {
-        if (this.provider instanceof ClouderyProvider)
-          await this.provider.createOrganization(org);
-        fqdn = await this.provider.create(request);
-      }
+      if (!found)
+        fqdn = await this.createOrganizationInstance(
+          entry.dn as string,
+          org,
+          request
+        );
       if (!fqdn) return 'pending';
       await this.organizationReady(entry, fqdn);
       return 'ready';
@@ -454,7 +537,6 @@ export default class TwakeInstances extends DmPlugin {
       orgId: org.id,
       orgDomain: org.domain,
       offer: this.settings.twake_instance_cloudery_organization_offer,
-      organization: true,
     };
   }
 
@@ -479,7 +561,7 @@ export default class TwakeInstances extends DmPlugin {
       return;
     }
     const request = this.organizationRequest({ id, name, domain });
-    const found = await this.provider.find(request);
+    const found = await this.find(entry.dn as string, request);
     if (found) {
       const key = id.toLowerCase();
       if (!found.ready || this.announcing.has(key)) return;
@@ -503,12 +585,51 @@ export default class TwakeInstances extends DmPlugin {
         );
       return;
     }
-    await this.provider.createOrganization({ id, name, domain });
     try {
-      await this.provider.create(request);
+      await this.createOrganizationInstance(
+        entry.dn as string,
+        { id, name, domain },
+        request
+      );
     } catch (err) {
       // Another member of the same new organization may have asked first
       if (!(await this.provider.find(request))) throw err;
+    }
+  }
+
+  /**
+   * Ask for an organization's instance, and for the Cloudery organization
+   * first. With an organization address attribute, the address is reserved
+   * on the organization entry while the instance is built, as an account's.
+   */
+  private async createOrganizationInstance(
+    dn: string,
+    org: { id: string; name: string; domain: string },
+    request: InstanceRequest
+  ): Promise<string | undefined> {
+    const address = this.provider.address(request);
+    if (
+      this.organizationFqdn &&
+      !(await this.reserve(dn, this.organizationFqdn, address))
+    )
+      throw new ConflictError(`${address} belongs to another user`);
+    const takeBack = async (): Promise<void> => {
+      if (this.organizationFqdn)
+        await this.unreserve(dn, this.organizationFqdn, address);
+    };
+    try {
+      // No instance is asked for yet
+      if (this.provider instanceof ClouderyProvider)
+        await this.provider.createOrganization(org);
+    } catch (err) {
+      await takeBack();
+      throw err;
+    }
+    try {
+      return await this.provider.create(request);
+    } catch (err) {
+      if (refusal(err)) await takeBack();
+      throw err;
     }
   }
 
@@ -551,21 +672,249 @@ export default class TwakeInstances extends DmPlugin {
     });
   }
 
-  /** Find the instance, or ask for it; write it down once it exists. */
+  /**
+   * Find the instance, or ask for it, from the instance its written address
+   * names when there is one. Its address is reserved while it is built, and
+   * written down for good once it exists.
+   */
   private async provide(
     dn: string,
     entry: AttributesList,
     account: Account,
-    req?: Request
+    req?: Request,
+    known?: { account: Account; found?: FoundInstance }
   ): Promise<'ready' | 'pending'> {
     if (account.orgId) await this.requestOrganization(account.orgId, req);
-    const found = await this.provider.find(account);
-    const fqdn = found
-      ? found.ready && found.fqdn
-      : await this.provider.create(account);
+    const claimed = known ?? (await this.claim(dn, account));
+    let fqdn = claimed.found?.ready && claimed.found.fqdn;
+    if (!claimed.found) {
+      const address = this.provider.address(claimed.account);
+      try {
+        fqdn = await this.provider.create(claimed.account);
+      } catch (err) {
+        if (refusal(err)) await this.unreserve(dn, this.fqdnAttribute, address);
+        throw err;
+      }
+    }
     if (!fqdn) return 'pending';
-    await this.ready(dn, entry, account, fqdn, req);
+    await this.ready(dn, entry, claimed.account, fqdn, req);
     return 'ready';
+  }
+
+  /**
+   * The account's slug, or, with `twake_instance_slug_numbered`, its first
+   * numbered form (`slug2`, `slug3`…) when another account holds it: distinct
+   * uids can reduce to one slug, and the directory tells them apart. The first
+   * one that is the account's own instance, or free, is the account's. Unless
+   * its instance is built, its address is reserved on the entry, so that no
+   * other account takes the instance while it is built. Without the setting,
+   * a slug another account holds refuses the instance.
+   */
+  private async claim(
+    dn: string,
+    account: Account
+  ): Promise<{ account: Account; found?: FoundInstance }> {
+    const last = this.settings.twake_instance_slug_numbered
+      ? MAX_SLUG_NUMBER
+      : 1;
+    let refused: unknown;
+    for (let n = 1; n <= last; n++) {
+      const candidate = n === 1 ? account : this.numbered(account, n);
+      try {
+        const found = await this.find(dn, candidate);
+        if (
+          !found?.ready &&
+          !(await this.reserve(
+            dn,
+            this.fqdnAttribute,
+            this.provider.address(candidate),
+            { declaredClasses: this.config.user_class }
+          ))
+        )
+          throw new ConflictError(
+            `${this.provider.address(candidate)} belongs to another user`
+          );
+        return { account: candidate, found };
+      } catch (err) {
+        if (!(err instanceof ConflictError)) throw err;
+        refused = err;
+      }
+    }
+    if (last === 1) throw refused;
+    const highest = this.numbered(account, MAX_SLUG_NUMBER).id;
+    // An operator's to settle: no form of the slug is left to give
+    this.logger.error({
+      plugin: this.name,
+      event: 'slug',
+      dn,
+      uid: account.twakeId,
+      slug: account.id,
+      error: `every form of the slug up to ${highest} is another account's`,
+    });
+    throw new ConflictError(
+      `${account.id}: held by other accounts up to ${highest}`
+    );
+  }
+
+  /**
+   * Write this address on the entry at `dn`, as the instance being built
+   * there, unless another entry holds it. Two entries may write one address
+   * at once: within this replica the writes of one address wait for each
+   * other, and across replicas the entry whose DN sorts first keeps it, the
+   * other taking its own back.
+   *
+   * @returns whether the entry holds the address
+   */
+  private async reserve(
+    dn: string,
+    attribute: string,
+    address: string,
+    options: ModifyOptions = {}
+  ): Promise<boolean> {
+    const lower = address.toLowerCase();
+    return this.serialized(`address:${lower}`, async () => {
+      if (await this.holder(dn, lower)) return false;
+      // As the server: the instance provisioning records its own progress, whoever's write started it
+      await this.server.ldap.system.modify(
+        dn,
+        { replace: { [attribute]: lower } },
+        undefined,
+        options
+      );
+      const self = this.key(dn);
+      if (
+        (await this.holders(dn, lower)).every(other => self < this.key(other))
+      )
+        return true;
+      await this.unreserve(dn, attribute, lower);
+      return false;
+    });
+  }
+
+  /** Take back a reservation, when the entry still holds that address */
+  private async unreserve(
+    dn: string,
+    attribute: string,
+    address: string
+  ): Promise<void> {
+    // As the server: the instance provisioning records its own progress, whoever's write started it
+    await this.server.ldap.system
+      .modify(dn, { delete: { [attribute]: address.toLowerCase() } })
+      .catch(() => undefined);
+  }
+
+  /** The account under the `n`th form of its slug, `slug2` for 2 */
+  private numbered(account: Account, n: number): Account {
+    return {
+      ...account,
+      id: numberedSlug(account.id, n, this.provider.slugMaxLength),
+    };
+  }
+
+  /**
+   * The instance at the address written on the account at `dn`. A modify can
+   * write it, so it is the account's only at its slug's address or at a
+   * numbered form of it, whatever `twake_instance_slug_numbered` says now, and
+   * only when no other entry holds it. It may be a reservation, so the
+   * provider is asked about it as that slug, the instance's OIDC id with the
+   * Cloudery, and says whether it is built. Any other address is not the
+   * account's.
+   */
+  private async confirm(
+    dn: string,
+    account: Account,
+    known: string
+  ): Promise<{ account: Account; found?: FoundInstance }> {
+    const address = known.toLowerCase();
+    const id = this.slugAt(
+      account.otherId ? [account.id, account.otherId] : [account.id],
+      address
+    );
+    if (!id) return { account };
+    const asked = id === account.id ? account : { ...account, id };
+    return { account: asked, found: await this.find(dn, asked, known) };
+  }
+
+  /**
+   * The instance at this request's address, or at `at`, once the directory
+   * says it is not another entry's: an instance is the one of the entry whose
+   * address attribute names it. The provider compares the OIDC id only.
+   */
+  private async find(
+    dn: string,
+    request: InstanceRequest,
+    at?: string
+  ): Promise<FoundInstance | undefined> {
+    await this.unheld(dn, (at ?? this.provider.address(request)).toLowerCase());
+    return this.provider.find(request, at);
+  }
+
+  /** Refuse an address another entry than `dn` holds. */
+  private async unheld(dn: string, address: string): Promise<void> {
+    if (await this.holder(dn, address))
+      throw new ConflictError(`${address} belongs to another user`);
+  }
+
+  /**
+   * The entry other than `dn` whose address attribute, or organization
+   * address attribute, holds this address, built or being built. A tombstone
+   * keeps its address, so a deleted account's instance stays its own.
+   */
+  private async holder(
+    dn: string,
+    address: string
+  ): Promise<string | undefined> {
+    return (await this.holders(dn, address))[0];
+  }
+
+  /** The entries other than `dn` that hold this address */
+  private async holders(dn: string, address: string): Promise<string[]> {
+    const value = escapeLdapFilter(address.toLowerCase());
+    const attributes = [
+      ...new Set(
+        [this.fqdnAttribute, this.organizationFqdn]
+          .filter(Boolean)
+          .map(a => a.toLowerCase())
+      ),
+    ];
+    const filter =
+      attributes.length === 1
+        ? `(${attributes[0]}=${value})`
+        : `(|${attributes.map(a => `(${a}=${value})`).join('')})`;
+    // As the server: who holds an address is read whoever's write asks
+    const res = (await this.server.ldap.system.search(
+      { paged: false, scope: 'sub', filter, attributes },
+      this.config.ldap_base
+    )) as SearchResult;
+    const self = this.key(dn);
+    return res.searchEntries
+      .map(e => e.dn)
+      .filter(other => this.key(other) !== self);
+  }
+
+  /**
+   * The slug among `ids`, or the numbered form of one, whose instance is at
+   * this address
+   */
+  private slugAt(ids: string[], address: string): string | undefined {
+    const lower = address.toLowerCase();
+    const at = (id: string): string =>
+      this.provider.address({ id } as InstanceRequest);
+    return (
+      ids.find(id => at(id) === lower) ??
+      ids.map(id => this.numberedAt(id, lower)).find(Boolean)
+    );
+  }
+
+  /** The numbered form of slug `id` whose instance is at this address */
+  private numberedAt(id: string, address: string): string | undefined {
+    const lower = address.toLowerCase();
+    for (let n = 2; n <= MAX_SLUG_NUMBER; n++) {
+      const numbered = numberedSlug(id, n, this.provider.slugMaxLength);
+      if (this.provider.address({ id: numbered } as InstanceRequest) === lower)
+        return numbered;
+    }
+    return undefined;
   }
 
   protected async ready(
@@ -648,7 +997,7 @@ export default class TwakeInstances extends DmPlugin {
       return this.releaseMembers(dn);
     if (
       this.organizationFqdn &&
-      !first(this.value(entry, this.organizationFqdn))
+      first(this.value(entry, this.organizationFqdn)) !== fqdn
     )
       // As the server: the instance provisioning records its own progress, whoever's write started it
       await this.server.ldap.system.modify(dn, {
@@ -708,11 +1057,10 @@ export default class TwakeInstances extends DmPlugin {
     const account = this.account(dn, member);
     const known = first(this.value(member, this.fqdnAttribute));
     if (!account || !known) return;
-    const confirmed =
-      known.toLowerCase() === this.provider.address(account)
-        ? { fqdn: known, ready: true }
-        : await this.provider.find(account, known);
-    if (confirmed?.ready) return this.settle(dn, confirmed.fqdn);
+    const { found } = await this.confirm(dn, account, known);
+    if (found?.ready) return this.settle(dn, found.fqdn);
+    // A reservation: workplace.created sends it once the instance is built
+    if (found) return;
     this.logger.warn(
       `${this.name}: ${dn} stays held, its address ${known} is not confirmed; ensureInstance sends it once it is`
     );
@@ -861,6 +1209,7 @@ export default class TwakeInstances extends DmPlugin {
       : (cozy && this.settings.twake_instance_cozy_org_domain) || undefined;
     const offer = this.offers[matched.index];
     const id = this.id(uid, match);
+    const otherId = this.id(uid, match, !this.dashes);
     if (!id) {
       this.logger.warn(
         `${this.name}: ${dn} gives no instance slug, no instance`
@@ -869,8 +1218,12 @@ export default class TwakeInstances extends DmPlugin {
     }
     return {
       id,
-      // cozyProvision's OIDC id, the uid; the Cloudery's is the slug
-      ...(cozy ? { oidc: uid } : {}),
+      ...(otherId && otherId !== id ? { otherId } : {}),
+      // cozyProvision's OIDC id, the uid; the Cloudery's is the slug unless
+      // --twake-instance-cloudery-oidc says uid
+      ...(cozy || this.settings.twake_instance_cloudery_oidc === 'uid'
+        ? { oidc: uid }
+        : {}),
       twakeId: uid,
       email,
       publicName:
@@ -959,13 +1312,21 @@ export default class TwakeInstances extends DmPlugin {
     }
   }
 
-  private id(uid: string, match: RegExpExecArray): string {
+  private id(
+    uid: string,
+    match: RegExpExecArray,
+    dashes = this.dashes
+  ): string {
     const groups: Record<string, string> = { uid, ...match.groups };
     return instanceSlug(
       this.settings.twake_instance_id.replace(
         /\{(\w+)\}/g,
         (_, name: string) => groups[name] ?? ''
-      )
+      ),
+      {
+        maxLength: this.provider.slugMaxLength,
+        dashes,
+      }
     );
   }
 

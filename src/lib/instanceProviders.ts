@@ -12,23 +12,62 @@ import {
 } from './errors.js';
 import { timedOutbound } from './metrics.js';
 
+/** The longest slug the Cloudery takes. */
+export const CLOUDERY_SLUG_MAX_LENGTH = 30;
+
 /**
- * Reduce a name to what the Cloudery takes in a slug; it refused `_` or `@`
- * with "Slug is invalid". `-` is kept, except at either end where no host
- * name takes it: an instance already created with one would otherwise change
- * address. Distinct uids can reduce to one slug, so a creation first checks
- * that an instance already there is the account's own.
+ * The longest slug given to cozy-stack: a DNS label's (RFC 1035). No longer
+ * one can be an address, so an instance cozy-stack already holds keeps its
+ * own; the Cloudery's 30 would move the longer ones.
+ */
+export const COZY_SLUG_MAX_LENGTH = 63;
+
+/**
+ * Reduce a name to what the provider takes in a slug; the Cloudery refused
+ * `_` or `@` with "Slug is invalid", and a slug longer than
+ * {@link CLOUDERY_SLUG_MAX_LENGTH}. `-` is kept, except at either end where
+ * no host name takes it: an instance already created with one would
+ * otherwise change address. Without `dashes`, none is kept: a Cloudery taking
+ * `/\A[a-z0-9]{0,30}\z/` only, and cozy-stack serving apps at
+ * `<slug>-<app>.<domain>` (flat subdomains), refuse a `-` in an instance's
+ * first label. Distinct uids can reduce to one slug, so a creation first
+ * checks that an instance already there is the account's own.
  *
  * @param value uid, or the slug template filled in
+ * @param rules.maxLength the provider's longest slug
+ * @param rules.dashes whether `-` is kept inside the slug
  * @returns the slug, empty when nothing of `value` is kept
  */
-export const instanceSlug = (value: string): string => {
-  const slug = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+export const instanceSlug = (
+  value: string,
+  { maxLength, dashes = true }: { maxLength: number; dashes?: boolean }
+): string => {
+  const slug = value
+    .toLowerCase()
+    .replace(dashes ? /[^a-z0-9-]/g : /[^a-z0-9]/g, '');
   let start = 0;
-  let end = slug.length;
-  while (start < end && slug[start] === '-') start++;
+  while (start < slug.length && slug[start] === '-') start++;
+  // Cut first: a cut slug may end on a dash too
+  let end = Math.min(slug.length, start + maxLength);
   while (end > start && slug[end - 1] === '-') end--;
   return slug.slice(start, end);
+};
+
+/**
+ * The `n`th form of a slug another account holds: the slug with `n` at its
+ * end, shortened so that the whole still fits `maxLength`.
+ *
+ * @param slug the account's slug
+ * @param n 2 for the first number, 3 for the next…
+ * @param maxLength the provider's longest slug
+ */
+export const numberedSlug = (
+  slug: string,
+  n: number,
+  maxLength: number
+): string => {
+  const suffix = String(n);
+  return slug.slice(0, maxLength - suffix.length) + suffix;
 };
 
 /**
@@ -65,12 +104,6 @@ export interface InstanceRequest {
   orgId?: string;
   orgDomain?: string;
   offer?: string;
-  /**
-   * An organization's own instance. It may be owned at the platform domain,
-   * as a personal account's is; with the Cloudery, the organization's link
-   * tells them apart
-   */
-  organization?: boolean;
 }
 
 export interface FoundInstance {
@@ -86,8 +119,10 @@ export interface InstanceProvider {
    */
   create(request: InstanceRequest): Promise<string | undefined>;
   /**
-   * The instance at this request's address, if any. One that belongs to
-   * another account is a conflict, not an answer.
+   * The instance at this request's address, if any. One whose OIDC id is
+   * another is a conflict, not an answer. The email is not compared: the
+   * account's mail is the one that counts, and which account an instance
+   * belongs to is the directory's to say.
    */
   find(
     request: InstanceRequest,
@@ -95,15 +130,25 @@ export interface InstanceProvider {
   ): Promise<FoundInstance | undefined>;
   /** The address this request's instance gets. */
   address(request: InstanceRequest): string;
+  /** The longest slug this provider takes */
+  readonly slugMaxLength: number;
 }
 
 const MAX_BODY = 500;
 
-async function refused(what: string, res: Response): Promise<Error> {
+/**
+ * A provider's answer refusing an instance: unlike a call that timed out or
+ * failed on the way, no instance was accepted.
+ */
+export class InstanceRefusedError extends BadGatewayError {}
+
+async function refused(
+  what: string,
+  res: Response,
+  Refusal: typeof BadGatewayError = BadGatewayError
+): Promise<Error> {
   const body = (await res.text().catch(() => '')).slice(0, MAX_BODY);
-  return new BadGatewayError(
-    `${what}: HTTP ${res.status}${body ? ` ${body}` : ''}`
-  );
+  return new Refusal(`${what}: HTTP ${res.status}${body ? ` ${body}` : ''}`);
 }
 
 /**
@@ -157,6 +202,7 @@ abstract class HttpProvider {
 
 export class ClouderyProvider extends HttpProvider implements InstanceProvider {
   protected readonly target = 'cloudery';
+  readonly slugMaxLength = CLOUDERY_SLUG_MAX_LENGTH;
 
   constructor(
     private readonly url: string,
@@ -185,7 +231,7 @@ export class ClouderyProvider extends HttpProvider implements InstanceProvider {
         publicName: request.publicName,
         public_name: request.publicName,
         locale: request.locale,
-        oidc: request.id,
+        oidc: request.oidc ?? request.id,
         slug: request.id,
         phone: request.phone || '',
         offer: request.offer || this.offer,
@@ -195,7 +241,12 @@ export class ClouderyProvider extends HttpProvider implements InstanceProvider {
         ...(request.orgDomain ? { org_domain: request.orgDomain } : {}),
       }),
     });
-    if (!res.ok) throw await refused('Cloudery refused the instance', res);
+    if (!res.ok)
+      throw await refused(
+        'Cloudery refused the instance',
+        res,
+        InstanceRefusedError
+      );
     return undefined;
   }
 
@@ -211,46 +262,19 @@ export class ClouderyProvider extends HttpProvider implements InstanceProvider {
     if (!res.ok) throw await refused('Cloudery instance search failed', res);
     const { items } = await this.json<{
       items?: {
-        _id?: string;
         fqdn: string;
-        internal_email?: string;
         oidc?: string;
         instantiated_at?: string | null;
       }[];
     }>(res);
     const found = items?.[0];
     if (!found) return undefined;
-    // Only the fields the instance holds are compared
-    if (
-      (found.internal_email &&
-        found.internal_email.toLowerCase() !== request.email.toLowerCase() &&
-        !(
-          request.organization &&
-          (await this.organizationHolds(request.id, found._id))
-        )) ||
-      (found.oidc && found.oidc !== request.id)
-    )
+    // Only an OIDC id the instance holds is compared
+    if (found.oidc && found.oidc !== (request.oidc ?? request.id))
       throw new ConflictError(
         `${fqdn} already exists and belongs to another user`
       );
     return { fqdn: found.fqdn, ready: Boolean(found.instantiated_at) };
-  }
-
-  /** Whether the Cloudery holds this instance as the organization's own */
-  private async organizationHolds(
-    id: string,
-    instanceId?: string
-  ): Promise<boolean> {
-    if (!instanceId) return false;
-    const res = await this.call(
-      `${this.url}/api/v2/organizations/${encodeURIComponent(id)}`,
-      { headers: this.headers() }
-    );
-    if (res.status === 404) return false;
-    if (!res.ok)
-      throw await refused('Cloudery organization lookup failed', res);
-    const org = await this.json<{ instance_id?: string | null }>(res);
-    return org.instance_id === instanceId;
   }
 
   async createOrganization(org: {
@@ -292,6 +316,7 @@ export class CozyStackProvider
   implements InstanceProvider
 {
   protected readonly target = 'cozy-stack';
+  readonly slugMaxLength = COZY_SLUG_MAX_LENGTH;
   private readonly auth: string;
 
   constructor(
@@ -335,7 +360,12 @@ export class CozyStackProvider
         throw new ConflictError(`${fqdn} already exists`);
       return fqdn;
     }
-    if (!res.ok) throw await refused('cozy-stack refused the instance', res);
+    if (!res.ok)
+      throw await refused(
+        'cozy-stack refused the instance',
+        res,
+        InstanceRefusedError
+      );
     await this.finishOnboarding(fqdn);
     return fqdn;
   }
@@ -349,10 +379,7 @@ export class CozyStackProvider
     const found = await this.read(fqdn);
     if (!found) return undefined;
     // Strict here: an instance cozy-stack holds with no owner is not ours
-    if (
-      found.email?.toLowerCase() !== request.email.toLowerCase() ||
-      found.oidc_id !== (request.oidc ?? request.id)
-    )
+    if (found.oidc_id !== (request.oidc ?? request.id))
       throw new ConflictError(
         `${fqdn} already exists and belongs to another user`
       );
@@ -380,10 +407,7 @@ export class CozyStackProvider
 
   private async read(
     fqdn: string
-  ): Promise<
-    | { email?: string; oidc_id?: string; onboarding_finished?: boolean }
-    | undefined
-  > {
+  ): Promise<{ oidc_id?: string; onboarding_finished?: boolean } | undefined> {
     const res = await this.call(
       `${this.url}/instances/${encodeURIComponent(fqdn)}`,
       { headers: this.headers() }
@@ -393,7 +417,6 @@ export class CozyStackProvider
     const { data } = await this.json<{
       data?: {
         attributes?: {
-          email?: string;
           oidc_id?: string;
           onboarding_finished?: boolean;
         };
