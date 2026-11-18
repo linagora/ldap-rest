@@ -347,6 +347,8 @@ describe('LDAP Utils', () => {
       // with: the cache must not take the refusal's place
       const cached = 'uid=x,ou=users,dc=example,dc=com';
       expect(normalizeDn(cached)).to.equal(cached);
+      // What an object with no `toString` of its own reads as
+      expect(normalizeDn('[object Object]')).to.equal('[object object]');
       for (const forged of [
         [cached],
         { toString: () => cached },
@@ -661,6 +663,8 @@ describe('LDAP Utils', () => {
 
     it('recomputes a DN once an attribute type is registered', () => {
       expect(normalizeDn('1.2.3.4.5=x')).to.equal('1.2.3.4.5=x');
+      // Registered for the rest of the run: there is no way to take a type
+      // back out of the registry
       registerAttributeTypes([{ oid: '1.2.3.4.5', names: ['memoTestType'] }]);
       expect(normalizeDn('1.2.3.4.5=x')).to.equal('memotesttype=x');
       expect(normalizeDn('memoTestType=x')).to.equal('memotesttype=x');
