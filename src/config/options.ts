@@ -335,20 +335,25 @@ function reportWarning(
  * configuration entries and the environment variables it would read.
  *
  * A caller that keeps what it read compares these to know whether reading
- * again would answer the same.
+ * again would answer the same. `parsedKeys` is the set {@link readOptions}
+ * is given: for an option the parser knew, it reads the configuration entry
+ * and nothing else, so the environment and the aliases are not compared.
  *
  * @param options the declared options
  * @param config the parsed configuration
+ * @param parsedKeys the options the parser knew, if the caller knows them
  * @returns the values, in the declaration's order
  */
 export function optionInputs(
   options: OptionSet,
-  config: Config | Record<string, unknown>
+  config: Config | Record<string, unknown>,
+  parsedKeys: ReadonlySet<string> = new Set()
 ): unknown[] {
   const source = config as Record<string, unknown>;
   const inputs: unknown[] = [];
   for (const [key, spec] of Object.entries(options)) {
     inputs.push(source[key]);
+    if (parsedKeys.has(key)) continue;
     for (const alias of spec.aliases ?? []) inputs.push(source[cliKey(alias)]);
     for (const name of [spec.env, ...(spec.envAliases ?? [])])
       inputs.push(name === undefined ? undefined : process.env[name]);
@@ -358,8 +363,8 @@ export function optionInputs(
 
 /**
  * Read a plugin's options from a parsed configuration, applying the declared
- * defaults and checking the values. `DmPlugin.options()` calls it once per
- * instance and keeps the result.
+ * defaults and checking the values. `DmPlugin.options()` keeps the result and
+ * reads again only when one of the values it read has changed.
  *
  * `parsedKeys` names the options the parser knew. An option declared outside
  * `src/config/args.ts` reaches the parser as an unknown `--name value` pair,

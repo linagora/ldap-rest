@@ -199,7 +199,7 @@ export default abstract class DmPlugin {
       );
     // Read on the request path — once per search entry in some plugins — for
     // values that only change when the configuration or the environment does
-    const inputs = optionInputs(declared, this.config);
+    const inputs = optionInputs(declared, this.config, parsedOptionKeys);
     const cached = this.optionsCache;
     if (cached && cached.inputs.every((value, i) => value === inputs[i]))
       return cached.value as OptionsOf<T>;
