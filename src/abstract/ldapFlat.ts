@@ -428,11 +428,23 @@ export default abstract class LdapFlat extends DmPlugin {
    * without being able to read it back: the asymmetry is a projection, not an
    * authorization rule, so it lives with the schema.
    *
+   * The set is built once per schema: a page is projected entry by entry.
+   *
    * @returns lowercased attribute names
    */
   protected hiddenAttributes(): Set<string> {
-    return neverReturnAttributes([this.schema]);
+    // A plugin may load its schema after it starts serving: read the set from
+    // the schema it holds now
+    if (!this.hiddenFrom || this.hiddenFrom.schema !== this.schema)
+      this.hiddenFrom = {
+        schema: this.schema,
+        hidden: neverReturnAttributes([this.schema]),
+      };
+    return this.hiddenFrom.hidden;
   }
+
+  /** The set {@link hiddenAttributes} last built, and the schema it read */
+  private hiddenFrom?: { schema?: Schema; hidden: Set<string> };
 
   /**
    * Attributes to ask for when reading one entry. `*` brings the user
@@ -452,10 +464,13 @@ export default abstract class LdapFlat extends DmPlugin {
    * (`userPassword;binary`), so both are normalised before comparison.
    *
    * @param entry entry as read from the directory
+   * @param hidden the attributes to leave out, when the caller projects many
    * @returns a copy without the hidden attributes
    */
-  protected project<T extends Record<string, unknown>>(entry: T): T {
-    const hidden = this.hiddenAttributes();
+  protected project<T extends Record<string, unknown>>(
+    entry: T,
+    hidden = this.hiddenAttributes()
+  ): T {
     if (hidden.size === 0) return entry;
     const out: Record<string, unknown> = {};
     for (const [name, value] of Object.entries(entry)) {
@@ -472,10 +487,11 @@ export default abstract class LdapFlat extends DmPlugin {
    * @returns a copy without the hidden attributes
    */
   protected projectList(list: LdapList): LdapList {
-    if (this.hiddenAttributes().size === 0) return list;
+    const hidden = this.hiddenAttributes();
+    if (hidden.size === 0) return list;
     const out: LdapList = {};
     for (const [id, entry] of Object.entries(list))
-      out[id] = this.project(entry);
+      out[id] = this.project(entry, hidden);
     return out;
   }
 

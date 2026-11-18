@@ -14,6 +14,7 @@ import type { SearchResult } from 'ldapts';
 
 import { DM } from '../../../src/bin';
 import DmPlugin from '../../../src/abstract/plugin';
+import LdapFlat from '../../../src/abstract/ldapFlat';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapGroups from '../../../src/plugins/ldap/groups';
@@ -111,6 +112,57 @@ describe('Schema guards on every route', function () {
         members: ['uid=a', 'uid=b'],
       });
       expect(probe.hide([['uid=a']])).to.deep.equal([['uid=a']]);
+    });
+
+    it('should follow a schema a plugin loads after it started serving', () => {
+      const late = {
+        config: {},
+        logger: console,
+        hooks: {},
+        loadedPlugins: { users: {} },
+      } as unknown as DM;
+      const plugin = new Probe(late);
+      const entry = { dn: 'uid=a', uid: 'a', userPassword: 'x' };
+      expect(plugin.hide(entry)).to.deep.equal(entry);
+      const users = late.loadedPlugins as unknown as Record<
+        string,
+        { schema?: Schema }
+      >;
+      users.users.schema = {
+        strict: false,
+        attributes: { userPassword: { type: 'string', neverReturn: true } },
+      };
+      expect(plugin.hide(entry)).to.deep.equal({ dn: 'uid=a', uid: 'a' });
+    });
+  });
+
+  describe('hiddenAttributes', () => {
+    // A page is projected entry by entry, and the schema may arrive after the
+    // plugin started serving: the set is built once per schema, read again
+    // when the plugin holds another one.
+    const flat = (schema?: Schema): LdapFlat =>
+      Object.assign(Object.create(LdapFlat.prototype) as LdapFlat, { schema });
+    const hiddenOf = (plugin: LdapFlat): Set<string> =>
+      (
+        plugin as unknown as { hiddenAttributes(): Set<string> }
+      ).hiddenAttributes();
+    const users: Schema = {
+      strict: false,
+      attributes: { userPassword: { type: 'string', neverReturn: true } },
+    };
+
+    it('builds the set once, and keeps it', () => {
+      const plugin = flat(users);
+      const hidden = hiddenOf(plugin);
+      expect([...hidden]).to.deep.equal(['userpassword']);
+      expect(hiddenOf(plugin)).to.equal(hidden);
+    });
+
+    it('reads the schema the plugin holds now', () => {
+      const plugin = flat();
+      expect(hiddenOf(plugin).size).to.equal(0);
+      Object.assign(plugin, { schema: users });
+      expect([...hiddenOf(plugin)]).to.deep.equal(['userpassword']);
     });
   });
 

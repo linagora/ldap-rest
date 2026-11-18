@@ -226,20 +226,7 @@ export default abstract class DmPlugin {
    * @returns the same shape, without the hidden attributes
    */
   protected hideNeverReturn<T>(data: T): T {
-    const schemas: (Schema | undefined)[] = [];
-    const isSchema = (value: unknown): value is Schema =>
-      typeof (value as Schema | undefined)?.attributes === 'object';
-    for (const plugin of Object.values(this.server.loadedPlugins)) {
-      const candidate = plugin as unknown as {
-        schema?: unknown;
-        instances?: { schema?: unknown }[];
-      };
-      if (isSchema(candidate.schema)) schemas.push(candidate.schema);
-      if (Array.isArray(candidate.instances))
-        for (const instance of candidate.instances)
-          if (isSchema(instance.schema)) schemas.push(instance.schema);
-    }
-    const hidden = neverReturnAttributes(schemas);
+    const hidden = this.hiddenEverywhere();
     if (hidden.size === 0 || !data || typeof data !== 'object') return data;
     // Only a plain object is an entry: projecting an array as one turns it
     // into an object keyed by index.
@@ -254,6 +241,44 @@ export default abstract class DmPlugin {
       Object.entries(data).map(([key, entry]) => [key, project(entry)])
     ) as T;
   }
+
+  /**
+   * The attributes the schemas of the loaded plugins mark `neverReturn`,
+   * rebuilt only when one of those schemas is not the one read last time.
+   *
+   * The list of schemas is read on each answer, as a plugin may load its
+   * schema after it started serving.
+   *
+   * @returns lowercased attribute names
+   */
+  private hiddenEverywhere(): Set<string> {
+    const schemas: Schema[] = [];
+    const isSchema = (value: unknown): value is Schema =>
+      typeof (value as Schema | undefined)?.attributes === 'object';
+    for (const plugin of Object.values(this.server.loadedPlugins)) {
+      const candidate = plugin as unknown as {
+        schema?: unknown;
+        instances?: { schema?: unknown }[];
+      };
+      if (isSchema(candidate.schema)) schemas.push(candidate.schema);
+      if (Array.isArray(candidate.instances))
+        for (const instance of candidate.instances)
+          if (isSchema(instance.schema)) schemas.push(instance.schema);
+    }
+    const cached = this.hiddenFromSchemas;
+    if (
+      cached &&
+      cached.schemas.length === schemas.length &&
+      schemas.every((schema, i) => schema === cached.schemas[i])
+    )
+      return cached.hidden;
+    const hidden = neverReturnAttributes(schemas);
+    this.hiddenFromSchemas = { schemas, hidden };
+    return hidden;
+  }
+
+  /** The set {@link hiddenEverywhere} last built, and the schemas it read */
+  private hiddenFromSchemas?: { schemas: Schema[]; hidden: Set<string> };
 
   /** Names already warned about by requirePlugin, so each warns at most once. */
   private missingPluginsWarned?: Set<string>;
