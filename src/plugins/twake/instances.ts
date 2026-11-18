@@ -741,8 +741,18 @@ export default class TwakeInstances extends DmPlugin {
       }
     }
     if (last === 1) throw refused;
+    const highest = this.numbered(account, MAX_SLUG_NUMBER).id;
+    // An operator's to settle: no form of the slug is left to give
+    this.logger.error({
+      plugin: this.name,
+      event: 'slug',
+      dn,
+      uid: account.twakeId,
+      slug: account.id,
+      error: `every form of the slug up to ${highest} is another account's`,
+    });
     throw new ConflictError(
-      `${account.id}: held by other accounts up to ${this.numbered(account, MAX_SLUG_NUMBER).id}`
+      `${account.id}: held by other accounts up to ${highest}`
     );
   }
 

@@ -7,7 +7,7 @@ import nock from 'nock';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
-import { ForbiddenError } from '../../../src/lib/errors';
+import { ConflictError, ForbiddenError } from '../../../src/lib/errors';
 import { outboundCalls } from '../../helpers/metrics';
 import { answerAfter } from '../../helpers/nock';
 import {
@@ -309,6 +309,44 @@ describe('Twake instances plugin', function () {
         ).to.match(/belongs to another user/);
         expect(asked.activeMocks()).to.have.lengthOf(1);
         expect(rabbit.published).to.deep.equal([]);
+      });
+    });
+
+    it('logs the account when every numbered form of its slug is taken', async () => {
+      const self = plugin(dm) as unknown as {
+        settings: { twake_instance_slug_numbered: boolean };
+        find: () => Promise<unknown>;
+      };
+      const logged: unknown[] = [];
+      const logger = plugin(dm).logger;
+      const { error } = logger;
+      logger.error = ((m: unknown) => {
+        logged.push(m);
+        return logger;
+      }) as typeof error;
+      self.settings.twake_instance_slug_numbered = true;
+      // Every form held, as by other accounts
+      self.find = async (): Promise<never> => {
+        throw new ConflictError('belongs to another user');
+      };
+      try {
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(
+          String(await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe'))))
+        ).to.match(/held by other accounts up to in-janedoe99/);
+      } finally {
+        delete (self as { find?: unknown }).find;
+        self.settings.twake_instance_slug_numbered = false;
+        logger.error = error;
+        await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
+      }
+      expect(logged).to.deep.include({
+        plugin: 'twakeInstances',
+        event: 'slug',
+        dn: dnOf('in-jane_doe'),
+        uid: 'in-jane_doe',
+        slug: 'in-janedoe',
+        error: "every form of the slug up to in-janedoe99 is another account's",
       });
     });
 
