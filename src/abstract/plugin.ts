@@ -21,6 +21,7 @@ import {
   type Schema,
 } from '../config/schema.js';
 import {
+  optionInputs,
   readOptions,
   type OptionsOf,
   type OptionSet,
@@ -196,10 +197,24 @@ export default abstract class DmPlugin {
         `${this.constructor.name}: options() takes the definitions the ` +
           'plugin declares'
       );
-    return readOptions(declared, this.config, parsedOptionKeys, message =>
-      this.logger.warn(message)
-    ) as OptionsOf<T>;
+    // Read on the request path — once per search entry in some plugins — for
+    // values that only change when the configuration or the environment does
+    const inputs = optionInputs(declared, this.config, parsedOptionKeys);
+    const cached = this.optionsCache;
+    if (cached && cached.inputs.every((value, i) => value === inputs[i]))
+      return cached.value as OptionsOf<T>;
+    const value = readOptions(
+      declared,
+      this.config,
+      parsedOptionKeys,
+      message => this.logger.warn(message)
+    );
+    this.optionsCache = { inputs, value };
+    return value as OptionsOf<T>;
   }
+
+  /** What {@link options} last read, and the values it read it from */
+  private optionsCache?: { inputs: unknown[]; value: unknown };
 
   /**
    * Uniq ID, to be used when calling hooks

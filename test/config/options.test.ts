@@ -4,6 +4,7 @@ import configArgs from '../../src/config/args';
 import {
   defineOptions,
   opt,
+  optionInputs,
   readOptions,
   toConfigEntries,
 } from '../../src/config/options';
@@ -940,6 +941,36 @@ describe('plugin options', () => {
       expect(plugin.options(definitions).sample_size).to.equal(4);
     });
 
+    it('answers the values it read until one of them changes', () => {
+      const dm = new DM();
+      const plugin = new Sample(dm);
+      const first = plugin.options(definitions);
+      expect(plugin.options(definitions)).to.equal(first);
+      (dm.config as unknown as Record<string, unknown>).sample_label = 'y';
+      const second = plugin.options(definitions);
+      expect(second).to.not.equal(first);
+      expect(second.sample_label).to.equal('y');
+    });
+
+    it('reads the environment again when it changed', () => {
+      const fromEnv = defineOptions({
+        sample_env: opt.string({ env: 'DM_TEST_OPTIONS_SAMPLE', default: 'a' }),
+      });
+      class FromEnv extends DmPlugin {
+        static optionDefinitions = fromEnv;
+        name = 'fromEnv';
+      }
+      delete process.env.DM_TEST_OPTIONS_SAMPLE;
+      const plugin = new FromEnv(new DM());
+      expect(plugin.options(fromEnv).sample_env).to.equal('a');
+      process.env.DM_TEST_OPTIONS_SAMPLE = 'b';
+      try {
+        expect(plugin.options(fromEnv).sample_env).to.equal('b');
+      } finally {
+        delete process.env.DM_TEST_OPTIONS_SAMPLE;
+      }
+    });
+
     it('refuses definitions the plugin does not declare', () => {
       const plugin = new Sample(new DM());
       expect(() =>
@@ -959,6 +990,48 @@ describe('plugin options', () => {
       expect(() => new Refused(new DM())).to.throw(
         /--required-value is required/
       );
+    });
+  });
+
+  describe('optionInputs', () => {
+    const declared = defineOptions({
+      sample_env: opt.string({
+        env: 'DM_TEST_OPTIONS_INPUTS',
+        aliases: ['--sample-old'],
+        default: 'a',
+      }),
+    });
+
+    it('reads the entry, the alias and the environment of a declared-in-plugin option', () => {
+      process.env.DM_TEST_OPTIONS_INPUTS = 'from-env';
+      try {
+        expect(optionInputs(declared, {})).to.deep.equal([
+          undefined,
+          undefined,
+          'from-env',
+        ]);
+        expect(optionInputs(declared, { sample_old: 'x' })).to.deep.equal([
+          undefined,
+          'x',
+          'from-env',
+        ]);
+      } finally {
+        delete process.env.DM_TEST_OPTIONS_INPUTS;
+      }
+    });
+
+    // What readOptions reads for such an option: the parser gave it its value
+    it('reads the entry alone for an option the parser knew', () => {
+      process.env.DM_TEST_OPTIONS_INPUTS = 'from-env';
+      try {
+        const parsed = new Set(['sample_env']);
+        expect(optionInputs(declared, {}, parsed)).to.deep.equal([undefined]);
+        expect(
+          optionInputs(declared, { sample_env: 'x' }, parsed)
+        ).to.deep.equal(['x']);
+      } finally {
+        delete process.env.DM_TEST_OPTIONS_INPUTS;
+      }
     });
   });
 });
