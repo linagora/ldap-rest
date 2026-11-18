@@ -432,7 +432,7 @@ export default abstract class LdapFlat extends DmPlugin {
    *
    * @returns lowercased attribute names
    */
-  protected hiddenAttributes(): Set<string> {
+  protected hiddenAttributes(): ReadonlySet<string> {
     // A plugin may load its schema after it starts serving: read the set from
     // the schema it holds now
     if (!this.hiddenFrom || this.hiddenFrom.schema !== this.schema)
@@ -444,7 +444,7 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   /** The set {@link hiddenAttributes} last built, and the schema it read */
-  private hiddenFrom?: { schema?: Schema; hidden: Set<string> };
+  private hiddenFrom?: { schema?: Schema; hidden: ReadonlySet<string> };
 
   /**
    * Attributes to ask for when reading one entry. `*` brings the user

@@ -251,7 +251,7 @@ export default abstract class DmPlugin {
    *
    * @returns lowercased attribute names
    */
-  private hiddenEverywhere(): Set<string> {
+  private hiddenEverywhere(): ReadonlySet<string> {
     const schemas: Schema[] = [];
     const isSchema = (value: unknown): value is Schema =>
       typeof (value as Schema | undefined)?.attributes === 'object';
@@ -278,7 +278,10 @@ export default abstract class DmPlugin {
   }
 
   /** The set {@link hiddenEverywhere} last built, and the schemas it read */
-  private hiddenFromSchemas?: { schemas: Schema[]; hidden: Set<string> };
+  private hiddenFromSchemas?: {
+    schemas: Schema[];
+    hidden: ReadonlySet<string>;
+  };
 
   /** Names already warned about by requirePlugin, so each warns at most once. */
   private missingPluginsWarned?: Set<string>;
