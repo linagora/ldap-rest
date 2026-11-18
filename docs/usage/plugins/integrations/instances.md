@@ -166,7 +166,8 @@ instance at it: the second is refused, as the address is the first one's. With
 `--twake-instance-slug-numbered` it gets `slug2`, or the next number free or
 already its own, up to `slug99`. A name no expression captures stops
 the server at startup. It is the slug of the instance's address; the OIDC id is
-this slug with the Cloudery, and the `uid` with cozy-stack. `user.created`
+this slug with the Cloudery, the `uid` with
+`--twake-instance-cloudery-oidc uid`, and the `uid` with cozy-stack. `user.created`
 names the account by its `uid` (`twakeId`), and gives its Matrix ID as
 `matrixId`, `@local:domain` from its lowercased `mail`; a mail that gives no
 valid Matrix ID sends none, and
@@ -183,9 +184,11 @@ An instance is the one of the entry whose address attribute
 `--twake-instance-organization-fqdn-attribute`) names it. The account's
 `mail`, the one OpenID Connect gives, is the one that counts: an instance
 whose email differs is never refused for it. With the Cloudery the OIDC id is
-the slug, so two `uid`s that reduce to one slug cannot be told apart by the
-provider; the directory tells them apart. The provider still refuses an
-instance whose OIDC id is another.
+the slug by default, so two `uid`s that reduce to one slug cannot be told
+apart by the provider; the directory tells them apart. The provider still
+refuses an instance whose OIDC id is another: with
+`--twake-instance-cloudery-oidc uid`, as with cozy-stack, that also tells two
+such `uid`s apart.
 
 - An instance at an address another entry holds is not taken, nor asked
   about. A tombstone keeps its entry and its address, so a deleted account's

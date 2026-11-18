@@ -231,7 +231,7 @@ export class ClouderyProvider extends HttpProvider implements InstanceProvider {
         publicName: request.publicName,
         public_name: request.publicName,
         locale: request.locale,
-        oidc: request.id,
+        oidc: request.oidc ?? request.id,
         slug: request.id,
         phone: request.phone || '',
         offer: request.offer || this.offer,
@@ -270,7 +270,7 @@ export class ClouderyProvider extends HttpProvider implements InstanceProvider {
     const found = items?.[0];
     if (!found) return undefined;
     // Only an OIDC id the instance holds is compared
-    if (found.oidc && found.oidc !== request.id)
+    if (found.oidc && found.oidc !== (request.oidc ?? request.id))
       throw new ConflictError(
         `${fqdn} already exists and belongs to another user`
       );

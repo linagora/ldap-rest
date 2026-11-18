@@ -248,6 +248,69 @@ describe('Twake instances plugin', function () {
         }
       });
 
+    describe('with --twake-instance-cloudery-oidc uid', () => {
+      const settings = (): { twake_instance_cloudery_oidc: string } =>
+        (
+          plugin(dm) as unknown as {
+            settings: { twake_instance_cloudery_oidc: string };
+          }
+        ).settings;
+
+      beforeEach(() => {
+        // The default keeps the slug, as the instances created so far have it
+        expect(settings().twake_instance_cloudery_oidc).to.equal('slug');
+        settings().twake_instance_cloudery_oidc = 'uid';
+      });
+
+      afterEach(async () => {
+        settings().twake_instance_cloudery_oidc = 'slug';
+        nock.cleanAll();
+        await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
+      });
+
+      it('asks for the instance with the uid as OIDC id', async () => {
+        let asked: Record<string, unknown> = {};
+        const scope = search('in-janedoe.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => {
+            asked = body as Record<string, unknown>;
+            return true;
+          })
+          .reply(202, {});
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        expect(scope.isDone()).to.equal(true);
+        expect(asked).to.include({ oidc: 'in-jane_doe', slug: 'in-janedoe' });
+      });
+
+      it('takes the instance whose OIDC id is the uid, and refuses another uid’s', async () => {
+        const built = (oidc: string): nock.Scope =>
+          search('in-janedoe.example.org').reply(200, {
+            items: [
+              {
+                fqdn: 'in-janedoe.example.org',
+                oidc,
+                instantiated_at: '2026-01-01T00:00:00Z',
+              },
+            ],
+          });
+        built('in-jane.doe');
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'), rest());
+        built('in-jane.doe');
+        expect(
+          String(await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe'))))
+        ).to.match(/belongs to another user/);
+        expect(rabbit.published).to.deep.equal([]);
+
+        built('in-jane_doe');
+        expect(await plugin(dm).ensureInstance(dnOf('in-jane_doe'))).to.equal(
+          'ready'
+        );
+        expect(
+          rabbit.published.map(p => p.message.workplaceFqdn)
+        ).to.deep.equal(['in-janedoe.example.org']);
+      });
+    });
+
     it('numbers the slug another uid holds, with twake_instance_slug_numbered', async () => {
       const settings = (
         plugin(dm) as unknown as {

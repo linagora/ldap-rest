@@ -1182,8 +1182,11 @@ export default class TwakeInstances extends DmPlugin {
     }
     return {
       id,
-      // cozyProvision's OIDC id, the uid; the Cloudery's is the slug
-      ...(cozy ? { oidc: uid } : {}),
+      // cozyProvision's OIDC id, the uid; the Cloudery's is the slug unless
+      // --twake-instance-cloudery-oidc says uid
+      ...(cozy || this.settings.twake_instance_cloudery_oidc === 'uid'
+        ? { oidc: uid }
+        : {}),
       twakeId: uid,
       email,
       publicName:

@@ -609,6 +609,7 @@ See [lifecycle events](plugins/integrations/lifecycle-events.md).
 | `--twake-instance-cloudery-domain`               | `DM_TWAKE_INSTANCE_CLOUDERY_DOMAIN`               |                                       | Domain of the instances                                   |
 | `--twake-instance-cloudery-offer`                | `DM_TWAKE_INSTANCE_CLOUDERY_OFFER`                | `b2b_twake_default`                   | Offer of an account's instance, or one per DN expression  |
 | `--twake-instance-cloudery-organization-offer`   | `DM_TWAKE_INSTANCE_CLOUDERY_ORGANIZATION_OFFER`   |                                       | Offer of an organization's instance                       |
+| `--twake-instance-cloudery-oidc`                 | `DM_TWAKE_INSTANCE_CLOUDERY_OIDC`                 | `slug`                                | OIDC id of a Cloudery instance: `slug` or `uid`           |
 | `--twake-instance-cozy-url`                      | `DM_TWAKE_INSTANCE_COZY_URL`                      |                                       | cozy-stack admin API                                      |
 | `--twake-instance-cozy-user`                     | `DM_TWAKE_INSTANCE_COZY_USER`                     | `admin`                               | Its user                                                  |
 | `--twake-instance-cozy-passphrase`               | `DM_TWAKE_INSTANCE_COZY_PASSPHRASE`               |                                       | Its passphrase                                            |
@@ -646,6 +647,15 @@ about, never taken as is, and only when no other entry holds it. It is
 recognised whatever the setting says, so turning it off later strands no
 numbered account: its address is still confirmed, and with cozy-stack its delete
 destroys its numbered instance.
+
+`--twake-instance-cloudery-oidc uid` gives a Cloudery instance the account's
+`uid` as OIDC id, as cozy-stack instances have it, rather than its slug: the
+`sub` an OpenID Provider gives naturally. The Cloudery then tells apart two
+`uid`s that reduce to one slug too. A delivery that gives the slug as `sub`, a
+LemonLDAP macro for instance, can give the `uid` instead. The default, `slug`,
+is what the instances created so far carry: changing it on a deployment that
+has instances makes their OIDC id no longer the one asked about, and they are
+refused as someone else's.
 
 See [instances](plugins/integrations/instances.md).
 

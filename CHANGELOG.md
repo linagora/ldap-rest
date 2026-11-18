@@ -18,6 +18,12 @@
   is turned off, and with cozy-stack the delete of a numbered account destroys
   its numbered instance.
 
+- `--twake-instance-cloudery-oidc uid` gives a Cloudery instance the
+  account's `uid` as OIDC id, the `sub` an OpenID Provider gives, rather than
+  its slug, which may be cleaned or numbered (`jeanclaudedusse2`). The
+  default, `slug`, keeps the OIDC id of the instances created so far
+  ([configuration](docs/usage/configuration.md#coretwakeinstances)).
+
 ### Changed
 
 - `twake/instances` and `twake/clouderyProvision` no longer refuse an

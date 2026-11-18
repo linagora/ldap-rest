@@ -1521,6 +1521,12 @@
     "env": "DM_TWAKE_INSTANCE_CLOUDERY_OFFER"
   },
   {
+    "cli": "--twake-instance-cloudery-oidc",
+    "type": "string",
+    "default": "slug",
+    "env": "DM_TWAKE_INSTANCE_CLOUDERY_OIDC"
+  },
+  {
     "cli": "--twake-instance-cloudery-organization-offer",
     "type": "string",
     "default": "",

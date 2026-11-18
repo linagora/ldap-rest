@@ -81,6 +81,13 @@ export const twakeInstancesOptions = defineOptions({
     env: 'DM_TWAKE_INSTANCE_CLOUDERY_ORGANIZATION_OFFER',
     default: '',
   }),
+  // The OIDC id of a Cloudery instance: its slug, as the instances created so
+  // far have it, or the account's uid
+  twake_instance_cloudery_oidc: opt.string({
+    env: 'DM_TWAKE_INSTANCE_CLOUDERY_OIDC',
+    default: 'slug',
+    choices: ['slug', 'uid'],
+  }),
   twake_instance_cozy_url: opt.string({
     env: 'DM_TWAKE_INSTANCE_COZY_URL',
     default: '',
