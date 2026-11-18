@@ -4,7 +4,7 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
-## Unreleased
+## From 2.3.2
 
 ### An instance is the account whose address names it
 
