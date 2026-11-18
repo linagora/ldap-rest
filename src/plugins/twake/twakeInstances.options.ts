@@ -31,6 +31,20 @@ export const twakeInstancesOptions = defineOptions({
     env: 'DM_TWAKE_INSTANCE_ID',
     default: '{uid}',
   }),
+  // `-` inside an instance slug: `auto` keeps none with the Cloudery, which
+  // refuses it, and keeps it with cozy-stack; `false` for a cozy-stack with
+  // flat subdomains too
+  twake_instance_slug_dashes: opt.string({
+    env: 'DM_TWAKE_INSTANCE_SLUG_DASHES',
+    default: 'auto',
+    choices: ['auto', 'true', 'false'],
+  }),
+  // A slug another account holds: number this one (`slug2`, `slug3`…) rather
+  // than refuse the instance
+  twake_instance_slug_numbered: opt.boolean({
+    env: 'DM_TWAKE_INSTANCE_SLUG_NUMBERED',
+    default: false,
+  }),
   twake_instance_fqdn_attribute: opt.string({
     env: 'DM_TWAKE_INSTANCE_FQDN_ATTRIBUTE',
     default: 'twakeWorkspaceUrl',
@@ -68,6 +82,13 @@ export const twakeInstancesOptions = defineOptions({
   twake_instance_cloudery_organization_offer: opt.string({
     env: 'DM_TWAKE_INSTANCE_CLOUDERY_ORGANIZATION_OFFER',
     default: '',
+  }),
+  // The OIDC id of a Cloudery instance: its slug, as the instances created so
+  // far have it, or the account's uid
+  twake_instance_cloudery_oidc: opt.string({
+    env: 'DM_TWAKE_INSTANCE_CLOUDERY_OIDC',
+    default: 'slug',
+    choices: ['slug', 'uid'],
   }),
   twake_instance_cozy_url: opt.string({
     env: 'DM_TWAKE_INSTANCE_COZY_URL',
@@ -154,4 +175,16 @@ export type TwakeInstancesOptions = OptionsOf<typeof twakeInstancesOptions>;
 /** The checked values for a caller that holds a Config instead of the plugin */
 export function twakeInstancesOptionsOf(config: Config): TwakeInstancesOptions {
   return readOptions(twakeInstancesOptions, config);
+}
+
+/**
+ * Whether an instance slug keeps its `-`: as `--twake-instance-slug-dashes`
+ * says, or with `auto` as the provider takes it, the Cloudery refusing it.
+ */
+export function slugDashes(
+  settings: Pick<TwakeInstancesOptions, 'twake_instance_slug_dashes'>,
+  provider: 'cloudery' | 'cozy-stack'
+): boolean {
+  const value = settings.twake_instance_slug_dashes;
+  return value === 'auto' ? provider === 'cozy-stack' : value === 'true';
 }

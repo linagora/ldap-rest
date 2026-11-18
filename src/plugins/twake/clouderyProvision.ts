@@ -4,15 +4,18 @@
  * B2B sibling of `cozyProvision`. For SCIM users created under a configured
  * B2B LDAP branch, it provisions a Twake/Cozy instance via the Cloudery
  * (manager) API, writes the returned FQDN to the `twakeWorkspaceUrl` attribute
- * (bare FQDN) and the org id to `twakeOrganizationId` (the org id arrives in a
- * header, so the SCIM body cannot carry it), and publishes the same lifecycle
- * messages cozyProvision does.
+ * (bare FQDN, reserved there while the instance is built, as
+ * `core/twake/instances` does) and the org id to `twakeOrganizationId` (the
+ * org id arrives in a header, so the SCIM body cannot carry it), and publishes
+ * the same lifecycle messages cozyProvision does.
  *
  * The org id is carried per-request in a header (single shared B2B token), so
  * onboarding a new org needs no config change; the org branch is selected by
  * the core `BaseResolver` (also from a header). The operator supplies the email
  * in the SCIM body, `org_domain` is its domain, and `slug` = `oidc` =
- * instanceSlug(userName + orgId).
+ * instanceSlug(userName + orgId), cut to the Cloudery's 30 characters and
+ * without `-` under `--twake-instance-slug-dashes false`, as
+ * `core/twake/instances` builds it.
  *
  * Alongside the FQDN, the post-create write stamps two attributes the admin
  * panel reads off the user entry: `twakeOrganizationRole` and (when present)
@@ -29,8 +32,11 @@ import type { Request } from 'express';
 import DmPlugin, { type Role, escapeDnValue } from '../../abstract/plugin.js';
 import type { DM } from '../../bin/index.js';
 import { Hooks } from '../../hooks.js';
-import { instanceSlug } from '../../lib/instanceProviders.js';
-import { isChildOf } from '../../lib/utils.js';
+import {
+  CLOUDERY_SLUG_MAX_LENGTH,
+  instanceSlug,
+} from '../../lib/instanceProviders.js';
+import { escapeLdapFilter, isChildOf, normalizeDn } from '../../lib/utils.js';
 import type RabbitMq from '../rabbitmq.js';
 import { BaseResolver } from '../scim/baseResolver.js';
 import { scimOptionsOf } from '../scim/scim.options.js';
@@ -38,6 +44,10 @@ import type { ScimUser } from '../scim/types.js';
 
 import { clouderyOptions, clouderyOptionsOf } from './cloudery.options.js';
 import { cozyOptionsOf } from './cozy.options.js';
+import {
+  slugDashes,
+  twakeInstancesOptionsOf,
+} from './twakeInstances.options.js';
 
 type ReqWithUser = Request & { user?: string };
 
@@ -50,7 +60,6 @@ interface ClouderyInstanceResponse {
 /** An instance as the Cloudery's search lists it */
 interface ClouderyInstanceSummary {
   _id: string;
-  internal_email?: string;
   oidc?: string;
 }
 
@@ -66,6 +75,18 @@ interface DeleteContext {
   fqdn: string;
   domain: string;
 }
+
+/** The Cloudery answered the create with a refusal: no instance accepted */
+class CreateRefusedError extends Error {}
+
+/** A DN as the directory compares it */
+const dnKey = (dn: string): string => {
+  try {
+    return normalizeDn(dn);
+  } catch {
+    return dn.toLowerCase();
+  }
+};
 
 // A create that fails between the pre- and post-create hooks would otherwise
 // leak its captured context; prune anything older than this.
@@ -109,6 +130,7 @@ export default class ClouderyProvision extends DmPlugin {
   private readonly userDeletedRoutingKey: string;
   private readonly pollIntervalMs: number;
   private readonly maxPollAttempts: number;
+  private readonly slugDashes: boolean;
 
   private readonly baseResolver: BaseResolver;
 
@@ -162,6 +184,11 @@ export default class ClouderyProvision extends DmPlugin {
     this.userDeletedRoutingKey = cozy.cozy_user_deleted_routing_key;
     this.pollIntervalMs = settings.cloudery_workflow_poll_interval_ms;
     this.maxPollAttempts = settings.cloudery_workflow_max_attempts;
+    // The Cloudery takes the slug core/twake/instances would give it
+    this.slugDashes = slugDashes(
+      twakeInstancesOptionsOf(server.config),
+      'cloudery'
+    );
 
     this.baseResolver = new BaseResolver(this.config);
 
@@ -370,7 +397,10 @@ export default class ClouderyProvision extends DmPlugin {
 
     const email = ctx.email;
     const orgDomain = emailDomain(email);
-    const slug = instanceSlug(userName + ctx.orgId);
+    const slug = instanceSlug(userName + ctx.orgId, {
+      maxLength: CLOUDERY_SLUG_MAX_LENGTH,
+      dashes: this.slugDashes,
+    });
     if (!slug) {
       this.logger.error({
         plugin: this.name,
@@ -399,12 +429,14 @@ export default class ClouderyProvision extends DmPlugin {
     // Cloudery mint a numbered duplicate (slug2). Fail open: if the lookup
     // errors, fall through to create rather than block provisioning.
     //
-    // Reused only when its email and OIDC id, where it carries them, are the
-    // account's, as `ClouderyProvider.find` does: distinct userNames can
-    // reduce to one slug (`jane_doe`, `janedoe`), sharing the OIDC id, and
-    // the email is what tells them apart. A re-import whose mail changed
-    // since is refused too.
+    // Reused only when its OIDC id, where it carries one, is the account's, as
+    // `ClouderyProvider.find` does, and no other entry holds its address: an
+    // instance is the account's whose address attribute names it. Distinct
+    // userNames can reduce to one slug (`jane_doe`, `janedoe`), sharing the
+    // OIDC id, and the directory tells them apart. The email is not compared:
+    // the account's mail is the one that counts.
     const expectedFqdn = `${slug}.${this.clouderyDomain}`.toLowerCase();
+    const dn = `${this.rdnAttribute}=${escapeDnValue(userName)},${ctx.base}`;
     let existing: ClouderyInstanceSummary | null = null;
     try {
       existing = await this.findInstanceByFqdn(expectedFqdn);
@@ -419,9 +451,8 @@ export default class ClouderyProvision extends DmPlugin {
     }
     if (
       existing &&
-      ((existing.internal_email &&
-        existing.internal_email.toLowerCase() !== email.toLowerCase()) ||
-        (existing.oidc && existing.oidc.toLowerCase() !== slug))
+      ((existing.oidc && existing.oidc.toLowerCase() !== slug) ||
+        (await this.heldElsewhere(dn, expectedFqdn, log)))
     ) {
       this.logger.error({
         ...log,
@@ -443,6 +474,12 @@ export default class ClouderyProvision extends DmPlugin {
       });
       fqdn = expectedFqdn;
     } else {
+      // Reserved while it is built, so that another userName reducing to the
+      // slug does not take it meanwhile
+      if (!(await this.reserve(dn, expectedFqdn, log))) {
+        this.logger.error({ ...log, result: 'slug_taken', fqdn: expectedFqdn });
+        return;
+      }
       let instance: ClouderyInstanceResponse;
       try {
         this.logger.info({
@@ -474,6 +511,10 @@ export default class ClouderyProvision extends DmPlugin {
           // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
           error: `${err}`,
         });
+        // Kept when the request may have been accepted: a re-import finds
+        // its own reservation and the instance, or asks again
+        if (err instanceof CreateRefusedError)
+          await this.unreserve(dn, expectedFqdn);
         return;
       }
 
@@ -481,6 +522,8 @@ export default class ClouderyProvision extends DmPlugin {
         ? await this.waitForWorkflow(instance.workflow)
         : true;
       if (!ready) {
+        // Kept: the Cloudery accepted the instance, which may stay at its
+        // address, and a re-import of this user finds its own reservation
         this.logger.error({
           ...log,
           result: 'workflow_failed',
@@ -491,7 +534,6 @@ export default class ClouderyProvision extends DmPlugin {
 
       fqdn = instance.fqdn;
     }
-    const dn = `${this.rdnAttribute}=${escapeDnValue(userName)},${ctx.base}`;
     // Role and phones live on the user entry for the admin panel to read; they
     // are not part of the Cloudery create payload. Phones are stored as the JSON
     // the panel expects ([{ number, primary }]) and only when present.
@@ -731,7 +773,9 @@ export default class ClouderyProvision extends DmPlugin {
         http_status_text: res.statusText,
         body: body || undefined,
       });
-      throw new Error(`Cloudery createInstance HTTP ${res.status}`);
+      throw new CreateRefusedError(
+        `Cloudery createInstance HTTP ${res.status}`
+      );
     }
     const data = (await res.json()) as ClouderyInstanceResponse;
     this.logger.info({
@@ -845,6 +889,90 @@ export default class ClouderyProvision extends DmPlugin {
    * @param fqdn instance address
    * @param only the one field to ask for, when the others are not needed
    */
+  /**
+   * Whether an entry other than `dn` holds this address. A failed lookup
+   * counts as held: the instance would otherwise be handed over unchecked.
+   */
+  private async heldElsewhere(
+    dn: string,
+    fqdn: string,
+    log: Record<string, unknown>
+  ): Promise<boolean> {
+    const others = await this.holders(dn, fqdn, log);
+    return !others || others.length > 0;
+  }
+
+  /**
+   * Write this address on the entry at `dn` while its instance is built,
+   * unless another entry holds it. Two entries writing it at once: the one
+   * whose DN sorts first keeps it, the other takes its own back.
+   *
+   * @returns whether the entry holds the address
+   */
+  private async reserve(
+    dn: string,
+    fqdn: string,
+    log: Record<string, unknown>
+  ): Promise<boolean> {
+    if (await this.heldElsewhere(dn, fqdn, log)) return false;
+    // As the server: the provisioned instance is recorded on the account, whoever created it
+    await this.server.ldap.system.modify(
+      dn,
+      { replace: { [this.fqdnAttribute]: fqdn } },
+      undefined,
+      { declaredClasses: this.config.user_class }
+    );
+    const others = await this.holders(dn, fqdn, log);
+    const self = dnKey(dn);
+    if (others && others.every(other => self < other)) return true;
+    await this.unreserve(dn, fqdn);
+    return false;
+  }
+
+  /** Take back a reservation, when the entry still holds that address */
+  private async unreserve(dn: string, fqdn: string): Promise<void> {
+    // As the server: the provisioned instance is recorded on the account, whoever created it
+    await this.server.ldap.system
+      .modify(dn, { delete: { [this.fqdnAttribute]: fqdn } })
+      .catch(() => undefined);
+  }
+
+  /**
+   * The DNs, normalized, of the entries other than `dn` that hold this
+   * address; undefined when the directory cannot say.
+   */
+  private async holders(
+    dn: string,
+    fqdn: string,
+    log: Record<string, unknown>
+  ): Promise<string[] | undefined> {
+    try {
+      // As the server: who holds an address is read whoever imports the user
+      const res = (await this.server.ldap.system.search(
+        {
+          paged: false,
+          scope: 'sub',
+          filter: `(${this.fqdnAttribute}=${escapeLdapFilter(fqdn)})`,
+          attributes: [this.fqdnAttribute],
+        },
+        this.config.ldap_base
+      )) as { searchEntries?: Record<string, unknown>[] };
+      const self = dnKey(dn);
+      return (res.searchEntries ?? [])
+        .map(e => dnKey(String(e.dn)))
+        .filter(other => other !== self);
+    } catch (err) {
+      this.logger.error({
+        ...log,
+        result: 'holder_lookup_failed',
+        fqdn,
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        error: `${err}`,
+      });
+      return undefined;
+    }
+  }
+
   private async findInstanceByFqdn(
     fqdn: string,
     only?: string
