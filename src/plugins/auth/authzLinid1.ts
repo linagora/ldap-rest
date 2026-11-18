@@ -308,11 +308,14 @@ export default class AuthzLinid1 extends AuthzBase {
 
     // Read before the base filter: it mutates the entries it judges, and a
     // group it drops is one we may have to put back.
+    const global = this.globalBranches();
     const delegated = new Map<string, Entry>();
     for (const entry of result.searchEntries) {
-      const dn = String(entry.dn);
-      if (this.isGlobalBranch(dn)) continue;
+      // The attribute first: a user carries none, and the branch test below
+      // normalizes the DN against every global branch.
       if (this.delegationsOf(entry, attr).length === 0) continue;
+      const dn = String(entry.dn);
+      if (this.isGlobalBranch(dn, global)) continue;
       delegated.set(this.dnKey(dn), entry);
     }
 
@@ -532,9 +535,17 @@ export default class AuthzLinid1 extends AuthzBase {
     return names;
   }
 
-  /** Whether `dn` is in a branch only its organization's administrators read. */
-  private isGlobalBranch(dn: string): boolean {
-    return this.globalBranches().some(branch => this.within(dn, branch));
+  /**
+   * Whether `dn` is in a branch only its organization's administrators read.
+   *
+   * @param dn the DN to judge
+   * @param branches the global branches, read once when judging many DNs
+   */
+  private isGlobalBranch(
+    dn: string,
+    branches = this.globalBranches()
+  ): boolean {
+    return branches.some(branch => this.within(dn, branch));
   }
 
   /**
@@ -730,9 +741,10 @@ export default class AuthzLinid1 extends AuthzBase {
         base
       )) as SearchResult;
       const groups: { dn: string; manageMembers: boolean }[] = [];
+      const global = this.globalBranches();
       for (const entry of result.searchEntries ?? []) {
         const dn = String(entry.dn);
-        if (this.isGlobalBranch(dn)) continue;
+        if (this.isGlobalBranch(dn, global)) continue;
         if (delegationsIntersect(branches, this.delegationsOf(entry, attr)))
           groups.push({ dn, manageMembers: true });
       }

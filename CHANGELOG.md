@@ -1,5 +1,56 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A Cloudery deployment keeps no `-` inside an instance slug, the default of
+  `--twake-instance-slug-dashes` (`auto`) with `cloudery`: the Cloudery takes
+  `[a-z0-9]` only, so a uid like `jean-claude.dusse` got no instance ("Slug is
+  invalid"). With cozy-stack `auto` keeps it; `false` drops it for a
+  cozy-stack with flat subdomains, which refuses a `-` in an instance's first
+  label, and `true` keeps it whatever the provider. An account whose address
+  was given by the other setting keeps its instance there
+  ([configuration](docs/usage/configuration.md#coretwakeinstances),
+  [upgrading](docs/usage/upgrading.md#slugs-keep-no-dash-with-the-cloudery)).
+  `core/twake/clouderyProvision` reads it too.
+- `--twake-instance-slug-numbered` numbers a slug another account holds
+  (`slug2`, `slug3`…) rather than refuse the instance: distinct uids can
+  reduce to one slug. A numbered address stays the account's when the setting
+  is turned off, and with cozy-stack the delete of a numbered account destroys
+  its numbered instance.
+- `--twake-instance-cloudery-oidc uid` gives a Cloudery instance the
+  account's `uid` as OIDC id, the `sub` an OpenID Provider gives, rather than
+  its slug, which may be cleaned or numbered (`jeanclaudedusse2`). The
+  default, `slug`, keeps the OIDC id of the instances created so far
+  ([configuration](docs/usage/configuration.md#coretwakeinstances)).
+
+### Changed
+
+- `twake/instances` and `twake/clouderyProvision` no longer refuse an
+  instance because its email is not the account's `mail`, the one OpenID
+  Connect gives and the one that counts. An instance is the account's whose
+  address attribute names it: distinct uids that reduce to one slug, which the
+  Cloudery gives one OIDC id, are told apart by the directory. Without
+  `core/twake/tombstone`, an instance a deleted account left on the Cloudery,
+  whose address no entry holds any more, is given to a new account with the
+  same slug
+  ([instances](docs/usage/plugins/integrations/instances.md#which-account-an-instance-is),
+  [upgrading](docs/usage/upgrading.md#an-instance-is-the-account-whose-address-names-it)).
+- The address attribute of `twake/instances` and `twake/clouderyProvision` is
+  written when the instance is asked for, before it is built: it reserves the
+  instance, so that another uid reducing to the same slug does not take it
+  while it is built. The mark and the provider say the instance is built, not
+  the address: what reads it, a LemonLDAP login or `core/twake/drive`, may
+  meet an instance still being built
+  ([instances](docs/usage/plugins/integrations/instances.md#which-account-an-instance-is),
+  [upgrading](docs/usage/upgrading.md#the-address-is-written-before-the-instance-is-built)).
+
+### Fixed
+
+- An instance slug is cut to the 30 characters the Cloudery takes, with the
+  Cloudery; to a DNS label's 63 with cozy-stack.
+
 ## v2.3.2 (2026-11-16)
 
 - The Docker image runs Node.js 26 on Alpine 3.24: Node.js 25 no longer

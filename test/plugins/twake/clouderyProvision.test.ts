@@ -45,17 +45,36 @@ class StubLdap {
   }
   // entry returned by a base-scope search keyed by dn
   entries: Record<string, Record<string, unknown>> = {};
+  // entries a filtered search answers: those holding an address
+  holders: Record<string, unknown>[] = [];
+  holderLookupFails = false;
+  // The address reserved while an instance is built, and taken back, apart
+  // from the account's writes
+  reservations: ModifyCall[] = [];
   async modify(
     dn: string,
     changes: Record<string, unknown>,
     _req?: unknown,
     options?: Record<string, unknown>
   ): Promise<boolean> {
-    this.modifyCalls.push({ dn, changes, options });
+    const replace = changes.replace as Record<string, unknown> | undefined;
+    const reservation =
+      changes.delete !== undefined ||
+      (replace !== undefined &&
+        Object.keys(replace).join() === 'twakeWorkspaceUrl');
+    (reservation ? this.reservations : this.modifyCalls).push({
+      dn,
+      changes,
+      options,
+    });
     return true;
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async search(_opts: any, base: string): Promise<any> {
+  async search(opts: any, base: string): Promise<any> {
+    if (opts?.filter) {
+      if (this.holderLookupFails) throw new Error('directory down');
+      return { searchEntries: this.holders };
+    }
     const entry = this.entries[base];
     return { searchEntries: entry ? [entry] : [] };
   }
@@ -282,7 +301,9 @@ describe('ClouderyProvision plugin', () => {
       );
     });
 
-    it('reuses an existing instance whose email and OIDC id are the account’s', async () => {
+    it('reuses an existing instance whose OIDC id is the account’s, whatever its email', async () => {
+      // Its own entry may hold the address already: it is not another's
+      ldap.holders = [{ dn: `uid=john.doe,${USER_BASE}` }];
       const scope = nock(CLOUDERY)
         .get('/api/v2/instances')
         .query(q => q.fqdn === 'johndoeacme123.twake.app')
@@ -290,7 +311,7 @@ describe('ClouderyProvision plugin', () => {
           items: [
             {
               _id: 'existing-uuid',
-              internal_email: 'John.Doe@acme.com',
+              internal_email: 'old.john@acme.com',
               oidc: 'johndoeacme123',
             },
           ],
@@ -301,6 +322,9 @@ describe('ClouderyProvision plugin', () => {
       expect(scope.isDone()).to.equal(true);
       expect(ldap.modifyCalls).to.have.length(1);
       expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].message.internalEmail).to.equal(
+        'john.doe@acme.com'
+      );
     });
 
     it('reduces the slug to what the Cloudery takes', async () => {
@@ -329,9 +353,67 @@ describe('ClouderyProvision plugin', () => {
       expect(body.oidc).to.equal('janedoestgacme123');
     });
 
-    it('refuses an instance another account holds under the same slug', async () => {
-      // `john_doe` and `john.doe` reduce to one slug. No POST is registered:
-      // a create attempt fails the test, as handing the instance over would.
+    it('drops every dash from the slug by default, the Cloudery refusing it', async () => {
+      let body: Record<string, unknown> = {};
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'jeanclaudedusseacme123.twake.app')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', b => {
+          body = b as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, { id: 'inst-3', fqdn: 'jeanclaudedusseacme123.twake.app' });
+
+      await create(
+        {
+          ...user,
+          userName: 'jean-claude.dusse',
+          emails: [{ value: 'jean-claude@acme.com', primary: true }],
+        },
+        makeReq('acme123')
+      );
+
+      expect(scope.isDone()).to.equal(true);
+      expect(body).to.include({
+        slug: 'jeanclaudedusseacme123',
+        oidc: 'jeanclaudedusseacme123',
+      });
+    });
+
+    it('keeps the dashes in the slug under --twake-instance-slug-dashes true, cut to the 30 characters the Cloudery takes', async () => {
+      Object.assign(dm.config, { twake_instance_slug_dashes: 'true' });
+      plugin = new ClouderyProvision(dm);
+      let body: Record<string, unknown> = {};
+      const slug = `${'a'.repeat(23)}-bbbbbb`;
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === `${slug}.twake.app`)
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', b => {
+          body = b as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, { id: 'inst-4', fqdn: `${slug}.twake.app` });
+
+      await create(
+        {
+          ...user,
+          userName: `${'a'.repeat(23)}-bbbbbb`,
+          emails: [{ value: 'long@acme.com', primary: true }],
+        },
+        makeReq('acme123')
+      );
+
+      expect(scope.isDone()).to.equal(true);
+      expect(body).to.include({ slug, oidc: slug });
+    });
+
+    it('refuses an instance whose address another account holds under the same slug', async () => {
+      // `john_doe` and `john.doe` reduce to one slug and share the OIDC id:
+      // the directory tells them apart. No POST is registered: a create
+      // attempt fails the test, as handing the instance over would.
+      ldap.holders = [{ dn: `uid=john.doe,${USER_BASE}` }];
       const scope = nock(CLOUDERY)
         .get('/api/v2/instances')
         .query(q => q.fqdn === 'johndoeacme123.twake.app')
@@ -353,6 +435,22 @@ describe('ClouderyProvision plugin', () => {
         },
         makeReq('acme123')
       );
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.modifyCalls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    it('refuses an existing instance when the directory cannot say who holds it', async () => {
+      ldap.holderLookupFails = true;
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, {
+          items: [{ _id: 'existing-uuid', oidc: 'johndoeacme123' }],
+        });
+
+      await create(user, makeReq('acme123'));
 
       expect(scope.isDone()).to.equal(true);
       expect(ldap.modifyCalls).to.have.length(0);
@@ -686,6 +784,103 @@ describe('ClouderyProvision plugin', () => {
       await create(user, makeReq('acme123'));
 
       expect(scope.isDone()).to.equal(true);
+      expect(ldap.modifyCalls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
+      // Its reservation is kept: the Cloudery accepted the instance
+      expect(ldap.reservations.map(r => r.changes)).to.deep.equal([
+        { replace: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
+      ]);
+    });
+
+    it('keeps the reservation when the Cloudery cannot be reached', async () => {
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .replyWithError('socket hang up');
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.reservations.map(r => r.changes)).to.deep.equal([
+        { replace: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
+      ]);
+      expect(ldap.modifyCalls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    it('reserves again over its own reservation on a re-import', async () => {
+      ldap.holders = [{ dn: `uid=john.doe,${USER_BASE}` }];
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances')
+        .reply(200, { id: 'inst-1', fqdn: 'johndoeacme123.twake.app' });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.reservations).to.have.length(1);
+      expect(ldap.modifyCalls).to.have.length(1);
+      expect(rabbit.calls).to.have.length(1);
+    });
+
+    it('reserves the address before asking for the instance', async () => {
+      let reserved: ModifyCall[] = [];
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances', () => {
+          reserved = [...ldap.reservations];
+          return true;
+        })
+        .reply(200, { id: 'inst-1', fqdn: 'johndoeacme123.twake.app' });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(reserved).to.deep.equal([
+        {
+          dn: `uid=john.doe,${USER_BASE}`,
+          changes: {
+            replace: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' },
+          },
+          options: { declaredClasses: dm.config.user_class },
+        },
+      ]);
+      expect(ldap.modifyCalls).to.have.length(1);
+      expect(rabbit.calls).to.have.length(1);
+    });
+
+    it('takes the reservation back when the Cloudery refuses the instance', async () => {
+      const scope = nock(CLOUDERY).post('/api/v1/instances').reply(500, 'down');
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.reservations.map(r => r.changes)).to.deep.equal([
+        { replace: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
+        { delete: { twakeWorkspaceUrl: 'johndoeacme123.twake.app' } },
+      ]);
+      expect(ldap.modifyCalls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    it('asks for no instance at an address another entry holds, built or being built', async () => {
+      // `john_doe`'s instance is still being built: no instance to find yet,
+      // but its entry holds the address
+      ldap.holders = [{ dn: `uid=john_doe,${USER_BASE}` }];
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, { items: [] });
+      const asked = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .optionally()
+        .reply(200, { id: 'inst-1', fqdn: 'johndoeacme123.twake.app' });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(asked.activeMocks()).to.have.length(1);
+      expect(ldap.reservations).to.have.length(0);
       expect(ldap.modifyCalls).to.have.length(0);
       expect(rabbit.calls).to.have.length(0);
     });
