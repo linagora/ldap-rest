@@ -342,6 +342,22 @@ describe('LDAP Utils', () => {
       );
     });
 
+    it('should refuse a value that is not a string even once a DN is cached', () => {
+      // Read as text, a value that is not a string spells the DN it answers
+      // with: the cache must not take the refusal's place
+      const cached = 'uid=x,ou=users,dc=example,dc=com';
+      expect(normalizeDn(cached)).to.equal(cached);
+      for (const forged of [
+        [cached],
+        { toString: () => cached },
+        { length: 1e100 },
+      ])
+        expect(
+          () => normalizeDn(forged as unknown as string),
+          JSON.stringify(forged)
+        ).to.throw(BadRequestError, 'must be a string');
+    });
+
     it('should answer with a 400 status code', () => {
       try {
         parseDn(undefined as unknown as string);
@@ -648,6 +664,13 @@ describe('LDAP Utils', () => {
       registerAttributeTypes([{ oid: '1.2.3.4.5', names: ['memoTestType'] }]);
       expect(normalizeDn('1.2.3.4.5=x')).to.equal('memotesttype=x');
       expect(normalizeDn('memoTestType=x')).to.equal('memotesttype=x');
+    });
+
+    it('answers a DN too long to keep', () => {
+      const long = `cn=${'a'.repeat(2000)},dc=example`;
+      expect(normalizeDn(long)).to.equal(long);
+      expect(normalizeDn(long)).to.equal(long);
+      expect(isDnInBranch(long, 'dc=example')).to.equal(true);
     });
 
     it('still answers a DN it had to evict', () => {

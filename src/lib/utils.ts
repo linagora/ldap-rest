@@ -884,6 +884,8 @@ const attributeTypeSpellings = new Map<string, string>();
  */
 const normalizedRdnsCache = new Map<string, readonly string[]>();
 const NORMALIZED_RDNS_CACHE_SIZE = 1000;
+/** Longer DNs are answered without being kept: see {@link normalizedRdns} */
+const NORMALIZED_RDNS_CACHE_MAX_LENGTH = 1024;
 
 /**
  * Teach {@link normalizeDn} the names and OIDs of attribute types: each is
@@ -1031,6 +1033,10 @@ export function canonicalDn(dn: string): string {
  * the directory spelled `\2C` would read as one that was not escaped.
  */
 function normalizedRdns(dn: string, foldCase = true): readonly string[] {
+  // The key is read from the value as text, so a value that is not a string
+  // would take the answer of the DN it spells instead of {@link parseDn}'s
+  // refusal of it: see the CWE-834 note there.
+  if (typeof dn !== 'string') throw new BadRequestError('DN must be a string');
   const key = `${foldCase ? '1' : '0'}${dn}`;
   const cached = normalizedRdnsCache.get(key);
   if (cached !== undefined) {
@@ -1040,11 +1046,15 @@ function normalizedRdns(dn: string, foldCase = true): readonly string[] {
     return cached;
   }
   const rdns = Object.freeze(computeRdns(dn, foldCase));
-  if (normalizedRdnsCache.size >= NORMALIZED_RDNS_CACHE_SIZE) {
-    const oldest = normalizedRdnsCache.keys().next();
-    if (!oldest.done) normalizedRdnsCache.delete(oldest.value);
+  // A very long DN would hold its place, and the memory, for the life of the
+  // process: the answers worth keeping are branch bases and entry DNs
+  if (dn.length <= NORMALIZED_RDNS_CACHE_MAX_LENGTH) {
+    if (normalizedRdnsCache.size >= NORMALIZED_RDNS_CACHE_SIZE) {
+      const oldest = normalizedRdnsCache.keys().next();
+      if (!oldest.done) normalizedRdnsCache.delete(oldest.value);
+    }
+    normalizedRdnsCache.set(key, rdns);
   }
-  normalizedRdnsCache.set(key, rdns);
   return rdns;
 }
 
