@@ -566,7 +566,7 @@ export function neverReturnAttributes(
  */
 export function withoutAttributes<T extends object>(
   entry: T,
-  hidden: Set<string>
+  hidden: ReadonlySet<string>
 ): T {
   if (hidden.size === 0) return entry;
   const out: Record<string, unknown> = {};
