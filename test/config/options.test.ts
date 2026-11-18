@@ -940,6 +940,36 @@ describe('plugin options', () => {
       expect(plugin.options(definitions).sample_size).to.equal(4);
     });
 
+    it('answers the values it read until one of them changes', () => {
+      const dm = new DM();
+      const plugin = new Sample(dm);
+      const first = plugin.options(definitions);
+      expect(plugin.options(definitions)).to.equal(first);
+      (dm.config as unknown as Record<string, unknown>).sample_label = 'y';
+      const second = plugin.options(definitions);
+      expect(second).to.not.equal(first);
+      expect(second.sample_label).to.equal('y');
+    });
+
+    it('reads the environment again when it changed', () => {
+      const fromEnv = defineOptions({
+        sample_env: opt.string({ env: 'DM_TEST_OPTIONS_SAMPLE', default: 'a' }),
+      });
+      class FromEnv extends DmPlugin {
+        static optionDefinitions = fromEnv;
+        name = 'fromEnv';
+      }
+      delete process.env.DM_TEST_OPTIONS_SAMPLE;
+      const plugin = new FromEnv(new DM());
+      expect(plugin.options(fromEnv).sample_env).to.equal('a');
+      process.env.DM_TEST_OPTIONS_SAMPLE = 'b';
+      try {
+        expect(plugin.options(fromEnv).sample_env).to.equal('b');
+      } finally {
+        delete process.env.DM_TEST_OPTIONS_SAMPLE;
+      }
+    });
+
     it('refuses definitions the plugin does not declare', () => {
       const plugin = new Sample(new DM());
       expect(() =>

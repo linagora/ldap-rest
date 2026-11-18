@@ -331,9 +331,35 @@ function reportWarning(
 }
 
 /**
+ * The values {@link readOptions} takes a declaration's options from: the
+ * configuration entries and the environment variables it would read.
+ *
+ * A caller that keeps what it read compares these to know whether reading
+ * again would answer the same.
+ *
+ * @param options the declared options
+ * @param config the parsed configuration
+ * @returns the values, in the declaration's order
+ */
+export function optionInputs(
+  options: OptionSet,
+  config: Config | Record<string, unknown>
+): unknown[] {
+  const source = config as Record<string, unknown>;
+  const inputs: unknown[] = [];
+  for (const [key, spec] of Object.entries(options)) {
+    inputs.push(source[key]);
+    for (const alias of spec.aliases ?? []) inputs.push(source[cliKey(alias)]);
+    for (const name of [spec.env, ...(spec.envAliases ?? [])])
+      inputs.push(name === undefined ? undefined : process.env[name]);
+  }
+  return inputs;
+}
+
+/**
  * Read a plugin's options from a parsed configuration, applying the declared
- * defaults and checking the values. Called once per instance by
- * `DmPlugin.options()`.
+ * defaults and checking the values. `DmPlugin.options()` calls it once per
+ * instance and keeps the result.
  *
  * `parsedKeys` names the options the parser knew. An option declared outside
  * `src/config/args.ts` reaches the parser as an unknown `--name value` pair,
