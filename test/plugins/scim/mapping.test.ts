@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 
+import { parseDirectoryDate } from '../../../src/lib/utils';
 import { ScimError } from '../../../src/plugins/scim/errors';
 import {
   DEFAULT_USER_MAPPING,
@@ -117,6 +118,72 @@ describe('SCIM mapping', () => {
           ctx
         ).active
       ).to.be.true;
+    });
+  });
+
+  describe('ldapTimeToIso fast path', () => {
+    // The general reader, as it was before the UTC fast path.
+    const reference = (value: string): string => {
+      if (!/^\d{4}\d{2}\d{2}\d{2}/.test(value)) return value;
+      const date = parseDirectoryDate(value);
+      if (!date) return value;
+      return date.toISOString().replace(/\.000Z$/, 'Z');
+    };
+    const p = (n: number, w: number) => String(n).padStart(w, '0');
+
+    it('matches the general reader on a sweep of valid and invalid times', () => {
+      const years = [
+        0, 1, 99, 100, 1899, 1900, 1999, 2000, 2023, 2024, 2100, 9999,
+      ];
+      let n = 0;
+      for (const y of years)
+        for (let mo = 0; mo <= 13; mo++)
+          for (const d of [0, 1, 15, 28, 29, 30, 31, 32])
+            for (const [h, mi, s] of [
+              [0, 0, 0],
+              [23, 59, 59],
+              [24, 0, 0],
+              [12, 60, 0],
+              [12, 30, 60],
+              [12, 30, 61],
+              [7, 5, 9],
+            ]) {
+              const v = `${p(y, 4)}${p(mo, 2)}${p(d, 2)}${p(h, 2)}${p(mi, 2)}${p(s, 2)}Z`;
+              expect(ldapTimeToIso(v), v).to.equal(reference(v));
+              n++;
+            }
+      expect(n).to.be.greaterThan(5000);
+    });
+    it('matches the general reader on pseudo-random timestamps', () => {
+      let seed = 12345;
+      const rnd = (max: number) => {
+        seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+        return seed % max;
+      };
+      for (let i = 0; i < 20000; i++) {
+        const v = `${p(rnd(10000), 4)}${p(rnd(14), 2)}${p(rnd(33), 2)}${p(rnd(25), 2)}${p(rnd(61), 2)}${p(rnd(62), 2)}Z`;
+        expect(ldapTimeToIso(v), v).to.equal(reference(v));
+      }
+    });
+    it('hands everything but the plain UTC form to the general reader', () => {
+      for (const v of [
+        '20250101123045.5Z',
+        '20250101123045+0200',
+        '20250101123045',
+        '202501011230Z',
+        '20250101123060Z',
+        '20241231235960Z',
+        '20250230123045Z',
+        '20251301123045Z',
+        ' 20250101123045Z',
+        '20250101123045Z\n',
+        '2025-01-01T12:30:45Z',
+        'garbage',
+      ])
+        expect(ldapTimeToIso(v), v).to.equal(reference(v));
+      expect(ldapTimeToIso('20241231235960Z')).to.equal('2025-01-01T00:00:00Z');
+      expect(ldapTimeToIso('20240229000000Z')).to.equal('2024-02-29T00:00:00Z');
+      expect(ldapTimeToIso('20250229000000Z')).to.equal('20250229000000Z');
     });
   });
 

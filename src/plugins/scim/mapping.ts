@@ -111,6 +111,25 @@ function asString(v: AttributeValue | undefined): string | undefined {
   return String(v);
 }
 
+const UTC_SECONDS = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/;
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** The plain UTC form, rewritten as text: see {@link ldapTimeToIso} */
+function utcSecondsToIso(value: string): string | undefined {
+  const m = UTC_SECONDS.exec(value);
+  if (!m) return undefined;
+  const [, y, mo, d, h, mi, s] = m;
+  const month = +mo;
+  const day = +d;
+  if (month < 1 || month > 12 || day < 1 || +h > 23 || +mi > 59 || +s > 59)
+    return undefined;
+  const year = +y;
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  if (day > (month === 2 && leap ? 29 : DAYS_IN_MONTH[month - 1]))
+    return undefined;
+  return `${y}-${mo}-${d}T${h}:${mi}:${s}Z`;
+}
+
 /**
  * LDAP GeneralizedTime (RFC 4517 §3.3.13) → SCIM DateTime (RFC 7643 §2.3.5,
  * an `xsd:dateTime`).
@@ -121,14 +140,18 @@ function asString(v: AttributeValue | undefined): string | undefined {
  * `xsd:dateTime` and reject anything else, so the raw directory value must not
  * be forwarded as-is.
  *
- * The instant is read by {@link parseDirectoryDate}, as every other directory
- * time is; this only writes it in the form SCIM asks for, in UTC. A value that
- * does not look like a GeneralizedTime is returned untouched: a directory may
- * already store an ISO 8601 string, and dropping it would lose more than
- * passing it through.
+ * The plain `YYYYMMDDHHMMSSZ` form, already UTC, is rewritten as text once
+ * its fields are checked. Any other form (a fraction, an offset, a leap
+ * second, an impossible date) is read by {@link parseDirectoryDate}, as every
+ * other directory time is, then written in the form SCIM asks for, in UTC. A
+ * value that does not look like a GeneralizedTime is returned untouched: a
+ * directory may already store an ISO 8601 string, and dropping it would lose
+ * more than passing it through.
  */
 export function ldapTimeToIso(value: string | undefined): string | undefined {
   if (!value) return undefined;
+  const fast = utcSecondsToIso(value);
+  if (fast) return fast;
   if (!/^\d{4}\d{2}\d{2}\d{2}/.test(value)) return value;
   const date = parseDirectoryDate(value);
   if (!date) return value;
