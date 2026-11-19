@@ -114,9 +114,7 @@ function asString(v: AttributeValue | undefined): string | undefined {
 const UTC_SECONDS = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/;
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-// The form OpenLDAP writes is already UTC: reformat the text instead of
-// building two Dates. Anything else (leap second, impossible date, fraction,
-// offset) is left to parseDirectoryDate.
+/** The plain UTC form, rewritten as text: see {@link ldapTimeToIso} */
 function utcSecondsToIso(value: string): string | undefined {
   const m = UTC_SECONDS.exec(value);
   if (!m) return undefined;
@@ -142,11 +140,13 @@ function utcSecondsToIso(value: string): string | undefined {
  * `xsd:dateTime` and reject anything else, so the raw directory value must not
  * be forwarded as-is.
  *
- * The instant is read by {@link parseDirectoryDate}, as every other directory
- * time is; this only writes it in the form SCIM asks for, in UTC. A value that
- * does not look like a GeneralizedTime is returned untouched: a directory may
- * already store an ISO 8601 string, and dropping it would lose more than
- * passing it through.
+ * The plain `YYYYMMDDHHMMSSZ` form, already UTC, is rewritten as text once
+ * its fields are checked. Any other form (a fraction, an offset, a leap
+ * second, an impossible date) is read by {@link parseDirectoryDate}, as every
+ * other directory time is, then written in the form SCIM asks for, in UTC. A
+ * value that does not look like a GeneralizedTime is returned untouched: a
+ * directory may already store an ISO 8601 string, and dropping it would lose
+ * more than passing it through.
  */
 export function ldapTimeToIso(value: string | undefined): string | undefined {
   if (!value) return undefined;
