@@ -881,8 +881,40 @@ const attributeTypeSpellings = new Map<string, string>();
  *
  * Bounded, and cleared whenever a new attribute type is registered, since a
  * DN's normalization depends on it: see {@link registerAttributeTypes}.
+ *
+ * One map per case mode, keyed on the DN itself: V8 keeps a string's hash in
+ * the string, and a branch base or an entry DN is the same string call after
+ * call. The two maps share one bound and one use order, a linked list so that
+ * a hit only rewrites a few links instead of deleting and re-adding its key.
  */
-const normalizedRdnsCache = new Map<string, readonly string[]>();
+const normalizedRdnsCache = {
+  folded: new Map<string, RdnsMemo>(),
+  kept: new Map<string, RdnsMemo>(),
+};
+class RdnsMemo {
+  older: RdnsMemo = this;
+  newer: RdnsMemo = this;
+  constructor(
+    readonly dn: string,
+    readonly cache: Map<string, RdnsMemo>,
+    readonly rdns: readonly string[]
+  ) {}
+
+  unlink(): void {
+    this.older.newer = this.newer;
+    this.newer.older = this.older;
+  }
+
+  /** Link this memo as the newest of the ring that `order` heads */
+  linkNewest(order: RdnsMemo): void {
+    this.older = order.older;
+    this.newer = order;
+    order.older.newer = this;
+    order.older = this;
+  }
+}
+/** Head of the use order: its `newer` is the least recently used memo */
+const normalizedRdnsOrder = new RdnsMemo('', new Map(), []);
 const NORMALIZED_RDNS_CACHE_SIZE = 1000;
 /** Longer DNs are answered without being kept: see {@link normalizedRdns} */
 const NORMALIZED_RDNS_CACHE_MAX_LENGTH = 1024;
@@ -898,7 +930,9 @@ export function registerAttributeTypes(
 ): void {
   // A DN normalized before knows the types registered so far: its spelling
   // would no longer be the one a later comparison computes.
-  normalizedRdnsCache.clear();
+  normalizedRdnsCache.folded.clear();
+  normalizedRdnsCache.kept.clear();
+  normalizedRdnsOrder.older = normalizedRdnsOrder.newer = normalizedRdnsOrder;
   for (const { oid, names } of types) {
     const canonical = (names[0] ?? oid).toLowerCase();
     for (const alias of [oid, ...names]) {
@@ -1033,27 +1067,36 @@ export function canonicalDn(dn: string): string {
  * the directory spelled `\2C` would read as one that was not escaped.
  */
 function normalizedRdns(dn: string, foldCase = true): readonly string[] {
-  // The key is read from the value as text, so a value that is not a string
-  // would take the answer of the DN it spells instead of {@link parseDn}'s
-  // refusal of it: see the CWE-834 note there.
+  // Refused before the lookup, so that {@link parseDn}'s refusal of a value
+  // that is not a string never depends on what the cache holds: see the
+  // CWE-834 note there.
   if (typeof dn !== 'string') throw new BadRequestError('DN must be a string');
-  const key = `${foldCase ? '1' : '0'}${dn}`;
-  const cached = normalizedRdnsCache.get(key);
+  const cache = foldCase
+    ? normalizedRdnsCache.folded
+    : normalizedRdnsCache.kept;
+  const order = normalizedRdnsOrder;
+  const cached = cache.get(dn);
   if (cached !== undefined) {
     // Back in last place: the bases stay while a page's entries leave
-    normalizedRdnsCache.delete(key);
-    normalizedRdnsCache.set(key, cached);
-    return cached;
+    if (cached.newer !== order) {
+      cached.unlink();
+      cached.linkNewest(order);
+    }
+    return cached.rdns;
   }
   const rdns = Object.freeze(computeRdns(dn, foldCase));
   // A very long DN would hold its place, and the memory, for the life of the
   // process: the answers worth keeping are branch bases and entry DNs
   if (dn.length <= NORMALIZED_RDNS_CACHE_MAX_LENGTH) {
-    if (normalizedRdnsCache.size >= NORMALIZED_RDNS_CACHE_SIZE) {
-      const oldest = normalizedRdnsCache.keys().next();
-      if (!oldest.done) normalizedRdnsCache.delete(oldest.value);
+    const { folded, kept } = normalizedRdnsCache;
+    if (folded.size + kept.size >= NORMALIZED_RDNS_CACHE_SIZE) {
+      const oldest = order.newer;
+      oldest.unlink();
+      oldest.cache.delete(oldest.dn);
     }
-    normalizedRdnsCache.set(key, rdns);
+    const memo = new RdnsMemo(dn, cache, rdns);
+    memo.linkNewest(order);
+    cache.set(dn, memo);
   }
   return rdns;
 }
@@ -1172,8 +1215,10 @@ export function isDnInBranch(dn: string, base: string): boolean {
   if (baseParts.length === 0) return false;
   const dnParts = normalizedRdns(dn);
   if (dnParts.length < baseParts.length) return false;
-  const tail = dnParts.slice(dnParts.length - baseParts.length);
-  return tail.every((part, i) => part === baseParts[i]);
+  const offset = dnParts.length - baseParts.length;
+  for (let i = 0; i < baseParts.length; i++)
+    if (dnParts[offset + i] !== baseParts[i]) return false;
+  return true;
 }
 
 /**
