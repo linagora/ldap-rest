@@ -744,6 +744,12 @@ export function isDirectChildOf(dn: string, base: string): boolean {
 /** A DN value's escapes: a run of hex pairs, or one escaped character. */
 const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
 
+/** The characters {@link canonicalValue} escapes wherever they stand */
+const DN_SPECIALS = ',+"\\<>;=';
+const DN_SPECIAL_CODES = new Set(
+  Array.from(DN_SPECIALS, char => char.charCodeAt(0))
+);
+
 /**
  * One spelling for a DN value (RFC 4514 §2.4): every escape decoded — the
  * directory answers `ou=Sales\2C EMEA` for what a configuration writes
@@ -822,12 +828,6 @@ function canonicalValue(raw: string, foldCase = true): string {
   }
   return out;
 }
-
-/** The characters {@link canonicalValue} escapes wherever they stand */
-const DN_SPECIALS = ',+"\\<>;=';
-const DN_SPECIAL_CODES = new Set(
-  Array.from(DN_SPECIALS, char => char.charCodeAt(0))
-);
 
 /**
  * Whether a trimmed value is already what {@link canonicalValue} makes of
