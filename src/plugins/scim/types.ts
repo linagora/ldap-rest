@@ -192,7 +192,12 @@ export interface MappingEntry {
   readOnly?: boolean;
   operational?: boolean;
   writeOnly?: boolean;
-  converter?: 'boolean' | 'number' | 'string';
+  /**
+   * Type of a simple (`ldap`) entry's values: `boolean` is `TRUE`/`FALSE` in
+   * the directory and a JSON boolean in SCIM, `number` a JSON number, `date`
+   * a GeneralizedTime in the directory and an `xsd:dateTime` in SCIM.
+   */
+  converter?: 'boolean' | 'number' | 'string' | 'date';
 }
 
 export interface ResourceMapping {

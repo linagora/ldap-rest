@@ -208,6 +208,10 @@
       "import": "./dist/plugins/scim/bulk.js",
       "types": "./dist/src/plugins/scim/bulk.d.ts"
     },
+    "./plugin-scim-converters": {
+      "import": "./dist/plugins/scim/converters.js",
+      "types": "./dist/src/plugins/scim/converters.d.ts"
+    },
     "./plugin-scim-discovery": {
       "import": "./dist/plugins/scim/discovery.js",
       "types": "./dist/src/plugins/scim/discovery.d.ts"

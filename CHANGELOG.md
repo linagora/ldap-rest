@@ -24,7 +24,13 @@
   ([plugin development](docs/plugin-development/README.md#core-properties))
 - SCIM `POST /Users/.search` and `POST /Groups/.search` take the list query
   in a SearchRequest body (RFC 7644 §3.4.3)
-  ([SCIM](docs/usage/plugins/integrations/scim.md#searching-with-post)).
+  ([SCIM](docs/usage/plugins/integrations/scim.md#searching-with-post))
+- The `converter` of a SCIM mapping entry is applied: `boolean` writes
+  `TRUE`/`FALSE` and answers JSON booleans, `number` takes and answers JSON
+  integers, and the new `date` reads and writes GeneralizedTime as
+  `xsd:dateTime` (milliseconds kept, a bare date refused), in bodies, PATCH
+  values and filters
+  ([SCIM](docs/usage/plugins/integrations/scim.md#file-shape))
 
 ### Changed
 

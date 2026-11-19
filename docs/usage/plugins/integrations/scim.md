@@ -243,6 +243,7 @@ Each element of `entries` is a `MappingEntry` with the following optional fields
 | `readOnly`      | `true` to skip this attribute on write: create and PUT ignore it, a PATCH naming it answers `400 mutability`.                 |
 | `operational`   | `true` for LDAP operational attributes (e.g. `entryUUID`) — loaded on read only, and read-only.                               |
 | `writeOnly`     | `true` to write this attribute but never return it nor accept it in a filter (RFC 7643 §7 `returned: "never"`).               |
+| `converter`     | Type of an `ldap` entry's values: `string` (default), `boolean`, `number` or `date` (see below).                              |
 
 Write-only is a property of the LDAP attribute: another entry naming it
 returns nothing either. Credential attributes (`userPassword`, `pwdHistory`,
@@ -251,6 +252,27 @@ and gMSA passwords…, the list `core/ldap/raw` hides) are
 write-only whatever the file says, so a mapping such as
 `{ "scim": "password", "ldap": "userPassword" }` lets clients set passwords
 without ever reading the stored hash back.
+
+`converter` turns the directory's text into the JSON type SCIM carries, and
+back, on write, on read and in filters (`eq`, `ne`, `gt`, `ge`, `lt`, `le`;
+substring operators match the text as given):
+
+| `converter` | SCIM                                   | LDAP                                |
+| ----------- | -------------------------------------- | ----------------------------------- |
+| `boolean`   | `true` / `false` (or the strings)      | `TRUE` / `FALSE` (RFC 4517 Boolean) |
+| `number`    | a JSON integer                         | its decimal text (RFC 4517 Integer) |
+| `date`      | `xsd:dateTime`, `2024-01-31T12:00:00Z` | GeneralizedTime, in UTC             |
+
+`number` takes integers only (`1.5`, `1e21` or `0x10` answer `400`), within
+±2^53−1; a stored integer beyond that range is answered as its text, which a
+JSON number would round. `date` takes a full `xsd:dateTime` with its zone: a
+bare date (`2024-01-31`), a time without seconds or a date that does not
+exist (`2024-02-30`, `T24:00:00`) is refused, and a fraction is kept down to
+the millisecond (`…12:00:00.750Z` is stored `…120000.75Z`).
+
+A value of the wrong type answers `400 invalidValue` (`invalidFilter` in a
+filter). A directory value the converter cannot read is answered as stored.
+An unknown `converter` stops the server at startup.
 
 ### Merging
 
