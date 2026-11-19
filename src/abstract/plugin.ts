@@ -23,6 +23,7 @@ import {
 import {
   optionInputs,
   readOptions,
+  sameOptionInputs,
   type OptionsOf,
   type OptionSet,
 } from '../config/options.js';
@@ -199,10 +200,13 @@ export default abstract class DmPlugin {
       );
     // Read on the request path — once per search entry in some plugins — for
     // values that only change when the configuration or the environment does
-    const inputs = optionInputs(declared, this.config, parsedOptionKeys);
     const cached = this.optionsCache;
-    if (cached && cached.inputs.every((value, i) => value === inputs[i]))
+    if (
+      cached &&
+      sameOptionInputs(declared, this.config, cached.inputs, parsedOptionKeys)
+    )
       return cached.value as OptionsOf<T>;
+    const inputs = optionInputs(declared, this.config, parsedOptionKeys);
     const value = readOptions(
       declared,
       this.config,
