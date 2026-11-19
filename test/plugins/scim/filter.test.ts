@@ -1,8 +1,111 @@
 import { expect } from 'chai';
 
-import { scimFilterToLdap } from '../../../src/plugins/scim/filter';
+import {
+  scimFilterToLdap,
+  tokenize,
+  type Token,
+} from '../../../src/plugins/scim/filter';
 import { DEFAULT_USER_MAPPING } from '../../../src/plugins/scim/mapping';
-import { ScimError } from '../../../src/plugins/scim/errors';
+import { ScimError, scimInvalidFilter } from '../../../src/plugins/scim/errors';
+
+// The tokenizer as it was before it classified characters by code and
+// sliced string literals; the new one must agree with it on every input.
+function referenceTokenize(input: string): Token[] {
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const c = input[i];
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r') {
+      i++;
+      continue;
+    }
+    if (c === '(') {
+      tokens.push({ kind: 'LPAREN', value: '(', pos: i });
+      i++;
+      continue;
+    }
+    if (c === ')') {
+      tokens.push({ kind: 'RPAREN', value: ')', pos: i });
+      i++;
+      continue;
+    }
+    if (c === '[') {
+      tokens.push({ kind: 'LBRACK', value: '[', pos: i });
+      i++;
+      continue;
+    }
+    if (c === ']') {
+      tokens.push({ kind: 'RBRACK', value: ']', pos: i });
+      i++;
+      continue;
+    }
+    if (c === '"') {
+      // String literal, with \" and \\ escapes
+      const start = i;
+      i++;
+      let value = '';
+      while (i < input.length && input[i] !== '"') {
+        if (input[i] === '\\' && i + 1 < input.length) {
+          const next = input[i + 1];
+          if (next === '"') {
+            value += '"';
+            i += 2;
+            continue;
+          }
+          if (next === '\\') {
+            value += '\\';
+            i += 2;
+            continue;
+          }
+          if (next === 'n') {
+            value += '\n';
+            i += 2;
+            continue;
+          }
+          if (next === 't') {
+            value += '\t';
+            i += 2;
+            continue;
+          }
+        }
+        value += input[i];
+        i++;
+      }
+      if (i >= input.length) {
+        throw scimInvalidFilter(
+          `Unterminated string literal at position ${start}`
+        );
+      }
+      i++; // skip closing "
+      tokens.push({ kind: 'STRING', value, pos: start });
+      continue;
+    }
+    if (c >= '0' && c <= '9') {
+      const start = i;
+      while (
+        i < input.length &&
+        /[0-9.+\-eE]/.test(input[i]) &&
+        !/[\s()[\]]/.test(input[i])
+      ) {
+        i++;
+      }
+      tokens.push({ kind: 'NUMBER', value: input.slice(start, i), pos: start });
+      continue;
+    }
+    // Word: identifier, keyword, or dotted path
+    if (/[A-Za-z_$:]/.test(c)) {
+      const start = i;
+      while (i < input.length && /[A-Za-z0-9_.$:]/.test(input[i])) {
+        i++;
+      }
+      tokens.push({ kind: 'WORD', value: input.slice(start, i), pos: start });
+      continue;
+    }
+    throw scimInvalidFilter(`Unexpected character '${c}' at position ${i}`);
+  }
+  tokens.push({ kind: 'EOF', value: '', pos: input.length });
+  return tokens;
+}
 
 describe('SCIM filter parser', () => {
   // `active` is a Users-only pseudo-attribute.
@@ -213,6 +316,74 @@ describe('SCIM filter parser', () => {
     it('null values', () => {
       const r = scimFilterToLdap('displayName eq null', m);
       expect(r.ldapFilter).to.equal('(!(displayName=*))');
+    });
+  });
+
+  describe('tokenizer', () => {
+    const outcome = (fn: (s: string) => Token[], input: string) => {
+      try {
+        return { tokens: fn(input) };
+      } catch (e) {
+        return { error: (e as ScimError).message };
+      }
+    };
+    const values = (input: string) =>
+      tokenize(input)
+        .filter(t => t.kind === 'STRING')
+        .map(t => t.value);
+
+    it('keeps a lone trailing backslash as a literal character', () => {
+      // Unterminated: the backslash is consumed, then the string ends.
+      expect(() => tokenize('a eq "abc\\')).to.throw(
+        'Unterminated string literal at position 5'
+      );
+      expect(values('"a\\\\"')).to.deep.equal(['a\\']);
+    });
+    it('reports an unterminated string at its opening quote', () => {
+      expect(() => tokenize('userName eq "abc')).to.throw(
+        'Unterminated string literal at position 12'
+      );
+      expect(() => tokenize('a eq "x\\"')).to.throw(
+        'Unterminated string literal at position 5'
+      );
+      expect(() => tokenize('"')).to.throw(
+        'Unterminated string literal at position 0'
+      );
+    });
+    it('keeps the backslash of an unknown escape', () => {
+      expect(values('"a\\xb"')).to.deep.equal(['a\\xb']);
+      expect(values('"\\x"')).to.deep.equal(['\\x']);
+    });
+    it('decodes the four escapes', () => {
+      expect(values('"q\\"q\\\\q\\nq\\tq"')).to.deep.equal(['q"q\\q\nq\tq']);
+    });
+    it('rejects an unexpected character with its position', () => {
+      expect(() => tokenize('a eq #')).to.throw(
+        "Unexpected character '#' at position 5"
+      );
+    });
+    it('agrees with the reference tokenizer on generated inputs', () => {
+      const alphabet = [
+        ...'aZ_$:.09+-eE \t\n\r()[]"\\nt#é',
+        'eq',
+        'and',
+        '\\"',
+        '\\\\',
+        '\ud83d',
+      ];
+      let seed = 987654321;
+      const rnd = (max: number) => {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        return seed % max;
+      };
+      for (let n = 0; n < 20000; n++) {
+        let input = '';
+        for (let k = rnd(24); k > 0; k--)
+          input += alphabet[rnd(alphabet.length)];
+        expect(outcome(tokenize, input), JSON.stringify(input)).to.deep.equal(
+          outcome(referenceTokenize, input)
+        );
+      }
     });
   });
 });
