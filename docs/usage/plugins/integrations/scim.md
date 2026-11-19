@@ -359,11 +359,19 @@ another group, and a user and a group can share an id (`--scim-id-attribute`
 defaults to the RDN value). A reference that says neither is looked up as a
 user first, then as the group at `cn=<value>,<group base>` — not elsewhere
 under the group branch, so a user id that outlived its account does not take
-a group of that name for it. A group cannot be made a member of itself
-(`400 invalidValue`); a cycle through several groups is not detected. Under
+a group of that name for it. With `--scim-id-attribute entryUUID`, a bare
+value also names the one group holding that id. A group cannot be made a
+member of itself (`400 invalidValue`); a cycle through several groups is not
+detected. Under
 an authorization model judging by branch, a member in a branch the caller
 may not read refuses the whole write instead, whether the account exists or
 not. A DN outside the user and group bases is left out.
+
+With `--scim-id-attribute` set to another attribute than the RDN, a group's
+`members[].value` and `$ref` carry each member's id, which costs one read
+per member each time the group is answered; the read is skipped when
+`attributes` or `excludedAttributes` leaves `members` out. A member the
+caller may not read is answered by its RDN value.
 
 ### Schema advertisement
 

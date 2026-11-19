@@ -15,6 +15,7 @@ import type {
 import type { Config } from '../../config/args.js';
 import type { DmRequest } from '../../lib/auth/base.js';
 import type HookBus from '../../lib/hookBus.js';
+import { isAuthzRefusal } from '../../lib/errors.js';
 import {
   escapeDnValue,
   escapeLdapFilter,
@@ -43,10 +44,13 @@ import {
   ldapToScimGroup,
   scimGroupToLdap,
   requiredLdapAttributes,
+  asArray,
+  asString,
   type MappingContext,
 } from './mapping.js';
 import { scimFilterToLdap } from './filter.js';
 import { pagedSearch } from './list.js';
+import { projectionKeeps, type ProjectionQuery } from './projection.js';
 import { patchToModifyRequest, writePatch } from './patch.js';
 import {
   extractLdapCode,
@@ -58,6 +62,21 @@ import {
 } from './errors.js';
 import type { ScimUsers } from './users.js';
 import type { ScimOptions } from './scim.options.js';
+
+/** Member entries read at once when their ids are not their RDN values */
+const MEMBER_READS = 8;
+
+/** A projection for a read that only checks the group is there */
+const ONLY_ID: ProjectionQuery = { attributes: ['id'] };
+
+/**
+ * Whether a member read failed because the entry is not there for the caller:
+ * absent (LDAP 32), or refused (LDAP 50, or an authorization plugin).
+ */
+const isUnreadableMember = (err: unknown): boolean => {
+  const code = extractLdapCode(err);
+  return code === 32 || code === 50 || isAuthzRefusal(err);
+};
 
 export interface GroupListQuery {
   filter?: string;
@@ -153,17 +172,111 @@ export class ScimGroups {
     };
   }
 
-  private dnForId(id: string, req?: DmRequest): string {
-    const base = this.baseResolver.groupBase(req);
-    return `${this.rdnAttribute}=${escapeDnValue(id)},${base}`;
+  /** Whether a SCIM id is the RDN value, so its DN is built, not searched */
+  private get idIsRdn(): boolean {
+    return (
+      this.idAttribute === 'rdn' ||
+      this.idAttribute.toLowerCase() === this.rdnAttribute.toLowerCase()
+    );
+  }
+
+  /** DN of the entry a SCIM id names, see ScimUsers.dnForId */
+  private async dnForId(id: string, req: DmRequest): Promise<string> {
+    if (this.idIsRdn)
+      return `${this.rdnAttribute}=${escapeDnValue(id)},${this.baseResolver.groupBase(req)}`;
+    const dn = await this.findById(req, id);
+    if (!dn) throw scimNotFound(`Group ${id} not found`);
+    return dn;
   }
 
   /**
-   * Resolve an LDAP member DN back to a SCIM reference (for GET responses).
-   * Best-effort: extract the RDN value and a guessed type (User if in user base).
+   * The group under the group base whose id attribute holds `id`, when ids
+   * are not RDN values.
+   *
+   * @param req the request, for the tenant's base and the caller's rights
+   * @param id a SCIM id
+   * @returns its DN, undefined unless exactly one group holds it
+   */
+  private async findById(
+    req: DmRequest,
+    id: string
+  ): Promise<string | undefined> {
+    let result: SearchResult;
+    try {
+      result = (await this.ldap.forRequest(req).search(
+        {
+          filter: `(${this.idAttribute}=${escapeLdapFilter(id)})`,
+          scope: 'sub',
+          paged: false,
+          attributes: ['dn'],
+        },
+        this.baseResolver.groupBase(req)
+      )) as SearchResult;
+    } catch (err) {
+      // The base itself is absent: no match, same as an empty result
+      if (extractLdapCode(err) === 32) return undefined;
+      throw err;
+    }
+    return result.searchEntries?.length === 1
+      ? result.searchEntries[0].dn
+      : undefined;
+  }
+
+  /**
+   * The SCIM id of each member DN of `entries`, keyed by lower-cased DN, when
+   * the id is not the RDN value: one base read per distinct member, a few at
+   * a time. A member that is absent, that the caller may not read, or that
+   * lacks the id attribute, is left out and answered by its RDN value; any
+   * other failure is raised.
+   */
+  private async memberIds(
+    req: DmRequest,
+    entries: AttributesList[]
+  ): Promise<Map<string, string>> {
+    const ids = new Map<string, string>();
+    if (this.idIsRdn) return ids;
+    const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
+    const dns = new Map<string, string>();
+    for (const e of entries)
+      for (const dn of asArray(e['member']))
+        if (dn && !isDummyMemberDn(dn, placeholder))
+          dns.set(dn.toLowerCase(), dn);
+    const directory = this.ldap.forRequest(req);
+    const queue = [...dns.entries()];
+    const worker = async (): Promise<void> => {
+      for (let next = queue.shift(); next; next = queue.shift()) {
+        const [key, dn] = next;
+        try {
+          const result = (await directory.search(
+            {
+              scope: 'base',
+              paged: false,
+              attributes: [this.idAttribute],
+            },
+            dn
+          )) as SearchResult;
+          const entry = result.searchEntries?.[0];
+          const id = entry ? asString(entry[this.idAttribute]) : undefined;
+          if (id) ids.set(key, id);
+        } catch (err) {
+          if (!isUnreadableMember(err)) throw err;
+        }
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(MEMBER_READS, queue.length) }, worker)
+    );
+    return ids;
+  }
+
+  /**
+   * Resolve an LDAP member DN back to a SCIM reference (for GET responses):
+   * its id from `ids` (see memberIds), else its RDN value, and a type guessed
+   * from its base or RDN attribute.
    */
   private buildMemberResolver(
-    req: DmRequest | undefined
+    req: DmRequest | undefined,
+    ids: Map<string, string> = new Map()
   ): (dn: string) => MultiValued | undefined {
     const userBase = this.baseResolver.userBase(req);
     const groupBase = this.baseResolver.groupBase(req);
@@ -187,7 +300,7 @@ export class ScimGroups {
       const eq = rdn ? rdn.indexOf('=') : -1;
       if (eq <= 0) return undefined;
       const rdnType = rdn.slice(0, eq).trim();
-      const value = rdnValue(dn);
+      const value = ids.get(dn.toLowerCase()) ?? rdnValue(dn);
       const lower = dn.toLowerCase();
       let type: 'User' | 'Group' | undefined;
       if (userBase && lower.endsWith(userBase.toLowerCase())) type = 'User';
@@ -268,8 +381,29 @@ export class ScimGroups {
     }
   }
 
-  async get(req: DmRequest, id: string): Promise<ScimGroup> {
-    const dn = this.dnForId(id, req);
+  /**
+   * The group a SCIM id names.
+   *
+   * @param req the request, for the tenant's base and the caller's rights
+   * @param id its SCIM id
+   * @param projection what the answer keeps: without `members`, their ids
+   *   are not read
+   * @returns the group
+   */
+  async get(
+    req: DmRequest,
+    id: string,
+    projection: ProjectionQuery = {}
+  ): Promise<ScimGroup> {
+    return this.getByDn(req, await this.dnForId(id, req), id, projection);
+  }
+
+  private async getByDn(
+    req: DmRequest,
+    dn: string,
+    id: string,
+    projection: ProjectionQuery = {}
+  ): Promise<ScimGroup> {
     let result: SearchResult;
     try {
       result = (await this.ldap.forRequest(req).search(
@@ -289,17 +423,23 @@ export class ScimGroups {
     if (!result.searchEntries || result.searchEntries.length === 0) {
       throw scimNotFound(`Group ${id} not found`);
     }
+    const entry = result.searchEntries[0];
     return ldapToScimGroup(
-      result.searchEntries[0],
+      entry,
       this.mapping,
       this.ctx(req),
-      this.buildMemberResolver(req)
+      this.buildMemberResolver(
+        req,
+        projectionKeeps(projection, 'members')
+          ? await this.memberIds(req, [entry])
+          : undefined
+      )
     );
   }
 
   async list(
     req: DmRequest,
-    query: GroupListQuery
+    query: GroupListQuery & ProjectionQuery
   ): Promise<ListResponse<ScimGroup>> {
     const base = this.baseResolver.groupBase(req);
     const startIndex = Math.max(1, query.startIndex || 1);
@@ -321,7 +461,7 @@ export class ScimGroups {
 
     if (idEquals) {
       try {
-        const group = await this.get(req, idEquals);
+        const group = await this.get(req, idEquals, query);
         return {
           schemas: [SCHEMA_LIST_RESPONSE],
           totalResults: 1,
@@ -353,7 +493,12 @@ export class ScimGroups {
       maxScanned: this.maxScanned,
     });
 
-    const resolver = this.buildMemberResolver(req);
+    const resolver = this.buildMemberResolver(
+      req,
+      projectionKeeps(query, 'members')
+        ? await this.memberIds(req, entries)
+        : undefined
+    );
     const resources = entries.map(e =>
       ldapToScimGroup(e, this.mapping, this.ctx(req), resolver)
     );
@@ -420,7 +565,7 @@ export class ScimGroups {
       throw err;
     }
 
-    const created = await this.get(req, rdn);
+    const created = await this.getByDn(req, dn, rdn);
     this.hookBus.notify('scimgroupcreatedone', created);
     return created;
   }
@@ -430,7 +575,7 @@ export class ScimGroups {
     id: string,
     resource: ScimGroup
   ): Promise<ScimGroup> {
-    await this.get(req, id); // ensure exists
+    await this.get(req, id, ONLY_ID); // ensure exists
     const hookInput = await this.hookBus.chain('scimgroupupdate', [
       id,
       resource,
@@ -453,7 +598,7 @@ export class ScimGroups {
       memberDns.push(placeholder);
     }
 
-    const dn = this.dnForId(id, req);
+    const dn = await this.dnForId(id, req);
     this.assertNotSelfMember(dn, memberDns);
     const changes: ModifyRequest = { replace: {} };
     for (const [k, v] of Object.entries(attributes)) {
@@ -473,9 +618,9 @@ export class ScimGroups {
     id: string,
     patch: PatchRequest
   ): Promise<ScimGroup> {
-    const dn = this.dnForId(id, req);
+    const dn = await this.dnForId(id, req);
     await writePatch(dn, async () => {
-      const current = await this.currentEntry(req, id); // ensure exists
+      const current = await this.currentEntry(req, dn, id); // ensure exists
       const changes = await patchToModifyRequest(patch, {
         mapping: this.mapping,
         memberAttribute: 'member',
@@ -535,9 +680,9 @@ export class ScimGroups {
   /** Fetch the raw LDAP entry backing a SCIM id, or raise 404. */
   private async currentEntry(
     req: DmRequest,
+    dn: string,
     id: string
   ): Promise<AttributesList> {
-    const dn = this.dnForId(id, req);
     let result: SearchResult;
     try {
       result = (await this.ldap.forRequest(req).search(
@@ -561,9 +706,9 @@ export class ScimGroups {
   }
 
   async delete(req: DmRequest, id: string): Promise<void> {
-    await this.get(req, id); // ensure exists
+    await this.get(req, id, ONLY_ID); // ensure exists
     const [finalId] = await this.hookBus.chain('scimgroupdelete', [id, req]);
-    const dn = this.dnForId(finalId, req);
+    const dn = await this.dnForId(finalId, req);
     await this.ldap.forRequest(req).delete(dn);
     this.hookBus.notify('scimgroupdeletedone', finalId);
   }
@@ -586,7 +731,8 @@ export class ScimGroups {
 
   /**
    * The group at the DN a value names, under the group base and nowhere
-   * else: a bare value names `cn=<value>,<group base>`.
+   * else: a bare value names `cn=<value>,<group base>`, or, when ids are not
+   * RDN values, the one group whose id attribute holds it.
    *
    * @param req the request, for the tenant's base and the caller's rights
    * @param value an id or a DN
@@ -618,7 +764,8 @@ export class ScimGroups {
       // which would silently drop the reference from the group.
       if (extractLdapCode(err) !== 32) throw err;
     }
-    return undefined;
+    if (given || this.idIsRdn) return undefined;
+    return this.findById(req, value);
   }
 
   /** Used internally and by Bulk to resolve a Group SCIM reference to a DN. */

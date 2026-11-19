@@ -1140,7 +1140,8 @@ export default class Scim extends DmPlugin {
       const projection = this.parseProjection(req);
       const group = await this.groups.get(
         req as DmRequest,
-        req.params.id as string
+        req.params.id as string,
+        projection
       );
       this.scimJson(res, 200, projectResource(group, projection));
     });

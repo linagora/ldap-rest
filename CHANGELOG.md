@@ -43,6 +43,10 @@
   group cannot be made a member of itself (`400 invalidValue`)
   ([#785](https://github.com/linagora/ldap-rest/issues/785),
   [details](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior))
+- With `--scim-id-attribute` set to an attribute other than the RDN
+  (`entryUUID`…), a SCIM User or Group is found by the id the server answered:
+  GET, PUT, PATCH, DELETE and member references no longer answer 404, and a
+  Group's `members[].value` and `$ref` carry the member's id.
 
 ## v2.5.0 (2026-11-23)
 

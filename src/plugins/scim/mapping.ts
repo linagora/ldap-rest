@@ -102,7 +102,7 @@ export function withExternalId(
   };
 }
 
-function asString(v: AttributeValue | undefined): string | undefined {
+export function asString(v: AttributeValue | undefined): string | undefined {
   if (v == null) return undefined;
   if (Array.isArray(v)) {
     const first = v[0];
@@ -160,7 +160,7 @@ export function ldapTimeToIso(value: string | undefined): string | undefined {
   return date.toISOString().replace(/\.000Z$/, 'Z');
 }
 
-function asArray(v: AttributeValue | undefined): string[] {
+export function asArray(v: AttributeValue | undefined): string[] {
   if (v == null) return [];
   if (Array.isArray(v)) {
     return v.map(x => (Buffer.isBuffer(x) ? x.toString() : String(x)));
