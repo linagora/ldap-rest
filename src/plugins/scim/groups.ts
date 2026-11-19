@@ -589,11 +589,14 @@ export class ScimGroups {
       this.objectClass
     );
 
+    const keepMembers =
+      this.options.scim_put_semantics === 'merge' &&
+      incoming.members === undefined;
     const memberDns =
       incoming.members && Array.isArray(incoming.members)
         ? await this.resolveMembers(req, incoming.members)
         : [];
-    if (memberDns.length === 0) {
+    if (memberDns.length === 0 && !keepMembers) {
       const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
       memberDns.push(placeholder);
     }
@@ -605,7 +608,7 @@ export class ScimGroups {
       if (k === 'objectClass' || k === this.rdnAttribute) continue;
       changes.replace![k] = v;
     }
-    changes.replace!.member = memberDns;
+    if (!keepMembers) changes.replace!.member = memberDns;
     await this.ldap.forRequest(req).modify(dn, changes);
 
     const updated = await this.get(req, id);

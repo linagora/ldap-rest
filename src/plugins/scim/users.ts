@@ -393,11 +393,13 @@ export class ScimUsers {
     ]);
     const incoming = hookInput[1];
 
+    const merge = this.options.scim_put_semantics === 'merge';
     const { attributes, active } = scimUserToLdap(
       incoming,
       this.mapping,
       this.ctx(req),
-      this.objectClass
+      this.objectClass,
+      !merge
     );
     const changes: ModifyRequest = { replace: {}, delete: [] };
     const skipAttrs = new Set([
@@ -424,6 +426,7 @@ export class ScimUsers {
       if (attributes[attr] != null) {
         changes.replace![attr] = attributes[attr];
       } else if (
+        !merge &&
         !writeOnly.has(attr.toLowerCase()) &&
         hasAttrValue(currentEntry[attr])
       ) {

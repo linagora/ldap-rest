@@ -31,6 +31,10 @@
   `xsd:dateTime` (milliseconds kept, a bare date refused), in bodies, PATCH
   values and filters
   ([SCIM](docs/usage/plugins/integrations/scim.md#file-shape))
+- `--scim-put-semantics merge` makes a SCIM PUT keep the attributes, and the
+  Group members, the body leaves out; the default, `replace`, removes them as
+  RFC 7644 asks
+  ([SCIM](docs/usage/plugins/integrations/scim.md#put-replace-or-merge))
 
 ### Changed
 

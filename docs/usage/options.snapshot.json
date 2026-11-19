@@ -1296,6 +1296,12 @@
     "env": "DM_SCIM_PREFIX"
   },
   {
+    "cli": "--scim-put-semantics",
+    "type": "string",
+    "default": "replace",
+    "env": "DM_SCIM_PUT_SEMANTICS"
+  },
+  {
     "cli": "--scim-user-base",
     "type": "string",
     "default": "",

@@ -574,7 +574,8 @@ export function scimUserToLdap(
   user: ScimUser,
   mapping: ResourceMapping,
   ctx: MappingContext,
-  objectClass: string[]
+  objectClass: string[],
+  fillRequired = true
 ): { rdn: string; attributes: AttributesList; active?: boolean } {
   const attributes: AttributesList = { objectClass };
   const rdnValue = namingValue(user, 'userName') || namingValue(user, 'id');
@@ -637,7 +638,9 @@ export function scimUserToLdap(
     attributes[ctx.lockAttribute] = ctx.lockValue || DEFAULT_LOCK_VALUE;
   }
 
-  // Ensure required inetOrgPerson attributes have sensible defaults
+  // Ensure required inetOrgPerson attributes have sensible defaults; a
+  // merge keeps the entry's own instead
+  if (!fillRequired) return { rdn: rdnValue, attributes, active };
   if (!attributes.cn && rdnValue) attributes.cn = rdnValue;
   if (!attributes.sn) {
     const sn = [user.name?.familyName, user.displayName, rdnValue].find(

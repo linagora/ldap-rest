@@ -57,6 +57,7 @@ All SCIM endpoints sit behind the auth middleware registered before the plugin
 | `--scim-group-rdn-attribute`         | `DM_SCIM_GROUP_RDN_ATTRIBUTE`         | `cn`                                               | RDN attribute for Groups                                                                         |
 | `--scim-group-external-id-attribute` | `DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE` | —                                                  | LDAP attribute storing a Group's `externalId` (unset: not supported)                             |
 | `--scim-id-attribute`                | `DM_SCIM_ID_ATTRIBUTE`                | `rdn`                                              | `rdn` (default) or `entryUUID` for SCIM `id`                                                     |
+| `--scim-put-semantics`               | `DM_SCIM_PUT_SEMANTICS`               | `replace`                                          | `replace` (RFC 7644) or `merge`: what a PUT does with the attributes it leaves out               |
 | `--scim-user-mapping`                | `DM_SCIM_USER_MAPPING`                | —                                                  | Path to JSON mapping override                                                                    |
 | `--scim-group-mapping`               | `DM_SCIM_GROUP_MAPPING`               | —                                                  | Same for Groups                                                                                  |
 | `--scim-max-results`                 | `DM_SCIM_MAX_RESULTS`                 | `200`                                              | Maximum page size (caps `count`)                                                                 |
@@ -422,6 +423,16 @@ hold one, so nothing is stored unless the deployment names an attribute:
 Without it, `externalId` sent on a Group is ignored and a filter on it answers
 `400 invalidFilter` — which is at least honest. Any free attribute of your
 group entries works; use a mapping override if you would rather name it there.
+
+## PUT: replace or merge
+
+A PUT replaces the resource (RFC 7644 §3.5.1): a mapped attribute the body
+leaves out is removed from the entry, and a Group's members are the ones the
+body lists. `--scim-put-semantics merge` serves clients written against a
+service whose PUT updated only what it was sent: an attribute, a
+sub-attribute of `name` or a Group's `members` left out of the body is kept,
+the ones sent replace what the entry holds. `active` is kept when left out
+under either.
 
 ## Filter syntax
 
