@@ -64,6 +64,14 @@ const KEYWORDS = new Set([
   'null',
 ]);
 
+/** The escapes a string literal decodes, by the code of the escaped character */
+const STRING_ESCAPES = new Map([
+  [34, '"'],
+  [92, '\\'],
+  [110, '\n'],
+  [116, '\t'],
+]);
+
 // [0-9.+\-eE]
 function isNumberPart(c: number): boolean {
   return (
@@ -133,16 +141,7 @@ export function tokenize(input: string): Token[] {
         if (code === 34) break;
         if (code === 92 && i + 1 < input.length) {
           const next = input.charCodeAt(i + 1);
-          const decoded =
-            next === 34
-              ? '"'
-              : next === 92
-                ? '\\'
-                : next === 110
-                  ? '\n'
-                  : next === 116
-                    ? '\t'
-                    : undefined;
+          const decoded = STRING_ESCAPES.get(next);
           if (decoded !== undefined) {
             value += input.slice(segment, i) + decoded;
             i += 2;
