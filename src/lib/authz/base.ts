@@ -1419,15 +1419,26 @@ export default abstract class AuthzBase extends DmPlugin {
       // Within a branch the caller holds, a narrower rule may still refuse
       // the entry: asked once per DN
       const readable = new Map<string, boolean>();
+      // A page shares a few links between many accounts. The whole verdict,
+      // `within` included, is kept per value as spelled, so it never has to
+      // decide whether two spellings name the same DN. `readsOrganisation`
+      // skips `within`: it must never answer from this map.
+      const verdicts = new Map<string, boolean>();
       const reads = async (value: string): Promise<boolean> => {
-        if (!within(value)) return false;
-        const key = normalizeDn(value);
-        if (!readable.has(key))
-          readable.set(
-            key,
-            (await this.getUserPermissions(user, value)).read === true
-          );
-        return readable.get(key)!;
+        const known = verdicts.get(value);
+        if (known !== undefined) return known;
+        let verdict = false;
+        if (within(value)) {
+          const key = normalizeDn(value);
+          if (!readable.has(key))
+            readable.set(
+              key,
+              (await this.getUserPermissions(user, value)).read === true
+            );
+          verdict = readable.get(key)!;
+        }
+        verdicts.set(value, verdict);
+        return verdict;
       };
 
       // An organization under a global write branch is read by every
