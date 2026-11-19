@@ -332,19 +332,26 @@ function reportWarning(
 
 /** Where {@link readOptions} reads a declaration's values from */
 interface InputPlan {
-  /** Entries of the options the parser knew: only their value counts */
-  readonly values: readonly string[];
   /**
-   * Entries of the other options, aliases included: `readOptions` tests
-   * whether they are present, and one set to `undefined` hides the alias
-   * and the environment, so their presence counts too
+   * Configuration keys of the options the parser knew: `readOptions` reads
+   * their value alone, an absent entry being `undefined`
    */
-  readonly entries: readonly string[];
+  readonly valueKeys: readonly string[];
+  /**
+   * Configuration keys of the other options, aliases included: `readOptions`
+   * tests whether they are present, and one set to `undefined` hides the
+   * alias and the environment, so their presence counts too
+   */
+  readonly presenceKeys: readonly string[];
   /** Environment variables, in the declaration's order */
-  readonly variables: readonly string[];
+  readonly envNames: readonly string[];
 }
 
-/** What {@link optionInputs} gives for an entry the configuration lacks */
+/**
+ * What {@link optionInputs} gives for an entry or alias the configuration
+ * lacks, for an option the parser did not know. For an option it knew, an
+ * absent entry is `undefined`.
+ */
 export const absentEntry: unique symbol = Symbol('absent entry');
 
 const noParsedKeys: ReadonlySet<string> = new Set();
@@ -358,28 +365,35 @@ const inputPlans = new WeakMap<
   WeakMap<ReadonlySet<string>, InputPlan>
 >();
 
+/**
+ * The plan is kept for the declaration and the set it was first built from:
+ * neither may change afterwards, or the plan would read the old ones.
+ */
 function inputPlan(
   options: OptionSet,
   parsedKeys: ReadonlySet<string>
 ): InputPlan {
   let byKeys = inputPlans.get(options);
-  if (!byKeys) inputPlans.set(options, (byKeys = new WeakMap()));
+  if (!byKeys) {
+    byKeys = new WeakMap();
+    inputPlans.set(options, byKeys);
+  }
   let plan = byKeys.get(parsedKeys);
   if (plan) return plan;
-  const values: string[] = [];
-  const entries: string[] = [];
-  const variables: string[] = [];
+  const valueKeys: string[] = [];
+  const presenceKeys: string[] = [];
+  const envNames: string[] = [];
   for (const [key, spec] of Object.entries(options)) {
     if (parsedKeys.has(key)) {
-      values.push(key);
+      valueKeys.push(key);
       continue;
     }
-    entries.push(key);
-    for (const alias of spec.aliases ?? []) entries.push(cliKey(alias));
-    if (spec.env !== undefined) variables.push(spec.env);
-    variables.push(...(spec.envAliases ?? []));
+    presenceKeys.push(key);
+    for (const alias of spec.aliases ?? []) presenceKeys.push(cliKey(alias));
+    if (spec.env !== undefined) envNames.push(spec.env);
+    envNames.push(...(spec.envAliases ?? []));
   }
-  plan = { values, entries, variables };
+  plan = { valueKeys, presenceKeys, envNames };
   byKeys.set(parsedKeys, plan);
   return plan;
 }
@@ -406,13 +420,13 @@ export function optionInputs(
   config: Config | Record<string, unknown>,
   parsedKeys: ReadonlySet<string> = noParsedKeys
 ): unknown[] {
-  const { values, entries, variables } = inputPlan(options, parsedKeys);
+  const { valueKeys, presenceKeys, envNames } = inputPlan(options, parsedKeys);
   const source = config as Record<string, unknown>;
   const inputs: unknown[] = [];
-  for (const key of values) inputs.push(source[key]);
-  for (const key of entries)
+  for (const key of valueKeys) inputs.push(source[key]);
+  for (const key of presenceKeys)
     inputs.push(key in source ? source[key] : absentEntry);
-  for (const name of variables) inputs.push(process.env[name]);
+  for (const name of envNames) inputs.push(process.env[name]);
   return inputs;
 }
 
@@ -429,20 +443,23 @@ export function sameOptionInputs(
   inputs: readonly unknown[],
   parsedKeys: ReadonlySet<string> = noParsedKeys
 ): boolean {
-  const { values, entries, variables } = inputPlan(options, parsedKeys);
-  if (inputs.length !== values.length + entries.length + variables.length)
+  const { valueKeys, presenceKeys, envNames } = inputPlan(options, parsedKeys);
+  if (
+    inputs.length !==
+    valueKeys.length + presenceKeys.length + envNames.length
+  )
     return false;
   const source = config as Record<string, unknown>;
   let at = 0;
-  for (let i = 0; i < values.length; i++, at++)
-    if (source[values[i]] !== inputs[at]) return false;
-  for (let i = 0; i < entries.length; i++, at++) {
-    const key = entries[i];
+  for (let i = 0; i < valueKeys.length; i++, at++)
+    if (source[valueKeys[i]] !== inputs[at]) return false;
+  for (let i = 0; i < presenceKeys.length; i++, at++) {
+    const key = presenceKeys[i];
     if ((key in source ? source[key] : absentEntry) !== inputs[at])
       return false;
   }
-  for (let i = 0; i < variables.length; i++, at++)
-    if (process.env[variables[i]] !== inputs[at]) return false;
+  for (let i = 0; i < envNames.length; i++, at++)
+    if (process.env[envNames[i]] !== inputs[at]) return false;
   return true;
 }
 

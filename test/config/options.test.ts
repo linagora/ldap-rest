@@ -1044,7 +1044,7 @@ describe('plugin options', () => {
     const declared = defineOptions({
       sample_env: opt.string({
         env: 'DM_TEST_OPTIONS_INPUTS',
-        aliases: ['--sample-old'],
+        aliases: ['sample-old'],
         default: 'a',
       }),
     });
@@ -1092,7 +1092,7 @@ describe('plugin options', () => {
       sample_env: opt.string({
         env: 'DM_TEST_SAME_INPUTS',
         envAliases: ['DM_TEST_SAME_INPUTS_OLD'],
-        aliases: ['--sample-old'],
+        aliases: ['sample-old'],
         default: 'a',
       }),
       sample_size: opt.number({ default: 3 }),
@@ -1113,38 +1113,84 @@ describe('plugin options', () => {
       );
     });
 
-    const changes: [string, (c: Record<string, unknown>) => unknown][] = [
-      ['an entry changed', c => (c.sample_size = 5)],
-      ['an entry became undefined', c => (c.sample_env = undefined)],
-      ['an alias changed', c => (c.sample_old = 'y')],
-      ['the variable changed', () => (process.env.DM_TEST_SAME_INPUTS = 'f')],
-      [
-        'a former variable changed',
-        () => (process.env.DM_TEST_SAME_INPUTS_OLD = 'o'),
-      ],
+    // Each change gives readOptions another answer, so a "same" would serve
+    // a stale value. readOptions tests the presence of an entry or alias of
+    // an option the parser did not know: one set to undefined hides the
+    // alias and the environment.
+    const changes: {
+      what: string;
+      config: Record<string, unknown>;
+      variable?: string;
+      change: (c: Record<string, unknown>) => void;
+    }[] = [
+      {
+        what: 'an entry changed',
+        config: { sample_env: 'x', sample_size: 4 },
+        change: (c): void => {
+          c.sample_size = 5;
+        },
+      },
+      {
+        what: 'an entry became undefined',
+        config: { sample_env: 'x' },
+        change: (c): void => {
+          c.sample_env = undefined;
+        },
+      },
+      {
+        what: 'an absent entry is set to undefined',
+        config: {},
+        change: (c): void => {
+          c.sample_env = undefined;
+        },
+      },
+      {
+        what: 'an entry set to undefined is removed',
+        config: { sample_env: undefined },
+        change: (c): void => {
+          delete c.sample_env;
+        },
+      },
+      {
+        what: 'an alias appears',
+        config: {},
+        change: (c): void => {
+          c.sample_old = 'y';
+        },
+      },
+      {
+        what: 'an absent alias is set to undefined',
+        config: {},
+        change: (c): void => {
+          c.sample_old = undefined;
+        },
+      },
+      {
+        what: 'the variable changed',
+        config: {},
+        change: (): void => {
+          process.env.DM_TEST_SAME_INPUTS = 'f';
+        },
+      },
+      {
+        what: 'a former variable appears',
+        config: {},
+        variable: undefined,
+        change: (): void => {
+          process.env.DM_TEST_SAME_INPUTS_OLD = 'o';
+        },
+      },
     ];
-    for (const [what, change] of changes) {
+    for (const { what, config, change, ...rest } of changes) {
       it(`says no when ${what}`, () => {
-        process.env.DM_TEST_SAME_INPUTS = 'e';
-        const config: Record<string, unknown> = {
-          sample_env: 'x',
-          sample_size: 4,
-        };
-        const inputs = optionInputs(declared, config);
-        change(config);
-        expect(sameOptionInputs(declared, config, inputs)).to.equal(false);
-      });
-    }
-
-    // readOptions tests their presence: an entry set to undefined hides the
-    // alias and the environment
-    for (const key of ['sample_env', 'sample_old']) {
-      it(`says no when an absent ${key} is set to undefined`, () => {
-        process.env.DM_TEST_SAME_INPUTS = 'e';
-        const config: Record<string, unknown> = {};
-        const inputs = optionInputs(declared, config);
-        config[key] = undefined;
-        expect(sameOptionInputs(declared, config, inputs)).to.equal(false);
+        const variable = 'variable' in rest ? rest.variable : 'e';
+        if (variable !== undefined) process.env.DM_TEST_SAME_INPUTS = variable;
+        const current = { ...config };
+        const before = readOptions(declared, current);
+        const inputs = optionInputs(declared, current);
+        change(current);
+        expect(readOptions(declared, current)).to.not.deep.equal(before);
+        expect(sameOptionInputs(declared, current, inputs)).to.equal(false);
       });
     }
 
