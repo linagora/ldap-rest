@@ -670,6 +670,14 @@ describe('LDAP Utils', () => {
       expect(normalizeDn('memoTestType=x')).to.equal('memotesttype=x');
     });
 
+    it('recomputes a DN in both case modes once an attribute type is registered', () => {
+      expect(normalizeDn('1.2.3.4.6=X')).to.equal('1.2.3.4.6=x');
+      expect(canonicalDn('1.2.3.4.6=X')).to.equal('1.2.3.4.6=X');
+      registerAttributeTypes([{ oid: '1.2.3.4.6', names: ['memoTestKept'] }]);
+      expect(canonicalDn('1.2.3.4.6=X')).to.equal('memotestkept=X');
+      expect(normalizeDn('1.2.3.4.6=X')).to.equal('memotestkept=x');
+    });
+
     it('answers a DN too long to keep', () => {
       const long = `cn=${'a'.repeat(2000)},dc=example`;
       expect(normalizeDn(long)).to.equal(long);
