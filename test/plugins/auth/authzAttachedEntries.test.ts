@@ -62,6 +62,7 @@ describe('Authorization by attachment', function () {
   let previousTtl: string | undefined;
   let previousFilter: string | undefined;
   let previousCacheTtl: string | undefined;
+  let authz: AuthzPerBranch;
 
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
@@ -120,7 +121,8 @@ describe('Authorization by attachment', function () {
         .catch(() => undefined);
 
     await server.registerPlugin('testAuth', new TestAuthPlugin(server));
-    await server.registerPlugin('authzPerBranch', new AuthzPerBranch(server));
+    authz = new AuthzPerBranch(server);
+    await server.registerPlugin('authzPerBranch', authz);
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
     server.setupErrorMiddleware();
     request = supertest(server.app);
@@ -344,5 +346,174 @@ describe('Authorization by attachment', function () {
       .type('json')
       .send({ replace: { description: 'own branch' } });
     expect(res.status, JSON.stringify(res.body)).to.equal(200);
+  });
+
+  describe('a page of entries sharing their links', () => {
+    const all = { read: true, write: true, delete: true };
+    let commaOrg: string;
+    let narrowOrg: string;
+    let previousAuthConfig: typeof authz.authConfig;
+
+    before(() => {
+      // Branches that exist only in these rules: the entries below are
+      // handed to the hook, never written to the directory.
+      commaOrg = `ou=Sales\\, East,${base}`;
+      narrowOrg = `ou=Narrow,${orgA}`;
+      previousAuthConfig = authz.authConfig;
+      authz.authConfig = {
+        default: { read: false, write: false, delete: false },
+        users: {
+          [ADMIN_A]: {
+            [orgA]: all,
+            [commaOrg]: all,
+            [narrowOrg]: { read: false, write: false, delete: false },
+          },
+          [ADMIN_B]: { [orgB]: all },
+        },
+        groups: {},
+      };
+    });
+
+    after(() => {
+      authz.authConfig = previousAuthConfig;
+    });
+
+    const filter = async (
+      who: string,
+      entries: AttributesList[]
+    ): Promise<string[]> => {
+      const [result] = await Promise.resolve(
+        authz.hooks.ldapsearchfilter!([
+          {
+            searchEntries: entries.map(entry => ({ ...entry })),
+            searchReferences: [],
+          } as unknown as SearchResult,
+          { user: who, headers: {} } as unknown as DmRequest,
+          { scope: 'sub' },
+        ])
+      );
+      return result.searchEntries.map(entry => String(entry.dn));
+    };
+
+    const linked = (name: string, link: string | string[]): AttributesList => ({
+      dn: `uid=${name},${userBranch}`,
+      objectClass: ['top', 'twakeAccount'],
+      twakeDepartmentLink: link,
+    });
+
+    // Each link comes back several times, in several spellings, and the
+    // escaped separator reads as a single RDN outside every branch.
+    const page = (): AttributesList[] => [
+      linked('out1', orgB),
+      linked('in1', orgA),
+      linked('out2', orgB),
+      linked('in2', `ou=AttachOrgA, ${base}`),
+      linked('in3', `OU=attachorga,${base.toUpperCase()}`),
+      linked('in4', orgA),
+      linked('out3', orgB),
+      linked('in5', `ou=AttachOrgA, ${base}`),
+      linked('comma1', `ou=Sales\\2C East,${base}`),
+      linked('comma2', commaOrg),
+      linked('comma3', `ou=sales\\2c east,${base}`),
+      linked('escaped1', `ou=AttachOrgA\\2C${base}`),
+      linked('escaped2', `ou=AttachOrgA\\2C${base}`),
+      linked('narrow1', narrowOrg),
+      linked('narrow2', narrowOrg),
+      linked('both1', [orgB, orgA]),
+      linked('both2', [orgB, `ou=AttachOrgA\\2C${base}`]),
+      linked('both3', [orgB, orgA]),
+    ];
+    const dns = (...names: string[]): string[] =>
+      names.map(name => `uid=${name},${userBranch}`);
+    const shown = (): string[] =>
+      dns(
+        'in1',
+        'in2',
+        'in3',
+        'in4',
+        'in5',
+        'comma1',
+        'comma2',
+        'comma3',
+        'both1',
+        'both3'
+      );
+
+    it('should show the entries attached to a held branch, whatever the spelling of the link', async () => {
+      expect(await filter(ADMIN_A, page())).to.deep.equal(shown());
+    });
+
+    it('should judge an entry in a page as it judges it alone, in any order', async () => {
+      const alone: string[] = [];
+      for (const entry of page())
+        alone.push(...(await filter(ADMIN_A, [entry])));
+      expect(alone).to.deep.equal(shown());
+      expect(await filter(ADMIN_A, page().reverse())).to.deep.equal(
+        shown().reverse()
+      );
+    });
+
+    it('should not carry a verdict from one caller to the next', async () => {
+      expect(await filter(ADMIN_B, page())).to.deep.equal(
+        dns('out1', 'out2', 'out3', 'both1', 'both2', 'both3')
+      );
+      expect(await filter(ADMIN_A, page())).to.deep.equal(shown());
+    });
+
+    it('should place each link value in the branches once per page', async () => {
+      // Counts the walks over the caller's branches, one per value placed in
+      // them: a page repeating a handful of links must not pay per entry.
+      const original = authz.getAuthorizedBranches.bind(authz);
+      let walks = 0;
+      authz.getAuthorizedBranches = async (uid: string) => {
+        const branches = await original(uid);
+        return Object.assign([...branches], {
+          some(...args: Parameters<string[]['some']>): boolean {
+            walks++;
+            return Array.prototype.some.apply(branches, args);
+          },
+        });
+      };
+      try {
+        const entries = page();
+        expect(await filter(ADMIN_A, entries)).to.deep.equal(shown());
+        // Every value is asked: an entry linked to two stops at the first
+        // that shows it, and each of them lists a hidden one first.
+        const distinct = new Set(
+          entries.flatMap(entry =>
+            ([] as unknown[]).concat(entry.twakeDepartmentLink).map(String)
+          )
+        );
+        expect(walks).to.equal(distinct.size);
+      } finally {
+        authz.getAuthorizedBranches = original;
+      }
+    });
+
+    it('should not show an account attached to an organization read outside the held branches', async () => {
+      // The default lets every administrator read the organization's own
+      // entry, which is judged by the rules alone; an account attached to it
+      // is judged by the branches held, and none holds it.
+      const top = server.config.ldap_top_organization as string;
+      const shared = `ou=AttachShared,${top}`;
+      const saved = authz.authConfig;
+      authz.authConfig = {
+        ...saved,
+        default: { read: true, write: false, delete: false },
+      };
+      try {
+        expect(
+          await filter(ADMIN_A, [
+            {
+              dn: shared,
+              objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+            },
+            linked('attached', shared),
+          ])
+        ).to.deep.equal([shared]);
+      } finally {
+        authz.authConfig = saved;
+      }
+    });
   });
 });
