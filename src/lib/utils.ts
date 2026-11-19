@@ -766,6 +766,7 @@ const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
  */
 function canonicalValue(raw: string, foldCase = true): string {
   const trimmed = trimUnescaped(raw);
+  if (isPlainValue(trimmed)) return foldCase ? trimmed.toLowerCase() : trimmed;
   if (/^#(?:[0-9a-fA-F]{2})+$/.test(trimmed)) return trimmed;
   raw = unquotedValue(trimmed);
   // Each character, decoded; hex pairs that are not, kept as `\xx`
@@ -815,11 +816,39 @@ function canonicalValue(raw: string, foldCase = true): string {
     if (kept(char)) out += char;
     else if (char.charCodeAt(0) < 0x20 || char.charCodeAt(0) === 0x7f)
       out += `\\${hexByte(char.charCodeAt(0))}`;
-    else if (',+"\\<>;='.includes(char) || (i === 0 && char === '#'))
+    else if (DN_SPECIALS.includes(char) || (i === 0 && char === '#'))
       out += `\\${char}`;
     else out += char;
   }
   return out;
+}
+
+/** The characters {@link canonicalValue} escapes wherever they stand */
+const DN_SPECIALS = ',+"\\<>;=';
+const DN_SPECIAL_CODES = new Set(
+  Array.from(DN_SPECIALS, char => char.charCodeAt(0))
+);
+
+/**
+ * Whether a trimmed value is already what {@link canonicalValue} makes of
+ * it, but for case: printable ASCII, which NFKC leaves alone, with nothing
+ * to decode, unquote, escape or drop as an insignificant space. Anything
+ * else takes the whole of {@link canonicalValue}.
+ */
+function isPlainValue(value: string): boolean {
+  const last = value.length - 1;
+  // Empty, or a `#` to escape or a BER value to keep
+  if (last < 0 || value.charCodeAt(0) === 0x23) return false;
+  for (let i = 0; i <= last; i++) {
+    const code = value.charCodeAt(i);
+    // Controls, DEL and non-ASCII
+    if (code < 0x20 || code > 0x7e) return false;
+    if (code === 0x20) {
+      if (i === 0 || i === last || value.charCodeAt(i + 1) === 0x20)
+        return false;
+    } else if (DN_SPECIAL_CODES.has(code)) return false;
+  }
+  return true;
 }
 
 function hexByte(byte: number): string {
@@ -976,7 +1005,7 @@ registerAttributeTypes([
  * @returns the name, or undefined for a type it was not given
  */
 export function knownAttributeName(type: string): string | undefined {
-  return attributeTypeSpellings.get(type.toLowerCase().replace(/^oid\./, ''));
+  return attributeTypeSpellings.get(attributeTypeKey(type));
 }
 
 /**
@@ -994,9 +1023,14 @@ export function rdnTypes(dn: string): string[] {
 
 /** An attribute type of a DN as {@link normalizeDn} spells it. */
 function canonicalType(type: string): string {
-  // `OID.2.5.4.11`, the LDAPv2 spelling of an OID
-  const name = type.toLowerCase().replace(/^oid\./, '');
+  const name = attributeTypeKey(type);
   return attributeTypeNames.get(name) ?? name;
+}
+
+/** An attribute type in lower case, without the `OID.` of LDAPv2 */
+function attributeTypeKey(type: string): string {
+  const name = type.toLowerCase();
+  return name.startsWith('oid.') ? name.slice(4) : name;
 }
 
 /**

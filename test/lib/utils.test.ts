@@ -14,6 +14,7 @@ import {
   normalizeDn,
   canonicalDn,
   registerAttributeTypes,
+  knownAttributeName,
   isDnInBranch,
   isDirectChildOf,
   organizationLink,
@@ -643,6 +644,117 @@ describe('LDAP Utils', () => {
       // One assertion: its value holds the `+` and the `=`
       expect(normalizeDn('cn=a\\+sn=b,dc=x')).to.equal('cn=a\\+sn\\=b,dc=x');
       expect(normalizeDn('sn=b+cn=a,dc=x')).to.equal('cn=a+sn=b,dc=x');
+    });
+  });
+
+  describe('plain values', () => {
+    /** mulberry32: a seeded generator, so that a failure replays */
+    function seeded(seed: number): () => number {
+      return () => {
+        seed = (seed + 0x6d2b79f5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 2 ** 32;
+      };
+    }
+
+    const hexSpelling = (value: string): string =>
+      Array.from(
+        value,
+        char => `\\${char.charCodeAt(0).toString(16).padStart(2, '0')}`
+      ).join('');
+
+    it('reads a printable ASCII value as its hex spelling', () => {
+      // The hex spelling holds a backslash, so it always takes the whole
+      // canonicalValue; the value as written takes the shortcut when plain
+      const random = seeded(744);
+      const printable = Array.from({ length: 95 }, (_, i) =>
+        String.fromCharCode(0x20 + i)
+      ).join('');
+      const pools = ['abcdefxyzABCXYZ0129.-_@', '  ##', printable];
+      for (let n = 0; n < 5000; n++) {
+        let value = '';
+        const length = Math.floor(random() * 12);
+        for (let i = 0; i < length; i++) {
+          const pool = pools[Math.floor(random() ** 2 * pools.length)];
+          value += pool[Math.floor(random() * pool.length)];
+        }
+        // The DN syntax escapes these; a leading quote would open a quoted
+        // value and a `#` with hex pairs a BER one
+        let spelled = value.replace(/[\\,+;]/g, '\\$&');
+        const start = spelled.length - spelled.trimStart().length;
+        if (
+          spelled[start] === '"' ||
+          /^#(?:[0-9a-fA-F]{2})+$/.test(spelled.trim())
+        )
+          spelled = `${spelled.slice(0, start)}\\${spelled.slice(start)}`;
+        const dn = `cn=${spelled},dc=x`;
+        const hex = `cn=${hexSpelling(value)},dc=x`;
+        expect(normalizeDn(dn), dn).to.equal(normalizeDn(hex));
+        expect(canonicalDn(dn), dn).to.equal(canonicalDn(hex));
+      }
+    });
+
+    it('folds the case of a plain value only for normalizeDn', () => {
+      expect(normalizeDn('uid=Jean.Dupont42,OU=Users')).to.equal(
+        'uid=jean.dupont42,ou=users'
+      );
+      expect(canonicalDn('uid=Jean.Dupont42,OU=Users')).to.equal(
+        'uid=Jean.Dupont42,ou=Users'
+      );
+    });
+
+    it('reads an empty value as empty', () => {
+      for (const dn of ['cn=,dc=x', 'cn=   ,dc=x'])
+        expect(normalizeDn(dn), dn).to.equal('cn=,dc=x');
+    });
+
+    it('escapes a leading # and keeps a BER value', () => {
+      expect(normalizeDn('cn=#Abc,dc=x')).to.equal('cn=\\#abc,dc=x');
+      expect(canonicalDn('cn=#Abc,dc=x')).to.equal('cn=\\#Abc,dc=x');
+      expect(canonicalDn('cn=#4A42,dc=x')).to.equal('cn=#4A42,dc=x');
+      expect(canonicalDn('cn=a#B,dc=x')).to.equal('cn=a#B,dc=x');
+    });
+
+    it('drops the spaces at either end and in a run', () => {
+      expect(canonicalDn('cn=  A  B   C ,dc=x')).to.equal('cn=A B C,dc=x');
+      expect(normalizeDn('cn=A\\ ,dc=x')).to.equal('cn=a,dc=x');
+      expect(normalizeDn('cn=\\ A,dc=x')).to.equal('cn=a,dc=x');
+    });
+
+    it('folds non-ASCII characters with NFKC', () => {
+      // Fullwidth J, Kelvin sign
+      expect(canonicalDn('cn=ＪeanK,dc=x')).to.equal('cn=JeanK,dc=x');
+      expect(normalizeDn('cn=ＪeanK,dc=x')).to.equal('cn=jeank,dc=x');
+      expect(canonicalDn('cn=André,dc=x')).to.equal('cn=André,dc=x');
+    });
+
+    it('escapes control characters and DEL as hex', () => {
+      expect(canonicalDn('cn=A\u0001b,dc=x')).to.equal('cn=A\\01b,dc=x');
+      expect(canonicalDn('cn=A\tb,dc=x')).to.equal('cn=A\\09b,dc=x');
+      expect(canonicalDn('cn=A\u007fb,dc=x')).to.equal('cn=A\\7fb,dc=x');
+    });
+
+    it('escapes each special character', () => {
+      expect(canonicalDn('cn=A=b<c>d"E,dc=x')).to.equal(
+        'cn=A\\=b\\<c\\>d\\"E,dc=x'
+      );
+      expect(normalizeDn('cn=A=b<c>d"E,dc=x')).to.equal(
+        'cn=a\\=b\\<c\\>d\\"e,dc=x'
+      );
+      expect(canonicalDn('cn=A\\,b\\+c\\;d\\\\E,dc=x')).to.equal(
+        'cn=A\\,b\\+c\\;d\\\\E,dc=x'
+      );
+      expect(canonicalDn('cn="A,b",dc=x')).to.equal('cn=A\\,b,dc=x');
+    });
+
+    it('strips the OID. prefix of a type only', () => {
+      expect(normalizeDn('oid.2.5.4.11=x,OIDx=y,oid2=z')).to.equal(
+        'ou=x,oidx=y,oid2=z'
+      );
+      expect(knownAttributeName('OID.2.5.4.3')).to.equal('cn');
+      expect(knownAttributeName('Oid.CommonName')).to.equal('cn');
+      expect(knownAttributeName('oidcn')).to.equal(undefined);
     });
   });
 
