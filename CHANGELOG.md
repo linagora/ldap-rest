@@ -22,6 +22,9 @@
 - Plugins can declare an `init()` step, awaited before their routes and hooks
   are registered
   ([plugin development](docs/plugin-development/README.md#core-properties))
+- SCIM `POST /Users/.search` and `POST /Groups/.search` take the list query
+  in a SearchRequest body (RFC 7644 §3.4.3)
+  ([SCIM](docs/usage/plugins/integrations/scim.md#searching-with-post)).
 
 ### Changed
 

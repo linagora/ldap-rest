@@ -100,12 +100,14 @@ All responses have `Content-Type: application/scim+json`.
 | Method                    | Path                                       | Description                           |
 | ------------------------- | ------------------------------------------ | ------------------------------------- |
 | GET                       | `/Users`                                   | List Users (filter, pagination, sort) |
+| POST                      | `/Users/.search`                           | List Users from a SearchRequest body  |
 | GET                       | `/Users/{id}`                              | Get a User                            |
 | POST                      | `/Users`                                   | Create a User                         |
 | PUT                       | `/Users/{id}`                              | Replace a User                        |
 | PATCH                     | `/Users/{id}`                              | Partial update (add/remove/replace)   |
 | DELETE                    | `/Users/{id}`                              | Delete a User                         |
 | GET/POST/PUT/PATCH/DELETE | `/Groups[/{id}]`                           | Same operations on Groups             |
+| POST                      | `/Groups/.search`                          | List Groups from a SearchRequest body |
 | POST                      | `/Bulk`                                    | Batch operations with `bulkId` refs   |
 | GET                       | `/ServiceProviderConfig`                   | Capabilities                          |
 | GET                       | `/ResourceTypes` / `/ResourceTypes/{name}` | Resource metadata                     |
@@ -417,6 +419,27 @@ via `escapeLdapFilter()` — no LDAP injection is possible.
 
 Unknown SCIM attributes raise `400 invalidFilter`, as does a filter nested
 more than 32 levels deep (a parenthesis and a `not (` each count one).
+
+### Searching with POST
+
+`POST /Users/.search` and `POST /Groups/.search` take the query in a
+SearchRequest body (RFC 7644 §3.4.3) instead of the URL, which keeps filters
+holding personal data out of access logs and proxies. They answer what the
+`GET` list answers for the same query:
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
+  "filter": "userName eq \"alice\"",
+  "attributes": ["userName", "name.familyName"],
+  "startIndex": 1,
+  "count": 10
+}
+```
+
+`schemas` may be left out. `attributes` and `excludedAttributes` are lists of
+strings; a member of the wrong type answers `400 invalidValue`. The search at
+the server root (`POST /.search`, across resource types) is not served.
 
 ## Pagination
 
@@ -799,7 +822,8 @@ the `configurable` role automatically, and `core/configApi` picks it up.
 
 - No `/Me` endpoint (RFC 7644 §3.11).
 - ETag / `If-Match` advertised but not enforced.
-- No `/.search` POST endpoint (use GET with `?filter=…`).
+- No `POST /.search` at the server root; it is served per resource type
+  (`/Users/.search`, `/Groups/.search`).
 - A list walks its result set to count it, bounded by `--scim-max-scanned`
   (10000 by default). Past that bound it answers `400 tooMany`, as RFC 7644
   §3.12 allows; raise the bound or narrow the query with a filter.
