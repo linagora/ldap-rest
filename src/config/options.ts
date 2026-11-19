@@ -330,38 +330,120 @@ function reportWarning(
   warn(message);
 }
 
+/** Where {@link readOptions} reads a declaration's values from */
+interface InputPlan {
+  /** Entries of the options the parser knew: only their value counts */
+  readonly values: readonly string[];
+  /**
+   * Entries of the other options, aliases included: `readOptions` tests
+   * whether they are present, and one set to `undefined` hides the alias
+   * and the environment, so their presence counts too
+   */
+  readonly entries: readonly string[];
+  /** Environment variables, in the declaration's order */
+  readonly variables: readonly string[];
+}
+
+/** What {@link optionInputs} gives for an entry the configuration lacks */
+export const absentEntry: unique symbol = Symbol('absent entry');
+
+const noParsedKeys: ReadonlySet<string> = new Set();
+
+/**
+ * Plans by declaration, then by set of parsed keys. A declaration is a
+ * constant, so what it reads is listed once rather than on every comparison.
+ */
+const inputPlans = new WeakMap<
+  OptionSet,
+  WeakMap<ReadonlySet<string>, InputPlan>
+>();
+
+function inputPlan(
+  options: OptionSet,
+  parsedKeys: ReadonlySet<string>
+): InputPlan {
+  let byKeys = inputPlans.get(options);
+  if (!byKeys) inputPlans.set(options, (byKeys = new WeakMap()));
+  let plan = byKeys.get(parsedKeys);
+  if (plan) return plan;
+  const values: string[] = [];
+  const entries: string[] = [];
+  const variables: string[] = [];
+  for (const [key, spec] of Object.entries(options)) {
+    if (parsedKeys.has(key)) {
+      values.push(key);
+      continue;
+    }
+    entries.push(key);
+    for (const alias of spec.aliases ?? []) entries.push(cliKey(alias));
+    if (spec.env !== undefined) variables.push(spec.env);
+    variables.push(...(spec.envAliases ?? []));
+  }
+  plan = { values, entries, variables };
+  byKeys.set(parsedKeys, plan);
+  return plan;
+}
+
 /**
  * The values {@link readOptions} takes a declaration's options from: the
- * configuration entries and the environment variables it would read.
+ * entries of the options the parser knew, the entries of the others with
+ * their aliases, then the environment variables.
  *
- * A caller that keeps what it read compares these to know whether reading
- * again would answer the same. `parsedKeys` is the set {@link readOptions}
- * is given: for an option the parser knew, it reads the configuration entry
- * and nothing else, so the environment and the aliases are not compared.
- *
- * An entry absent from the configuration and one set to `undefined` are the
- * same value here, as they are for `readOptions` once defaults are applied.
+ * A caller that keeps what it read gives them back to {@link sameOptionInputs}
+ * to know whether reading again would answer the same. `parsedKeys` is the
+ * set {@link readOptions} is given: for an option the parser knew, it reads
+ * the configuration entry and nothing else, so the environment and the
+ * aliases are not compared, and an absent entry reads as `undefined`. For
+ * another option, an absent entry or alias is {@link absentEntry}.
  *
  * @param options the declared options
  * @param config the parsed configuration
  * @param parsedKeys the options the parser knew, if the caller knows them
- * @returns the values, in the declaration's order
+ * @returns the values, in that order
  */
 export function optionInputs(
   options: OptionSet,
   config: Config | Record<string, unknown>,
-  parsedKeys: ReadonlySet<string> = new Set()
+  parsedKeys: ReadonlySet<string> = noParsedKeys
 ): unknown[] {
+  const { values, entries, variables } = inputPlan(options, parsedKeys);
   const source = config as Record<string, unknown>;
   const inputs: unknown[] = [];
-  for (const [key, spec] of Object.entries(options)) {
-    inputs.push(source[key]);
-    if (parsedKeys.has(key)) continue;
-    for (const alias of spec.aliases ?? []) inputs.push(source[cliKey(alias)]);
-    for (const name of [spec.env, ...(spec.envAliases ?? [])])
-      inputs.push(name === undefined ? undefined : process.env[name]);
-  }
+  for (const key of values) inputs.push(source[key]);
+  for (const key of entries)
+    inputs.push(key in source ? source[key] : absentEntry);
+  for (const name of variables) inputs.push(process.env[name]);
   return inputs;
+}
+
+/**
+ * Whether the configuration and the environment still give the values
+ * {@link optionInputs} returned for the same declaration and parsed keys.
+ * It reads every input again, so a configuration changed in place or a new
+ * environment value is seen, and allocates nothing: `DmPlugin.options()`
+ * calls it on the request path, where the answer is nearly always yes.
+ */
+export function sameOptionInputs(
+  options: OptionSet,
+  config: Config | Record<string, unknown>,
+  inputs: readonly unknown[],
+  parsedKeys: ReadonlySet<string> = noParsedKeys
+): boolean {
+  const { values, entries, variables } = inputPlan(options, parsedKeys);
+  if (inputs.length !== values.length + entries.length + variables.length)
+    return false;
+  const source = config as Record<string, unknown>;
+  let at = 0;
+  for (let i = 0; i < values.length; i++, at++)
+    if (source[values[i]] !== inputs[at]) return false;
+  for (let i = 0; i < entries.length; i++, at++) {
+    const key = entries[i];
+    if ((key in source ? source[key] : absentEntry) !== inputs[at])
+      return false;
+  }
+  for (let i = 0; i < variables.length; i++, at++)
+    if (process.env[variables[i]] !== inputs[at]) return false;
+  return true;
 }
 
 /**

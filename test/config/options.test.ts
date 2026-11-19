@@ -2,10 +2,12 @@ import { expect } from 'chai';
 
 import configArgs from '../../src/config/args';
 import {
+  absentEntry,
   defineOptions,
   opt,
   optionInputs,
   readOptions,
+  sameOptionInputs,
   toConfigEntries,
 } from '../../src/config/options';
 import { ConfigParser } from '../../src/lib/parseConfig';
@@ -971,6 +973,51 @@ describe('plugin options', () => {
       }
     });
 
+    it('stops reading the environment when the entry is set to undefined', () => {
+      const fromEnv = defineOptions({
+        sample_env: opt.string({ env: 'DM_TEST_OPTIONS_HIDDEN', default: 'a' }),
+      });
+      class Hidden extends DmPlugin {
+        static optionDefinitions = fromEnv;
+        name = 'hidden';
+      }
+      const dm = new DM();
+      process.env.DM_TEST_OPTIONS_HIDDEN = 'b';
+      try {
+        const plugin = new Hidden(dm);
+        expect(plugin.options(fromEnv).sample_env).to.equal('b');
+        (dm.config as unknown as Record<string, unknown>).sample_env =
+          undefined;
+        expect(plugin.options(fromEnv).sample_env).to.equal('a');
+      } finally {
+        delete process.env.DM_TEST_OPTIONS_HIDDEN;
+      }
+    });
+
+    it('reads a former variable again when it changed', () => {
+      const fromOld = defineOptions({
+        sample_env: opt.string({
+          env: 'DM_TEST_OPTIONS_NEW',
+          envAliases: ['DM_TEST_OPTIONS_OLD'],
+          default: 'a',
+        }),
+      });
+      class FromOld extends DmPlugin {
+        static optionDefinitions = fromOld;
+        name = 'fromOld';
+      }
+      delete process.env.DM_TEST_OPTIONS_NEW;
+      delete process.env.DM_TEST_OPTIONS_OLD;
+      const plugin = new FromOld(new DM());
+      expect(plugin.options(fromOld).sample_env).to.equal('a');
+      process.env.DM_TEST_OPTIONS_OLD = 'b';
+      try {
+        expect(plugin.options(fromOld).sample_env).to.equal('b');
+      } finally {
+        delete process.env.DM_TEST_OPTIONS_OLD;
+      }
+    });
+
     it('refuses definitions the plugin does not declare', () => {
       const plugin = new Sample(new DM());
       expect(() =>
@@ -1006,12 +1053,12 @@ describe('plugin options', () => {
       process.env.DM_TEST_OPTIONS_INPUTS = 'from-env';
       try {
         expect(optionInputs(declared, {})).to.deep.equal([
-          undefined,
-          undefined,
+          absentEntry,
+          absentEntry,
           'from-env',
         ]);
         expect(optionInputs(declared, { sample_old: 'x' })).to.deep.equal([
-          undefined,
+          absentEntry,
           'x',
           'from-env',
         ]);
@@ -1032,6 +1079,98 @@ describe('plugin options', () => {
       } finally {
         delete process.env.DM_TEST_OPTIONS_INPUTS;
       }
+    });
+
+    it('reads no variable for an option that declares none', () => {
+      const plain = defineOptions({ sample_plain: opt.string() });
+      expect(optionInputs(plain, { sample_plain: 'x' })).to.deep.equal(['x']);
+    });
+  });
+
+  describe('sameOptionInputs', () => {
+    const declared = defineOptions({
+      sample_env: opt.string({
+        env: 'DM_TEST_SAME_INPUTS',
+        envAliases: ['DM_TEST_SAME_INPUTS_OLD'],
+        aliases: ['--sample-old'],
+        default: 'a',
+      }),
+      sample_size: opt.number({ default: 3 }),
+    });
+
+    afterEach(() => {
+      delete process.env.DM_TEST_SAME_INPUTS;
+      delete process.env.DM_TEST_SAME_INPUTS_OLD;
+    });
+
+    it('says yes while nothing it reads changed', () => {
+      process.env.DM_TEST_SAME_INPUTS = 'e';
+      const config = { sample_env: 'x', sample_size: 4 };
+      const inputs = optionInputs(declared, config);
+      expect(sameOptionInputs(declared, config, inputs)).to.equal(true);
+      expect(sameOptionInputs(declared, { ...config }, [...inputs])).to.equal(
+        true
+      );
+    });
+
+    const changes: [string, (c: Record<string, unknown>) => unknown][] = [
+      ['an entry changed', c => (c.sample_size = 5)],
+      ['an entry became undefined', c => (c.sample_env = undefined)],
+      ['an alias changed', c => (c.sample_old = 'y')],
+      ['the variable changed', () => (process.env.DM_TEST_SAME_INPUTS = 'f')],
+      [
+        'a former variable changed',
+        () => (process.env.DM_TEST_SAME_INPUTS_OLD = 'o'),
+      ],
+    ];
+    for (const [what, change] of changes) {
+      it(`says no when ${what}`, () => {
+        process.env.DM_TEST_SAME_INPUTS = 'e';
+        const config: Record<string, unknown> = {
+          sample_env: 'x',
+          sample_size: 4,
+        };
+        const inputs = optionInputs(declared, config);
+        change(config);
+        expect(sameOptionInputs(declared, config, inputs)).to.equal(false);
+      });
+    }
+
+    // readOptions tests their presence: an entry set to undefined hides the
+    // alias and the environment
+    for (const key of ['sample_env', 'sample_old']) {
+      it(`says no when an absent ${key} is set to undefined`, () => {
+        process.env.DM_TEST_SAME_INPUTS = 'e';
+        const config: Record<string, unknown> = {};
+        const inputs = optionInputs(declared, config);
+        config[key] = undefined;
+        expect(sameOptionInputs(declared, config, inputs)).to.equal(false);
+      });
+    }
+
+    it('reads an absent entry as undefined for an option the parser knew', () => {
+      const parsed = new Set(['sample_env']);
+      const inputs = optionInputs(declared, {}, parsed);
+      expect(
+        sameOptionInputs(declared, { sample_env: undefined }, inputs, parsed)
+      ).to.equal(true);
+    });
+
+    it('ignores the environment and the aliases of an option the parser knew', () => {
+      const parsed = new Set(['sample_env']);
+      const config: Record<string, unknown> = { sample_env: 'x' };
+      const inputs = optionInputs(declared, config, parsed);
+      const unparsed = optionInputs(declared, config);
+      process.env.DM_TEST_SAME_INPUTS = 'f';
+      config.sample_old = 'y';
+      expect(sameOptionInputs(declared, config, inputs, parsed)).to.equal(true);
+      // The same declaration, read without the parsed keys, does see them
+      expect(sameOptionInputs(declared, config, unparsed)).to.equal(false);
+    });
+
+    it('says no to values taken for other parsed keys', () => {
+      const inputs = optionInputs(declared, {}, new Set(['sample_env']));
+      expect(sameOptionInputs(declared, {}, inputs)).to.equal(false);
     });
   });
 });
