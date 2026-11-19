@@ -486,7 +486,8 @@ describe('Authorization by attachment', function () {
         );
         expect(walks).to.equal(distinct.size);
       } finally {
-        authz.getAuthorizedBranches = original;
+        // Back to the prototype's method, not an own copy shadowing it
+        Reflect.deleteProperty(authz, 'getAuthorizedBranches');
       }
     });
 
