@@ -29,7 +29,7 @@ import {
 import type { ResourceMapping } from './types.js';
 import { scimInvalidFilter } from './errors.js';
 
-type TokenKind =
+export type TokenKind =
   | 'LPAREN'
   | 'RPAREN'
   | 'LBRACK'
@@ -39,7 +39,7 @@ type TokenKind =
   | 'NUMBER'
   | 'EOF';
 
-interface Token {
+export interface Token {
   kind: TokenKind;
   value: string;
   pos: number;
@@ -64,7 +64,35 @@ const KEYWORDS = new Set([
   'null',
 ]);
 
-function tokenize(input: string): Token[] {
+// [0-9.+\-eE]
+function isNumberPart(c: number): boolean {
+  return (
+    (c >= 48 && c <= 57) ||
+    c === 46 ||
+    c === 43 ||
+    c === 45 ||
+    c === 101 ||
+    c === 69
+  );
+}
+
+// [A-Za-z_$:]
+function isWordStart(c: number): boolean {
+  return (
+    (c >= 65 && c <= 90) ||
+    (c >= 97 && c <= 122) ||
+    c === 95 ||
+    c === 36 ||
+    c === 58
+  );
+}
+
+// [A-Za-z0-9_.$:]
+function isWordPart(c: number): boolean {
+  return isWordStart(c) || (c >= 48 && c <= 57) || c === 46;
+}
+
+export function tokenize(input: string): Token[] {
   const tokens: Token[] = [];
   let i = 0;
   while (i < input.length) {
@@ -94,35 +122,34 @@ function tokenize(input: string): Token[] {
       continue;
     }
     if (c === '"') {
-      // String literal, with \" and \\ escapes
+      // String literal, with \" \\ \n \t escapes; any other backslash is
+      // kept as a literal character
       const start = i;
       i++;
       let value = '';
-      while (i < input.length && input[i] !== '"') {
-        if (input[i] === '\\' && i + 1 < input.length) {
-          const next = input[i + 1];
-          if (next === '"') {
-            value += '"';
+      let segment = i;
+      while (i < input.length) {
+        const code = input.charCodeAt(i);
+        if (code === 34) break;
+        if (code === 92 && i + 1 < input.length) {
+          const next = input.charCodeAt(i + 1);
+          const decoded =
+            next === 34
+              ? '"'
+              : next === 92
+                ? '\\'
+                : next === 110
+                  ? '\n'
+                  : next === 116
+                    ? '\t'
+                    : undefined;
+          if (decoded !== undefined) {
+            value += input.slice(segment, i) + decoded;
             i += 2;
-            continue;
-          }
-          if (next === '\\') {
-            value += '\\';
-            i += 2;
-            continue;
-          }
-          if (next === 'n') {
-            value += '\n';
-            i += 2;
-            continue;
-          }
-          if (next === 't') {
-            value += '\t';
-            i += 2;
+            segment = i;
             continue;
           }
         }
-        value += input[i];
         i++;
       }
       if (i >= input.length) {
@@ -130,28 +157,23 @@ function tokenize(input: string): Token[] {
           `Unterminated string literal at position ${start}`
         );
       }
+      value += input.slice(segment, i);
       i++; // skip closing "
       tokens.push({ kind: 'STRING', value, pos: start });
       continue;
     }
-    if (c >= '0' && c <= '9') {
+    const code = input.charCodeAt(i);
+    if (code >= 48 && code <= 57) {
       const start = i;
-      while (
-        i < input.length &&
-        /[0-9.+\-eE]/.test(input[i]) &&
-        !/[\s()[\]]/.test(input[i])
-      ) {
-        i++;
-      }
+      while (i < input.length && isNumberPart(input.charCodeAt(i))) i++;
       tokens.push({ kind: 'NUMBER', value: input.slice(start, i), pos: start });
       continue;
     }
     // Word: identifier, keyword, or dotted path
-    if (/[A-Za-z_$:]/.test(c)) {
+    if (isWordStart(code)) {
       const start = i;
-      while (i < input.length && /[A-Za-z0-9_.$:]/.test(input[i])) {
-        i++;
-      }
+      i++;
+      while (i < input.length && isWordPart(input.charCodeAt(i))) i++;
       tokens.push({ kind: 'WORD', value: input.slice(start, i), pos: start });
       continue;
     }
