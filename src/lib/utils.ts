@@ -934,7 +934,10 @@ class RdnsMemo {
     this.newer.older = this.older;
   }
 
-  /** Link this memo as the newest of the ring that `order` heads */
+  /**
+   * Link this memo as the newest of the ring that `order` heads. It must not
+   * be in a ring already: unlink it first, or the ring is corrupted.
+   */
   linkNewest(order: RdnsMemo): void {
     this.older = order.older;
     this.newer = order;
