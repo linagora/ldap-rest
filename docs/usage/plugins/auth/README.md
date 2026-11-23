@@ -11,6 +11,7 @@ LDAP-Rest provides multiple authentication plugins to secure API access. These p
 | [HMAC](hmac.md)           | `core/auth/hmac`          | HMAC-SHA256 request signing for backend services |
 | [LemonLDAP::NG](llng.md)  | `core/auth/llng`          | Integration with LemonLDAP::NG SSO               |
 | [OpenID Connect](oidc.md) | `core/auth/openidconnect` | OAuth 2.0 / OpenID Connect authentication        |
+| [JWT](jwt.md)             | `core/auth/jwt`           | Access tokens from an OAuth 2.0 provider         |
 | [Fake](fake.md)           | `core/auth/fake`          | Development only: a fixed identity, no login     |
 
 ## What a rule is keyed on
@@ -25,6 +26,7 @@ of what a caller is called. Every one of them publishes the caller twice:
 | `core/auth/hmac`          | the service name from `--auth-hmac` | the same                                 |
 | `core/auth/llng`          | LLNG's `whatToTrace`                | `--llng-username-header`, or the same    |
 | `core/auth/openidconnect` | the OIDC `sub`                      | `--oidc-username-claim` (default: `sub`) |
+| `core/auth/jwt`           | `--jwt-identity-claim`              | the same                                 |
 | `core/auth/authzDynamic`  | the token's tenant                  | the same                                 |
 | `core/auth/fake`          | `--auth-fake-user`                  | the same                                 |
 

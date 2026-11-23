@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `core/auth/jwt` accepts OAuth 2.0 access tokens (`Authorization: Bearer`)
+  signed by an identity provider, checked against its published keys, for
+  machine clients using the `client_credentials` grant
+  ([JWT](docs/usage/plugins/auth/jwt.md)).
+
 ## v2.4.1 (2026-11-23)
 
 ### Security

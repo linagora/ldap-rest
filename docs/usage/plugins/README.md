@@ -28,6 +28,7 @@ Secure API access:
 | [hmac](auth/hmac.md)                               | HMAC-SHA256 signing for backend services       |
 | [llng](auth/llng.md)                               | LemonLDAP::NG SSO integration                  |
 | [oidc](auth/oidc.md)                               | OpenID Connect / OAuth 2.0                     |
+| [jwt](auth/jwt.md)                                 | OAuth 2.0 access tokens, as a resource server  |
 | [back-channel-logout](auth/back-channel-logout.md) | Honour a logout performed at the OIDC provider |
 
 ## Authorization Plugins

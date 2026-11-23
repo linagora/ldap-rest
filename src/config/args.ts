@@ -19,6 +19,7 @@ import {
   dynamicOptions,
   fakeOptions,
   hmacOptions,
+  jwtOptions,
   linid1Options,
   llngOptions,
   openidconnectOptions,
@@ -750,6 +751,9 @@ const configArgs: ConfigTemplate = [
 
   // Auth OpenID Connect plugin
   ...toConfigEntries(openidconnectOptions),
+
+  // Auth JWT plugin
+  ...toConfigEntries(jwtOptions),
 
   // Rate limiting, CrowdSec and trusted proxy plugins
   ...toConfigEntries(rateLimitOptions),

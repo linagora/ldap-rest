@@ -193,6 +193,53 @@ export const openidconnectOptions = defineOptions({
 });
 export type OpenidconnectOptions = OptionsOf<typeof openidconnectOptions>;
 
+/** Asymmetric only: a JWKS publishes public keys, never an HMAC secret */
+export const JWT_ALGORITHMS = [
+  'RS256',
+  'RS384',
+  'RS512',
+  'PS256',
+  'PS384',
+  'PS512',
+  'ES256',
+  'ES384',
+  'ES512',
+  'EdDSA',
+  'Ed25519',
+];
+
+export const jwtOptions = defineOptions({
+  jwt_issuer: opt.string({ env: 'DM_JWT_ISSUER', default: '' }),
+  jwt_jwks_uri: opt.string({ env: 'DM_JWT_JWKS_URI', default: '' }),
+  jwt_audience: opt.array({
+    env: 'DM_JWT_AUDIENCES',
+    default: [],
+    plural: 'jwt-audiences',
+  }),
+  jwt_algorithm: opt.array({
+    env: 'DM_JWT_ALGORITHMS',
+    default: JWT_ALGORITHMS,
+    plural: 'jwt-algorithms',
+    kind: 'identifiers',
+  }),
+  jwt_clock_tolerance: opt.number({
+    env: 'DM_JWT_CLOCK_TOLERANCE',
+    default: 30,
+    min: 0,
+  }),
+  jwt_identity_claim: opt.string({
+    env: 'DM_JWT_IDENTITY_CLAIM',
+    default: 'client_id',
+  }),
+  jwt_allowed_client: opt.array({
+    env: 'DM_JWT_ALLOWED_CLIENTS',
+    default: [],
+    plural: 'jwt-allowed-clients',
+    kind: 'identifiers',
+  }),
+});
+export type JwtOptions = OptionsOf<typeof jwtOptions>;
+
 export const rateLimitOptions = defineOptions({
   rate_limit_window_ms: opt.number({
     env: 'DM_RATE_LIMIT_WINDOW_MS',

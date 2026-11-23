@@ -76,6 +76,10 @@
       "import": "./dist/plugins/auth/hmac.js",
       "types": "./dist/src/plugins/auth/hmac.d.ts"
     },
+    "./plugin-auth-jwt": {
+      "import": "./dist/plugins/auth/jwt.js",
+      "types": "./dist/src/plugins/auth/jwt.d.ts"
+    },
     "./plugin-auth-llng": {
       "import": "./dist/plugins/auth/llng.js",
       "types": "./dist/src/plugins/auth/llng.d.ts"
@@ -905,6 +909,7 @@
     "@types/pg": "^8.23.1",
     "express-openid-connect": "^3.4.0",
     "iovalkey": "^0.4.0",
+    "jose": "^6.2.18",
     "lemonldap-ng-handler": "^0.10.0",
     "pg": "^8.23.0",
     "re2": "^1.22.1"
