@@ -34,6 +34,7 @@ import {
   DEFAULT_USER_MAPPING,
   loadMappingFile,
   mergeMapping,
+  replaceableLdapAttributes,
   ldapToScimUser,
   scimUserToLdap,
   requiredLdapAttributes,
@@ -367,11 +368,15 @@ export class ScimUsers {
       if (Array.isArray(v)) return v.length > 0 && v.some(x => x != null);
       return true;
     };
+    const { writable, writeOnly } = replaceableLdapAttributes(this.mapping);
     for (const attr of this.ldapAttributes()) {
-      if (skipAttrs.has(attr)) continue;
+      if (skipAttrs.has(attr) || !writable.has(attr.toLowerCase())) continue;
       if (attributes[attr] != null) {
         changes.replace![attr] = attributes[attr];
-      } else if (hasAttrValue(currentEntry[attr])) {
+      } else if (
+        !writeOnly.has(attr.toLowerCase()) &&
+        hasAttrValue(currentEntry[attr])
+      ) {
         (changes.delete as string[]).push(attr);
       }
     }

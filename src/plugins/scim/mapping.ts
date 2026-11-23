@@ -190,6 +190,64 @@ export function mergeMapping(
   return { ...base, entries: Array.from(map.values()) };
 }
 
+/** The LDAP attributes one mapping entry reads and writes */
+export function ldapAttributesOf(m: MappingEntry): string[] {
+  return [
+    ...(m.ldap ? [m.ldap] : []),
+    ...(m.ldapPrimary ? [m.ldapPrimary] : []),
+    ...(m.ldapSecondary ? [m.ldapSecondary] : []),
+    ...(m.sub ? Object.values(m.sub) : []),
+  ];
+}
+
+/** Whether the server never writes the entry */
+export function isReadOnly(m: MappingEntry): boolean {
+  return m.readOnly === true || m.operational === true;
+}
+
+/**
+ * Whether the entry is written but never returned. `userPassword` always is,
+ * whatever the mapping says: it holds a hash, which no client must read back.
+ */
+export function isWriteOnly(m: MappingEntry): boolean {
+  return (
+    m.writeOnly === true ||
+    ldapAttributesOf(m).some(a => a.toLowerCase() === 'userpassword')
+  );
+}
+
+/** The entry a SCIM path (`name.familyName`, `emails.value`) starts in */
+export function mappingEntryOf(
+  path: string,
+  mapping: ResourceMapping
+): MappingEntry | undefined {
+  if (typeof path !== 'string') return undefined;
+  const top = path.split('.')[0];
+  return mapping.entries.find(m => m.scim === top);
+}
+
+/**
+ * LDAP attributes a full replace (PUT) may write, lower-cased: those of the
+ * entries the server writes. The second set is the write-only ones: a body
+ * that omits them leaves them alone, since no client can read them back to
+ * send them again.
+ */
+export function replaceableLdapAttributes(mapping: ResourceMapping): {
+  writable: Set<string>;
+  writeOnly: Set<string>;
+} {
+  const writable = new Set<string>();
+  const writeOnly = new Set<string>();
+  for (const m of mapping.entries) {
+    if (isReadOnly(m)) continue;
+    for (const a of ldapAttributesOf(m)) {
+      writable.add(a.toLowerCase());
+      if (isWriteOnly(m)) writeOnly.add(a.toLowerCase());
+    }
+  }
+  return { writable, writeOnly };
+}
+
 export interface MappingContext {
   /** 'rdn' (default), 'entryUUID', or any LDAP attribute name */
   idAttribute: string;
@@ -418,6 +476,7 @@ export function ldapToScimUser(
   if (id) out.id = id;
 
   for (const m of mapping.entries) {
+    if (isWriteOnly(m)) continue;
     if (m.sub) {
       const sub: Record<string, string> = {};
       for (const [scimKey, ldapKey] of Object.entries(m.sub)) {
@@ -484,7 +543,7 @@ export function scimUserToLdap(
   const rdnValue = namingValue(user, 'userName') || namingValue(user, 'id');
 
   for (const m of mapping.entries) {
-    if (m.readOnly || m.operational) continue;
+    if (isReadOnly(m)) continue;
     const value = (user as Record<string, unknown>)[m.scim];
     if (value == null) continue;
     if (m.sub) {
@@ -560,7 +619,7 @@ export function ldapToScimGroup(
   if (id) out.id = id;
 
   for (const m of mapping.entries) {
-    if (!m.ldap) continue;
+    if (!m.ldap || isWriteOnly(m)) continue;
     const raw = entry[m.ldap];
     if (raw == null) continue;
     if (m.multi === 'array') {
@@ -610,7 +669,7 @@ export function scimGroupToLdap(
   const rdnValue =
     namingValue(group, 'displayName') || namingValue(group, 'id');
   for (const m of mapping.entries) {
-    if (m.readOnly || m.operational) continue;
+    if (isReadOnly(m)) continue;
     if (!m.ldap) continue;
     const v = (group as Record<string, unknown>)[m.scim];
     if (v == null) continue;
@@ -686,12 +745,8 @@ export function requiredLdapAttributes(
     ...OPERATIONAL_ATTRIBUTES,
     ...extra,
   ]);
-  for (const m of mapping.entries) {
-    if (m.ldap) attrs.add(m.ldap);
-    if (m.ldapPrimary) attrs.add(m.ldapPrimary);
-    if (m.ldapSecondary) attrs.add(m.ldapSecondary);
-    if (m.sub) for (const v of Object.values(m.sub)) attrs.add(v);
-  }
+  for (const m of mapping.entries)
+    for (const a of ldapAttributesOf(m)) attrs.add(a);
   return Array.from(attrs);
 }
 

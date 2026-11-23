@@ -202,6 +202,11 @@ would release locks SCIM never set — a ppolicy auto-lockout, or one an
 administrator placed — so a routine profile sync would defeat the
 brute-force control. Send `"active": true` to reactivate deliberately.
 
+A PUT also leaves alone the read-only entries, which it neither writes nor
+clears, and the write-only ones the body omits: a client cannot read a
+password back to send it again, so only a body that carries one replaces it.
+A PATCH `add` on a write-only entry replaces its value.
+
 ## Writing a custom mapping schema
 
 The mapping file is a plain JSON document describing how each SCIM attribute is
@@ -232,8 +237,13 @@ Each element of `entries` is a `MappingEntry` with the following optional fields
 | `sub`           | Object that maps SCIM sub-attributes to LDAP attributes. Used for complex SCIM values like `name.familyName` → `sn`.          |
 | `subDn`         | Sub-attribute names in `sub` whose value is a DN (for example `["value"]` for `manager`); they are held to RFC 4514 on write. |
 | `multi`         | `"array"` or `"single"` (default) — hints array serialization for `ldap`.                                                     |
-| `readOnly`      | `true` to skip this attribute on write (create/update ignore it).                                                             |
-| `operational`   | `true` for LDAP operational attributes (e.g. `entryUUID`) — loaded on read only.                                              |
+| `readOnly`      | `true` to skip this attribute on write: create and PUT ignore it, a PATCH naming it answers `400 mutability`.                 |
+| `operational`   | `true` for LDAP operational attributes (e.g. `entryUUID`) — loaded on read only, and read-only.                               |
+| `writeOnly`     | `true` to write this attribute but never return it nor accept it in a filter (RFC 7643 §7 `returned: "never"`).               |
+
+An entry mapped to `userPassword` is write-only whatever the file says, so a
+mapping such as `{ "scim": "password", "ldap": "userPassword" }` lets clients
+set passwords without ever reading the stored hash back.
 
 ### Merging
 

@@ -30,6 +30,7 @@ import {
   ScimError,
   kindOf,
   scimInvalidPath,
+  scimMutability,
   scimNoTarget,
   scimInvalidValue,
 } from './errors.js';
@@ -46,6 +47,9 @@ import {
   isDnSubAttribute,
   readActive,
   scimPathToLdapAttribute,
+  isReadOnly,
+  isWriteOnly,
+  mappingEntryOf,
 } from './mapping.js';
 
 export interface PatchContext {
@@ -355,6 +359,11 @@ async function applyOperation(
     for (const [scimAttr, v] of Object.entries(valueObj)) {
       // An empty name would come back here with no path, once per level
       if (!scimAttr) throw scimInvalidPath('Empty attribute name');
+      // A whole resource sent back carries the read-only attributes it was
+      // read with: ignored, as a PUT ignores them. Only a path naming one is
+      // refused.
+      const target = mappingEntryOf(scimAttr, ctx.mapping);
+      if (target && isReadOnly(target)) continue;
       await applyOperation({ op: op.op, path: scimAttr, value: v }, entry, ctx);
     }
     return;
@@ -461,6 +470,9 @@ async function applyOperation(
   if (!ldapAttr) {
     throw scimInvalidPath(`Unknown SCIM attribute path '${op.path}'`);
   }
+  const target = mappingEntryOf(top, ctx.mapping);
+  if (target && isReadOnly(target))
+    throw scimMutability(`'${op.path}' is read-only`);
 
   if (operation === 'remove') {
     entry.drop(ldapAttr);
@@ -474,7 +486,10 @@ async function applyOperation(
   const values = Array.isArray(value) ? value : [value];
   if (sub && isDnSubAttribute(ctx.mapping, top, sub))
     for (const v of values) assertReferenceDn(v, `${top}.${sub}`);
-  if (operation === 'add') entry.append(ldapAttr, values);
+  // A write-only value cannot be read back, so adding to it would leave a
+  // value the client never sees beside the one it sent: a second password.
+  if (operation === 'add' && !(target && isWriteOnly(target)))
+    entry.append(ldapAttr, values);
   else entry.set(ldapAttr, values);
 }
 
