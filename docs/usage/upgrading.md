@@ -16,6 +16,17 @@ Those rules were Perl, and the Node.js handler runs them as JavaScript:
 host LDAP-Rest protects in JavaScript
 ([examples](plugins/auth/llng.md#example-llng-authorization-rules)).
 
+### LemonLDAP::NG location keys are written in lower case
+
+**Who is affected:** a deployment that loads `core/auth/llng`.
+
+`core/auth/llng` gives the handler the request path in lower case. A location
+key of a virtual host it protects that may need a capital letter, such as
+`^/scim/v2/Users`, stops the server at startup: write it in lower case
+(`^/scim/v2/users`) or start it with `(?i)`. A configuration reloaded with such
+a key makes the plugin answer 503 until it is corrected
+([details](plugins/auth/llng.md#location-rules-and-letter-case)).
+
 ## From 2.3.2
 
 ### An instance is the account whose address names it

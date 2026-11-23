@@ -46,6 +46,155 @@ interface LlngHandler {
  */
 const initializedFrom = new WeakMap<LlngHandler, string>();
 
+/**
+ * The part of the handler `init()` resolves to that this plugin reads: the
+ * location rules of each virtual host, compiled. The package does not
+ * declare it; `unfoldableKeys` refuses to guess when it is not there.
+ */
+interface LlngInstance {
+  tsv?: { locationRegexp?: Record<string, Array<{ source: string }>> };
+}
+
+/**
+ * What an escape stands for: the character it encodes, `capital` for a
+ * property only capitals have, or undefined for a class or an assertion.
+ *
+ * @param escape the escape, backslash included, as RE2 accepts it
+ */
+function escaped(escape: string): string | undefined {
+  const hex = /^\\x(?:\{([0-9a-f]{1,6})\}|([0-9a-f]{2}))$/i.exec(escape);
+  if (hex)
+    return String.fromCodePoint(
+      Math.min(parseInt(hex[1] ?? hex[2], 16), 0x10ffff)
+    );
+  if (/^\\[0-7]{1,3}$/.test(escape))
+    return String.fromCharCode(parseInt(escape.slice(1), 8));
+  if (
+    /^\\p\{(?:Lu|Lt|Upper|Uppercase|Uppercase_Letter|Titlecase_Letter)\}$/.test(
+      escape
+    )
+  )
+    return 'capital';
+  if (/^\\[^a-zA-Z0-9]$/.test(escape)) return escape[1];
+  return undefined;
+}
+
+/** An escape at the start of `rest`, `\Q…\E` included */
+const ESCAPE =
+  /^\\(?:x\{[0-9a-fA-F]{1,6}\}|x[0-9a-fA-F]{2}|[0-7]{1,3}|[pP]\{[^}]*\}|Q[^]*?(?:\\E|$)|[^])/;
+
+const isCapital = (c: string | undefined): boolean =>
+  c === 'capital' || (c !== undefined && /^[\p{Lu}\p{Lt}]$/u.test(c));
+
+/** Whether every character from `first` to `last` is a capital */
+function capitalsOnly(first: string, last: string): boolean {
+  const from = first.codePointAt(0);
+  const to = last.codePointAt(0);
+  if (from === undefined || to === undefined || to - from > 0xffff)
+    return false;
+  for (let code = from; code <= to; code++)
+    if (!isCapital(String.fromCodePoint(code))) return false;
+  return true;
+}
+
+/**
+ * The first capital letter a compiled location key requires outside a part
+ * that ignores case, or undefined when it has none.
+ *
+ * It errs on the side of refusing: an optional capital (`U?`), an
+ * alternative (`(U|u)`) or a class of capitals only (`[A-Z]`) count, while
+ * `[Uu]`, `(?i)`, `(?i:…)` and escapes that do not encode a capital do not.
+ * The hexadecimal digits of a `%XX` do not either: the handler matches the
+ * path with its non-ASCII characters encoded that way, digits in upper case.
+ *
+ * @param source the key as RE2 compiled it
+ */
+function requiredCapital(source: string): string | undefined {
+  const ignoring = [false];
+  for (let i = 0; i < source.length; i++) {
+    const folded = ignoring[ignoring.length - 1];
+    const rest = source.slice(i);
+    if (rest[0] === '(') {
+      const flags = /^\(\?([imsU]*)(?:-([imsU]*))?([:)])/.exec(rest);
+      let inner = folded;
+      if (flags) {
+        if (flags[1].includes('i')) inner = true;
+        if (flags[2]?.includes('i')) inner = false;
+        i += flags[0].length - 1;
+        if (flags[3] === ')') {
+          ignoring[ignoring.length - 1] = inner;
+          continue;
+        }
+      } else {
+        i += (/^\(\?P?<[^>]*>/.exec(rest)?.[0].length ?? 1) - 1;
+      }
+      ignoring.push(inner);
+      continue;
+    }
+    if (rest[0] === ')') {
+      if (ignoring.length > 1) ignoring.pop();
+      continue;
+    }
+    if (rest[0] === '[') {
+      const negated = rest[1] === '^';
+      let j = negated ? 2 : 1;
+      let onlyCapitals = true;
+      let first = true;
+      while (j < rest.length && (rest[j] !== ']' || first)) {
+        first = false;
+        let member: string | undefined;
+        const posix = /^\[:(\^?)([a-z]+):\]/.exec(rest.slice(j));
+        const escape = rest[j] === '\\' ? ESCAPE.exec(rest.slice(j)) : null;
+        if (posix) {
+          member = posix[1] === '' && posix[2] === 'upper' ? 'capital' : '';
+          j += posix[0].length;
+        } else if (escape) {
+          member = escaped(escape[0]) ?? '';
+          j += escape[0].length;
+        } else {
+          member = rest[j];
+          j++;
+        }
+        if (rest[j] === '-' && rest[j + 1] !== ']' && j + 1 < rest.length) {
+          const end =
+            rest[j + 1] === '\\' ? ESCAPE.exec(rest.slice(j + 1)) : null;
+          const last = end ? (escaped(end[0]) ?? '') : rest[j + 1];
+          j += end ? end[0].length + 1 : 2;
+          if (!capitalsOnly(member, last)) onlyCapitals = false;
+          continue;
+        }
+        if (!isCapital(member)) onlyCapitals = false;
+      }
+      const klass = rest.slice(0, j + 1);
+      i += j;
+      if (!folded && !negated && onlyCapitals && !first) return klass;
+      continue;
+    }
+    let literal: string | undefined = rest[0];
+    if (rest[0] === '\\') {
+      const escape = ESCAPE.exec(rest);
+      if (!escape) break;
+      i += escape[0].length - 1;
+      if (escape[0][1] === 'Q') {
+        const quoted = /[\p{Lu}\p{Lt}]/u.exec(
+          escape[0].slice(2).replace(/\\E$/, '')
+        );
+        if (!folded && quoted) return escape[0];
+        continue;
+      }
+      literal = escaped(escape[0]);
+      if (!folded && isCapital(literal)) return escape[0];
+      continue;
+    }
+    if (rest[0] === '%' && /^%[0-9a-fA-F]{2}/.test(rest)) {
+      i += 2;
+      continue;
+    }
+    if (!folded && isCapital(literal)) return literal;
+  }
+  return undefined;
+}
+
 export default class AuthLLNG extends AuthBase {
   static optionDefinitions = llngOptions;
 
@@ -53,6 +202,9 @@ export default class AuthLLNG extends AuthBase {
   roles: Role[] = ['auth'] as const;
 
   private handler?: LlngHandler;
+  private instance?: LlngInstance;
+  /** How many keys of each list of location rules were found foldable */
+  private readonly foldable = new WeakMap<object, number>();
 
   /**
    * Load the optional `lemonldap-ng-handler` dependency before the server
@@ -103,7 +255,9 @@ export default class AuthLLNG extends AuthBase {
       );
     }
     try {
-      await handler.init({ configStorage: { confFile } });
+      this.instance = (await handler.init({
+        configStorage: { confFile },
+      })) as LlngInstance;
     } catch (err) {
       throw new Error(
         `${this.name}: cannot initialize the LemonLDAP::NG handler from ` +
@@ -112,6 +266,9 @@ export default class AuthLLNG extends AuthBase {
           `in nodeVhosts. (${err instanceof Error ? err.message : String(err)})`
       );
     }
+    const unfoldable = this.unfoldableKeys();
+    if (unfoldable)
+      throw new Error(`${this.name}: ${unfoldable} (in ${confFile})`);
     initializedFrom.set(handler, confFile);
     this.handler = handler;
     super.api(app);
@@ -181,6 +338,85 @@ export default class AuthLLNG extends AuthBase {
     return AuthLLNG.headerValue(req, AuthLLNG.USER_HEADER);
   }
 
+  /**
+   * The request as the handler must see it: its path in lower case, the
+   * characters it sends percent-encoded included.
+   *
+   * Express routes this server ignoring case, while the handler matches its
+   * location rules case-sensitively: `/API/V1/LDAP/USERS` reaches the routes
+   * of `/api/v1/ldap/users` without matching `^/api/v1/ldap/users`, and would
+   * be judged by `default`. The handler also decodes the ASCII letters of a
+   * `%XX` before matching, so an encoded capital (`/users/%42ob`) would
+   * escape a rule naming the entry in lower case; a non-ASCII one stays
+   * encoded (`%C3%89` for `É`), and is folded to its lower case encoded.
+   *
+   * The handler writes the headers it exports into `req.headers`; the copy
+   * shares that object with the request, and nothing else is changed on it.
+   *
+   * @param req incoming request
+   * @returns the request itself when its path is already folded
+   */
+  private static foldedPath(req: DmRequest): DmRequest {
+    const url = req.url;
+    if (typeof url !== 'string') return req;
+    const query = url.indexOf('?');
+    const path = query === -1 ? url : url.slice(0, query);
+    const folded = path.toLowerCase().replace(/(?:%[0-9a-f]{2})+/g, run => {
+      let text: string;
+      try {
+        text = decodeURIComponent(run);
+      } catch {
+        return run;
+      }
+      return Array.from(text.toLowerCase(), c =>
+        /^[a-z0-9]$/.test(c) ? c : encodeURIComponent(c)
+      ).join('');
+    });
+    if (folded === path) return req;
+    return Object.create(req, {
+      url: {
+        value: query === -1 ? folded : folded + url.slice(query),
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      },
+    }) as DmRequest;
+  }
+
+  /**
+   * Find a location key that may need a capital letter, which the folded path
+   * never has: it would let the paths it names fall to `default`. See
+   * `requiredCapital`. The handler compiles the keys again whenever its
+   * configuration reloads, so this runs on every request; a list already
+   * read is not read again.
+   *
+   * @returns what is wrong, or undefined when every key can match
+   */
+  private unfoldableKeys(): string | undefined {
+    const rules = this.instance?.tsv?.locationRegexp;
+    if (!rules || typeof rules !== 'object')
+      return (
+        'cannot read the location rules of lemonldap-ng-handler, which this ' +
+        'plugin checks: this version of the package is not supported'
+      );
+    for (const [vhost, list] of Object.entries(rules)) {
+      if (!Array.isArray(list)) continue;
+      const checked = this.foldable.get(list) ?? 0;
+      for (const { source } of list.slice(checked)) {
+        const capital =
+          typeof source === 'string' ? requiredCapital(source) : undefined;
+        if (capital)
+          return (
+            `the location rule ${source} of ${vhost} may need a capital ` +
+            `letter (${capital}), and the handler is given the path in ` +
+            'lower case. Write the key in lower case, or start it with (?i)'
+          );
+      }
+      this.foldable.set(list, list.length);
+    }
+    return undefined;
+  }
+
   protected identitySource(): string {
     const header = this.options(llngOptions).llng_username_header;
     return (
@@ -210,9 +446,15 @@ export default class AuthLLNG extends AuthBase {
     // which is the one a case-insensitive read finds first.
     const usernameHeader =
       this.options(llngOptions).llng_username_header.toLowerCase();
+    const unfoldable = this.unfoldableKeys();
+    if (unfoldable) {
+      this.logger.error(`${this.name}: ${unfoldable}`);
+      res.status(503).json({ error: 'Service Unavailable' });
+      return;
+    }
     AuthLLNG.dropForgedIdentity(req);
     if (usernameHeader) AuthLLNG.dropForgedIdentity(req, usernameHeader);
-    this.handler.run(req, res, () => {
+    this.handler.run(AuthLLNG.foldedPath(req), res, () => {
       const user = AuthLLNG.vouchedIdentity(req);
       if (!user) {
         // The handler let the request through without naming anyone. Its
