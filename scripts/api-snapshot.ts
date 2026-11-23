@@ -31,11 +31,13 @@ const declarations = path.join(root, 'temp', 'api', 'declarations');
 const reportTempDir = path.join(root, 'temp', 'api', 'reports');
 
 /**
- * The entry points of `.`, `./hooks`, `./plugin`, `./ldapactions` and
- * `./expressformatedresponses`, as `rollup.config.mjs` generates them.
+ * The entry points of `.`, `./hooks`, `./plugin`, `./auth-base`,
+ * `./ldapactions` and `./expressformatedresponses`, as `rollup.config.mjs`
+ * generates them.
  */
 export const API_ENTRIES: Record<string, string> = {
   'ldap-rest': 'src/bin/index.d.ts',
+  'auth-base': 'src/lib/auth/public.d.ts',
   expressformatedresponses: 'src/lib/expressFormatedResponses.d.ts',
   hooks: 'src/hooks.d.ts',
   ldapactions: 'src/lib/ldapActions.d.ts',

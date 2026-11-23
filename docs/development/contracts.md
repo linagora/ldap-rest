@@ -11,7 +11,8 @@ request says so before it merges.
   responses (references resolved), statuses and response headers. The error
   `code` values are reviewed by hand: the document types them as strings.
 - **Plugin API**: what the npm sub-path exports declare — `ldap-rest`,
-  `./hooks`, `./plugin`, `./ldapactions`, `./expressformatedresponses`, the
+  `./hooks`, `./plugin`, `./auth-base`, `./ldapactions`,
+  `./expressformatedresponses`, the
   `./plugin-*`, `./abstract-*` and `./browser-*` entries — and the JSON
   schema format of the `./schema-*` entries.
 
@@ -31,8 +32,8 @@ contract shows up as a diff instead of a surprise after the release:
 - `openapi.json` is the REST API document the published reference is built
   from. Regenerate it with `npm run generate:openapi`; `npm run check:openapi`
   fails when it is stale.
-- `etc/api/*.api.md` are the API Extractor reports of the five entry points
-  #595 covers first — `ldap-rest`, `./plugin`, `./hooks`, `./ldapactions` and
+- `etc/api/*.api.md` are the API Extractor reports of the entry points —
+  `ldap-rest`, `./plugin`, `./auth-base`, `./hooks`, `./ldapactions` and
   `./expressformatedresponses` — one file per sub-path. Regenerate them with
   `npm run snapshot:api`; `npm run check:api`, part of `npm run check`, fails
   when one is stale. A report lists what the entry exports and the shapes of

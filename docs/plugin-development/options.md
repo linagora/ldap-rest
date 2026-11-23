@@ -127,10 +127,39 @@ const configArgs: ConfigTemplate = [
 The `Config` interface keeps the hand-written fields until every plugin has
 moved. A migrated plugin no longer reads them: it uses `options()`.
 
-Plugins outside the repository cannot add to `args.ts` yet, but they can
-declare options the same way and name them in `optionDefinitions`: the startup
-report subtracts those keys and their aliases, and `options()` reads a declared
-`env` variable or a deprecated CLI alias the parser did not carry, warning at
-startup for the alias as it does for a core option. An option without a
-declaration still reaches `this.config` from an unknown `--key value` pair, and
-the startup report names it.
+### Plugins outside the repository
+
+A plugin outside the repository cannot add to `args.ts`, but it declares its
+options the same way, importing `defineOptions` and `opt` from
+`ldap-rest/plugin`, and names them in `optionDefinitions`:
+
+```javascript
+import DmPlugin, { defineOptions, opt } from 'ldap-rest/plugin';
+
+const demoOptions = defineOptions({
+  demo_url: opt.string({ env: 'DM_DEMO_URL', required: true }),
+});
+
+export default class Demo extends DmPlugin {
+  static optionDefinitions = demoOptions;
+  name = 'demo';
+
+  constructor(server) {
+    super(server);
+    this.url = this.options(demoOptions).demo_url;
+  }
+}
+```
+
+`DM_DEMO_URL` then sets it, with the defaults and checks above, and the
+startup report, `--strict-options` included, counts it as known. So do the
+`module:name:{json}` overrides, which keep their JSON types.
+
+The command line is narrower for such a plugin: the parser does not know its
+options, so `--demo-url value` reaches it as a string, which suits a string
+option only. A number, boolean or list option is set through its variable or
+the overrides, and an array option's `plural` form is not read.
+
+An option without a declaration reaches `this.config` from an unknown
+`--key value` pair only: no `DM_*` variable is read for it, and the startup
+report names both.

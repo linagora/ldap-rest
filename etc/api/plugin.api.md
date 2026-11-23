@@ -27,6 +27,17 @@ Settled<F extends (...args: never[]) => infer R ? R : never>
 // @public
 type Args<K extends keyof Hooks> = NonNullable<Hooks[K]> extends (...args: infer A) => unknown ? A : never;
 
+// @public (undocumented)
+type ArrayKind = 'identifiers' | 'dns' | 'phrases';
+
+// @public (undocumented)
+export interface ArrayOption extends OptionSpec<string[]> {
+    readonly kind?: ArrayKind;
+    readonly plural?: string;
+    // (undocumented)
+    readonly type: 'array';
+}
+
 // @public
 export const asyncHandler: (fn: (req: Request_2, res: Response_2, next: NextFunction) => Promise<void>) => RequestHandler;
 
@@ -66,13 +77,12 @@ interface AttributeTypeDefinition {
 // @public (undocumented)
 type AttributeValue = Buffer | Buffer[] | string[] | string;
 
-// @public (undocumented)
+// @public
 abstract class AuthBase extends DmPlugin {
     afterChain?(req: DmRequest, res: Response_2, next: () => void): void;
     afterLoad(): void;
     api(_app: Express_2): void;
     authenticate(req: Request_2, res: Response_2, next: () => void): Promise<void>;
-    // (undocumented)
     abstract authMethod(req: DmRequest, res: Response_2, next: () => void): void;
     protected identitySource(): string;
     protected knownIdentities(): string[] | undefined;
@@ -111,6 +121,12 @@ export class BadGatewayError extends HttpError {
 // @public
 export class BadRequestError extends HttpError {
     constructor(message?: string);
+}
+
+// @public (undocumented)
+export interface BooleanOption extends OptionSpec<boolean> {
+    // (undocumented)
+    readonly type: 'boolean';
 }
 
 // @public (undocumented)
@@ -754,6 +770,9 @@ export class ConflictError extends HttpError {
 }
 
 // @public
+export function defineOptions<T extends OptionSet>(options: T): T;
+
+// @public
 export const defineRoute: <P extends TSchema | undefined = undefined, Q extends TSchema | undefined = undefined, B extends TSchema | undefined = undefined>(app: Express_2, route: RouteDefinition<P, Q, B>) => void;
 
 // @public
@@ -1024,6 +1043,12 @@ export class HttpError extends Error {
 type Input<T> = T extends TSchema ? Static<T> : unknown;
 
 // @public (undocumented)
+export interface JsonOption<T> extends OptionSpec<T> {
+    // (undocumented)
+    readonly type: 'json';
+}
+
+// @public (undocumented)
 class ldapActions {
     constructor(server: DM);
     // (undocumented)
@@ -1154,6 +1179,16 @@ export class NotFoundError extends HttpError {
 // @public
 type NotifiedName = Exclude<keyof Hooks, ChainedName>;
 
+// @public (undocumented)
+export interface NumberOption extends OptionSpec<number> {
+    // (undocumented)
+    readonly max?: number;
+    // (undocumented)
+    readonly min?: number;
+    // (undocumented)
+    readonly type: 'number';
+}
+
 // @public
 interface ObjectClassDefinition {
     // (undocumented)
@@ -1190,15 +1225,25 @@ interface OidcSessionClaims {
 }
 
 // @public (undocumented)
-type OptionSet = Record<string, OptionSpec<unknown>>;
+export const opt: {
+    string: (options?: Omit<StringOption, "type">) => StringOption;
+    number: (options?: Omit<NumberOption, "type">) => NumberOption;
+    boolean: (options?: Omit<BooleanOption, "type">) => BooleanOption;
+    array: (options?: Omit<ArrayOption, "type">) => ArrayOption;
+    stringOrFalse: (options?: Omit<StringOrFalseOption, "type" | "allowFalse">) => StringOrFalseOption;
+    json: <T = Record<string, unknown>>(options?: Omit<JsonOption<T>, "type">) => JsonOption<T>;
+};
+
+// @public (undocumented)
+export type OptionSet = Record<string, OptionSpec<unknown>>;
 
 // @public
-type OptionsOf<T extends OptionSet> = {
+export type OptionsOf<T extends OptionSet> = {
     [K in keyof T]: T[K] extends OptionSpec<infer V> ? V : never;
 };
 
 // @public (undocumented)
-interface OptionSpec<T> {
+export interface OptionSpec<T> {
     readonly aliases?: readonly string[];
     readonly default?: T;
     readonly emptyIsValue?: boolean;
@@ -1472,6 +1517,21 @@ export class ServiceUnavailableError extends HttpError {
 
 // @public
 type Settled<T> = T extends Promise<infer P> ? P : T;
+
+// @public (undocumented)
+export interface StringOption extends OptionSpec<string> {
+    readonly choices?: readonly string[];
+    // (undocumented)
+    readonly type: 'string';
+}
+
+// @public (undocumented)
+export interface StringOrFalseOption extends OptionSpec<string | false> {
+    // (undocumented)
+    readonly allowFalse: true;
+    // (undocumented)
+    readonly type: 'string';
+}
 
 // @public
 interface SyntaxDefinition {

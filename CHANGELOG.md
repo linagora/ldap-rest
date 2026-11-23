@@ -15,6 +15,11 @@
 
 - SCIM: a mapping entry marked `writeOnly` is written but never returned nor
   filtered on ([SCIM](docs/usage/plugins/integrations/scim.md#file-shape)).
+- External plugins can declare their options: `defineOptions` and `opt` are
+  exported from `ldap-rest/plugin`, so their `DM_*` variables are read and
+  known to `--strict-options`; `AuthBase` is published as
+  `ldap-rest/auth-base` for authentication plugins
+  ([plugin options](docs/plugin-development/options.md#plugins-outside-the-repository)).
 
 ### Fixed
 

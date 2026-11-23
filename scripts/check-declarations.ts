@@ -34,7 +34,13 @@ const entries = Object.entries(
     .exports as Record<string, { types?: string }>
 ).filter(([, target]) => target.types);
 
-const consumer = `import DmPlugin, { HttpError } from 'ldap-rest/plugin';
+const consumer = `import DmPlugin, {
+  HttpError,
+  defineOptions,
+  opt,
+  type OptionsOf,
+} from 'ldap-rest/plugin';
+import AuthBase, { type DmRequest } from 'ldap-rest/auth-base';
 import { escapeLdapFilter } from 'ldap-rest';
 import type { ScimUser } from 'ldap-rest/plugin-scim-types';
 ${entries
@@ -56,6 +62,23 @@ type ApiArgument = Parameters<NonNullable<DmPlugin['api']>>[0];
 // @ts-expect-error Express is not a number
 const apiArgument: ApiArgument = 1;
 
+const probeOptions = defineOptions({
+  probe_url: opt.string({ env: 'DM_PROBE_URL' }),
+});
+// @ts-expect-error probe_url is a string
+const probeUrl: number = ({} as OptionsOf<typeof probeOptions>).probe_url;
+
+export class AuthProbe extends AuthBase {
+  static optionDefinitions = probeOptions;
+  name = 'authProbe';
+  authMethod(req: DmRequest, _res: unknown, next: () => void): void {
+    // @ts-expect-error a request is not a number
+    const request: number = req;
+    void request;
+    next();
+  }
+}
+
 export class Probe extends DmPlugin {
   name = 'probe';
 
@@ -67,6 +90,7 @@ export class Probe extends DmPlugin {
     void escaped;
     void user;
     void apiArgument;
+    void probeUrl;
   }
 }
 

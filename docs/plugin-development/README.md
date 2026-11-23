@@ -116,7 +116,7 @@ export default class MyPlugin extends DmPlugin {
 
 The `asyncHandler` is exported from:
 
-- `ldap-rest/abstract/plugin` (recommended for plugins)
+- `ldap-rest/plugin` (recommended for plugins)
 - `ldap-rest` (for external use)
 
 See [Exposing API Endpoints](#exposing-api-endpoints) for detailed examples.
@@ -285,11 +285,17 @@ A core plugin declares its options next to its code, in a
 `<plugin>.options.ts` file, and reads them through `this.options()` with their
 types, defaults and checks. See [plugin options](options.md).
 
-A plugin outside the repository cannot add to `src/config/args.ts` yet. It keeps
-reading `this.config.<name>`: LDAP-Rest accepts and stores unknown
-`--option-name value` pairs under `option_name`, with `--option-name` and
-`DM_OPTION_NAME` overriding in that order. See
-[configuration](../usage/configuration.md#environment-variables).
+A plugin outside the repository declares its options the same way, with
+`defineOptions` and `opt` from `ldap-rest/plugin`, so that its environment
+variables are read: see
+[plugins outside the repository](options.md#plugins-outside-the-repository).
+An undeclared `--option-name value` pair still lands in `this.config.option_name`,
+but no `DM_*` variable does.
+
+An authentication plugin extends `AuthBase`, from `ldap-rest/auth-base`, and
+implements `authMethod(req, res, next)`; the error classes (`HttpError`,
+`UnauthorizedError`…) come from `ldap-rest/plugin`, the JSON responses from
+`ldap-rest/expressformatedresponses`.
 
 ---
 

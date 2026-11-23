@@ -28,6 +28,10 @@
       "import": "./dist/abstract/plugin.js",
       "types": "./dist/src/abstract/plugin.d.ts"
     },
+    "./auth-base": {
+      "import": "./dist/lib/auth/public.js",
+      "types": "./dist/src/lib/auth/public.d.ts"
+    },
     "./expressformatedresponses": {
       "import": "./dist/lib/expressFormatedResponses.js",
       "types": "./dist/src/lib/expressFormatedResponses.d.ts"
