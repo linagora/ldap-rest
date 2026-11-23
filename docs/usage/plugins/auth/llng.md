@@ -84,21 +84,23 @@ npm install lemonldap-ng-handler
 
 ## LLNG Configuration
 
-Configure LDAP-Rest as a protected virtual host in LemonLDAP::NG:
+Declare the virtual host of LDAP-Rest in LemonLDAP::NG and list it in
+`nodeVhosts`. The handler runs inside LDAP-Rest: a reverse proxy in front only
+forwards, and must keep the `Host` header, which names the virtual host:
 
 ```apache
-# In LLNG Manager: Virtual Hosts > api.example.com
 <VirtualHost *:443>
   ServerName api.example.com
 
-  # LemonLDAP::NG Handler
-  PerlHeaderParserHandler Lemonldap::NG::Handler::ApacheMP2
-
-  # Proxy to LDAP-Rest
+  ProxyPreserveHost On
   ProxyPass / http://localhost:8081/
   ProxyPassReverse / http://localhost:8081/
 </VirtualHost>
 ```
+
+Do not also put a Perl handler (`Lemonldap::NG::Handler::ApacheMP2`) in front
+of this virtual host: the two handlers read the same rules, in two different
+languages.
 
 ## Use Cases
 
@@ -109,18 +111,31 @@ Configure LDAP-Rest as a protected virtual host in LemonLDAP::NG:
 
 ## Example: LLNG Authorization Rules
 
-Configure access rules in LLNG Manager:
+The Node.js handler evaluates the rules as **JavaScript**, not Perl: `$name`
+becomes `session.name` and the rest is run as is. A Perl rule does not do what
+it reads: `$groups =~ /\badmins\b/` assigns `-1` to `$groups` and grants every
+user, and `eq`, `and` or `m#…#` stop the server at startup. `$uri` is not
+provided either: the path is chosen by the location key, a regular expression
+tried in order before `default`.
 
-```perl
-# Allow only HR group to access users endpoint
-$groups =~ /\bhr\b/ and $uri =~ m#^/api/v1/ldap/users#
+In the LLNG Manager, under _Virtual Hosts > api.example.com > Access rules_,
+or in the configuration file:
 
-# Allow admins full access
-$groups =~ /\badmins\b/
-
-# Allow specific users to manage groups
-$uid eq "groupmanager" and $uri =~ m#^/api/v1/ldap/groups#
+```json
+{
+  "locationRules": {
+    "api.example.com": {
+      "^/api/v1/ldap/users": "/\\b(?:hr|admins)\\b/.test($groups)",
+      "^/api/v1/ldap/groups": "$uid === \"groupmanager\" || /\\badmins\\b/.test($groups)",
+      "default": "/\\badmins\\b/.test($groups)"
+    }
+  }
+}
 ```
+
+The HR group and the admins reach the users, `groupmanager` and the admins
+reach the groups, and only the admins reach the rest. A location rule replaces
+`default` for the paths it matches: repeat in it whom `default` lets through.
 
 ## Troubleshooting
 

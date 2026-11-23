@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- The LemonLDAP::NG documentation gave its access rules in Perl, which the
+  Node.js handler runs as JavaScript: `$groups =~ /\badmins\b/` granted every
+  user. The examples are now JavaScript; rewrite the rules of a virtual host
+  LDAP-Rest protects if they were copied from them
+  ([LemonLDAP::NG](docs/usage/plugins/auth/llng.md#example-llng-authorization-rules),
+  [GHSA-gcqr-9422-mfj8](https://github.com/linagora/ldap-rest/security/advisories/GHSA-gcqr-9422-mfj8)).
+
 ## v2.4.0 (2026-11-18)
 
 ### Added
