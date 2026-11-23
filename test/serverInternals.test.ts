@@ -477,6 +477,7 @@ describe('Server internals', () => {
         }
         expect(error).to.be.instanceOf(Error);
         expect((error as Error).message).to.contain(reason);
+        expect((error as Error).message).to.contain('named (');
         expect((error as Error).message).to.not.contain('/a');
         expect(dm.loadedPlugins).to.not.have.property('named');
       });

@@ -995,6 +995,7 @@ export class DM {
         // Loading the plugin without them would run it with the settings the
         // overrides were written to replace. The message leaves them out:
         // they may hold a secret, and the parser's error points into them.
+        const instance = name ? `${name} (${pluginName})` : pluginName;
         let parsed: unknown;
         try {
           parsed = JSON.parse(tmp);
@@ -1003,21 +1004,18 @@ export class DM {
           const at = /at position \d+/.exec(String(err))?.[0];
           return Promise.reject(
             new Error(
-              `Overrides for plugin ${pluginName} are not valid JSON` +
+              `Overrides for plugin ${instance} are not valid JSON` +
                 (at ? ` (${at})` : '')
             )
           );
         }
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
           return Promise.reject(
-            new Error(
-              `Overrides for plugin ${pluginName} must be a JSON object`
-            )
+            new Error(`Overrides for plugin ${instance} must be a JSON object`)
           );
         overrides = parsed as Config;
         this.logger.debug(
-          `Overrides for plugin ${name || pluginName}: ` +
-            Object.keys(parsed).join(', ')
+          `Overrides for plugin ${instance}: ` + Object.keys(parsed).join(', ')
         );
       } else {
         name = tmp;
