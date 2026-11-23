@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `core/auth/llng` hands the LemonLDAP::NG handler the path in lower case:
+  `/API/V1/LDAP/USERS` reached the users routes without matching the location
+  rule `^/api/v1/ldap/users`, and was judged by `default`
+  ([upgrading](docs/usage/upgrading.md#lemonldapng-location-keys-are-written-in-lower-case),
+  [GHSA-q4v2-7mxw-mr3m](https://github.com/linagora/ldap-rest/security/advisories/GHSA-q4v2-7mxw-mr3m)).
+
 ## v2.4.0 (2026-11-18)
 
 ### Added

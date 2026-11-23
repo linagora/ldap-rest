@@ -55,7 +55,7 @@ describe('LemonLDAP::NG auth plugin', () => {
           calls.init = args;
           if (options.failInit) throw options.failInit;
           ready = true;
-          return {};
+          return { tsv: { locationRegexp: {} } };
         },
         run: (
           req: { headers: Record<string, string> },
@@ -110,7 +110,7 @@ describe('LemonLDAP::NG auth plugin', () => {
       const dm = new DM();
       await dm.ready;
       const silent = {
-        init: async (): Promise<unknown> => ({}),
+        init: async (): Promise<unknown> => ({ tsv: { locationRegexp: {} } }),
         run: (_req: unknown, _res: unknown, next: () => void): void => next(),
       };
       const plugin = new (withHandler(silent))(dm);
@@ -141,7 +141,7 @@ describe('LemonLDAP::NG auth plugin', () => {
       const dm = new DM();
       await dm.ready;
       const silent = {
-        init: async (): Promise<unknown> => ({}),
+        init: async (): Promise<unknown> => ({ tsv: { locationRegexp: {} } }),
         run: (_req: unknown, _res: unknown, next: () => void): void => next(),
       };
       const plugin = new (withHandler(silent))(dm);
@@ -199,7 +199,7 @@ describe('LemonLDAP::NG auth plugin', () => {
       await dm.ready;
       let seen: unknown = 'not run';
       const spy = {
-        init: async (): Promise<unknown> => ({}),
+        init: async (): Promise<unknown> => ({ tsv: { locationRegexp: {} } }),
         run: (
           req: { headers: Record<string, string> },
           _res: unknown,
@@ -235,7 +235,7 @@ describe('LemonLDAP::NG auth plugin', () => {
       await dm.ready;
       dm.config.llng_username_header = 'X-Login';
       const exporting = {
-        init: async (): Promise<unknown> => ({}),
+        init: async (): Promise<unknown> => ({ tsv: { locationRegexp: {} } }),
         run: (
           req: { headers: Record<string, string> },
           _res: unknown,
@@ -286,7 +286,7 @@ describe('LemonLDAP::NG auth plugin', () => {
       const dm = new DM();
       await dm.ready;
       const lowercasing = {
-        init: async (): Promise<unknown> => ({}),
+        init: async (): Promise<unknown> => ({ tsv: { locationRegexp: {} } }),
         run: (
           req: { headers: Record<string, string> },
           _res: unknown,

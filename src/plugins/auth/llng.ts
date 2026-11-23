@@ -46,6 +46,15 @@ interface LlngHandler {
  */
 const initializedFrom = new WeakMap<LlngHandler, string>();
 
+/**
+ * The part of the handler `init()` resolves to that this plugin reads: the
+ * location rules of each virtual host, compiled. The package does not
+ * declare it; `unfoldableKeys` refuses to guess when it is not there.
+ */
+interface LlngInstance {
+  tsv?: { locationRegexp?: Record<string, Array<{ source: string }>> };
+}
+
 export default class AuthLLNG extends AuthBase {
   static optionDefinitions = llngOptions;
 
@@ -53,6 +62,9 @@ export default class AuthLLNG extends AuthBase {
   roles: Role[] = ['auth'] as const;
 
   private handler?: LlngHandler;
+  private instance?: LlngInstance;
+  /** How many keys of each list of location rules were found foldable */
+  private readonly foldable = new WeakMap<object, number>();
 
   /**
    * Load the optional `lemonldap-ng-handler` dependency before the server
@@ -103,7 +115,9 @@ export default class AuthLLNG extends AuthBase {
       );
     }
     try {
-      await handler.init({ configStorage: { confFile } });
+      this.instance = (await handler.init({
+        configStorage: { confFile },
+      })) as LlngInstance;
     } catch (err) {
       throw new Error(
         `${this.name}: cannot initialize the LemonLDAP::NG handler from ` +
@@ -112,6 +126,9 @@ export default class AuthLLNG extends AuthBase {
           `in nodeVhosts. (${err instanceof Error ? err.message : String(err)})`
       );
     }
+    const unfoldable = this.unfoldableKeys();
+    if (unfoldable)
+      throw new Error(`${this.name}: ${unfoldable} (in ${confFile})`);
     initializedFrom.set(handler, confFile);
     this.handler = handler;
     super.api(app);
@@ -181,6 +198,84 @@ export default class AuthLLNG extends AuthBase {
     return AuthLLNG.headerValue(req, AuthLLNG.USER_HEADER);
   }
 
+  /**
+   * The request as the handler must see it: its path in lower case, encoded
+   * letters decoded first.
+   *
+   * Express routes this server ignoring case, while the handler matches its
+   * location rules case-sensitively: `/API/V1/LDAP/USERS` reaches the routes
+   * of `/api/v1/ldap/users` without matching `^/api/v1/ldap/users`, and would
+   * be judged by `default`. The handler also decodes `%XX` before matching,
+   * so an encoded capital (`/users/%42ob`) would escape a rule naming the
+   * entry in lower case.
+   *
+   * The handler writes the headers it exports into `req.headers`; the copy
+   * shares that object with the request, and nothing else is changed on it.
+   *
+   * @param req incoming request
+   * @returns the request itself when its path is already folded
+   */
+  private static foldedPath(req: DmRequest): DmRequest {
+    const url = req.url;
+    if (typeof url !== 'string') return req;
+    const query = url.indexOf('?');
+    const path = query === -1 ? url : url.slice(0, query);
+    const folded = path
+      .replace(/%(?:[46][1-9a-f]|[57][0-9a])/gi, code =>
+        String.fromCharCode(parseInt(code.slice(1), 16))
+      )
+      .toLowerCase();
+    if (folded === path) return req;
+    return Object.create(req, {
+      url: {
+        value: query === -1 ? folded : folded + url.slice(query),
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      },
+    }) as DmRequest;
+  }
+
+  /**
+   * Find a location key the folded path can never match: a capital letter
+   * outside an escape, with no `(?i)`. It would let the paths it names fall
+   * to `default`. The handler compiles the keys again whenever its
+   * configuration reloads, so this runs on every request; a list already
+   * read is not read again.
+   *
+   * @returns what is wrong, or undefined when every key can match
+   */
+  private unfoldableKeys(): string | undefined {
+    const rules = this.instance?.tsv?.locationRegexp;
+    if (!rules || typeof rules !== 'object')
+      return (
+        'cannot read the location rules of lemonldap-ng-handler, which this ' +
+        'plugin checks: this version of the package is not supported'
+      );
+    for (const [vhost, list] of Object.entries(rules)) {
+      if (!Array.isArray(list)) continue;
+      const checked = this.foldable.get(list) ?? 0;
+      for (const { source } of list.slice(checked)) {
+        if (
+          typeof source !== 'string' ||
+          /^\^?\(\?[ims]*i[ims]*\)/.test(source)
+        )
+          continue;
+        const literal = source
+          .replace(/\\(?:[pPx]\{[^}]*\}|[^])/g, '')
+          .replace(/\(\?P?<[^>]*>/g, '');
+        if (/[A-Z]/.test(literal))
+          return (
+            `the location rule ${source} of ${vhost} has a capital letter, ` +
+            'and the handler matches it against the path in lower case. ' +
+            'Write it in lower case, or start it with (?i)'
+          );
+      }
+      this.foldable.set(list, list.length);
+    }
+    return undefined;
+  }
+
   protected identitySource(): string {
     const header = this.options(llngOptions).llng_username_header;
     return (
@@ -210,9 +305,15 @@ export default class AuthLLNG extends AuthBase {
     // which is the one a case-insensitive read finds first.
     const usernameHeader =
       this.options(llngOptions).llng_username_header.toLowerCase();
+    const unfoldable = this.unfoldableKeys();
+    if (unfoldable) {
+      this.logger.error(`${this.name}: ${unfoldable}`);
+      res.status(503).json({ error: 'Service Unavailable' });
+      return;
+    }
     AuthLLNG.dropForgedIdentity(req);
     if (usernameHeader) AuthLLNG.dropForgedIdentity(req, usernameHeader);
-    this.handler.run(req, res, () => {
+    this.handler.run(AuthLLNG.foldedPath(req), res, () => {
       const user = AuthLLNG.vouchedIdentity(req);
       if (!user) {
         // The handler let the request through without naming anyone. Its
