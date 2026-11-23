@@ -1,22 +1,18 @@
 # Changelog
 
-## Unreleased
+## v2.4.1 (2026-11-23)
 
 ### Security
 
-- A pooled LDAP connection whose socket dropped (directory restart, failover,
-  idle timeout) replays the server's bind before its next operation, and one
-  that lost its bind is never handed out: the operation no longer ran
-  anonymously
+- A pooled LDAP connection whose socket dropped rebinds before its next
+  operation, which ran anonymously
   ([GHSA-46wr-qcjh-rmrr](https://github.com/linagora/ldap-rest/security/advisories/GHSA-46wr-qcjh-rmrr)).
-- The LemonLDAP::NG documentation gave its access rules in Perl, which the
-  Node.js handler runs as JavaScript: `$groups =~ /\badmins\b/` granted every
-  user. The examples are now JavaScript
+- The LemonLDAP::NG rule examples were Perl, which the Node.js handler runs as
+  JavaScript: they granted every user
   ([upgrading](docs/usage/upgrading.md#lemonldapng-access-rules-are-javascript),
   [GHSA-gcqr-9422-mfj8](https://github.com/linagora/ldap-rest/security/advisories/GHSA-gcqr-9422-mfj8)).
-- `core/auth/llng` hands the LemonLDAP::NG handler the path in lower case:
-  `/API/V1/LDAP/USERS` reached the users routes without matching the location
-  rule `^/api/v1/ldap/users`, and was judged by `default`
+- `core/auth/llng` matches location rules against the path in lower case:
+  `/API/V1/LDAP/USERS` escaped `^/api/v1/ldap/users`
   ([upgrading](docs/usage/upgrading.md#lemonldapng-location-keys-are-written-in-lower-case),
   [GHSA-q4v2-7mxw-mr3m](https://github.com/linagora/ldap-rest/security/advisories/GHSA-q4v2-7mxw-mr3m)).
 
