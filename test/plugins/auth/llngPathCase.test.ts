@@ -63,6 +63,11 @@ describe('LemonLDAP::NG location rules and the letter case of the path', () => {
       '^\\/x\\/\\x{55}sers',
       '^\\/x\\/\\125sers',
       '^\\/x\\/\\p{Lu}',
+      '^\\/x\\/\\p{Uppercase}',
+      '^\\/x\\/\\p{Uppercase_Letter}',
+      '^\\/x\\/É',
+      '^\\/x\\/\\x{FF21}',
+      '^\\/x\\/[À-Ö]',
       '^\\/x\\/[[:upper:]]',
       '^\\/x\\/\\QUsers\\E',
       '^\\/x\\/[A-Z]',
@@ -89,6 +94,8 @@ describe('LemonLDAP::NG location rules and the letter case of the path', () => {
       '^\\/x\\/[^A-Z]',
       '^\\/x\\/[[:alpha:]]',
       '^\\/x\\/\\x75sers',
+      '^\\/x\\/%C3%A9quipe',
+      '^\\/x\\/[À-ÿ]',
       '^\\/scim\\/v2\\/(?P<kind>schemas)',
     ];
     for (const key of matchLowerCase)
@@ -143,6 +150,7 @@ describe('LemonLDAP::NG location rules and the letter case of the path', () => {
       fixture = llngFixture({
         '^/api/v1/ldap/users': '/\\bhr\\b/.test($groups)',
         '^/api/v1/ldap/groups/admins': '/\\badmins\\b/.test($groups)',
+        '^/api/v1/ldap/groups/%C3%A9quipe': '/\\badmins\\b/.test($groups)',
         default: 'accept',
       });
       bob = fixture.session('bob-session', { uid: 'bob', groups: 'staff' });
@@ -188,6 +196,12 @@ describe('LemonLDAP::NG location rules and the letter case of the path', () => {
       const res = await get('/api/v1/ldap/groups/%41dmins', carol);
       expect(res.status).to.equal(403);
       await get('/api/v1/ldap/groups/staff', carol).expect(200);
+    });
+
+    it('applies it to a non-ASCII letter whatever its case', async () => {
+      await get('/api/v1/ldap/groups/%C3%A9quipe', carol).expect(403);
+      await get('/api/v1/ldap/groups/%c3%a9quipe', carol).expect(403);
+      await get('/api/v1/ldap/groups/%C3%89QUIPE', carol).expect(403);
     });
 
     it('routes the request as it was sent', async () => {

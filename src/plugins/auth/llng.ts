@@ -69,7 +69,12 @@ function escaped(escape: string): string | undefined {
     );
   if (/^\\[0-7]{1,3}$/.test(escape))
     return String.fromCharCode(parseInt(escape.slice(1), 8));
-  if (/^\\p\{(?:Lu|Lt|Upper)\}$/.test(escape)) return 'capital';
+  if (
+    /^\\p\{(?:Lu|Lt|Upper|Uppercase|Uppercase_Letter|Titlecase_Letter)\}$/.test(
+      escape
+    )
+  )
+    return 'capital';
   if (/^\\[^a-zA-Z0-9]$/.test(escape)) return escape[1];
   return undefined;
 }
@@ -79,16 +84,28 @@ const ESCAPE =
   /^\\(?:x\{[0-9a-fA-F]{1,6}\}|x[0-9a-fA-F]{2}|[0-7]{1,3}|[pP]\{[^}]*\}|Q[^]*?(?:\\E|$)|[^])/;
 
 const isCapital = (c: string | undefined): boolean =>
-  c === 'capital' || (c !== undefined && /^[A-Z]$/.test(c));
+  c === 'capital' || (c !== undefined && /^[\p{Lu}\p{Lt}]$/u.test(c));
+
+/** Whether every character from `first` to `last` is a capital */
+function capitalsOnly(first: string, last: string): boolean {
+  const from = first.codePointAt(0);
+  const to = last.codePointAt(0);
+  if (from === undefined || to === undefined || to - from > 0xffff)
+    return false;
+  for (let code = from; code <= to; code++)
+    if (!isCapital(String.fromCodePoint(code))) return false;
+  return true;
+}
 
 /**
  * The first capital letter a compiled location key requires outside a part
  * that ignores case, or undefined when it has none.
  *
  * It errs on the side of refusing: an optional capital (`U?`), an
- * alternative (`(U|u)`) or a mixed class read as one capital only (`[A-Z]`)
- * count, while `[Uu]`, `(?i)`, `(?i:…)` and escapes that do not encode a
- * capital do not.
+ * alternative (`(U|u)`) or a class of capitals only (`[A-Z]`) count, while
+ * `[Uu]`, `(?i)`, `(?i:…)` and escapes that do not encode a capital do not.
+ * The hexadecimal digits of a `%XX` do not either: the handler matches the
+ * path with its non-ASCII characters encoded that way, digits in upper case.
  *
  * @param source the key as RE2 compiled it
  */
@@ -143,8 +160,7 @@ function requiredCapital(source: string): string | undefined {
             rest[j + 1] === '\\' ? ESCAPE.exec(rest.slice(j + 1)) : null;
           const last = end ? (escaped(end[0]) ?? '') : rest[j + 1];
           j += end ? end[0].length + 1 : 2;
-          if (!(member >= 'A' && last <= 'Z' && member <= last))
-            onlyCapitals = false;
+          if (!capitalsOnly(member, last)) onlyCapitals = false;
           continue;
         }
         if (!isCapital(member)) onlyCapitals = false;
@@ -160,12 +176,18 @@ function requiredCapital(source: string): string | undefined {
       if (!escape) break;
       i += escape[0].length - 1;
       if (escape[0][1] === 'Q') {
-        const quoted = /[A-Z]/.exec(escape[0].slice(2).replace(/\\E$/, ''));
+        const quoted = /[\p{Lu}\p{Lt}]/u.exec(
+          escape[0].slice(2).replace(/\\E$/, '')
+        );
         if (!folded && quoted) return escape[0];
         continue;
       }
       literal = escaped(escape[0]);
       if (!folded && isCapital(literal)) return escape[0];
+      continue;
+    }
+    if (rest[0] === '%' && /^%[0-9a-fA-F]{2}/.test(rest)) {
+      i += 2;
       continue;
     }
     if (!folded && isCapital(literal)) return literal;
@@ -317,15 +339,16 @@ export default class AuthLLNG extends AuthBase {
   }
 
   /**
-   * The request as the handler must see it: its path in lower case, encoded
-   * letters decoded first.
+   * The request as the handler must see it: its path in lower case, the
+   * characters it sends percent-encoded included.
    *
    * Express routes this server ignoring case, while the handler matches its
    * location rules case-sensitively: `/API/V1/LDAP/USERS` reaches the routes
    * of `/api/v1/ldap/users` without matching `^/api/v1/ldap/users`, and would
-   * be judged by `default`. The handler also decodes `%XX` before matching,
-   * so an encoded capital (`/users/%42ob`) would escape a rule naming the
-   * entry in lower case.
+   * be judged by `default`. The handler also decodes the ASCII letters of a
+   * `%XX` before matching, so an encoded capital (`/users/%42ob`) would
+   * escape a rule naming the entry in lower case; a non-ASCII one stays
+   * encoded (`%C3%89` for `É`), and is folded to its lower case encoded.
    *
    * The handler writes the headers it exports into `req.headers`; the copy
    * shares that object with the request, and nothing else is changed on it.
@@ -338,11 +361,17 @@ export default class AuthLLNG extends AuthBase {
     if (typeof url !== 'string') return req;
     const query = url.indexOf('?');
     const path = query === -1 ? url : url.slice(0, query);
-    const folded = path
-      .replace(/%(?:[46][1-9a-f]|[57][0-9a])/gi, code =>
-        String.fromCharCode(parseInt(code.slice(1), 16))
-      )
-      .toLowerCase();
+    const folded = path.toLowerCase().replace(/(?:%[0-9a-f]{2})+/g, run => {
+      let text: string;
+      try {
+        text = decodeURIComponent(run);
+      } catch {
+        return run;
+      }
+      return Array.from(text.toLowerCase(), c =>
+        /^[a-z0-9]$/.test(c) ? c : encodeURIComponent(c)
+      ).join('');
+    });
     if (folded === path) return req;
     return Object.create(req, {
       url: {

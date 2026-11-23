@@ -48,18 +48,19 @@ only have been trustworthy if that proxy stripped the client's copy itself.
 
 LDAP-Rest routes paths ignoring letter case: `/API/V1/LDAP/USERS` reaches the
 same routes as `/api/v1/ldap/users`. The handler is therefore given the path in
-lower case, percent-encoded letters decoded first, so that a location rule
+lower case, letters sent percent-encoded included, so that a location rule
 covers every spelling of the paths it names. The request itself is routed as
-it was sent.
+it was sent. The handler matches non-ASCII characters percent-encoded, with
+upper-case digits: write `équipe` as `%C3%A9quipe` in a key.
 
 Write the location keys in lower case, `^/scim/v2/users` rather than
 `^/scim/v2/Users`, or start them with `(?i)`. The plugin refuses a key that
 may need a capital letter outside a part that ignores case, whether written
-(`Users`, `[A-Z]`) or encoded (`\x55`, `\p{Lu}`, `[[:upper:]]`): it stops the
-server at startup, and a configuration reloaded with one makes the plugin
-answer 503 until it is corrected. The check errs on the side of refusing: an
-optional capital (`U?`) or an alternative (`(U|u)`) is refused too, while
-`[Uu]` and `(?i:…)` are accepted.
+(`Users`, `É`, `[A-Z]`) or encoded (`\x55`, `\p{Lu}`, `[[:upper:]]`): it
+stops the server at startup, and a configuration reloaded with one makes the
+plugin answer 503 until it is corrected. The check errs on the side of
+refusing: an optional capital (`U?`) or an alternative (`(U|u)`) is refused
+too, while `[Uu]` and `(?i:…)` are accepted.
 
 ## Prerequisites
 
