@@ -24,6 +24,7 @@ import { escapeLdapFilter } from '../../lib/utils.js';
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
+  isWriteOnlyAttribute,
   scimPathToLdapAttribute,
 } from './mapping.js';
 import type { ResourceMapping } from './types.js';
@@ -378,6 +379,9 @@ class Parser {
     if (!ldapAttr) {
       throw scimInvalidFilter(`Unknown attribute path '${path}'`);
     }
+    // A filter would answer, match by match, what the attribute holds
+    if (isWriteOnlyAttribute(ldapAttr, this.mapping))
+      throw scimInvalidFilter(`'${path}' is write-only`);
     return ldapAttr;
   }
 

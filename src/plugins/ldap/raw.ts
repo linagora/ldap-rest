@@ -23,6 +23,7 @@ import type { SearchOptions, SearchResult } from 'ldapts';
 import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin.js';
 import type { DM } from '../../bin/index.js';
 import { tryMethodData } from '../../lib/expressFormatedResponses.js';
+import { SECRET_ATTRIBUTES } from '../../lib/secretAttributes.js';
 import { isDnInBranch, getParentDn, getRdn } from '../../lib/utils.js';
 import {
   BadRequestError,
@@ -126,32 +127,6 @@ export interface RawSearchResult {
 const VALID_SCOPES = ['base', 'one', 'sub'] as const;
 type Scope = (typeof VALID_SCOPES)[number];
 
-/**
- * Attributes holding credential material, hidden unless
- * `--ldap-raw-show-secrets` says otherwise. A password hash handed over
- * HTTP is an offline cracking target, and a directory browser has no need
- * to display one to do its job — so the safe reading is the default and
- * the permissive one is opt-in. Covers OpenLDAP, Samba, Kerberos and AD
- * spellings; add site-specific ones with `--ldap-raw-hidden-attribute`.
- */
-const SECRET_ATTRIBUTES = [
-  'userpassword',
-  'pwdhistory',
-  'sambantpassword',
-  'sambalmpassword',
-  'sambapasswordhistory',
-  'krbprincipalkey',
-  'krbextradata',
-  'krbpwdhistory',
-  'unicodepwd',
-  'dbcspwd',
-  'lmpwdhistory',
-  'ntpwdhistory',
-  'supplementalcredentials',
-  'userpkcs12',
-  'authpassword',
-];
-
 export const RawSearchQuery = Type.Object({
   base: Type.Optional(Type.String()),
   scope: Type.Optional(Type.String()),
@@ -211,6 +186,8 @@ export default class LdapRaw extends DmPlugin {
     this.bases = bases;
 
     this.showSecrets = settings.ldap_raw_show_secrets;
+    // Hidden unless --ldap-raw-show-secrets: a directory browser has no need
+    // to display a hash to do its job
     this.hiddenAttributes = new Set([
       ...(this.showSecrets ? [] : SECRET_ATTRIBUTES),
       ...settings.ldap_raw_hidden_attribute

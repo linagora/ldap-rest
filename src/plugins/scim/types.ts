@@ -172,7 +172,11 @@ export interface BulkResponse {
  * - ldapPrimary/ldapSecondary: primary vs non-primary in multi-valued attr (emails)
  * - sub: nested SCIM attribute name (for name.familyName etc.)
  * - multi: 'single' or 'array' (hint for formatting)
+ * - readOnly: never written; a PUT neither replaces nor clears it
  * - operational: read-only from LDAP operational attribute
+ * - writeOnly: written, never returned nor usable in a filter (RFC 7643
+ *   section 7, `returned: "never"`), as is every entry on the same LDAP
+ *   attribute; see `writeOnlyLdapAttributes()`
  */
 export interface MappingEntry {
   scim: string;
@@ -185,6 +189,7 @@ export interface MappingEntry {
   multi?: 'single' | 'array';
   readOnly?: boolean;
   operational?: boolean;
+  writeOnly?: boolean;
   converter?: 'boolean' | 'number' | 'string';
 }
 

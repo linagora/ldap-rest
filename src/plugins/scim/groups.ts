@@ -88,6 +88,8 @@ export class ScimGroups {
   private readonly hookBus: HookBus;
   private readonly mapping: ResourceMapping;
   private readonly attributes: string[];
+  /** What a PATCH reads: write-only attributes too, to remove them */
+  private readonly patchAttributes: string[];
   private readonly rdnAttribute: string;
   private readonly objectClass: string[];
   private readonly idAttribute: string;
@@ -123,6 +125,11 @@ export class ScimGroups {
       this.rdnAttribute,
       'member',
     ]);
+    this.patchAttributes = requiredLdapAttributes(
+      this.mapping,
+      [this.rdnAttribute, 'member'],
+      true
+    );
   }
 
   private ctx(req?: DmRequest): MappingContext {
@@ -481,7 +488,7 @@ export class ScimGroups {
         {
           paged: false,
           scope: 'base',
-          attributes: this.attributes,
+          attributes: this.patchAttributes,
         },
         dn
       )) as SearchResult;

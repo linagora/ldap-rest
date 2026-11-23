@@ -166,7 +166,8 @@ The built-in list covers the usual OpenLDAP, Samba, Kerberos and Active Director
 userPassword, authPassword, pwdHistory, sambaNTPassword, sambaLMPassword,
 sambaPasswordHistory, krbPrincipalKey, krbExtraData, krbPwdHistory,
 unicodePwd, dbcsPwd, lmPwdHistory, ntPwdHistory, supplementalCredentials,
-userPKCS12
+userPKCS12, ms-Mcs-AdmPwd, msLAPS-Password, msLAPS-EncryptedPassword,
+msLAPS-EncryptedDSRMPassword, msDS-ManagedPassword
 ```
 
 A password hash served over HTTP is an offline cracking target, and browsing a directory does not require reading one — hence hidden by default, visible only on request:

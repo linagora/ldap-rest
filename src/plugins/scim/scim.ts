@@ -26,6 +26,7 @@ import { ScimUsers } from './users.js';
 import { ScimGroups } from './groups.js';
 import { ScimBulk } from './bulk.js';
 import { ScimDiscovery } from './discovery.js';
+import { touchesWriteOnly } from './mapping.js';
 import {
   scimAsyncHandler,
   writeScimError,
@@ -1889,9 +1890,11 @@ export default class Scim extends DmPlugin {
     const userMapping = this.users.userMapping;
     const groupMapping = this.groups.groupMapping;
     const filterableUserAttrs = userMapping.entries
+      .filter(e => !touchesWriteOnly(e, userMapping))
       .map(e => e.scim)
       .concat(['id', 'active']);
     const filterableGroupAttrs = groupMapping.entries
+      .filter(e => !touchesWriteOnly(e, groupMapping))
       .map(e => e.scim)
       .concat(['id']);
 
