@@ -1,42 +1,35 @@
 # Changelog
 
-## Unreleased
+## v2.5.0 (2026-11-23)
 
 ### Security
 
 - SCIM never returns nor filters on credential attributes (`userPassword`,
-  `sambaNTPassword`, `pwdHistory`…), even when a mapping names them: a
-  mapped `userPassword` returned its hash on every read.
-- `core/ldap/raw` also hides the Active Directory LAPS and managed service
-  account passwords (`ms-Mcs-AdmPwd`, `msLAPS-Password`,
-  `msDS-ManagedPassword`…) unless `--ldap-raw-show-secrets` is set.
+  `sambaNTPassword`…), even when a mapping names them
+  ([#758](https://github.com/linagora/ldap-rest/issues/758))
+- `core/ldap/raw` also hides the Active Directory LAPS and gMSA passwords
 
 ### Added
 
-- SCIM: a mapping entry marked `writeOnly` is written but never returned nor
-  filtered on ([SCIM](docs/usage/plugins/integrations/scim.md#file-shape)).
-- External plugins can declare their options: `defineOptions` and `opt` are
-  exported from `ldap-rest/plugin`, so their `DM_*` variables are read and
-  known to `--strict-options`; `AuthBase` is published as
-  `ldap-rest/auth-base` for authentication plugins
-  ([plugin options](docs/plugin-development/options.md#plugins-outside-the-repository)).
-- `core/auth/jwt` accepts OAuth 2.0 access tokens (`Authorization: Bearer`)
-  signed by an identity provider, checked against its published keys, for
-  machine clients using the `client_credentials` grant
-  ([JWT](docs/usage/plugins/auth/jwt.md)).
+- `core/auth/jwt`: OAuth 2.0 access tokens from an identity provider, for
+  machine clients ([#760](https://github.com/linagora/ldap-rest/issues/760),
+  [JWT](docs/usage/plugins/auth/jwt.md))
+- SCIM mapping entries can be `writeOnly`
+  ([SCIM](docs/usage/plugins/integrations/scim.md#file-shape))
+- External plugins can declare their options with `defineOptions` and `opt`
+  from `ldap-rest/plugin`, and extend `AuthBase` from `ldap-rest/auth-base`
+  ([#762](https://github.com/linagora/ldap-rest/issues/762),
+  [plugin options](docs/plugin-development/options.md#plugins-outside-the-repository))
 
 ### Fixed
 
-- SCIM: a PUT no longer writes nor clears the `readOnly` and `operational`
-  entries of the mapping, which made the directory refuse the whole update
-  (`entryDN: no user modification allowed`). A PATCH naming one now answers
-  `400 mutability`, `operational` ones included, which a PATCH used to write.
-- `--plugin`, `--plugins` and `DM_PLUGINS` no longer split the JSON overrides
-  of a plugin instance on their commas or spaces
-  ([configuration](docs/usage/configuration.md#array-options)), and overrides
-  that are not a JSON object stop the server instead of loading the plugin
-  without them
-  ([upgrading](docs/usage/upgrading.md#invalid-plugin-overrides-stop-the-server)).
+- SCIM: a PUT no longer writes nor clears `readOnly` and `operational`
+  entries; a PATCH naming one answers `400 mutability`
+  ([#759](https://github.com/linagora/ldap-rest/issues/759))
+- `--plugin`, `--plugins` and `DM_PLUGINS` keep a plugin's JSON overrides
+  whole, and invalid overrides stop the server
+  ([#761](https://github.com/linagora/ldap-rest/issues/761),
+  [upgrading](docs/usage/upgrading.md#invalid-plugin-overrides-stop-the-server))
 
 ## v2.4.1 (2026-11-23)
 
