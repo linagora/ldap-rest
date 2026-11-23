@@ -105,6 +105,9 @@ export default class LdapPool {
           tlsOptions: url.startsWith('ldaps://')
             ? { minVersion: 'TLSv1.2' }
             : undefined,
+          // Without it, ldapts reconnects a dropped socket transparently and
+          // runs the next operation anonymously
+          autoRebind: true,
         };
 
         const client: Client = await this.clientFactory(options);
@@ -283,8 +286,15 @@ export default class LdapPool {
     this.cleanupExpiredConnections();
 
     // O(1) - Try to pop from available connections queue
-    if (this.availableConnections.length > 0) {
+    while (this.availableConnections.length > 0) {
       const conn = this.availableConnections.pop()!;
+      // The socket closed while the connection sat idle. `autoRebind` would
+      // replay the bind on the next operation; a fresh connection does not
+      // depend on it
+      if (!conn.client.isBound) {
+        this.discard(conn, 'lost its bind');
+        continue;
+      }
       conn.inUse = true;
       this.logger.debug('Reusing pooled LDAP connection');
       return conn;
@@ -349,6 +359,14 @@ export default class LdapPool {
     for (const waiter of this.waitingResolvers.splice(0)) waiter({ error });
   }
 
+  /** Take a connection out of the pool and close it */
+  private discard(pooled: PooledConnection, why: string): void {
+    const idx = this.connectionPool.indexOf(pooled);
+    if (idx !== -1) this.connectionPool.splice(idx, 1);
+    void pooled.client.unbind().catch(() => undefined);
+    this.logger.debug(`Discarded an LDAP connection that ${why}`);
+  }
+
   /** Let one queued request take a place that freed with no connection */
   private wakeWaiter(): void {
     this.waitingResolvers.shift()?.({ retry: true });
@@ -366,11 +384,9 @@ export default class LdapPool {
       return;
     }
 
-    if (Date.now() - pooled.createdAt > this.connectionTtl) {
-      const idx = this.connectionPool.indexOf(pooled);
-      if (idx !== -1) this.connectionPool.splice(idx, 1);
-      void pooled.client.unbind().catch(() => {});
-      this.logger.debug('Released expired LDAP connection (discarded)');
+    const expired = Date.now() - pooled.createdAt > this.connectionTtl;
+    if (expired || !pooled.client.isBound) {
+      this.discard(pooled, expired ? 'expired' : 'lost its bind');
       this.wakeWaiter();
       return;
     }
