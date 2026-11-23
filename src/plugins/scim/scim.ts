@@ -1890,11 +1890,11 @@ export default class Scim extends DmPlugin {
     const userMapping = this.users.userMapping;
     const groupMapping = this.groups.groupMapping;
     const filterableUserAttrs = userMapping.entries
-      .filter(e => !isWriteOnly(e))
+      .filter(e => !isWriteOnly(e, userMapping))
       .map(e => e.scim)
       .concat(['id', 'active']);
     const filterableGroupAttrs = groupMapping.entries
-      .filter(e => !isWriteOnly(e))
+      .filter(e => !isWriteOnly(e, groupMapping))
       .map(e => e.scim)
       .concat(['id']);
 

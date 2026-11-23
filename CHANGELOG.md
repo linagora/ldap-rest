@@ -2,19 +2,23 @@
 
 ## Unreleased
 
+### Security
+
+- SCIM never returns nor filters on credential attributes (`userPassword`,
+  `sambaNTPassword`, `pwdHistory`…), even when a mapping names them: a
+  mapped `userPassword` returned its hash on every read.
+
 ### Added
 
 - SCIM: a mapping entry marked `writeOnly` is written but never returned nor
-  filtered on; an entry mapped to `userPassword` always is, so its hash no
-  longer reaches clients
-  ([SCIM](docs/usage/plugins/integrations/scim.md#file-shape)).
+  filtered on ([SCIM](docs/usage/plugins/integrations/scim.md#file-shape)).
 
 ### Fixed
 
 - SCIM: a PUT no longer writes nor clears the `readOnly` and `operational`
   entries of the mapping, which made the directory refuse the whole update
-  (`entryDN: no user modification allowed`); a PATCH naming one answers
-  `400 mutability`.
+  (`entryDN: no user modification allowed`). A PATCH naming one now answers
+  `400 mutability`, `operational` ones included, which a PATCH used to write.
 
 ## v2.4.1 (2026-11-23)
 

@@ -12,6 +12,7 @@
 import fs from 'fs';
 
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions.js';
+import { SECRET_ATTRIBUTES } from '../../lib/secretAttributes.js';
 import { hasOnlyRfc4514Escapes, parseDirectoryDate } from '../../lib/utils.js';
 
 import { kindOf, scimInvalidValue } from './errors.js';
@@ -205,14 +206,46 @@ export function isReadOnly(m: MappingEntry): boolean {
   return m.readOnly === true || m.operational === true;
 }
 
+const writeOnlyCache = new WeakMap<ResourceMapping, ReadonlySet<string>>();
+
 /**
- * Whether the entry is written but never returned. `userPassword` always is,
- * whatever the mapping says: it holds a hash, which no client must read back.
+ * LDAP attributes, lower-cased, that SCIM writes but never returns nor
+ * filters on: those of the `writeOnly` entries, and credential material
+ * whatever the mapping says. Decided per attribute, not per entry: a second
+ * entry reading the same attribute would hand the value back.
  */
-export function isWriteOnly(m: MappingEntry): boolean {
+export function writeOnlyLdapAttributes(
+  mapping: ResourceMapping
+): ReadonlySet<string> {
+  let set = writeOnlyCache.get(mapping);
+  if (!set) {
+    const names = new Set(SECRET_ATTRIBUTES);
+    for (const m of mapping.entries)
+      if (m.writeOnly === true)
+        for (const a of ldapAttributesOf(m)) names.add(a.toLowerCase());
+    set = names;
+    writeOnlyCache.set(mapping, set);
+  }
+  return set;
+}
+
+/** Whether SCIM never returns this LDAP attribute */
+export function isWriteOnlyAttribute(
+  attribute: string,
+  mapping: ResourceMapping
+): boolean {
+  return writeOnlyLdapAttributes(mapping).has(attribute.toLowerCase());
+}
+
+/** Whether every LDAP attribute of the entry is write-only */
+export function isWriteOnly(
+  m: MappingEntry,
+  mapping: ResourceMapping
+): boolean {
+  const attributes = ldapAttributesOf(m);
   return (
-    m.writeOnly === true ||
-    ldapAttributesOf(m).some(a => a.toLowerCase() === 'userpassword')
+    attributes.length > 0 &&
+    attributes.every(a => isWriteOnlyAttribute(a, mapping))
   );
 }
 
@@ -234,18 +267,13 @@ export function mappingEntryOf(
  */
 export function replaceableLdapAttributes(mapping: ResourceMapping): {
   writable: Set<string>;
-  writeOnly: Set<string>;
+  writeOnly: ReadonlySet<string>;
 } {
   const writable = new Set<string>();
-  const writeOnly = new Set<string>();
-  for (const m of mapping.entries) {
-    if (isReadOnly(m)) continue;
-    for (const a of ldapAttributesOf(m)) {
-      writable.add(a.toLowerCase());
-      if (isWriteOnly(m)) writeOnly.add(a.toLowerCase());
-    }
-  }
-  return { writable, writeOnly };
+  for (const m of mapping.entries)
+    if (!isReadOnly(m))
+      for (const a of ldapAttributesOf(m)) writable.add(a.toLowerCase());
+  return { writable, writeOnly: writeOnlyLdapAttributes(mapping) };
 }
 
 export interface MappingContext {
@@ -475,11 +503,13 @@ export function ldapToScimUser(
   const id = resolveScimId(entry, ctx);
   if (id) out.id = id;
 
+  const hidden = (attribute: string | undefined): boolean =>
+    attribute !== undefined && isWriteOnlyAttribute(attribute, mapping);
   for (const m of mapping.entries) {
-    if (isWriteOnly(m)) continue;
     if (m.sub) {
       const sub: Record<string, string> = {};
       for (const [scimKey, ldapKey] of Object.entries(m.sub)) {
+        if (hidden(ldapKey)) continue;
         const v = asString(entry[ldapKey]);
         if (v != null) sub[scimKey] = v;
       }
@@ -490,11 +520,11 @@ export function ldapToScimUser(
     }
     if (m.ldapPrimary || m.ldapSecondary) {
       const arr: MultiValued[] = [];
-      if (m.ldapPrimary) {
+      if (m.ldapPrimary && !hidden(m.ldapPrimary)) {
         const primary = asString(entry[m.ldapPrimary]);
         if (primary != null) arr.push({ value: primary, primary: true });
       }
-      if (m.ldapSecondary) {
+      if (m.ldapSecondary && !hidden(m.ldapSecondary)) {
         for (const v of asArray(entry[m.ldapSecondary])) {
           arr.push({ value: v });
         }
@@ -502,7 +532,7 @@ export function ldapToScimUser(
       if (arr.length > 0) (out as Record<string, unknown>)[m.scim] = arr;
       continue;
     }
-    if (m.ldap) {
+    if (m.ldap && !hidden(m.ldap)) {
       if (m.multi === 'array') {
         const arr = asArray(entry[m.ldap]);
         if (arr.length > 0) (out as Record<string, unknown>)[m.scim] = arr;
@@ -619,7 +649,7 @@ export function ldapToScimGroup(
   if (id) out.id = id;
 
   for (const m of mapping.entries) {
-    if (!m.ldap || isWriteOnly(m)) continue;
+    if (!m.ldap || isWriteOnlyAttribute(m.ldap, mapping)) continue;
     const raw = entry[m.ldap];
     if (raw == null) continue;
     if (m.multi === 'array') {
@@ -734,11 +764,13 @@ function multiValued(element: unknown, attribute: string): MultiValued {
 
 /**
  * List of LDAP attributes to request from the directory so all
- * mapped SCIM attributes can be populated.
+ * mapped SCIM attributes can be populated. The write-only ones only when
+ * asked: a PATCH needs their values to remove them, a read does not.
  */
 export function requiredLdapAttributes(
   mapping: ResourceMapping,
-  extra: string[] = []
+  extra: string[] = [],
+  withWriteOnly = false
 ): string[] {
   const attrs = new Set<string>([
     'objectClass',
@@ -746,7 +778,8 @@ export function requiredLdapAttributes(
     ...extra,
   ]);
   for (const m of mapping.entries)
-    for (const a of ldapAttributesOf(m)) attrs.add(a);
+    for (const a of ldapAttributesOf(m))
+      if (withWriteOnly || !isWriteOnlyAttribute(a, mapping)) attrs.add(a);
   return Array.from(attrs);
 }
 

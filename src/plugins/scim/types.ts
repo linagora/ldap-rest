@@ -175,7 +175,8 @@ export interface BulkResponse {
  * - readOnly: never written; a PUT neither replaces nor clears it
  * - operational: read-only from LDAP operational attribute
  * - writeOnly: written, never returned nor usable in a filter (RFC 7643
- *   section 7, `returned: "never"`); see {@link isWriteOnly}
+ *   section 7, `returned: "never"`), as is every entry on the same LDAP
+ *   attribute; see `writeOnlyLdapAttributes()`
  */
 export interface MappingEntry {
   scim: string;

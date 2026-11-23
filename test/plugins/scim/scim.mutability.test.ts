@@ -10,8 +10,11 @@ import { DM } from '../../../src/bin';
 import { ScimError } from '../../../src/plugins/scim/errors';
 import { scimFilterToLdap } from '../../../src/plugins/scim/filter';
 import {
+  DEFAULT_GROUP_MAPPING,
   DEFAULT_USER_MAPPING,
+  ldapToScimGroup,
   ldapToScimUser,
+  requiredLdapAttributes,
   type MappingContext,
 } from '../../../src/plugins/scim/mapping';
 import { patchToModifyRequest } from '../../../src/plugins/scim/patch';
@@ -25,7 +28,10 @@ const mapping: ResourceMapping = {
   entries: [
     ...DEFAULT_USER_MAPPING.entries,
     { scim: 'secret', ldap: 'description', writeOnly: true },
+    { scim: 'desc', ldap: 'description' },
     { scim: 'password', ldap: 'userPassword' },
+    { scim: 'ntHash', ldap: 'sambaNTPassword' },
+    { scim: 'credentials', sub: { login: 'uid', hash: 'userPassword' } },
     { scim: 'entryDN', ldap: 'entryDN', operational: true, readOnly: true },
   ],
 };
@@ -57,21 +63,55 @@ describe('SCIM mapping mutability', () => {
           uid: 'alice',
           description: 'top secret',
           userPassword: '{SSHA}hash',
+          sambaNTPassword: 'NTHASH',
           entryDN: 'uid=alice,dc=example,dc=com',
         },
         mapping,
         ctx
       ) as Record<string, unknown>;
       expect(user).to.not.have.property('secret');
+      // Another entry on the same attribute would hand it back
+      expect(user).to.not.have.property('desc');
       expect(user).to.not.have.property('password');
+      expect(user).to.not.have.property('ntHash');
+      expect(user.credentials).to.deep.equal({ login: 'alice' });
       expect(user.entryDN).to.equal('uid=alice,dc=example,dc=com');
+    });
+
+    it('are left out of a group too', () => {
+      const group = ldapToScimGroup(
+        { cn: 'admins', userPassword: '{SSHA}hash' },
+        {
+          ...DEFAULT_GROUP_MAPPING,
+          entries: [
+            ...DEFAULT_GROUP_MAPPING.entries,
+            { scim: 'password', ldap: 'userPassword' },
+          ],
+        },
+        { ...ctx, resourceType: 'Group', rdnAttribute: 'cn' }
+      ) as Record<string, unknown>;
+      expect(group.displayName).to.equal('admins');
+      expect(group).to.not.have.property('password');
+    });
+
+    it('are fetched only when asked, for a PATCH', () => {
+      const read = requiredLdapAttributes(mapping).map(a => a.toLowerCase());
+      expect(read).to.not.include.members(['description']);
+      expect(read).to.not.include('userpassword');
+      expect(read).to.not.include('sambantpassword');
+      expect(read).to.include('uid');
+      const patch = requiredLdapAttributes(mapping, [], true);
+      expect(patch).to.include.members(['description', 'userPassword']);
     });
 
     it('cannot be filtered on', () => {
       for (const filter of [
         'secret eq "x"',
+        'desc eq "x"',
         'password sw "{SSHA"',
         'password pr',
+        'ntHash eq "x"',
+        'credentials.hash pr',
       ])
         expect(scimTypeOf(() => scimFilterToLdap(filter, mapping))).to.equal(
           'invalidFilter'
@@ -87,6 +127,17 @@ describe('SCIM mapping mutability', () => {
         { mapping, current: { userPassword: '{SSHA}old' } }
       );
       expect(req).to.deep.equal({ replace: { userPassword: 'new' } });
+    });
+
+    it('PATCH remove deletes the value', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: [PATCH_OP],
+          Operations: [{ op: 'remove', path: 'password' }],
+        },
+        { mapping, current: { userPassword: '{SSHA}old' } }
+      );
+      expect(req).to.deep.equal({ delete: { userPassword: '' } });
     });
   });
 
@@ -247,6 +298,16 @@ describe('SCIM mapping mutability', () => {
         .send({ ...withoutDn, password: 'secret-2' })
         .expect(200);
       expect(await storedPassword()).to.equal('secret-2');
+
+      await supertest(server.app)
+        .patch('/scim/v2/Users/scim-mut')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: [PATCH_OP],
+          Operations: [{ op: 'remove', path: 'password' }],
+        })
+        .expect(200);
+      expect([await storedPassword()].flat().filter(Boolean)).to.deep.equal([]);
     });
 
     it('refuses a filter on the password', async () => {

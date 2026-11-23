@@ -48,7 +48,7 @@ import {
   readActive,
   scimPathToLdapAttribute,
   isReadOnly,
-  isWriteOnly,
+  isWriteOnlyAttribute,
   mappingEntryOf,
 } from './mapping.js';
 
@@ -488,7 +488,7 @@ async function applyOperation(
     for (const v of values) assertReferenceDn(v, `${top}.${sub}`);
   // A write-only value cannot be read back, so adding to it would leave a
   // value the client never sees beside the one it sent: a second password.
-  if (operation === 'add' && !(target && isWriteOnly(target)))
+  if (operation === 'add' && !isWriteOnlyAttribute(ldapAttr, ctx.mapping))
     entry.append(ldapAttr, values);
   else entry.set(ldapAttr, values);
 }

@@ -241,9 +241,12 @@ Each element of `entries` is a `MappingEntry` with the following optional fields
 | `operational`   | `true` for LDAP operational attributes (e.g. `entryUUID`) — loaded on read only, and read-only.                               |
 | `writeOnly`     | `true` to write this attribute but never return it nor accept it in a filter (RFC 7643 §7 `returned: "never"`).               |
 
-An entry mapped to `userPassword` is write-only whatever the file says, so a
-mapping such as `{ "scim": "password", "ldap": "userPassword" }` lets clients
-set passwords without ever reading the stored hash back.
+Write-only is a property of the LDAP attribute: another entry naming it
+returns nothing either. Credential attributes (`userPassword`, `pwdHistory`,
+`sambaNTPassword`, `krbPrincipalKey`, `authPassword`, `unicodePwd`…) are
+write-only whatever the file says, so a mapping such as
+`{ "scim": "password", "ldap": "userPassword" }` lets clients set passwords
+without ever reading the stored hash back.
 
 ### Merging
 

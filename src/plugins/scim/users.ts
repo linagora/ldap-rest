@@ -151,8 +151,12 @@ export class ScimUsers {
    * operational on most directories, so it is never returned unless asked
    * for by name.
    */
-  private ldapAttributes(): string[] {
-    return requiredLdapAttributes(this.mapping, [this.lockAttribute]);
+  private ldapAttributes(withWriteOnly = false): string[] {
+    return requiredLdapAttributes(
+      this.mapping,
+      [this.lockAttribute],
+      withWriteOnly
+    );
   }
 
   private dnForId(id: string, req?: DmRequest): string {
@@ -369,7 +373,7 @@ export class ScimUsers {
       return true;
     };
     const { writable, writeOnly } = replaceableLdapAttributes(this.mapping);
-    for (const attr of this.ldapAttributes()) {
+    for (const attr of this.ldapAttributes(true)) {
       if (skipAttrs.has(attr) || !writable.has(attr.toLowerCase())) continue;
       if (attributes[attr] != null) {
         changes.replace![attr] = attributes[attr];
@@ -495,12 +499,14 @@ export class ScimUsers {
     const dn = this.dnForId(id, req);
     let result: SearchResult;
     try {
-      result = (await this.ldap
-        .forRequest(req)
-        .search(
-          { paged: false, scope: 'base', attributes: this.ldapAttributes() },
-          dn
-        )) as SearchResult;
+      result = (await this.ldap.forRequest(req).search(
+        {
+          paged: false,
+          scope: 'base',
+          attributes: this.ldapAttributes(true),
+        },
+        dn
+      )) as SearchResult;
     } catch (err) {
       if (extractLdapCode(err) === 32) {
         throw scimNotFound(`User ${id} not found`);
