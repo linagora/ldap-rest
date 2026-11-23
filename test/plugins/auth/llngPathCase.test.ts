@@ -1,10 +1,9 @@
 import { expect } from 'chai';
 import express from 'express';
-import type { Express } from 'express';
+import type { Express, RequestHandler } from 'express';
 import request from 'supertest';
 
 import { DM } from '../../../src/bin';
-import type { DmRequest } from '../../../src/lib/auth/base';
 import AuthLLNG from '../../../src/plugins/auth/llng';
 import {
   loadLlng,
@@ -127,9 +126,7 @@ describe('LemonLDAP::NG location rules and the letter case of the path', () => {
       list.push({ source: '^\\/scim\\/v2\\/Users' });
 
       const app = express();
-      app.use((req, res, next) =>
-        plugin.authMethod(req as DmRequest, res, next)
-      );
+      app.use(plugin.authMethod.bind(plugin) as RequestHandler);
       app.get('/api/v1/ldap/users', (_req, res) => {
         res.json({});
       });
@@ -163,9 +160,7 @@ describe('LemonLDAP::NG location rules and the letter case of the path', () => {
       await plugin.api({} as Express);
 
       app = express();
-      app.use((req, res, next) =>
-        plugin.authMethod(req as DmRequest, res, next)
-      );
+      app.use(plugin.authMethod.bind(plugin) as RequestHandler);
       app.get('/api/v1/ldap/users{/:id}', (req, res) => {
         res.json({ path: req.path, id: req.params.id ?? null });
       });
