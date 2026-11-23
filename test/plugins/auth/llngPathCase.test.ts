@@ -56,23 +56,47 @@ describe('LemonLDAP::NG location rules and the letter case of the path', () => {
       }
     };
 
-    it('refuses at startup a key with a capital letter', async () => {
-      const { Plugin } = withKeys(['^\\/api\\/v1', '^\\/scim\\/v2\\/Users']);
-      const { error } = await startup(Plugin);
-      expect(error?.message).to.include('^\\/scim\\/v2\\/Users');
-      expect(error?.message).to.include('(?i)');
-    });
+    // Keys as RE2 compiles them: the handler escapes every `/`
+    const needCapital = [
+      '^\\/scim\\/v2\\/Users',
+      '^\\/x\\/\\x55sers',
+      '^\\/x\\/\\x{55}sers',
+      '^\\/x\\/\\125sers',
+      '^\\/x\\/\\p{Lu}',
+      '^\\/x\\/[[:upper:]]',
+      '^\\/x\\/\\QUsers\\E',
+      '^\\/x\\/[A-Z]',
+      '^\\/x\\/[\\x41-\\x5a]',
+      '^\\/x\\/U?',
+      '^(?i:\\/a)\\/Users',
+      '(?i)\\/a(?-i:\\/Users)',
+    ];
+    for (const key of needCapital)
+      it(`refuses at startup the key ${key}`, async () => {
+        const { Plugin } = withKeys(['^\\/api\\/v1', key]);
+        const { error } = await startup(Plugin);
+        expect(error?.message).to.include(key);
+        expect(error?.message).to.include('(?i)');
+      });
 
-    it('accepts capitals in escapes and keys that ignore case', async () => {
-      const { Plugin } = withKeys([
-        '^\\/api\\/v1\\/ldap\\/users\\/\\D+\\S*\\p{Lu}?\\x{41}?',
-        '(?i)^\\/scim\\/v2\\/Users',
-        '^(?i)\\/scim\\/v2\\/Groups',
-        '^\\/scim\\/v2\\/(?P<kind>schemas)',
-      ]);
-      const { error } = await startup(Plugin);
-      expect(error).to.equal(undefined);
-    });
+    const matchLowerCase = [
+      '^\\/x\\/\\D+\\S*\\w\\.',
+      '(?i)^\\/scim\\/v2\\/Users',
+      '^(?i)\\/scim\\/v2\\/Groups',
+      '^(?i:\\/scim\\/v2\\/Users)',
+      '^\\/x\\/[Uu]sers',
+      '^\\/x\\/[A-Za-z]',
+      '^\\/x\\/[^A-Z]',
+      '^\\/x\\/[[:alpha:]]',
+      '^\\/x\\/\\x75sers',
+      '^\\/scim\\/v2\\/(?P<kind>schemas)',
+    ];
+    for (const key of matchLowerCase)
+      it(`accepts the key ${key}`, async () => {
+        const { Plugin } = withKeys([key]);
+        const { error } = await startup(Plugin);
+        expect(error).to.equal(undefined);
+      });
 
     it('refuses the handler when it gives no compiled keys to read', async () => {
       const dm = new DM();

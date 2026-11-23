@@ -53,10 +53,13 @@ covers every spelling of the paths it names. The request itself is routed as
 it was sent.
 
 Write the location keys in lower case, `^/scim/v2/users` rather than
-`^/scim/v2/Users`, or start them with `(?i)`. A key with a capital letter
-outside an escape would never match: it stops the server at startup, and a
-configuration reloaded with one makes the plugin answer 503 until it is
-corrected.
+`^/scim/v2/Users`, or start them with `(?i)`. The plugin refuses a key that
+may need a capital letter outside a part that ignores case, whether written
+(`Users`, `[A-Z]`) or encoded (`\x55`, `\p{Lu}`, `[[:upper:]]`): it stops the
+server at startup, and a configuration reloaded with one makes the plugin
+answer 503 until it is corrected. The check errs on the side of refusing: an
+optional capital (`U?`) or an alternative (`(U|u)`) is refused too, while
+`[Uu]` and `(?i:…)` are accepted.
 
 ## Prerequisites
 

@@ -55,6 +55,124 @@ interface LlngInstance {
   tsv?: { locationRegexp?: Record<string, Array<{ source: string }>> };
 }
 
+/**
+ * What an escape stands for: the character it encodes, `capital` for a
+ * property only capitals have, or undefined for a class or an assertion.
+ *
+ * @param escape the escape, backslash included, as RE2 accepts it
+ */
+function escaped(escape: string): string | undefined {
+  const hex = /^\\x(?:\{([0-9a-f]{1,6})\}|([0-9a-f]{2}))$/i.exec(escape);
+  if (hex)
+    return String.fromCodePoint(
+      Math.min(parseInt(hex[1] ?? hex[2], 16), 0x10ffff)
+    );
+  if (/^\\[0-7]{1,3}$/.test(escape))
+    return String.fromCharCode(parseInt(escape.slice(1), 8));
+  if (/^\\p\{(?:Lu|Lt|Upper)\}$/.test(escape)) return 'capital';
+  if (/^\\[^a-zA-Z0-9]$/.test(escape)) return escape[1];
+  return undefined;
+}
+
+/** An escape at the start of `rest`, `\Q…\E` included */
+const ESCAPE =
+  /^\\(?:x\{[0-9a-fA-F]{1,6}\}|x[0-9a-fA-F]{2}|[0-7]{1,3}|[pP]\{[^}]*\}|Q[^]*?(?:\\E|$)|[^])/;
+
+const isCapital = (c: string | undefined): boolean =>
+  c === 'capital' || (c !== undefined && /^[A-Z]$/.test(c));
+
+/**
+ * The first capital letter a compiled location key requires outside a part
+ * that ignores case, or undefined when it has none.
+ *
+ * It errs on the side of refusing: an optional capital (`U?`), an
+ * alternative (`(U|u)`) or a mixed class read as one capital only (`[A-Z]`)
+ * count, while `[Uu]`, `(?i)`, `(?i:…)` and escapes that do not encode a
+ * capital do not.
+ *
+ * @param source the key as RE2 compiled it
+ */
+function requiredCapital(source: string): string | undefined {
+  const ignoring = [false];
+  for (let i = 0; i < source.length; i++) {
+    const folded = ignoring[ignoring.length - 1];
+    const rest = source.slice(i);
+    if (rest[0] === '(') {
+      const flags = /^\(\?([imsU]*)(?:-([imsU]*))?([:)])/.exec(rest);
+      let inner = folded;
+      if (flags) {
+        if (flags[1].includes('i')) inner = true;
+        if (flags[2]?.includes('i')) inner = false;
+        i += flags[0].length - 1;
+        if (flags[3] === ')') {
+          ignoring[ignoring.length - 1] = inner;
+          continue;
+        }
+      } else {
+        i += (/^\(\?P?<[^>]*>/.exec(rest)?.[0].length ?? 1) - 1;
+      }
+      ignoring.push(inner);
+      continue;
+    }
+    if (rest[0] === ')') {
+      if (ignoring.length > 1) ignoring.pop();
+      continue;
+    }
+    if (rest[0] === '[') {
+      const negated = rest[1] === '^';
+      let j = negated ? 2 : 1;
+      let onlyCapitals = true;
+      let first = true;
+      while (j < rest.length && (rest[j] !== ']' || first)) {
+        first = false;
+        let member: string | undefined;
+        const posix = /^\[:(\^?)([a-z]+):\]/.exec(rest.slice(j));
+        const escape = rest[j] === '\\' ? ESCAPE.exec(rest.slice(j)) : null;
+        if (posix) {
+          member = posix[1] === '' && posix[2] === 'upper' ? 'capital' : '';
+          j += posix[0].length;
+        } else if (escape) {
+          member = escaped(escape[0]) ?? '';
+          j += escape[0].length;
+        } else {
+          member = rest[j];
+          j++;
+        }
+        if (rest[j] === '-' && rest[j + 1] !== ']' && j + 1 < rest.length) {
+          const end =
+            rest[j + 1] === '\\' ? ESCAPE.exec(rest.slice(j + 1)) : null;
+          const last = end ? (escaped(end[0]) ?? '') : rest[j + 1];
+          j += end ? end[0].length + 1 : 2;
+          if (!(member >= 'A' && last <= 'Z' && member <= last))
+            onlyCapitals = false;
+          continue;
+        }
+        if (!isCapital(member)) onlyCapitals = false;
+      }
+      const klass = rest.slice(0, j + 1);
+      i += j;
+      if (!folded && !negated && onlyCapitals && !first) return klass;
+      continue;
+    }
+    let literal: string | undefined = rest[0];
+    if (rest[0] === '\\') {
+      const escape = ESCAPE.exec(rest);
+      if (!escape) break;
+      i += escape[0].length - 1;
+      if (escape[0][1] === 'Q') {
+        const quoted = /[A-Z]/.exec(escape[0].slice(2).replace(/\\E$/, ''));
+        if (!folded && quoted) return escape[0];
+        continue;
+      }
+      literal = escaped(escape[0]);
+      if (!folded && isCapital(literal)) return escape[0];
+      continue;
+    }
+    if (!folded && isCapital(literal)) return literal;
+  }
+  return undefined;
+}
+
 export default class AuthLLNG extends AuthBase {
   static optionDefinitions = llngOptions;
 
@@ -237,9 +355,9 @@ export default class AuthLLNG extends AuthBase {
   }
 
   /**
-   * Find a location key the folded path can never match: a capital letter
-   * outside an escape, with no `(?i)`. It would let the paths it names fall
-   * to `default`. The handler compiles the keys again whenever its
+   * Find a location key that may need a capital letter, which the folded path
+   * never has: it would let the paths it names fall to `default`. See
+   * `requiredCapital`. The handler compiles the keys again whenever its
    * configuration reloads, so this runs on every request; a list already
    * read is not read again.
    *
@@ -256,19 +374,13 @@ export default class AuthLLNG extends AuthBase {
       if (!Array.isArray(list)) continue;
       const checked = this.foldable.get(list) ?? 0;
       for (const { source } of list.slice(checked)) {
-        if (
-          typeof source !== 'string' ||
-          /^\^?\(\?[ims]*i[ims]*\)/.test(source)
-        )
-          continue;
-        const literal = source
-          .replace(/\\(?:[pPx]\{[^}]*\}|[^])/g, '')
-          .replace(/\(\?P?<[^>]*>/g, '');
-        if (/[A-Z]/.test(literal))
+        const capital =
+          typeof source === 'string' ? requiredCapital(source) : undefined;
+        if (capital)
           return (
-            `the location rule ${source} of ${vhost} has a capital letter, ` +
-            'and the handler matches it against the path in lower case. ' +
-            'Write it in lower case, or start it with (?i)'
+            `the location rule ${source} of ${vhost} may need a capital ` +
+            `letter (${capital}), and the handler is given the path in ` +
+            'lower case. Write the key in lower case, or start it with (?i)'
           );
       }
       this.foldable.set(list, list.length);
