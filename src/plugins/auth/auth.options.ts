@@ -193,8 +193,8 @@ export const openidconnectOptions = defineOptions({
 });
 export type OpenidconnectOptions = OptionsOf<typeof openidconnectOptions>;
 
-/** Asymmetric only: a JWKS publishes public keys, never an HMAC secret */
-export const JWT_ALGORITHMS = [
+/** The default of `--jwt-algorithm` */
+const JWT_DEFAULT_ALGORITHMS = [
   'RS256',
   'RS384',
   'RS512',
@@ -208,6 +208,17 @@ export const JWT_ALGORITHMS = [
   'Ed25519',
 ];
 
+/**
+ * What `--jwt-algorithm` accepts. Asymmetric only: a JWKS publishes public
+ * keys, never an HMAC secret. ML-DSA needs a Node.js whose Web Crypto has it.
+ */
+export const JWT_ALGORITHMS = [
+  ...JWT_DEFAULT_ALGORITHMS,
+  'ML-DSA-44',
+  'ML-DSA-65',
+  'ML-DSA-87',
+];
+
 export const jwtOptions = defineOptions({
   jwt_issuer: opt.string({ env: 'DM_JWT_ISSUER', default: '' }),
   jwt_jwks_uri: opt.string({ env: 'DM_JWT_JWKS_URI', default: '' }),
@@ -218,7 +229,7 @@ export const jwtOptions = defineOptions({
   }),
   jwt_algorithm: opt.array({
     env: 'DM_JWT_ALGORITHMS',
-    default: JWT_ALGORITHMS,
+    default: JWT_DEFAULT_ALGORITHMS,
     plural: 'jwt-algorithms',
     kind: 'identifiers',
   }),

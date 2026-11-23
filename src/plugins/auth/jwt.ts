@@ -56,6 +56,12 @@ const BEARER = /^Bearer[ \t]+([^\s]+)[ \t]*$/i;
 const codeOf = (err: unknown): unknown =>
   err && typeof err === 'object' ? (err as { code?: unknown }).code : undefined;
 
+/**
+ * The keys are unavailable, and the failure was logged where it happened:
+ * the requests answered 503 meanwhile log it at debug level only
+ */
+class KeysUnavailable extends Error {}
+
 /** Whether a URL reaches this host only, where plain http carries no risk */
 const loopback = (url: URL): boolean =>
   ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
@@ -78,6 +84,7 @@ export default class AuthJwt extends AuthBase {
   private readonly issuer: string;
   private readonly jwksUri?: URL;
   private readonly claim: string;
+  private readonly allowed: string[];
   private readonly verifyOptions: JWTVerifyOptions;
   private keys?: Promise<JWTVerifyGetKey>;
   /** `performance.now()` of the last failed discovery, immune to clock steps */
@@ -94,6 +101,9 @@ export default class AuthJwt extends AuthBase {
       .map(a => a.trim())
       .filter(Boolean);
     const type = this.settings.jwt_type.trim();
+    this.allowed = this.settings.jwt_allowed_client
+      .map(c => c.trim())
+      .filter(Boolean);
     const algorithms = this.settings.jwt_algorithm;
     if (!this.issuer) throw new Error(`${this.name}: --jwt-issuer is required`);
     if (!this.claim)
@@ -137,8 +147,7 @@ export default class AuthJwt extends AuthBase {
   }
 
   protected knownIdentities(): string[] | undefined {
-    const allowed = this.settings.jwt_allowed_client;
-    return allowed.length > 0 ? allowed : undefined;
+    return this.allowed.length > 0 ? this.allowed : undefined;
   }
 
   protected identitySource(): string {
@@ -192,14 +201,16 @@ export default class AuthJwt extends AuthBase {
       const code = codeOf(err);
       if (typeof code === 'string' && TOKEN_ERRORS.has(code))
         return this.refuse(res, code);
-      this.logger.error(`${this.name}: cannot verify tokens: ${String(err)}`);
+      if (err instanceof KeysUnavailable)
+        this.logger.debug(`${this.name}: 503: ${err.message}`);
+      else
+        this.logger.error(`${this.name}: cannot verify tokens: ${String(err)}`);
       return serviceUnavailable(res);
     }
     const identity = payload[this.claim];
     if (typeof identity !== 'string' || identity.length === 0)
       return this.refuse(res, `no "${this.claim}" claim`);
-    const allowed = this.settings.jwt_allowed_client;
-    if (allowed.length > 0 && !allowed.includes(identity)) {
+    if (this.allowed.length > 0 && !this.allowed.includes(identity)) {
       this.logger.warn(`${this.name}: client ${identity} is not allowed`);
       return forbidden(res);
     }
@@ -237,12 +248,18 @@ export default class AuthJwt extends AuthBase {
       this.failedAt !== undefined &&
       performance.now() - this.failedAt < AuthJwt.retryMs
     )
-      return Promise.reject(new Error('discovery failed, retrying shortly'));
+      return Promise.reject(
+        new KeysUnavailable('discovery failed, retrying shortly')
+      );
     this.failedAt = undefined;
-    this.keys = this.locateJwks().then(uri => this.remoteSet(uri));
-    this.keys.catch(() => {
-      this.failedAt = performance.now();
-    });
+    this.keys = this.locateJwks().then(
+      uri => this.remoteSet(uri),
+      (err: unknown) => {
+        this.failedAt = performance.now();
+        this.logger.error(`${this.name}: discovery failed: ${String(err)}`);
+        throw new KeysUnavailable('discovery failed, retrying shortly');
+      }
+    );
     return this.keys;
   }
 
@@ -259,14 +276,16 @@ export default class AuthJwt extends AuthBase {
       [customFetch]: (url, init) => this.fetch(url, init),
     });
     let failedAt: number | undefined;
-    const held: JWTVerifyGetKey = (...args) => {
-      const jwks = remote.jwks();
-      if (!jwks)
-        return Promise.reject(
-          new Error('the JWKS could not be fetched, retrying shortly')
-        );
-      return createLocalJWKSet(jwks)(...args);
-    };
+    /** The keys held when the last fetch failed, imported once */
+    let local: JWTVerifyGetKey | undefined;
+    const held: JWTVerifyGetKey = (...args) =>
+      local
+        ? local(...args)
+        : Promise.reject(
+            new KeysUnavailable(
+              'the JWKS could not be fetched, retrying shortly'
+            )
+          );
     return async (...args) => {
       if (
         failedAt !== undefined &&
@@ -288,6 +307,8 @@ export default class AuthJwt extends AuthBase {
           `${this.name}: cannot fetch the JWKS: ${String(err)}`
         );
         failedAt = performance.now();
+        const jwks = remote.jwks();
+        local = jwks ? createLocalJWKSet(jwks) : undefined;
         return held(...args);
       }
     };
@@ -312,7 +333,12 @@ export default class AuthJwt extends AuthBase {
     // issuer is not this provider's
     if (document.issuer !== issuer)
       throw new Error(
-        `${where} names issuer ${JSON.stringify(document.issuer)}, not ${issuer}`
+        `${where} names issuer ${JSON.stringify(document.issuer)}, not ${issuer}` +
+          (typeof document.issuer === 'string' &&
+          document.issuer.replace(/\/$/, '') === issuer.replace(/\/$/, '')
+            ? ': write --jwt-issuer exactly as the provider names itself, ' +
+              'trailing slash included, since tokens carry that value'
+            : '')
       );
     if (typeof document.jwks_uri !== 'string')
       throw new Error(`${where} names no jwks_uri`);

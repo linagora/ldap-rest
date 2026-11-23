@@ -91,7 +91,7 @@ Installation, configuration and plugin usage.
 - **[Configuration](./docs/usage/configuration.md)** - CLI options and environment variables
 - **[Helm chart](./helm/ldap-rest/README.md)** - Kubernetes deployment
 - **[Plugins](./docs/usage/plugins/README.md)** - Plugin documentation
-- **[Authentication](./docs/usage/plugins/auth/README.md)** - Token, TOTP, HMAC, LemonLDAP::NG, OpenID Connect
+- **[Authentication](./docs/usage/plugins/auth/README.md)** - Token, TOTP, HMAC, LemonLDAP::NG, OpenID Connect, JWT access tokens
 
 ### [Plugin Development](./docs/plugin-development/README.md)
 

@@ -25,11 +25,13 @@ class Provider {
   discoveryIssuer?: string;
   discoveryRedirect?: string;
   jwksHits = 0;
+  discoveryHits = 0;
   private server?: Server;
 
   async start(): Promise<void> {
     const app = express();
     app.get('/realm/.well-known/openid-configuration', (_req, res) => {
+      this.discoveryHits++;
       if (this.discoveryRedirect)
         return void res.redirect(302, this.discoveryRedirect);
       res.json({
@@ -69,6 +71,8 @@ describe('core/auth/jwt', () => {
   const provider = new Provider();
   let signing: CryptoKey;
   let stranger: CryptoKey;
+  /** Other algorithms, published under their own kid */
+  const others: Record<string, CryptoKey> = {};
 
   const now = (): number => Math.floor(Date.now() / 1000);
   const sign = (
@@ -119,6 +123,15 @@ describe('core/auth/jwt', () => {
       { ...(await exportJWK(pair.publicKey)), kid: 'k1', alg: 'RS256' },
     ];
     stranger = (await generateKeyPair('RS256')).privateKey;
+    for (const alg of ['ES256', 'PS256', 'EdDSA']) {
+      const other = await generateKeyPair(alg, { extractable: true });
+      others[alg] = other.privateKey;
+      provider.keys.push({
+        ...(await exportJWK(other.publicKey)),
+        kid: alg,
+        alg,
+      });
+    }
   });
 
   after(() => {
@@ -225,12 +238,61 @@ describe('core/auth/jwt', () => {
         );
       });
 
+    for (const alg of ['ES256', 'PS256', 'EdDSA'])
+      it(`verifies a ${alg} token`, async () => {
+        await call(app, await sign({}, others[alg], { alg, kid: alg })).expect(
+          200
+        );
+      });
+
     it('tolerates a little clock skew', async () => {
       await call(app, await sign({ exp: now() - 10 })).expect(200);
     });
   });
 
   describe('configuration', () => {
+    it('accepts any of several audiences', async () => {
+      const { app } = await server({ DM_JWT_AUDIENCES: 'other;ldap-rest' });
+      await call(app, await sign({})).expect(200);
+      await call(app, await sign({ aud: 'third' })).expect(401);
+    });
+
+    it('reads discovery once', async () => {
+      const { app } = await server();
+      const hits = provider.discoveryHits;
+      for (let i = 0; i < 3; i++) await call(app, await sign({})).expect(200);
+      expect(provider.discoveryHits - hits).to.equal(1);
+    });
+
+    it('trims the allowed clients of JSON overrides', async () => {
+      for (const name of ENV) delete process.env[name];
+      process.env.DM_JWT_ISSUER = provider.issuer;
+      const dm = new DM();
+      await dm.ready;
+      await dm.registerPlugin(
+        'authJwt',
+        new AuthJwt(
+          dm.withConfig({
+            ...dm.config,
+            jwt_allowed_client: [' backup '],
+          } as typeof dm.config)
+        )
+      );
+      dm.app.get('/api/whoami', (req, res) => {
+        res.json({ user: (req as DmRequest).user });
+      });
+      await call(dm.app, await sign({})).expect(200);
+    });
+
+    it('accepts ML-DSA when listed', async () => {
+      for (const name of ENV) delete process.env[name];
+      process.env.DM_JWT_ISSUER = provider.issuer;
+      process.env.DM_JWT_ALGORITHMS = 'ML-DSA-44';
+      const dm = new DM();
+      await dm.ready;
+      expect(() => new AuthJwt(dm)).to.not.throw();
+    });
+
     it('reads another identity claim', async () => {
       const { app } = await server({ DM_JWT_IDENTITY_CLAIM: 'azp' });
       const res = await call(app, await sign({ azp: 'svc' })).expect(200);

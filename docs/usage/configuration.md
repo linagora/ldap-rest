@@ -25,6 +25,7 @@ All LDAP-Rest configuration options.
     - [core/auth/hmac](#coreauthhmac)
     - [core/auth/llng](#coreauthllng)
     - [core/auth/openidconnect](#coreauthopenidconnect)
+    - [core/auth/jwt](#coreauthjwt)
     - [core/auth/fake](#coreauthfake)
     - [core/bcl](#corebcl)
   - [Authorization Plugins](#authorization-plugins)
@@ -75,8 +76,8 @@ Only options holding identifiers split on commas: `--plugin`, `--mail-domain`,
 `--twake-space-class`), the attribute
 options (`--ldap-raw-hidden-attribute`, `--applicative-account-attribute`,
 `--ldap-operational-attribute`, `--twake-tombstone-clear-attributes`),
-`--twake-tombstone-reasons`, `--authz-for`, `--authz-dynamic-bypass` and
-`--trusted-proxy`. Any other
+`--twake-tombstone-reasons`, `--authz-for`, `--authz-dynamic-bypass`,
+`--jwt-algorithm`, `--jwt-allowed-client` and `--trusted-proxy`. Any other
 option takes each value whole, so a DN or a secret keeps its commas.
 
 **Via CLI - use plural form with comma-separated values:**
