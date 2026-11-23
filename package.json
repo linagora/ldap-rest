@@ -839,6 +839,9 @@
     "test:dev": "./.dev.mk test",
     "test:one": "mocha --config .mocharc-one.json"
   },
+  "allowScripts": {
+    "re2": true
+  },
   "overrides": {
     "diff": ">=8.0.3",
     "glob": ">=11.1.0",

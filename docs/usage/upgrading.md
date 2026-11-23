@@ -4,6 +4,18 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## From 2.4.0
+
+### LemonLDAP::NG access rules are JavaScript
+
+**Who is affected:** a deployment that loads `core/auth/llng` with access rules
+copied from its documentation.
+
+Those rules were Perl, and the Node.js handler runs them as JavaScript:
+`$groups =~ /\badmins\b/` grants every user. Rewrite the rules of the virtual
+host LDAP-Rest protects in JavaScript
+([examples](plugins/auth/llng.md#example-llng-authorization-rules)).
+
 ## From 2.3.2
 
 ### An instance is the account whose address names it

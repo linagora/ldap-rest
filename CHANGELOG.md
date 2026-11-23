@@ -9,6 +9,11 @@
   that lost its bind is never handed out: the operation no longer ran
   anonymously
   ([GHSA-46wr-qcjh-rmrr](https://github.com/linagora/ldap-rest/security/advisories/GHSA-46wr-qcjh-rmrr)).
+- The LemonLDAP::NG documentation gave its access rules in Perl, which the
+  Node.js handler runs as JavaScript: `$groups =~ /\badmins\b/` granted every
+  user. The examples are now JavaScript
+  ([upgrading](docs/usage/upgrading.md#lemonldapng-access-rules-are-javascript),
+  [GHSA-gcqr-9422-mfj8](https://github.com/linagora/ldap-rest/security/advisories/GHSA-gcqr-9422-mfj8)).
 
 ## v2.4.0 (2026-11-18)
 
