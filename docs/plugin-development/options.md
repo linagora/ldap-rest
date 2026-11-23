@@ -151,8 +151,15 @@ export default class Demo extends DmPlugin {
 }
 ```
 
-`--demo-url` and `DM_DEMO_URL` then both set it, with the defaults and checks
-above, and the startup report, `--strict-options` included, counts them as
-known. An option without a declaration reaches `this.config` from an unknown
-`--key value` pair only: a `DM_*` variable is read for declared options alone,
-and the startup report names both.
+`DM_DEMO_URL` then sets it, with the defaults and checks above, and the
+startup report, `--strict-options` included, counts it as known. So do the
+`module:name:{json}` overrides, which keep their JSON types.
+
+The command line is narrower for such a plugin: the parser does not know its
+options, so `--demo-url value` reaches it as a string, which suits a string
+option only. A number, boolean or list option is set through its variable or
+the overrides, and an array option's `plural` form is not read.
+
+An option without a declaration reaches `this.config` from an unknown
+`--key value` pair only: no `DM_*` variable is read for it, and the startup
+report names both.

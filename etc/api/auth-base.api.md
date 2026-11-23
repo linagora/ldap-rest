@@ -23,9 +23,6 @@ Settled<F extends (...args: never[]) => infer R ? R : never>
 // @public
 type Args<K extends keyof Hooks> = NonNullable<Hooks[K]> extends (...args: infer A) => unknown ? A : never;
 
-// @public
-export function assertIdentityMode(config: Config, who: string): void;
-
 // @public (undocumented)
 type AttributesList = Record<string, AttributeValue>;
 
@@ -973,18 +970,6 @@ interface Hooks {
 // @public
 type HookValue<K extends keyof Hooks = keyof Hooks> = Hooks[K] | Function[] | undefined;
 
-// @public
-export function identityCoverage(loadedPlugins: Record<string, DmPlugin>): {
-    known: Set<string>;
-    unverifiable: string[];
-};
-
-// @public
-export function identityFor(req: DmRequest | undefined, config: Config): {
-    value?: string;
-    fellBack: boolean;
-};
-
 // @public (undocumented)
 class ldapActions {
     constructor(server: DM);
@@ -1168,9 +1153,6 @@ interface OptionSpec<T> {
 
 // @public (undocumented)
 type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
-
-// @public
-export function prefixCoversPath(prefix: string, path: string): boolean;
 
 // @public
 interface RequestBoundLdap {
@@ -1374,12 +1356,6 @@ interface SyntaxDefinition {
 
 // @public (undocumented)
 type VoidHook<T extends unknown[]> = (...args: T) => MaybePromise<void>;
-
-// @public
-export function warnUnmatchedRuleKeys(keys: string[], loadedPlugins: Record<string, DmPlugin>, who: string, logger: {
-    warn: (message: string) => unknown;
-    info: (message: string) => unknown;
-}): void;
 
 // (No @packageDocumentation comment for this package)
 
