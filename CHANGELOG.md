@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- External plugins can declare their options: `defineOptions` and `opt` are
+  exported from `ldap-rest/plugin`, so their `DM_*` variables are read and
+  known to `--strict-options`; `AuthBase` is published as
+  `ldap-rest/auth-base` for authentication plugins
+  ([plugin options](docs/plugin-development/options.md#plugins-outside-the-repository)).
+
 ## v2.4.1 (2026-11-23)
 
 ### Security

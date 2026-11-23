@@ -57,6 +57,19 @@ export {
   GatewayTimeoutError,
 } from '../lib/errors.js';
 
+export { defineOptions, opt } from '../config/options.js';
+export type {
+  ArrayOption,
+  BooleanOption,
+  JsonOption,
+  NumberOption,
+  OptionSet,
+  OptionSpec,
+  OptionsOf,
+  StringOption,
+  StringOrFalseOption,
+} from '../config/options.js';
+
 export type { HealthStatus };
 
 export type Role =

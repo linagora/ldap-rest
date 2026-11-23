@@ -107,6 +107,10 @@ pkg.exports = {
     import: './dist/abstract/plugin.js',
     types: './dist/src/abstract/plugin.d.ts',
   },
+  './auth-base': {
+    import: './dist/lib/auth/base.js',
+    types: './dist/src/lib/auth/base.d.ts',
+  },
   './expressformatedresponses': {
     import: './dist/lib/expressFormatedResponses.js',
     types: './dist/src/lib/expressFormatedResponses.d.ts',
@@ -157,6 +161,7 @@ export default async () => {
     {
       input: [
         'src/bin/index.ts',
+        'src/lib/auth/base.ts',
         ...p.map(file => `${PLUGINS_SRC_DIR}/${file}`),
         ...a.map(file => `src/abstract/${file}`),
       ],
