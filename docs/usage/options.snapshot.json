@@ -682,6 +682,71 @@
     "env": "DM_JAMES_WEBADMIN_URL"
   },
   {
+    "cli": "--jwt-algorithm",
+    "type": "array",
+    "default": [
+      "RS256",
+      "RS384",
+      "RS512",
+      "PS256",
+      "PS384",
+      "PS512",
+      "ES256",
+      "ES384",
+      "ES512",
+      "EdDSA",
+      "Ed25519"
+    ],
+    "plural": "--jwt-algorithms",
+    "env": "DM_JWT_ALGORITHMS",
+    "kind": "identifiers"
+  },
+  {
+    "cli": "--jwt-allowed-client",
+    "type": "array",
+    "default": [],
+    "plural": "--jwt-allowed-clients",
+    "env": "DM_JWT_ALLOWED_CLIENTS",
+    "kind": "identifiers"
+  },
+  {
+    "cli": "--jwt-audience",
+    "type": "array",
+    "default": [],
+    "plural": "--jwt-audiences",
+    "env": "DM_JWT_AUDIENCES"
+  },
+  {
+    "cli": "--jwt-clock-tolerance",
+    "type": "number",
+    "default": 30,
+    "env": "DM_JWT_CLOCK_TOLERANCE"
+  },
+  {
+    "cli": "--jwt-identity-claim",
+    "type": "string",
+    "default": "client_id",
+    "env": "DM_JWT_IDENTITY_CLAIM"
+  },
+  {
+    "cli": "--jwt-issuer",
+    "type": "string",
+    "default": "",
+    "env": "DM_JWT_ISSUER"
+  },
+  {
+    "cli": "--jwt-jwks-uri",
+    "type": "string",
+    "default": "",
+    "env": "DM_JWT_JWKS_URI"
+  },
+  {
+    "cli": "--jwt-type",
+    "type": "string",
+    "default": "",
+    "env": "DM_JWT_TYPE"
+  },
+  {
     "cli": "--ldap-base",
     "type": "string",
     "default": "",

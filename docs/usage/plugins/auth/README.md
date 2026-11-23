@@ -11,6 +11,7 @@ LDAP-Rest provides multiple authentication plugins to secure API access. These p
 | [HMAC](hmac.md)           | `core/auth/hmac`          | HMAC-SHA256 request signing for backend services |
 | [LemonLDAP::NG](llng.md)  | `core/auth/llng`          | Integration with LemonLDAP::NG SSO               |
 | [OpenID Connect](oidc.md) | `core/auth/openidconnect` | OAuth 2.0 / OpenID Connect authentication        |
+| [JWT](jwt.md)             | `core/auth/jwt`           | Access tokens from an OAuth 2.0 provider         |
 | [Fake](fake.md)           | `core/auth/fake`          | Development only: a fixed identity, no login     |
 
 ## What a rule is keyed on
@@ -25,6 +26,7 @@ of what a caller is called. Every one of them publishes the caller twice:
 | `core/auth/hmac`          | the service name from `--auth-hmac` | the same                                 |
 | `core/auth/llng`          | LLNG's `whatToTrace`                | `--llng-username-header`, or the same    |
 | `core/auth/openidconnect` | the OIDC `sub`                      | `--oidc-username-claim` (default: `sub`) |
+| `core/auth/jwt`           | `--jwt-identity-claim`              | the same                                 |
 | `core/auth/authzDynamic`  | the token's tenant                  | the same                                 |
 | `core/auth/fake`          | `--auth-fake-user`                  | the same                                 |
 
@@ -181,18 +183,18 @@ base class, but nothing obliges a third implementation to.
 
 ## Choosing an Authentication Method
 
-| Feature                | Token         | TOTP                      | HMAC                   | LemonLDAP::NG         | OpenID Connect                   |
-| ---------------------- | ------------- | ------------------------- | ---------------------- | --------------------- | -------------------------------- |
-| **Setup Complexity**   | Simple        | Simple                    | Medium                 | Medium                | Medium                           |
-| **User Management**    | None          | Manual                    | Manual (service-based) | External (LLNG)       | External (Provider)              |
-| **SSO Support**        | No            | No                        | No                     | Yes                   | Yes                              |
-| **MFA Support**        | No            | Yes (TOTP itself)         | N/A                    | Yes (via LLNG)        | Yes (via Provider)               |
-| **Session Management** | Stateless     | Stateless                 | Stateless              | LLNG Sessions         | OIDC Sessions                    |
-| **Code Expiration**    | Never         | 30-60 seconds             | Per-request            | Session-based         | Session-based                    |
-| **Request Integrity**  | No            | No                        | Yes (body + path hash) | No                    | No                               |
-| **Replay Protection**  | No            | Yes (single-use code)     | Yes (timestamp)        | Session-based         | Session-based                    |
-| **Best For**           | APIs, Scripts | MFA, one request per step | Backend Services       | Enterprises with LLNG | Cloud/SaaS, Enterprises with SSO |
-| **Dependencies**       | None          | None                      | None                   | lemonldap-ng-handler  | express-openid-connect           |
+| Feature                | Token         | TOTP                      | HMAC                   | LemonLDAP::NG         | OpenID Connect                   | JWT                       |
+| ---------------------- | ------------- | ------------------------- | ---------------------- | --------------------- | -------------------------------- | ------------------------- |
+| **Setup Complexity**   | Simple        | Simple                    | Medium                 | Medium                | Medium                           | Simple                    |
+| **User Management**    | None          | Manual                    | Manual (service-based) | External (LLNG)       | External (Provider)              | External (Provider)       |
+| **SSO Support**        | No            | No                        | No                     | Yes                   | Yes                              | N/A (machines)            |
+| **MFA Support**        | No            | Yes (TOTP itself)         | N/A                    | Yes (via LLNG)        | Yes (via Provider)               | N/A                       |
+| **Session Management** | Stateless     | Stateless                 | Stateless              | LLNG Sessions         | OIDC Sessions                    | Stateless                 |
+| **Code Expiration**    | Never         | 30-60 seconds             | Per-request            | Session-based         | Session-based                    | Token lifetime (`exp`)    |
+| **Request Integrity**  | No            | No                        | Yes (body + path hash) | No                    | No                               | No                        |
+| **Replay Protection**  | No            | Yes (single-use code)     | Yes (timestamp)        | Session-based         | Session-based                    | Until `exp`               |
+| **Best For**           | APIs, Scripts | MFA, one request per step | Backend Services       | Enterprises with LLNG | Cloud/SaaS, Enterprises with SSO | Machine clients of an IdP |
+| **Dependencies**       | None          | None                      | None                   | lemonldap-ng-handler  | express-openid-connect           | jose                      |
 
 ## Serving several populations from one server
 

@@ -20,6 +20,10 @@
   known to `--strict-options`; `AuthBase` is published as
   `ldap-rest/auth-base` for authentication plugins
   ([plugin options](docs/plugin-development/options.md#plugins-outside-the-repository)).
+- `core/auth/jwt` accepts OAuth 2.0 access tokens (`Authorization: Bearer`)
+  signed by an identity provider, checked against its published keys, for
+  machine clients using the `client_credentials` grant
+  ([JWT](docs/usage/plugins/auth/jwt.md)).
 
 ### Fixed
 
