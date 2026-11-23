@@ -456,6 +456,46 @@ describe('Server internals', () => {
     });
   });
 
+  describe('plugin overrides', () => {
+    const hello = '../../test/__plugins__/hello/index.js';
+
+    for (const [overrides, reason] of [
+      ['{"api_prefix":"/a",', 'not valid JSON'],
+      ['/a:secret', 'not valid JSON'],
+      ['"/a"', 'must be a JSON object'],
+      ['null', 'must be a JSON object'],
+      ['["/a"]', 'must be a JSON object'],
+    ])
+      it(`should refuse ${overrides} rather than load without them`, async () => {
+        const dm = new DM();
+        await dm.ready;
+        let error: unknown;
+        try {
+          await dm.loadPlugin(`${hello}:named:${overrides}`);
+        } catch (err) {
+          error = err;
+        }
+        expect(error).to.be.instanceOf(Error);
+        expect((error as Error).message).to.contain(reason);
+        expect((error as Error).message).to.contain('named (');
+        expect((error as Error).message).to.not.contain('/a');
+        expect(dm.loadedPlugins).to.not.have.property('named');
+      });
+
+    it('should apply every key of the overrides', async () => {
+      const dm = new DM();
+      await dm.ready;
+      expect(
+        await dm.loadPlugin(
+          `${hello}:named:{"api_prefix":"/a","log_level":"debug"}`
+        )
+      ).to.equal(true);
+      const config = dm.loadedPlugins.named.config;
+      expect(config.api_prefix).to.equal('/a');
+      expect(config.log_level).to.equal('debug');
+    });
+  });
+
   describe('rate limiting without a trusted proxy', () => {
     it('should warn that the client IP can be forged', async () => {
       const dm = new DM();

@@ -992,26 +992,31 @@ export class DM {
         name = tmp.substring(0, tmp.indexOf(':'));
         if (!name) name = undefined;
         tmp = tmp.substring(tmp.indexOf(':') + 1);
+        // Loading the plugin without them would run it with the settings the
+        // overrides were written to replace. The message leaves them out:
+        // they may hold a secret, and the parser's error points into them.
+        const instance = name ? `${name} (${pluginName})` : pluginName;
+        let parsed: unknown;
         try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          overrides = JSON.parse(tmp);
-          if (typeof overrides !== 'object') {
-            this.logger.error(
-              `Overrides for plugin ${pluginName} are not valid: ${tmp}`
-            );
-            overrides = undefined;
-          } else {
-            this.logger.debug(
-              `Overrides for plugin ${name || pluginName}: ${tmp}`
-            );
-          }
+          parsed = JSON.parse(tmp);
         } catch (err) {
-          this.logger.error(
-            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-            `Failed to parse overrides for plugin ${pluginName}: ${err}, using ${tmp}`
+          // V8 quotes the input in some of its messages: keep the position
+          const at = /at position \d+/.exec(String(err))?.[0];
+          return Promise.reject(
+            new Error(
+              `Overrides for plugin ${instance} are not valid JSON` +
+                (at ? ` (${at})` : '')
+            )
           );
-          overrides = undefined;
         }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+          return Promise.reject(
+            new Error(`Overrides for plugin ${instance} must be a JSON object`)
+          );
+        overrides = parsed as Config;
+        this.logger.debug(
+          `Overrides for plugin ${instance}: ` + Object.keys(parsed).join(', ')
+        );
       } else {
         name = tmp;
         if (!name) name = undefined;

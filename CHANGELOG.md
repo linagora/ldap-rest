@@ -22,6 +22,12 @@
   entries of the mapping, which made the directory refuse the whole update
   (`entryDN: no user modification allowed`). A PATCH naming one now answers
   `400 mutability`, `operational` ones included, which a PATCH used to write.
+- `--plugin`, `--plugins` and `DM_PLUGINS` no longer split the JSON overrides
+  of a plugin instance on their commas or spaces
+  ([configuration](docs/usage/configuration.md#array-options)), and overrides
+  that are not a JSON object stop the server instead of loading the plugin
+  without them
+  ([upgrading](docs/usage/upgrading.md#invalid-plugin-overrides-stop-the-server)).
 
 ## v2.4.1 (2026-11-23)
 
