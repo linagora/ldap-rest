@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- A pooled LDAP connection whose socket dropped (directory restart, failover,
+  idle timeout) replays the server's bind before its next operation, and one
+  that lost its bind is never handed out: the operation no longer ran
+  anonymously
+  ([GHSA-46wr-qcjh-rmrr](https://github.com/linagora/ldap-rest/security/advisories/GHSA-46wr-qcjh-rmrr)).
+
 ## v2.4.0 (2026-11-18)
 
 ### Added

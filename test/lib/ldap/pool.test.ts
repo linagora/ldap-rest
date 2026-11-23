@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import type { Client } from 'ldapts';
+import type { Client, ClientOptions } from 'ldapts';
 
 import LdapPool, { type PoolLogger } from '../../../src/lib/ldap/pool';
 
@@ -9,14 +9,16 @@ class FakeClient {
   unbound = false;
   searches = 0;
   readonly url: string;
+  readonly options: ClientOptions;
   private readonly refuseBind: boolean;
   private readonly refuseSearch: boolean;
 
   constructor(
-    url: string,
+    options: ClientOptions,
     behaviour: { bind?: boolean; search?: boolean } = {}
   ) {
-    this.url = url;
+    this.options = options;
+    this.url = options.url as string;
     this.refuseBind = behaviour.bind ?? false;
     this.refuseSearch = behaviour.search ?? false;
   }
@@ -35,6 +37,15 @@ class FakeClient {
 
   async unbind(): Promise<void> {
     this.unbound = true;
+  }
+
+  get isBound(): boolean {
+    return this.bound;
+  }
+
+  /** What ldapts does when the socket closes under it */
+  dropSocket(): void {
+    this.bound = false;
   }
 }
 
@@ -60,10 +71,7 @@ const poolFor = (
     connectionTtl: settings.connectionTtl ?? 60_000,
     logger: silentLogger,
     clientFactory: options => {
-      const client = new FakeClient(
-        options.url as string,
-        behaviour[options.url as string]
-      );
+      const client = new FakeClient(options, behaviour[options.url as string]);
       clients.push(client);
       return client as unknown as Client;
     },
@@ -126,6 +134,43 @@ describe('LdapPool', () => {
     const second = await pool.acquire();
     expect(second, 'a new connection took its place').to.not.equal(first);
     expect(clients).to.have.length(2);
+    pool.release(second);
+    await pool.close();
+  });
+
+  it('asks the client to replay its bind after a reconnect', async () => {
+    const { pool, clients } = poolFor(['ldap://one']);
+    pool.release(await pool.acquire());
+    expect(clients[0].options.autoRebind).to.equal(true);
+    await pool.close();
+  });
+
+  it('never hands out an idle connection whose socket dropped', async () => {
+    const { pool, clients } = poolFor(['ldap://one']);
+    const first = await pool.acquire();
+    pool.release(first);
+    clients[0].dropSocket();
+    const second = await pool.acquire();
+    expect(second.client).to.equal(clients[1] as unknown as Client);
+    expect(second.client.isBound).to.equal(true);
+    expect(clients[0].unbound, 'the dropped connection is closed').to.equal(
+      true
+    );
+    expect(pool.stats()).to.deep.include({ busy: 1, idle: 0 });
+    pool.release(second);
+    await pool.close();
+  });
+
+  it('does not take back a connection whose socket dropped in use', async () => {
+    const { pool, clients } = poolFor(['ldap://one']);
+    const first = await pool.acquire();
+    const waiting = pool.acquire();
+    clients[0].dropSocket();
+    pool.release(first);
+    const second = await waiting;
+    expect(second, 'the waiter got a new connection').to.not.equal(first);
+    expect(second.client.isBound).to.equal(true);
+    expect(clients[0].unbound).to.equal(true);
     pool.release(second);
     await pool.close();
   });
