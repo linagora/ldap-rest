@@ -62,13 +62,12 @@ interface AttributeTypeDefinition {
 // @public (undocumented)
 export type AttributeValue = Buffer | Buffer[] | string[] | string;
 
-// @public (undocumented)
+// @public
 abstract class AuthBase extends DmPlugin {
     afterChain?(req: DmRequest, res: Response_2, next: () => void): void;
     afterLoad(): void;
     api(_app: Express_2): void;
     authenticate(req: Request_2, res: Response_2, next: () => void): Promise<void>;
-    // (undocumented)
     abstract authMethod(req: DmRequest, res: Response_2, next: () => void): void;
     protected identitySource(): string;
     protected knownIdentities(): string[] | undefined;

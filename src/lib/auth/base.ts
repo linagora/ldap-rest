@@ -186,7 +186,35 @@ export function warnUnmatchedRuleKeys(
   );
 }
 
+/**
+ * Base class of the authentication plugins.
+ *
+ * A subclass implements {@link AuthBase.authMethod}; `api()` registers it
+ * with the server's authentication dispatcher, which runs it before any
+ * route on the paths it guards: every path, or those of `auth_path_prefix`
+ * (see {@link AuthBase.pathPrefixes}). Every plugin guarding a path must let
+ * a request through for it to reach a route.
+ *
+ * Optional overrides: `knownIdentities()` and `identitySource()` describe
+ * what the plugin publishes, for the startup checks; `afterChain()` gives a
+ * verdict once every authenticator has run. A subclass overriding
+ * `afterLoad()` calls `super.afterLoad()`.
+ */
 export default abstract class AuthBase extends DmPlugin {
+  /**
+   * Authenticate one request.
+   *
+   * Either answer it — 401, 403, 503… — and leave `next` alone, or publish
+   * the caller with `publishIdentity(req, user, userName?)` and call `next()`
+   * once, now or later: the check may be asynchronous. `passThrough(req,
+   * next)` lets a request through without vouching for it, so that the
+   * authorization plugins scoped to this one with `--authz-for` do not judge
+   * it.
+   *
+   * @param req the request, whose `user` and `userName` the plugin sets
+   * @param res the response, ended here when the request is refused
+   * @param next called once, when the request is authenticated
+   */
   abstract authMethod(req: DmRequest, res: Response, next: () => void): void;
 
   /** Validated prefixes, computed once: the catch-all reads them per request */
