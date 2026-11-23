@@ -461,6 +461,7 @@ describe('Server internals', () => {
 
     for (const [overrides, reason] of [
       ['{"api_prefix":"/a",', 'not valid JSON'],
+      ['/a:secret', 'not valid JSON'],
       ['"/a"', 'must be a JSON object'],
       ['null', 'must be a JSON object'],
       ['["/a"]', 'must be a JSON object'],
@@ -476,6 +477,7 @@ describe('Server internals', () => {
         }
         expect(error).to.be.instanceOf(Error);
         expect((error as Error).message).to.contain(reason);
+        expect((error as Error).message).to.not.contain('/a');
         expect(dm.loadedPlugins).to.not.have.property('named');
       });
 

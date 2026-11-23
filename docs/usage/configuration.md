@@ -108,8 +108,8 @@ way:
 
 - Options holding identifiers (the list above): a value containing `;` is
   split on `;` and spaces, any other on `,` and spaces. A value starting with
-  `;` is split on `;` too.
-- Nothing between JSON braces or brackets splits, in any form, so a plugin
+  `;` is split on `;` too. Nothing between JSON braces or brackets splits
+  there, in any form, and a `;` inside them does not count, so a plugin
   instance keeps all of its overrides (`module:name:{json}`, see
   [several populations](plugins/auth/README.md#serving-several-populations-from-one-server)):
 

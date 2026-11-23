@@ -5,9 +5,11 @@
 ### Fixed
 
 - `--plugin`, `--plugins` and `DM_PLUGINS` no longer split the JSON overrides
-  of a plugin instance on their commas or spaces, and overrides that are not a
-  JSON object stop the server instead of loading the plugin without them
-  ([configuration](docs/usage/configuration.md#array-options)).
+  of a plugin instance on their commas or spaces
+  ([configuration](docs/usage/configuration.md#array-options)), and overrides
+  that are not a JSON object stop the server instead of loading the plugin
+  without them
+  ([upgrading](docs/usage/upgrading.md#invalid-plugin-overrides-stop-the-server)).
 
 ## v2.4.1 (2026-11-23)
 

@@ -993,26 +993,32 @@ export class DM {
         if (!name) name = undefined;
         tmp = tmp.substring(tmp.indexOf(':') + 1);
         // Loading the plugin without them would run it with the settings the
-        // overrides were written to replace
+        // overrides were written to replace. The message leaves them out:
+        // they may hold a secret, and the parser's error points into them.
         let parsed: unknown;
         try {
           parsed = JSON.parse(tmp);
         } catch (err) {
+          // V8 quotes the input in some of its messages: keep the position
+          const at = /at position \d+/.exec(String(err))?.[0];
           return Promise.reject(
             new Error(
-              `Overrides for plugin ${pluginName} are not valid JSON ` +
-                `(${String(err)}): ${tmp}`
+              `Overrides for plugin ${pluginName} are not valid JSON` +
+                (at ? ` (${at})` : '')
             )
           );
         }
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
           return Promise.reject(
             new Error(
-              `Overrides for plugin ${pluginName} must be a JSON object: ${tmp}`
+              `Overrides for plugin ${pluginName} must be a JSON object`
             )
           );
         overrides = parsed as Config;
-        this.logger.debug(`Overrides for plugin ${name || pluginName}: ${tmp}`);
+        this.logger.debug(
+          `Overrides for plugin ${name || pluginName}: ` +
+            Object.keys(parsed).join(', ')
+        );
       } else {
         name = tmp;
         if (!name) name = undefined;

@@ -4,6 +4,21 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## From 2.4.1
+
+### Invalid plugin overrides stop the server
+
+**Who is affected:** a deployment loading a plugin as `module:name:{json}` whose
+overrides are not a JSON object: a typo, a trailing `module:name:`, a string,
+`null` or a list.
+
+The server used to log the error and load the plugin without its overrides,
+so an authentication or authorization instance ran without the
+`auth_path_prefix` or `authz_for` it was given. It now refuses to start
+(`Overrides for plugin … are not valid JSON`): fix the JSON. Overrides holding
+several keys, which `--plugin` and `DM_PLUGINS` used to cut at their commas,
+now load whole.
+
 ## From 2.4.0
 
 ### LemonLDAP::NG access rules are JavaScript
