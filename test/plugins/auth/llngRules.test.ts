@@ -66,7 +66,12 @@ describe('LemonLDAP::NG access rules in the documentation', function () {
   ): Promise<boolean> =>
     handler.grant({ headers: { host: llngVhost } }, uri, session).then(
       result => result,
-      () => false
+      // How the handler says no when `default` refuses; any other rejection
+      // is a rule that failed to run, and fails the test
+      (reason: unknown) => {
+        if (reason === 'Unauthorized') return false;
+        throw reason instanceof Error ? reason : new Error(String(reason));
+      }
     );
 
   it('grants nothing to a user outside the groups the rules name', async () => {
