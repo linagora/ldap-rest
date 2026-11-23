@@ -992,26 +992,27 @@ export class DM {
         name = tmp.substring(0, tmp.indexOf(':'));
         if (!name) name = undefined;
         tmp = tmp.substring(tmp.indexOf(':') + 1);
+        // Loading the plugin without them would run it with the settings the
+        // overrides were written to replace
+        let parsed: unknown;
         try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          overrides = JSON.parse(tmp);
-          if (typeof overrides !== 'object') {
-            this.logger.error(
-              `Overrides for plugin ${pluginName} are not valid: ${tmp}`
-            );
-            overrides = undefined;
-          } else {
-            this.logger.debug(
-              `Overrides for plugin ${name || pluginName}: ${tmp}`
-            );
-          }
+          parsed = JSON.parse(tmp);
         } catch (err) {
-          this.logger.error(
-            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-            `Failed to parse overrides for plugin ${pluginName}: ${err}, using ${tmp}`
+          return Promise.reject(
+            new Error(
+              `Overrides for plugin ${pluginName} are not valid JSON ` +
+                `(${String(err)}): ${tmp}`
+            )
           );
-          overrides = undefined;
         }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+          return Promise.reject(
+            new Error(
+              `Overrides for plugin ${pluginName} must be a JSON object: ${tmp}`
+            )
+          );
+        overrides = parsed as Config;
+        this.logger.debug(`Overrides for plugin ${name || pluginName}: ${tmp}`);
       } else {
         name = tmp;
         if (!name) name = undefined;

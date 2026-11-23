@@ -109,6 +109,16 @@ way:
 - Options holding identifiers (the list above): a value containing `;` is
   split on `;` and spaces, any other on `,` and spaces. A value starting with
   `;` is split on `;` too.
+- Nothing between JSON braces or brackets splits, in any form, so a plugin
+  instance keeps all of its overrides (`module:name:{json}`, see
+  [several populations](plugins/auth/README.md#serving-several-populations-from-one-server)):
+
+  ```bash
+  --plugin 'core/scim:scimA:{"scim_prefix":"/scim/a/v2","scim_user_base":"ou=a,dc=example,dc=com"},core/scim:scimB:{"scim_prefix":"/scim/b/v2","scim_user_base":"ou=b,dc=example,dc=com"}'
+  ```
+
+  Overrides that are not a JSON object stop the server.
+
 - Options holding DNs or DN expressions (`--ldap-raw-base`,
   `--james-mailing-list-branch`, `--twake-tombstone-dn`,
   `--twake-tombstone-group-bases`, `--twake-instance-dn`,

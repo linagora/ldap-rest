@@ -20,7 +20,9 @@ type ConfigResultValue =
 // What an array option holds, which tells how its values split:
 //  - identifiers (classes, attributes, plugins...): the singular form splits
 //    on commas; the environment variable and the plural form split on `;` if
-//    the value has one, else on `,`, and on spaces
+//    the value has one, else on `,`, and on spaces. Nothing inside JSON braces
+//    or brackets splits: a plugin may come with overrides,
+//    `module:name:{"a":1,"b":2}`
 //  - dns: a DN holds commas and spaces, so the singular form never splits and
 //    the environment variable and the plural form split on `;` only
 //  - phrases (an HMAC id:secret:Display Name, a TOTP secret:name[:digits]): the
@@ -334,11 +336,10 @@ export function splitValue(
   kind: ArrayKind | undefined,
   form: 'singular' | 'plural'
 ): string[] {
+  if (kind === 'identifiers') return splitIdentifiers(value, form);
   let separator: RegExp | undefined;
-  if (form === 'singular') {
-    if (kind === 'identifiers') separator = /,/;
-  } else if (kind === 'dns') separator = /;/;
-  else {
+  if (form === 'plural' && kind === 'dns') separator = /;/;
+  else if (form === 'plural') {
     const spaces = kind === 'phrases' ? '\\r\\n' : '\\s';
     separator = new RegExp(`[${value.includes(';') ? ';' : ','}${spaces}]+`);
   }
@@ -348,6 +349,50 @@ export function splitValue(
         .map(v => v.trim())
         .filter(v => v.length > 0)
     : [value.trim()].filter(v => v.length > 0);
+}
+
+/**
+ * Positions of the characters outside JSON objects, arrays and the strings
+ * they hold. A quote outside braces is a plain character: a path may hold one.
+ */
+function topLevel(value: string): boolean[] {
+  const outside: boolean[] = [];
+  let depth = 0;
+  let inString = false;
+  for (let i = 0; i < value.length; i++) {
+    const c = value[i];
+    outside[i] = depth === 0 && !inString && c !== '{' && c !== '[';
+    if (inString) {
+      if (c === '\\') outside[++i] = false;
+      else if (c === '"') inString = false;
+    } else if (c === '"' && depth > 0) inString = true;
+    else if (c === '{' || c === '[') depth++;
+    else if ((c === '}' || c === ']') && depth > 0) depth--;
+  }
+  return outside;
+}
+
+function splitIdentifiers(
+  value: string,
+  form: 'singular' | 'plural'
+): string[] {
+  const outside = topLevel(value);
+  const semicolon = outside.some((top, i) => top && value[i] === ';');
+  const separates = (c: string): boolean =>
+    form === 'singular'
+      ? c === ','
+      : semicolon
+        ? c === ';' || /\s/.test(c)
+        : c === ',' || /\s/.test(c);
+  const items: string[] = [];
+  let start = 0;
+  for (let i = 0; i <= value.length; i++) {
+    if (i < value.length && !(outside[i] && separates(value[i]))) continue;
+    const item = value.slice(start, i).trim();
+    if (item) items.push(item);
+    start = i + 1;
+  }
+  return items;
 }
 
 // An integer only: parseInt would read 1e3 as 1 and 80abc as 80

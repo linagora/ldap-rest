@@ -110,6 +110,17 @@ describe('ConfigParser', () => {
       expect(parse().user_class).to.deep.equal(['top', 'a,b', 'c']);
     });
 
+    it('should keep the JSON overrides of a plugin whole', () => {
+      const a = 'core/scim:a:{"scim_prefix":"/a", "scim_base": "ou=a,dc=x"}';
+      const b = 'core/scim:b:{"authz_for":["oidc","token"],"x":"a;b c"}';
+      for (const value of [`${a},${b}`, `${a};${b}`, `${a} ${b}`]) {
+        process.env.DM_PLUGINS = value;
+        expect(parse().plugin, value).to.deep.equal([a, b]);
+      }
+      process.env.DM_PLUGINS = `${b};core/ldap/groups,core/static`;
+      expect(parse().plugin).to.deep.equal([b, 'core/ldap/groups,core/static']);
+    });
+
     it('should split on semicolons a value starting with one', () => {
       process.env.DM_USER_CLASSES = ';top;a,b';
       expect(parse().user_class).to.deep.equal(['top', 'a,b']);
@@ -524,6 +535,25 @@ describe('ConfigParser', () => {
     const parser = new ConfigParser(configArgs);
     const result = parser.parse(argv);
     expect(result).to.have.property('zig_zag').that.equals('test');
+  });
+
+  it('should keep the JSON overrides of a plugin whole on the command line', () => {
+    const a = 'core/scim:a:{"scim_prefix":"/a","scim_user_base":"ou=a,dc=x"}';
+    const b = 'core/scim:b:{"scim_prefix":"/b","scim_user_base":"ou=b,dc=x"}';
+    delete process.env.DM_PLUGINS;
+    const parse = (...args: string[]): string[] | undefined =>
+      new ConfigParser(configArgs).parse(['node', 'script.js', ...args]).plugin;
+    expect(parse('--plugin', a, '--plugin', `${b},core/static`)).to.deep.equal([
+      a,
+      b,
+      'core/static',
+    ]);
+    expect(parse('--plugins', `${a};${b}`)).to.deep.equal([a, b]);
+    expect(parse('--plugins', `${a},${b} core/static`)).to.deep.equal([
+      a,
+      b,
+      'core/static',
+    ]);
   });
 
   describe('deprecated aliases', () => {
