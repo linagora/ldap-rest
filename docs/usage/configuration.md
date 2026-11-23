@@ -390,6 +390,7 @@ Development only, refused with `NODE_ENV=production` — see [Fake Authenticatio
 | `--jwt-clock-tolerance`                          | `DM_JWT_CLOCK_TOLERANCE` | `30`             | Seconds of clock skew allowed                                      |
 | `--jwt-identity-claim`                           | `DM_JWT_IDENTITY_CLAIM`  | `client_id`      | Claim published as `req.user` and `req.userName`                   |
 | `--jwt-allowed-client` / `--jwt-allowed-clients` | `DM_JWT_ALLOWED_CLIENTS` | `[]`             | Clients allowed in; empty, any (see [JWT](plugins/auth/jwt.md))    |
+| `--jwt-type`                                     | `DM_JWT_TYPE`            |                  | Required `typ` header, such as `at+jwt`; empty, not checked        |
 
 #### `core/bcl`
 

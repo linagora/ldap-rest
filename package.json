@@ -909,7 +909,7 @@
     "@types/pg": "^8.23.1",
     "express-openid-connect": "^3.4.0",
     "iovalkey": "^0.4.0",
-    "jose": "^6.2.18",
+    "jose": "^6.2.14",
     "lemonldap-ng-handler": "^0.10.0",
     "pg": "^8.23.0",
     "re2": "^1.22.1"

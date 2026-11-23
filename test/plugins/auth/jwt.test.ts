@@ -23,12 +23,15 @@ class Provider {
   keys: JWK[] = [];
   jwksStatus = 200;
   discoveryIssuer?: string;
+  discoveryRedirect?: string;
   jwksHits = 0;
   private server?: Server;
 
   async start(): Promise<void> {
     const app = express();
     app.get('/realm/.well-known/openid-configuration', (_req, res) => {
+      if (this.discoveryRedirect)
+        return void res.redirect(302, this.discoveryRedirect);
       res.json({
         issuer: this.discoveryIssuer ?? this.issuer,
         jwks_uri: `${this.issuer}/certs`,
@@ -59,6 +62,7 @@ const ENV = [
   'DM_JWT_ALGORITHMS',
   'DM_JWT_IDENTITY_CLAIM',
   'DM_JWT_ALLOWED_CLIENTS',
+  'DM_JWT_TYPE',
 ];
 
 describe('core/auth/jwt', () => {
@@ -70,7 +74,10 @@ describe('core/auth/jwt', () => {
   const sign = (
     claims: JWTPayload,
     key: CryptoKey = signing,
-    header: { alg: string; kid?: string } = { alg: 'RS256', kid: 'k1' }
+    header: { alg: string; kid?: string; typ?: string } = {
+      alg: 'RS256',
+      kid: 'k1',
+    }
   ): Promise<string> =>
     new SignJWT({
       client_id: 'backup',
@@ -230,6 +237,38 @@ describe('core/auth/jwt', () => {
       expect(res.body.user).to.equal('svc');
     });
 
+    it('checks the token type when asked', async () => {
+      const { app } = await server({ DM_JWT_TYPE: 'at+jwt' });
+      await call(app, await sign({})).expect(401);
+      await call(
+        app,
+        await sign({}, signing, { alg: 'RS256', kid: 'k1', typ: 'at+jwt' })
+      ).expect(200);
+    });
+
+    it('trims an issuer read from a secret file', async () => {
+      const { app } = await server({ DM_JWT_ISSUER: `${provider.issuer}\n` });
+      await call(app, await sign({})).expect(200);
+    });
+
+    it('tries each key of a set without kid', async () => {
+      const other = await generateKeyPair('RS256', { extractable: true });
+      const saved = provider.keys;
+      provider.keys = [
+        { ...(await exportJWK(other.publicKey)), alg: 'RS256' },
+        { ...saved[0], kid: undefined },
+      ];
+      try {
+        const { app } = await server({
+          DM_JWT_JWKS_URI: `${provider.issuer}/certs`,
+        });
+        await call(app, await sign({}, signing, { alg: 'RS256' })).expect(200);
+        await call(app, await sign({}, stranger, { alg: 'RS256' })).expect(401);
+      } finally {
+        provider.keys = saved;
+      }
+    });
+
     it('restricts access to the allowed clients', async () => {
       const { app } = await server({ DM_JWT_ALLOWED_CLIENTS: 'backup;sync' });
       await call(app, await sign({})).expect(200);
@@ -252,6 +291,7 @@ describe('core/auth/jwt', () => {
       [{ DM_JWT_ALGORITHMS: 'RS256;HS256' }, 'HS256 refused'],
       [{ DM_JWT_ALGORITHMS: 'none' }, 'none refused'],
       [{ DM_JWT_ISSUER: '' }, '--jwt-issuer is required'],
+      [{ DM_JWT_JWKS_URI: 'data:application/json,{}' }, 'not an http(s) URL'],
       [{ DM_JWT_IDENTITY_CLAIM: ' ' }, '--jwt-identity-claim is empty'],
     ] as Array<[Record<string, string>, string]>)
       it(`refuses to start on ${JSON.stringify(env)}`, async () => {
@@ -265,17 +305,56 @@ describe('core/auth/jwt', () => {
   });
 
   describe('when the keys cannot be had', () => {
+    afterEach(() => {
+      AuthJwt.retryMs = 30_000;
+      AuthJwt.remoteOptions = {};
+      provider.jwksStatus = 200;
+    });
+
     it('answers 503 while the JWKS fails, and recovers', async () => {
+      AuthJwt.retryMs = 0;
       const { app } = await server({
         DM_JWT_JWKS_URI: `${provider.issuer}/certs`,
       });
       provider.jwksStatus = 500;
-      try {
-        await call(app, await sign({})).expect(503);
-      } finally {
-        provider.jwksStatus = 200;
-      }
+      await call(app, await sign({})).expect(503);
+      provider.jwksStatus = 200;
       await call(app, await sign({})).expect(200);
+    });
+
+    it('waits before fetching a failing JWKS again', async () => {
+      const { app } = await server({
+        DM_JWT_JWKS_URI: `${provider.issuer}/certs`,
+      });
+      provider.jwksStatus = 500;
+      const hits = provider.jwksHits;
+      for (let i = 0; i < 5; i++) await call(app, await sign({})).expect(503);
+      expect(provider.jwksHits - hits).to.equal(1);
+    });
+
+    it('keeps verifying with the keys it held while the JWKS fails', async () => {
+      AuthJwt.remoteOptions = { cooldownDuration: 0 };
+      const { app } = await server({
+        DM_JWT_JWKS_URI: `${provider.issuer}/certs`,
+      });
+      await call(app, await sign({})).expect(200);
+      provider.jwksStatus = 500;
+      // An unknown kid makes jose fetch again, and that fetch fails
+      let hits = provider.jwksHits;
+      await call(
+        app,
+        await sign({}, stranger, { alg: 'RS256', kid: 'rotated' })
+      ).expect(401);
+      expect(provider.jwksHits).to.equal(hits + 1);
+      hits = provider.jwksHits;
+      for (let i = 0; i < 3; i++) {
+        await call(app, await sign({})).expect(200);
+        await call(
+          app,
+          await sign({}, stranger, { alg: 'RS256', kid: `r${i}` })
+        ).expect(401);
+      }
+      expect(provider.jwksHits).to.equal(hits);
     });
 
     it('refuses a malformed token without asking for the keys', async () => {
@@ -296,6 +375,16 @@ describe('core/auth/jwt', () => {
         provider.jwksStatus = 200;
       }
       expect(provider.jwksHits).to.equal(hits);
+    });
+
+    it('follows no redirect from discovery', async () => {
+      provider.discoveryRedirect = `${provider.issuer}/elsewhere`;
+      try {
+        const { app } = await server();
+        await call(app, await sign({})).expect(503);
+      } finally {
+        provider.discoveryRedirect = undefined;
+      }
     });
 
     it('answers 503 when discovery names another issuer', async () => {

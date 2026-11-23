@@ -741,6 +741,12 @@
     "env": "DM_JWT_JWKS_URI"
   },
   {
+    "cli": "--jwt-type",
+    "type": "string",
+    "default": "",
+    "env": "DM_JWT_TYPE"
+  },
+  {
     "cli": "--ldap-base",
     "type": "string",
     "default": "",

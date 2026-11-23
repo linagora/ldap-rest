@@ -7,13 +7,20 @@
  * See `docs/usage/plugins/auth/jwt.md`.
  * @group Plugins
  */
+import { performance } from 'perf_hooks';
+
 import type { Response } from 'express';
 import {
+  createLocalJWKSet,
   createRemoteJWKSet,
   customFetch,
   decodeProtectedHeader,
+  errors,
   jwtVerify,
+  type JWTPayload,
   type JWTVerifyGetKey,
+  type JWTVerifyOptions,
+  type RemoteJWKSetOptions,
 } from 'jose';
 
 import AuthBase, { type DmRequest } from '../../lib/auth/base.js';
@@ -26,8 +33,6 @@ import type { Role } from '../../abstract/plugin.js';
 
 import { JWT_ALGORITHMS, jwtOptions, type JwtOptions } from './auth.options.js';
 
-/** How long a failed discovery is kept before the next request retries it */
-const DISCOVERY_RETRY_MS = 30_000;
 const DISCOVERY_TIMEOUT_MS = 5_000;
 
 /**
@@ -44,42 +49,91 @@ const TOKEN_ERRORS = new Set([
   'ERR_JOSE_ALG_NOT_ALLOWED',
   'ERR_JOSE_NOT_SUPPORTED',
   'ERR_JWKS_NO_MATCHING_KEY',
-  'ERR_JWKS_MULTIPLE_MATCHING_KEYS',
 ]);
 
 const BEARER = /^Bearer[ \t]+([^\s]+)[ \t]*$/i;
 
+const codeOf = (err: unknown): unknown =>
+  err && typeof err === 'object' ? (err as { code?: unknown }).code : undefined;
+
+/** Whether a URL reaches this host only, where plain http carries no risk */
+const loopback = (url: URL): boolean =>
+  ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+
 export default class AuthJwt extends AuthBase {
   static optionDefinitions = jwtOptions;
+  /**
+   * How long a failure to get the keys — discovery or JWKS — is kept before
+   * a request tries again, so that a provider outage does not turn every
+   * request into an outbound fetch
+   */
+  static retryMs = 30_000;
+  /** jose's cache settings, left to its defaults outside the tests */
+  static remoteOptions: RemoteJWKSetOptions = {};
 
   name = 'authJwt';
   roles: Role[] = ['auth'] as const;
 
   private readonly settings: JwtOptions;
+  private readonly issuer: string;
+  private readonly jwksUri?: URL;
+  private readonly claim: string;
+  private readonly verifyOptions: JWTVerifyOptions;
   private keys?: Promise<JWTVerifyGetKey>;
-  private keysFailedAt = 0;
+  /** `performance.now()` of the last failed discovery, immune to clock steps */
+  private failedAt?: number;
 
   constructor(...args: ConstructorParameters<typeof AuthBase>) {
     super(...args);
     this.settings = this.options(jwtOptions);
-    const { jwt_issuer, jwt_algorithm, jwt_identity_claim } = this.settings;
-    if (!jwt_issuer.trim())
-      throw new Error(`${this.name}: --jwt-issuer is required`);
-    if (!jwt_identity_claim.trim())
+    // A value from a secret file often ends with a newline
+    this.issuer = this.settings.jwt_issuer.trim();
+    this.claim = this.settings.jwt_identity_claim.trim();
+    const jwksUri = this.settings.jwt_jwks_uri.trim();
+    const audience = this.settings.jwt_audience
+      .map(a => a.trim())
+      .filter(Boolean);
+    const type = this.settings.jwt_type.trim();
+    const algorithms = this.settings.jwt_algorithm;
+    if (!this.issuer) throw new Error(`${this.name}: --jwt-issuer is required`);
+    if (!this.claim)
       throw new Error(`${this.name}: --jwt-identity-claim is empty`);
-    if (jwt_algorithm.length === 0)
+    if (algorithms.length === 0)
       throw new Error(`${this.name}: --jwt-algorithm lists no algorithm`);
     // HS* would verify with a public key read as an HMAC secret: anyone
     // holding the published key could sign tokens
-    const refused = jwt_algorithm.filter(alg => !JWT_ALGORITHMS.includes(alg));
+    const refused = algorithms.filter(alg => !JWT_ALGORITHMS.includes(alg));
     if (refused.length > 0)
       throw new Error(
         `${this.name}: --jwt-algorithm ${refused.join(', ')} refused; ` +
           `known asymmetric algorithms: ${JWT_ALGORITHMS.join(', ')}`
       );
-    for (const uri of [this.settings.jwt_jwks_uri, jwt_issuer])
-      if (uri && !URL.canParse(uri))
-        throw new Error(`${this.name}: "${uri}" is not a URL`);
+    this.httpUrl(this.issuer, '--jwt-issuer');
+    if (jwksUri) this.jwksUri = this.httpUrl(jwksUri, '--jwt-jwks-uri');
+    this.verifyOptions = {
+      issuer: this.issuer,
+      audience: audience.length > 0 ? audience : undefined,
+      algorithms,
+      clockTolerance: this.settings.jwt_clock_tolerance,
+      requiredClaims: ['exp'],
+      ...(type ? { typ: type } : {}),
+    };
+  }
+
+  /**
+   * An http(s) URL, or a startup refusal. Whoever can alter the keys on
+   * their way can sign any identity, so plain http off this host is said.
+   */
+  private httpUrl(value: string, what: string): URL {
+    const url = URL.canParse(value) ? new URL(value) : undefined;
+    if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:'))
+      throw new Error(`${this.name}: ${what} "${value}" is not an http(s) URL`);
+    if (url.protocol === 'http:' && !loopback(url))
+      this.logger.warn(
+        `${this.name}: ${what} ${value} is plain http: the signing keys can ` +
+          'be replaced on their way'
+      );
+    return url;
   }
 
   protected knownIdentities(): string[] | undefined {
@@ -88,14 +142,14 @@ export default class AuthJwt extends AuthBase {
   }
 
   protected identitySource(): string {
-    return `req.user and req.userName: the token's "${this.settings.jwt_identity_claim}" claim`;
+    return `req.user and req.userName: the token's "${this.claim}" claim`;
   }
 
   afterLoad(): void {
     super.afterLoad();
-    if (this.settings.jwt_audience.length === 0)
+    if (!this.verifyOptions.audience)
       this.logger.warn(
-        `${this.name}: no --jwt-audience, so a token ${this.settings.jwt_issuer} ` +
+        `${this.name}: no --jwt-audience, so a token ${this.issuer} ` +
           'signed for any other service is accepted here too'
       );
   }
@@ -107,6 +161,12 @@ export default class AuthJwt extends AuthBase {
       return unauthorized(res);
     }
     void this.verify(match[1], req, res, next);
+  }
+
+  private refuse(res: Response, reason: string): void {
+    this.logger.warn(`${this.name}: token refused: ${reason}`);
+    res.set('WWW-Authenticate', 'Bearer error="invalid_token"');
+    unauthorized(res);
   }
 
   private async verify(
@@ -123,50 +183,21 @@ export default class AuthJwt extends AuthBase {
     } catch {
       alg = undefined;
     }
-    if (typeof alg !== 'string' || !this.settings.jwt_algorithm.includes(alg)) {
-      this.logger.warn(
-        `${this.name}: token refused: unreadable or alg not allowed`
-      );
-      res.set('WWW-Authenticate', 'Bearer error="invalid_token"');
-      return unauthorized(res);
-    }
-    let keys: JWTVerifyGetKey;
+    if (typeof alg !== 'string' || !this.settings.jwt_algorithm.includes(alg))
+      return this.refuse(res, 'unreadable, or alg not allowed');
+    let payload: JWTPayload;
     try {
-      keys = await this.keySet();
+      payload = await this.verified(token);
     } catch (err) {
-      this.logger.error(`${this.name}: no signing keys: ${String(err)}`);
-      return serviceUnavailable(res);
-    }
-    let payload: Record<string, unknown>;
-    try {
-      ({ payload } = await jwtVerify(token, keys, {
-        issuer: this.settings.jwt_issuer,
-        audience:
-          this.settings.jwt_audience.length > 0
-            ? this.settings.jwt_audience
-            : undefined,
-        algorithms: this.settings.jwt_algorithm,
-        clockTolerance: this.settings.jwt_clock_tolerance,
-        requiredClaims: ['exp'],
-      }));
-    } catch (err) {
-      const code = (err as { code?: unknown }).code;
-      if (typeof code === 'string' && TOKEN_ERRORS.has(code)) {
-        this.logger.warn(`${this.name}: token refused: ${code}`);
-        res.set('WWW-Authenticate', 'Bearer error="invalid_token"');
-        return unauthorized(res);
-      }
+      const code = codeOf(err);
+      if (typeof code === 'string' && TOKEN_ERRORS.has(code))
+        return this.refuse(res, code);
       this.logger.error(`${this.name}: cannot verify tokens: ${String(err)}`);
       return serviceUnavailable(res);
     }
-    const identity = payload[this.settings.jwt_identity_claim];
-    if (typeof identity !== 'string' || identity.length === 0) {
-      this.logger.warn(
-        `${this.name}: token refused: no "${this.settings.jwt_identity_claim}" claim`
-      );
-      res.set('WWW-Authenticate', 'Bearer error="invalid_token"');
-      return unauthorized(res);
-    }
+    const identity = payload[this.claim];
+    if (typeof identity !== 'string' || identity.length === 0)
+      return this.refuse(res, `no "${this.claim}" claim`);
     const allowed = this.settings.jwt_allowed_client;
     if (allowed.length > 0 && !allowed.includes(identity)) {
       this.logger.warn(`${this.name}: client ${identity} is not allowed`);
@@ -176,35 +207,100 @@ export default class AuthJwt extends AuthBase {
     next();
   }
 
+  private async verified(token: string): Promise<JWTPayload> {
+    const keys = await this.keySet();
+    try {
+      return (await jwtVerify(token, keys, this.verifyOptions)).payload;
+    } catch (err) {
+      // A set whose keys carry no `kid` can offer several candidates: jose
+      // hands them over rather than trying each one
+      if (codeOf(err) !== 'ERR_JWKS_MULTIPLE_MATCHING_KEYS') throw err;
+      for await (const key of err as AsyncIterable<CryptoKey>) {
+        try {
+          return (await jwtVerify(token, key, this.verifyOptions)).payload;
+        } catch (inner) {
+          if (codeOf(inner) !== 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED')
+            throw inner;
+        }
+      }
+      throw new errors.JWSSignatureVerificationFailed();
+    }
+  }
+
   /**
-   * The provider's keys, fetched once and refreshed by jose when a token
-   * names a key it does not hold. A failed discovery is retried after a
-   * delay, not on every request while the provider is down.
+   * The provider's keys, once discovery has named them. A failed discovery
+   * is answered 503 for {@link AuthJwt.retryMs} before a request tries again.
    */
   private keySet(): Promise<JWTVerifyGetKey> {
+    if (this.keys && this.failedAt === undefined) return this.keys;
     if (
-      !this.keys ||
-      (this.keysFailedAt &&
-        Date.now() - this.keysFailedAt >= DISCOVERY_RETRY_MS)
-    ) {
-      this.keysFailedAt = 0;
-      this.keys = this.jwksUri().then(uri =>
-        createRemoteJWKSet(uri, {
-          [customFetch]: (url, init) => this.fetch(url, init),
-        })
-      );
-      this.keys.catch(() => {
-        this.keysFailedAt = Date.now();
-      });
-    }
+      this.failedAt !== undefined &&
+      performance.now() - this.failedAt < AuthJwt.retryMs
+    )
+      return Promise.reject(new Error('discovery failed, retrying shortly'));
+    this.failedAt = undefined;
+    this.keys = this.locateJwks().then(uri => this.remoteSet(uri));
+    this.keys.catch(() => {
+      this.failedAt = performance.now();
+    });
     return this.keys;
   }
 
-  private async jwksUri(): Promise<URL> {
-    if (this.settings.jwt_jwks_uri) return new URL(this.settings.jwt_jwks_uri);
-    const issuer = this.settings.jwt_issuer;
+  /**
+   * jose caches the set for 10 minutes and fetches it again sooner for a
+   * token naming a key it does not hold, at most every 30 seconds after a
+   * success. After a failure it neither waits nor keeps the keys it held:
+   * here a failed fetch is followed by {@link AuthJwt.retryMs} without fetching,
+   * during which the last keys fetched still verify tokens.
+   */
+  private remoteSet(uri: URL): JWTVerifyGetKey {
+    const remote = createRemoteJWKSet(uri, {
+      ...AuthJwt.remoteOptions,
+      [customFetch]: (url, init) => this.fetch(url, init),
+    });
+    let failedAt: number | undefined;
+    const held: JWTVerifyGetKey = (...args) => {
+      const jwks = remote.jwks();
+      if (!jwks)
+        return Promise.reject(
+          new Error('the JWKS could not be fetched, retrying shortly')
+        );
+      return createLocalJWKSet(jwks)(...args);
+    };
+    return async (...args) => {
+      if (
+        failedAt !== undefined &&
+        performance.now() - failedAt < AuthJwt.retryMs
+      )
+        return held(...args);
+      try {
+        const key = await remote(...args);
+        failedAt = undefined;
+        return key;
+      } catch (err) {
+        const code = codeOf(err);
+        if (
+          typeof code === 'string' &&
+          (TOKEN_ERRORS.has(code) || code === 'ERR_JWKS_MULTIPLE_MATCHING_KEYS')
+        )
+          throw err;
+        this.logger.error(
+          `${this.name}: cannot fetch the JWKS: ${String(err)}`
+        );
+        failedAt = performance.now();
+        return held(...args);
+      }
+    };
+  }
+
+  /** Read once: a provider moving its JWKS needs a restart */
+  private async locateJwks(): Promise<URL> {
+    if (this.jwksUri) return this.jwksUri;
+    const issuer = this.issuer;
     const where = `${issuer.endsWith('/') ? issuer.slice(0, -1) : issuer}/.well-known/openid-configuration`;
+    // No redirect, as jose follows none for the JWKS
     const response = await this.fetch(where, {
+      redirect: 'error',
       signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
     });
     if (!response.ok) throw new Error(`${where} answered ${response.status}`);
@@ -218,11 +314,8 @@ export default class AuthJwt extends AuthBase {
       throw new Error(
         `${where} names issuer ${JSON.stringify(document.issuer)}, not ${issuer}`
       );
-    if (
-      typeof document.jwks_uri !== 'string' ||
-      !URL.canParse(document.jwks_uri)
-    )
+    if (typeof document.jwks_uri !== 'string')
       throw new Error(`${where} names no jwks_uri`);
-    return new URL(document.jwks_uri);
+    return this.httpUrl(document.jwks_uri, `${where} jwks_uri`);
   }
 }

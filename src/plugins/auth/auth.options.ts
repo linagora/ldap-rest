@@ -237,6 +237,7 @@ export const jwtOptions = defineOptions({
     plural: 'jwt-allowed-clients',
     kind: 'identifiers',
   }),
+  jwt_type: opt.string({ env: 'DM_JWT_TYPE', default: '' }),
 });
 export type JwtOptions = OptionsOf<typeof jwtOptions>;
 
