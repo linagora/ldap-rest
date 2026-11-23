@@ -118,6 +118,11 @@ class WorkingEntry {
   private readonly touched = new Set<string>();
   /** Attributes an operation of this request set as a whole */
   private readonly whole = new Set<string>();
+  /**
+   * Attributes the snapshot may not show although the entry holds them: the
+   * write-only ones, which the bind account may write without reading
+   */
+  private readonly unseen = new Set<string>();
 
   constructor(private readonly current: AttributesList) {}
 
@@ -135,6 +140,11 @@ class WorkingEntry {
   append(attr: string, values: string[]): void {
     const kept = this.get(attr);
     this.write(attr, [...kept, ...values.filter(v => !kept.includes(v))]);
+  }
+
+  /** Mark an attribute whose current values the snapshot may not show */
+  blind(attr: string): void {
+    this.unseen.add(attr);
   }
 
   drop(attr: string, values?: string[]): void {
@@ -157,6 +167,13 @@ class WorkingEntry {
       const after = this.get(attr);
       const added = after.filter(v => !before.includes(v));
       const removed = before.filter(v => !after.includes(v));
+      if (after.length === 0 && this.unseen.has(attr)) {
+        // A replace without values clears the attribute if the entry holds
+        // one, and is no error if it holds none, unlike a delete
+        if (!req.replace) req.replace = {};
+        req.replace[attr] = [];
+        continue;
+      }
       if (added.length === 0 && removed.length === 0) continue;
       // Values added or removed one by one are sent as such. `before` is the
       // entry as the caller read it, and another write may have changed it
@@ -474,6 +491,8 @@ async function applyOperation(
   if (target && isReadOnly(target))
     throw scimMutability(`'${op.path}' is read-only`);
 
+  const writeOnly = isWriteOnlyAttribute(ldapAttr, ctx.mapping);
+  if (writeOnly) entry.blind(ldapAttr);
   if (operation === 'remove') {
     entry.drop(ldapAttr);
     return;
@@ -488,8 +507,7 @@ async function applyOperation(
     for (const v of values) assertReferenceDn(v, `${top}.${sub}`);
   // A write-only value cannot be read back, so adding to it would leave a
   // value the client never sees beside the one it sent: a second password.
-  if (operation === 'add' && !isWriteOnlyAttribute(ldapAttr, ctx.mapping))
-    entry.append(ldapAttr, values);
+  if (operation === 'add' && !writeOnly) entry.append(ldapAttr, values);
   else entry.set(ldapAttr, values);
 }
 

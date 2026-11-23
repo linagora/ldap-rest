@@ -7,6 +7,9 @@
 - SCIM never returns nor filters on credential attributes (`userPassword`,
   `sambaNTPassword`, `pwdHistory`…), even when a mapping names them: a
   mapped `userPassword` returned its hash on every read.
+- `core/ldap/raw` also hides the Active Directory LAPS and managed service
+  account passwords (`ms-Mcs-AdmPwd`, `msLAPS-Password`,
+  `msDS-ManagedPassword`…) unless `--ldap-raw-show-secrets` is set.
 
 ### Added
 

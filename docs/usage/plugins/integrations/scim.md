@@ -205,7 +205,8 @@ brute-force control. Send `"active": true` to reactivate deliberately.
 A PUT also leaves alone the read-only entries, which it neither writes nor
 clears, and the write-only ones the body omits: a client cannot read a
 password back to send it again, so only a body that carries one replaces it.
-A PATCH `add` on a write-only entry replaces its value.
+A PATCH `add` on a write-only entry replaces its value, and a `remove` clears
+it even when the bind account may write the attribute without reading it.
 
 ## Writing a custom mapping schema
 
@@ -243,7 +244,8 @@ Each element of `entries` is a `MappingEntry` with the following optional fields
 
 Write-only is a property of the LDAP attribute: another entry naming it
 returns nothing either. Credential attributes (`userPassword`, `pwdHistory`,
-`sambaNTPassword`, `krbPrincipalKey`, `authPassword`, `unicodePwd`…) are
+`sambaNTPassword`, `krbPrincipalKey`, `authPassword`, `unicodePwd`, the LAPS
+and gMSA passwords…, the list `core/ldap/raw` hides) are
 write-only whatever the file says, so a mapping such as
 `{ "scim": "password", "ldap": "userPassword" }` lets clients set passwords
 without ever reading the stored hash back.

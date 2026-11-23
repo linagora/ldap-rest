@@ -237,16 +237,15 @@ export function isWriteOnlyAttribute(
   return writeOnlyLdapAttributes(mapping).has(attribute.toLowerCase());
 }
 
-/** Whether every LDAP attribute of the entry is write-only */
-export function isWriteOnly(
+/**
+ * Whether one LDAP attribute of the entry is write-only: a filter on it, or
+ * on one of its sub-attributes, may be refused
+ */
+export function touchesWriteOnly(
   m: MappingEntry,
   mapping: ResourceMapping
 ): boolean {
-  const attributes = ldapAttributesOf(m);
-  return (
-    attributes.length > 0 &&
-    attributes.every(a => isWriteOnlyAttribute(a, mapping))
-  );
+  return ldapAttributesOf(m).some(a => isWriteOnlyAttribute(a, mapping));
 }
 
 /** The entry a SCIM path (`name.familyName`, `emails.value`) starts in */

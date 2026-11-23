@@ -15,6 +15,7 @@ import {
   ldapToScimGroup,
   ldapToScimUser,
   requiredLdapAttributes,
+  touchesWriteOnly,
   type MappingContext,
 } from '../../../src/plugins/scim/mapping';
 import { patchToModifyRequest } from '../../../src/plugins/scim/patch';
@@ -31,6 +32,7 @@ const mapping: ResourceMapping = {
     { scim: 'desc', ldap: 'description' },
     { scim: 'password', ldap: 'userPassword' },
     { scim: 'ntHash', ldap: 'sambaNTPassword' },
+    { scim: 'laps', ldap: 'ms-Mcs-AdmPwd' },
     { scim: 'credentials', sub: { login: 'uid', hash: 'userPassword' } },
     { scim: 'entryDN', ldap: 'entryDN', operational: true, readOnly: true },
   ],
@@ -64,6 +66,7 @@ describe('SCIM mapping mutability', () => {
           description: 'top secret',
           userPassword: '{SSHA}hash',
           sambaNTPassword: 'NTHASH',
+          'ms-Mcs-AdmPwd': 'local-admin',
           entryDN: 'uid=alice,dc=example,dc=com',
         },
         mapping,
@@ -74,6 +77,7 @@ describe('SCIM mapping mutability', () => {
       expect(user).to.not.have.property('desc');
       expect(user).to.not.have.property('password');
       expect(user).to.not.have.property('ntHash');
+      expect(user).to.not.have.property('laps');
       expect(user.credentials).to.deep.equal({ login: 'alice' });
       expect(user.entryDN).to.equal('uid=alice,dc=example,dc=com');
     });
@@ -102,6 +106,15 @@ describe('SCIM mapping mutability', () => {
       expect(read).to.include('uid');
       const patch = requiredLdapAttributes(mapping, [], true);
       expect(patch).to.include.members(['description', 'userPassword']);
+    });
+
+    it('are not announced as filterable, nor is an entry holding one', () => {
+      const filterable = mapping.entries
+        .filter(e => !touchesWriteOnly(e, mapping))
+        .map(e => e.scim);
+      expect(filterable).to.include.members(['userName', 'entryDN']);
+      for (const scim of ['secret', 'desc', 'password', 'credentials'])
+        expect(filterable).to.not.include(scim);
     });
 
     it('cannot be filtered on', () => {
@@ -137,7 +150,18 @@ describe('SCIM mapping mutability', () => {
         },
         { mapping, current: { userPassword: '{SSHA}old' } }
       );
-      expect(req).to.deep.equal({ delete: { userPassword: '' } });
+      expect(req).to.deep.equal({ replace: { userPassword: [] } });
+    });
+
+    it('PATCH remove clears a value the bind account cannot read', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: [PATCH_OP],
+          Operations: [{ op: 'remove', path: 'password' }],
+        },
+        { mapping, current: {} }
+      );
+      expect(req).to.deep.equal({ replace: { userPassword: [] } });
     });
   });
 
@@ -308,6 +332,15 @@ describe('SCIM mapping mutability', () => {
         })
         .expect(200);
       expect([await storedPassword()].flat().filter(Boolean)).to.deep.equal([]);
+      // Again, the entry holding none: no noSuchAttribute
+      await supertest(server.app)
+        .patch('/scim/v2/Users/scim-mut')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: [PATCH_OP],
+          Operations: [{ op: 'remove', path: 'password' }],
+        })
+        .expect(200);
     });
 
     it('refuses a filter on the password', async () => {

@@ -20,4 +20,10 @@ export const SECRET_ATTRIBUTES: readonly string[] = [
   'supplementalcredentials',
   'userpkcs12',
   'authpassword',
+  // AD local administrator (LAPS) and managed service account passwords
+  'ms-mcs-admpwd',
+  'mslaps-password',
+  'mslaps-encryptedpassword',
+  'mslaps-encrypteddsrmpassword',
+  'msds-managedpassword',
 ];
