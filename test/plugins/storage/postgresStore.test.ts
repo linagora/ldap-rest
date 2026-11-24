@@ -10,6 +10,7 @@
 import { expect } from 'chai';
 import { Pool } from 'pg';
 
+import { UnusableBackend } from '../../../src/lib/storage/store';
 import PostgresStore from '../../../src/plugins/storage/postgres';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 
@@ -171,6 +172,8 @@ describe('Keyed storage, in PostgreSQL, when it cannot be reached', function () 
       raised = err;
     }
     expect(String(raised)).to.match(/optional dependency "pg"/);
+    // No retry can bring it: the server does not start on it
+    expect(raised).to.be.instanceOf(UnusableBackend);
   });
 
   it('should answer a read with a warning and raise a write', async function () {

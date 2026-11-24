@@ -9,6 +9,7 @@
 import { expect } from 'chai';
 import { Valkey } from 'iovalkey';
 
+import { UnusableBackend } from '../../../src/lib/storage/store';
 import ValkeyStore from '../../../src/plugins/storage/valkey';
 import { skipIfMissingEnvVars } from '../../helpers/env';
 
@@ -138,6 +139,8 @@ describe('Keyed storage, in Valkey, when it cannot be reached', function () {
       raised = err;
     }
     expect(String(raised)).to.match(/optional dependency "iovalkey"/);
+    // No retry can bring it: the server does not start on it
+    expect(raised).to.be.instanceOf(UnusableBackend);
   });
 
   it('should answer a read with a warning and raise a write', async function () {

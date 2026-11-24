@@ -18,7 +18,6 @@ import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
 import Static from '../../src/plugins/static';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
-import { waitFor } from '../helpers/waitFor';
 
 type Attributes = Record<string, Record<string, unknown>>;
 
@@ -311,7 +310,7 @@ describe('Schemas extending another', () => {
       await dm.ready;
       dm.config.group_schema = groupFile;
       const groups = new LdapGroups(dm);
-      await waitFor(() => !!groups.schema, { what: 'group schema' });
+      await groups.init();
       expect(groups.schema?.attributes).to.not.have.property('description');
       expect(groups.schema?.attributes).to.have.property('member');
     });

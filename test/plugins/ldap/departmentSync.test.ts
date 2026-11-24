@@ -540,8 +540,6 @@ describe('LDAP Department Sync Plugin, attributes named by their roles', functio
     const organizations = new LdapOrganizations(server);
     await server.registerPlugin('ldapOrganizations', organizations);
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
-    for (let i = 0; i < 50 && !organizations.schema; i++)
-      await new Promise(r => setTimeout(r, 100));
     plugin = new LdapDepartmentSync(server);
   });
 

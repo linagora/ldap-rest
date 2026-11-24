@@ -804,6 +804,7 @@ abstract class DmPlugin {
     // (undocumented)
     hookBus: HookBus;
     hooks?: Hooks;
+    init?(): MaybePromise<void>;
     // (undocumented)
     logger: winston.Logger;
     // (undocumented)

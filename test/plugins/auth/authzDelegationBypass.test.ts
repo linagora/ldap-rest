@@ -243,9 +243,6 @@ describe('Delegated administration bypasses (#325)', function () {
     );
     server.setupErrorMiddleware();
     request = supertest(server.app);
-    // The organization plugin reads its schema asynchronously, and the
-    // domain link attribute is found through it.
-    await new Promise(resolve => setTimeout(resolve, 200));
   });
 
   after(async function () {

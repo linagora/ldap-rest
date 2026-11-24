@@ -129,6 +129,20 @@ export default abstract class DmPlugin {
    */
   followedOperationalAttributes?: string[];
 
+  /**
+   * Awaited by `registerPlugin` once the plugin's dependencies are
+   * registered, before its `api()` and hooks: what the plugin needs before
+   * it serves and a constructor cannot wait for, a file to read or a
+   * connection to open.
+   *
+   * Called once, and not again after a failure. Throwing here, or rejecting,
+   * refuses the plugin and `DM.ready` rejects: the plugin is not registered
+   * and its `close()` is called at once, so what was opened on the way is
+   * let go of there. `close()` must therefore cope with a plugin `init()`
+   * left halfway.
+   */
+  init?(): MaybePromise<void>;
+
   /* Function to register API */
   api?(app: Express): MaybePromise<void>;
 
@@ -169,9 +183,9 @@ export default abstract class DmPlugin {
   health?(): MaybePromise<HealthStatus>;
 
   /**
-   * Called once by the shutdown, after the server stopped serving: let go
-   * of what this plugin holds, a connection, a timer, a queue. See
-   * `docs/usage/operations.md#shutdown`.
+   * Called once by the shutdown, after the server stopped serving, or right
+   * after an `init()` that failed: let go of what this plugin holds, a
+   * connection, a timer, a queue. See `docs/usage/operations.md#shutdown`.
    */
   close?(): MaybePromise<void>;
 
@@ -278,8 +292,8 @@ export default abstract class DmPlugin {
    * The attributes the schemas of the loaded plugins mark `neverReturn`,
    * rebuilt only when one of those schemas is not the one read last time.
    *
-   * The list of schemas is read on each answer, as a plugin may load its
-   * schema after it started serving.
+   * The list of schemas is read on each answer, as a host may register a
+   * plugin after the server started serving.
    *
    * @returns lowercased attribute names
    */

@@ -163,16 +163,12 @@ describe('Flat entity rename, reference cascade', function () {
     server.setupErrorMiddleware();
     request = supertest(server.app);
 
-    // The group and organization plugins read their schemas asynchronously,
-    // and a binding without a schema is a binding that is never searched.
-    // Asserted rather than waited for: a cascade that covers three entities
-    // instead of four still answers 200, and the test would pass proving
-    // less than it says.
+    // A binding without a schema is a binding that is never searched.
+    // Asserted: a cascade that covers three entities instead of four still
+    // answers 200, and the test would pass proving less than it says.
     const organizations = server.loadedPlugins['ldapOrganizations'] as {
       schema?: unknown;
     };
-    for (let i = 0; i < 50 && !(groups.schema && organizations.schema); i++)
-      await new Promise(r => setTimeout(r, 100));
     expect(groups.schema, 'the group schema is loaded').to.not.equal(undefined);
     expect(
       organizations.schema,

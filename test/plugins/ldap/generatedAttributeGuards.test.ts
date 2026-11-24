@@ -127,10 +127,6 @@ describe('Generated attributes', function () {
       groups = new LdapGroups(server);
       await server.registerPlugin('ldapOrganizations', organizations);
       await server.registerPlugin('ldapGroups', groups);
-      // Both schemas are read asynchronously; without waiting, the validators
-      // return early and the test proves nothing.
-      for (let i = 0; i < 50 && !(organizations.schema && groups.schema); i++)
-        await new Promise(r => setTimeout(r, 100));
       server.setupErrorMiddleware();
       request = supertest(server.app);
       const topOrg = process.env.DM_LDAP_TOP_ORGANIZATION as string;

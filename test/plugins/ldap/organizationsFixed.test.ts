@@ -35,8 +35,6 @@ describe('Fixed attributes on organizations', function () {
     await server.ready;
     const organizations = new LdapOrganizations(server);
     await server.registerPlugin('ldapOrganizations', organizations);
-    for (let i = 0; i < 50 && !organizations.schema; i++)
-      await new Promise(r => setTimeout(r, 100));
     expect(organizations.schema?.attributes.objectClass?.fixed).to.be.true;
     expect(server.config.ldap_organization_class).to.deep.equal(
       configuredClasses

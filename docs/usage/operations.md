@@ -223,4 +223,5 @@ keeps serving.
 
 A plugin holding a connection, a timer or a queue implements `close()`,
 called once after the server stopped serving; it must settle, a failure is
-logged and does not hold the others.
+logged and does not hold the others. A plugin whose `init()` failed gets it
+right after the failure instead, see [plugin development](../plugin-development/README.md#core-properties).

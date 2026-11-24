@@ -67,9 +67,8 @@ describe('Back-Channel Logout, over the shared store', function () {
     bcl.api();
   });
 
-  after(() => {
-    storage?.store.stopSweeping();
-    if (storage) Storage.release(storage);
+  after(async () => {
+    await storage?.close();
     rmSync(dir, { recursive: true, force: true });
     for (const [k, v] of Object.entries(previous))
       if (v === undefined) delete process.env[k];
@@ -114,8 +113,7 @@ describe('Back-Channel Logout, over the shared store', function () {
         'a plugin built first still records what a token kills'
       ).to.equal(false);
     } finally {
-      late.store.stopSweeping();
-      Storage.release(late);
+      await late.close();
     }
   });
 

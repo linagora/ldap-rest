@@ -9,8 +9,10 @@ import fs from 'fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
+import type DmPlugin from '../abstract/plugin.js';
 import type { Config } from '../bin/index.js';
 import configArgs from '../config/args.js';
+import type { Schema } from '../config/schema.js';
 
 import { transformSchemas } from './utils.js';
 
@@ -243,6 +245,38 @@ export async function loadSchemaFileAsync<T = unknown>(
   assertMaxLengths(schema, file);
   detachAttributes(schema);
   return schema as T;
+}
+
+/**
+ * Read the entity schema a plugin is configured with, and tell the directory
+ * layer how it spells its attribute names.
+ *
+ * @param plugin the plugin serving the entities it describes
+ * @param file path of the schema
+ * @param what names the entity in the messages
+ * @param adapt applied to the schema read, before its names are told
+ * @returns the schema, adapted
+ * @throws Error naming the file when it cannot be loaded
+ */
+export async function loadEntitySchema(
+  plugin: DmPlugin,
+  file: string,
+  what: string,
+  adapt: (schema: Schema) => Schema = schema => schema
+): Promise<Schema> {
+  let read: Schema;
+  try {
+    read = await loadSchemaFileAsync<Schema>(file, { config: plugin.config });
+  } catch (err) {
+    throw new Error(
+      `Cannot load the ${what} schema from ${file}: ${err instanceof Error ? err.message : String(err)}`,
+      { cause: err }
+    );
+  }
+  const schema = adapt(read);
+  plugin.server.ldap.knowAttributeNames(Object.keys(schema.attributes));
+  plugin.logger.debug(`${what} schema loaded from ${file}`);
+  return schema;
 }
 
 /**

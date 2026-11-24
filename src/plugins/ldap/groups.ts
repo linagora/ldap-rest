@@ -31,7 +31,7 @@ import {
   WriteResponse,
 } from '../../lib/expressFormatedResponses.js';
 import { extractLdapCode } from '../../lib/ldapCodes.js';
-import { loadSchemaFileAsync } from '../../lib/schemaFile.js';
+import { loadEntitySchema } from '../../lib/schemaFile.js';
 import { staticSchemaUrl } from '../../lib/staticFiles.js';
 import {
   assertedRdnValue,
@@ -231,20 +231,14 @@ export default class LdapGroups extends DmPlugin {
         this.base,
         this.groupSettings.group_class
       );
-    if (this.groupSettings.group_schema) {
-      const file = this.groupSettings.group_schema;
-      loadSchemaFileAsync<Schema>(file, { config: this.config })
-        .then(schema => {
-          this.schema = this.adaptSchema(schema);
-          this.server.ldap.knowAttributeNames(
-            Object.keys(this.schema.attributes)
-          );
-          this.logger.debug('Group schema loaded');
-        })
-        .catch(err =>
-          this.logger.error(`Failed to load group schema from ${file}: ${err}`)
-        );
-    }
+  }
+
+  async init(): Promise<void> {
+    const file = this.groupSettings.group_schema;
+    if (file)
+      this.schema = await loadEntitySchema(this, file, 'group', schema =>
+        this.adaptSchema(schema)
+      );
   }
 
   /**

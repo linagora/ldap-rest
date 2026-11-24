@@ -419,7 +419,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
   /**
    * Entities the rules apply to, rebuilt on each call.
    *
-   * The organization and group plugins read their schema asynchronously, so a
+   * The organization and group plugins may be registered after this one, so a
    * snapshot taken in the constructor would miss them; the list is cheap to
    * rebuild since it only collects references.
    *

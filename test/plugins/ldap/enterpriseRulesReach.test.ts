@@ -73,8 +73,6 @@ describe('Enterprise rules reach every spelling and every naming', function () {
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
     const organizations = new LdapOrganizations(server);
     await server.registerPlugin('ldapOrganizations', organizations);
-    for (let i = 0; i < 50 && !organizations.schema; i++)
-      await new Promise(r => setTimeout(r, 100));
     await server.registerPlugin(
       'ldapEnterpriseRules',
       new LdapEnterpriseRules(server)

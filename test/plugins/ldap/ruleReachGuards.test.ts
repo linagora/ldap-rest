@@ -85,8 +85,6 @@ describe('Rules reach the other routes too', function () {
     );
     const groups = new LdapGroups(server);
     await server.registerPlugin('ldapGroups', groups);
-    for (let i = 0; i < 50 && !groups.schema; i++)
-      await new Promise(r => setTimeout(r, 100));
     await server.registerPlugin(
       'ldapEnterpriseRules',
       new LdapEnterpriseRules(server)

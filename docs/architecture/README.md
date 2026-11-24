@@ -143,9 +143,12 @@ sequenceDiagram
 
 The configuration is parsed from the command line and `DM_*` variables, then
 `DM` loads the plugins: `src/plugins/priority.json` first, one at a time in
-its order, then the rest in parallel. Once every load settled, the server
-checks the authorization composition, learns the directory's attribute types
-when an authorization plugin is loaded, reports unknown options and runs
+its order, then the rest in parallel. Each registration awaits the plugin's
+`init()`, then mounts its routes and subscribes its hooks: a plugin serves
+nothing before its schema is read or its backend tried, and an `init()` that
+fails closes the plugin and fails the startup. Once every load settled, the
+server checks the authorization composition, learns the directory's attribute
+types when an authorization plugin is loaded, reports unknown options and runs
 `afterLoad`. `DM.ready` resolves then, and rejects if a plugin failed to load;
 the CLI opens the port after it. An embedding host may register plugins after
 `ready`, and each registration is checked against the composition too.

@@ -1121,6 +1121,20 @@ export class DM {
       }
     }
     if (this._compositionState.composed) await this.admitToComposition(obj);
+    try {
+      await obj.init?.();
+    } catch (err) {
+      // The refusal is what the caller must read: a failed cleanup only adds
+      // a line to the log
+      try {
+        await obj.close?.();
+      } catch (closeErr) {
+        this.logger.warn(
+          `${obj.name}: close failed after a failed init: ${closeErr instanceof Error ? closeErr.message : String(closeErr)}`
+        );
+      }
+      throw err;
+    }
     if (obj.api) {
       this.mountAuthDispatcher(obj);
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);

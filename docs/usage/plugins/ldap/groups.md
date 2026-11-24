@@ -384,7 +384,9 @@ curl -X DELETE "http://localhost:8081/api/v1/ldap/groups/developers/members/uid%
 
 ## Schema Support
 
-The plugin supports JSON schema validation for group attributes. Example schema:
+The plugin supports JSON schema validation for group attributes. The schema
+(`--group-schema`) is read at startup: a file that cannot be read or parsed
+stops the server. Example schema:
 
 ```json
 {
