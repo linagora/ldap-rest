@@ -887,6 +887,21 @@ describe('ClouderyProvision plugin', () => {
   });
 
   describe('delete', () => {
+    // The reasons of the warnings logged, the instance left in place
+    let reasons: unknown[];
+    let realWarn: typeof plugin.logger.warn;
+    beforeEach(() => {
+      reasons = [];
+      realWarn = plugin.logger.warn;
+      plugin.logger.warn = ((m: unknown) => {
+        reasons.push((m as { reason?: unknown }).reason);
+        return plugin.logger;
+      }) as typeof plugin.logger.warn;
+    });
+    afterEach(() => {
+      plugin.logger.warn = realWarn;
+    });
+
     it('deletes the Cloudery instance and publishes domain.user.deleted', async () => {
       const dn = `uid=john.doe,${USER_BASE}`;
       ldap.entries[dn] = {
@@ -897,7 +912,7 @@ describe('ClouderyProvision plugin', () => {
       const scope = nock(CLOUDERY)
         .get('/api/v2/instances')
         .query(q => q.fqdn === 'johndoeacme123.twake.app')
-        .reply(200, { items: [{ _id: 'uuid-1' }] })
+        .reply(200, { items: [{ _id: 'uuid-1', oidc: 'johndoeacme123' }] })
         .delete('/api/v1/instances/uuid-1')
         .query(q => q.user_request === 'true')
         .reply(200, { workflow: 'wf-del' });
@@ -927,7 +942,7 @@ describe('ClouderyProvision plugin', () => {
       const scope = nock(CLOUDERY)
         .get('/api/v2/instances')
         .query(q => q.fqdn === 'johndoeorg1.twake.app')
-        .reply(200, { items: [{ _id: 'uuid-1' }] })
+        .reply(200, { items: [{ _id: 'uuid-1', oidc: 'johndoeorg1' }] })
         .delete('/api/v1/instances/uuid-1')
         .query(q => q.user_request === 'true')
         .reply(200, { workflow: 'wf-del' });
@@ -967,7 +982,7 @@ describe('ClouderyProvision plugin', () => {
       const scope = nock(CLOUDERY)
         .get('/api/v2/instances')
         .query(q => q.fqdn === 'johndoeacme123.twake.app')
-        .reply(200, { items: [{ _id: 'uuid-1' }] })
+        .reply(200, { items: [{ _id: 'uuid-1', oidc: 'johndoeacme123' }] })
         .delete('/api/v1/instances/uuid-1')
         .query(q => q.user_request === 'true')
         .reply(200, { workflow: 'wf-del' });
@@ -991,7 +1006,7 @@ describe('ClouderyProvision plugin', () => {
       const scope = nock(CLOUDERY)
         .get('/api/v2/instances')
         .query(q => q.fqdn === 'johndoeacme123.twake.app')
-        .reply(200, { items: [{ _id: 'uuid-1' }] })
+        .reply(200, { items: [{ _id: 'uuid-1', oidc: 'johndoeacme123' }] })
         .delete('/api/v1/instances/uuid-1')
         .query(q => q.user_request === 'true')
         .reply(200, { workflow: 'wf-del' });
@@ -1064,6 +1079,7 @@ describe('ClouderyProvision plugin', () => {
 
       expect(scope.activeMocks(), 'no lookup, no DELETE').to.have.length(2);
       expect(rabbit.calls).to.have.length(0);
+      expect(reasons).to.deep.equal(['held_elsewhere']);
     });
 
     it('leaves the instance alone when the directory cannot say who holds it', async () => {
@@ -1078,6 +1094,7 @@ describe('ClouderyProvision plugin', () => {
 
       expect(scope.activeMocks(), 'no lookup, no DELETE').to.have.length(2);
       expect(rabbit.calls).to.have.length(0);
+      expect(reasons).to.deep.equal(['holder_lookup_failed']);
     });
 
     it('leaves alone an instance whose OIDC id is another account’s', async () => {
@@ -1093,9 +1110,62 @@ describe('ClouderyProvision plugin', () => {
         `DELETE ${CLOUDERY}:80/api/v1/instances/uuid-1`,
       ]);
       expect(rabbit.calls).to.have.length(0);
+      expect(reasons).to.deep.equal(['oidc_mismatch']);
     });
 
-    for (const [what, address, req] of [
+    it('leaves alone an instance the Cloudery gives no OIDC id for', async () => {
+      ldap.entries[`uid=john.doe,${USER_BASE}`] = {
+        twakeWorkspaceUrl: 'johndoeacme123.twake.app',
+        mail: 'john.doe@acme.com',
+      };
+      const scope = cloudery();
+
+      await remove('john.doe', makeReq('acme123'));
+
+      expect(scope.activeMocks(), 'lookup, no DELETE').to.deep.equal([
+        `DELETE ${CLOUDERY}:80/api/v1/instances/uuid-1`,
+      ]);
+      expect(rabbit.calls).to.have.length(0);
+      expect(reasons).to.deep.equal(['oidc_unknown']);
+    });
+
+    it('leaves the instance alone when no organization id is known', async () => {
+      ldap.entries[`uid=john.doe,${USER_BASE}`] = {
+        twakeWorkspaceUrl: 'johndoeacme123.twake.app',
+        mail: 'john.doe@acme.com',
+      };
+      const scope = cloudery('johndoeacme123');
+
+      await remove('john.doe', makeReq());
+
+      expect(scope.activeMocks(), 'no lookup, no DELETE').to.have.length(2);
+      expect(rabbit.calls).to.have.length(0);
+      expect(reasons).to.deep.equal(['missing_org_id']);
+    });
+
+    it('publishes the address as stored, looking it up in lower case', async () => {
+      ldap.entries[`uid=john.doe,${USER_BASE}`] = {
+        twakeWorkspaceUrl: 'JohnDoeAcme123.Twake.App',
+        mail: 'john.doe@acme.com',
+      };
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, { items: [{ _id: 'uuid-1', oidc: 'johndoeacme123' }] })
+        .delete('/api/v1/instances/uuid-1')
+        .query(q => q.user_request === 'true')
+        .reply(200, { workflow: 'wf-del' });
+
+      await remove('john.doe', makeReq('acme123'));
+
+      expect(scope.isDone(), 'search + delete').to.equal(true);
+      expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].message.workplaceFqdn).to.equal(
+        'JohnDoeAcme123.Twake.App'
+      );
+    });
+
+    for (const [what, address, req, orgId = 'acme123'] of [
       ['its slug', 'johndoeacme123.twake.app', makeReq('acme123')],
       [
         'a numbered form of its slug',
@@ -1107,11 +1177,22 @@ describe('ClouderyProvision plugin', () => {
         'johndoeacme123.twake.app',
         makeReq(),
       ],
+      [
+        'its slug, the entry’s org id right and the header’s wrong',
+        'johndoeacme123.twake.app',
+        makeReq('other456'),
+      ],
+      [
+        'its slug, the header’s org id right and the entry’s missing',
+        'johndoeacme123.twake.app',
+        makeReq('acme123'),
+        null,
+      ],
     ] as const)
       it(`deletes the account’s instance at ${what}`, async () => {
         ldap.entries[`uid=john.doe,${USER_BASE}`] = {
           twakeWorkspaceUrl: address,
-          twakeOrganizationId: 'acme123',
+          ...(orgId === null ? {} : { twakeOrganizationId: orgId }),
           mail: 'john.doe@acme.com',
         };
         const scope = nock(CLOUDERY)
