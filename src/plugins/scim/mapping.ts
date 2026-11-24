@@ -313,21 +313,25 @@ export const DEFAULT_LOCK_VALUE = '000001010000Z';
  */
 const GENERALIZED_TIME = /^\d{10,14}(\.\d+)?(Z|[+-]\d{2,4})$/;
 
-/**
- * Where the configuration warnings go. A seam rather than a direct
- * `console.warn` so the unit tests can read what was said instead of
- * asserting on stderr.
- */
-export let warn: (message: string) => void = message => {
+let sink: (message: string) => void = message => {
   console.warn(`WARNING: ${message}`);
 };
 
+/**
+ * Report a configuration warning. Goes through a replaceable sink rather
+ * than a direct `console.warn` so the unit tests can read what was said
+ * instead of asserting on stderr.
+ */
+export function warn(message: string): void {
+  sink(message);
+}
+
 /** Testing seam: replace the warning sink, and get the previous one back. */
 export function setLockConfigWarn(
-  sink: (message: string) => void
+  replacement: (message: string) => void
 ): (message: string) => void {
-  const previous = warn;
-  warn = sink;
+  const previous = sink;
+  sink = replacement;
   return previous;
 }
 
