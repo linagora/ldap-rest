@@ -4,6 +4,21 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## From 2.5.0
+
+### An unreadable schema or an unreachable store stops the server
+
+**Who is affected:** a deployment loading `core/ldap/groups` or
+`core/ldap/organizations` with a `--group-schema` or `--organization-schema`
+that cannot be read or parsed, or `core/storage` with a backend that does not
+answer at startup.
+
+The server used to log the error and serve anyway: groups or organizations
+without the rules of their schema, a store failing its first operations. It
+now refuses to start (`Cannot load the group schema from …`, or the backend's
+error): fix the path or the file, or start the database or Valkey before
+LDAP-Rest.
+
 ## From 2.4.1
 
 ### Invalid plugin overrides stop the server

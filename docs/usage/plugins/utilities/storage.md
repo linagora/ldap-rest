@@ -106,9 +106,11 @@ write — reported to the identity provider — rather than a silent loss.
 A connection lost while running is retried in the background; meanwhile, reads
 answer "absent" with a warning and writes fail at once instead of waiting.
 
-`postgres` and `valkey` connect at startup, and report there an address that
-does not answer or a package that is not installed; the server starts anyway,
-and every operation tries to connect again.
+At startup, before the plugins using the store are loaded, `postgres` and
+`valkey` connect and `file` creates its directory. One that cannot — an
+address that does not answer, a package that is not installed, a directory
+that cannot be created — stops the server. The sweeper starts once the
+backend is open.
 
 ## Readiness
 

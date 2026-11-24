@@ -17,7 +17,6 @@ import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
 } from '../../helpers/env';
-import { waitFor } from '../../helpers/waitFor';
 
 describe('Empty value lists', function () {
   let server: DM;
@@ -49,9 +48,6 @@ describe('Empty value lists', function () {
     const groups = new LdapGroups(server);
     await server.registerPlugin('ldapOrganizations', organizations);
     await server.registerPlugin('ldapGroups', groups);
-    await waitFor(() => Boolean(organizations.schema && groups.schema), {
-      what: 'the organizations and groups schemas',
-    });
     server.setupErrorMiddleware();
     request = supertest(server.app);
 

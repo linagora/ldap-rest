@@ -142,16 +142,23 @@ export default class Storage extends DmPlugin {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     onlyInstance = this;
     this.logger.info(`storage: records kept by ${this.store.name}`);
-    // A constructor cannot wait, and an `api()` would mount the
-    // authentication dispatcher ahead of the plugins that must run before it.
-    // Started here, a wrong address or a missing driver is in the log at
-    // startup rather than at the first record written.
-    this.store
-      .open()
-      .catch(err =>
-        this.logger.error(err instanceof Error ? err.message : String(err))
-      );
-    this.store.startSweeping(settings.storage_sweep_interval);
+  }
+
+  /**
+   * Reach the backend before any consumer can write: a wrong address or a
+   * missing driver stops the server instead of failing the first record.
+   */
+  async init(): Promise<void> {
+    try {
+      await this.store.open();
+    } catch (err) {
+      // Refused, this instance is not the one: another may take its place
+      Storage.release(this);
+      throw err;
+    }
+    this.store.startSweeping(
+      this.options(storageOptions).storage_sweep_interval
+    );
   }
 
   async close(): Promise<void> {

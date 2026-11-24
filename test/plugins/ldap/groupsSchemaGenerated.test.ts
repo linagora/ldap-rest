@@ -53,10 +53,6 @@ describe('Group schema: a generated attribute is not asked of the client', funct
       'ldapEnterpriseRules',
       new LdapEnterpriseRules(server)
     );
-    // The schema is read asynchronously; without waiting, the validator
-    // returns early and the test proves nothing.
-    for (let i = 0; i < 50 && !plugin.schema; i++)
-      await new Promise(r => setTimeout(r, 100));
     groupDn = `cn=generatedgrp,${plugin.base}`;
     // The path is copied from the organization the group is linked to, so
     // that organization has to hold one.

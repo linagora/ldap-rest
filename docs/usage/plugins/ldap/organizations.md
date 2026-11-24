@@ -694,7 +694,9 @@ curl -X PUT "http://localhost:8081/api/v1/ldap/organizations/ou%3DIT%2Co%3Dgov%2
 
 ## Schema Support
 
-The plugin validates organizations against configured object classes. Example schema:
+The plugin validates organizations against configured object classes. The
+schema (`--organization-schema`) is read at startup: a file that cannot be
+read or parsed stops the server. Example schema:
 
 ```json
 {

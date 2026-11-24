@@ -50,8 +50,6 @@ describe('Organization and group validators', function () {
     await server.registerPlugin('ldapOrganizations', organizations);
     const groups = new LdapGroups(server);
     await server.registerPlugin('ldapGroups', groups);
-    for (let i = 0; i < 50 && (!organizations.schema || !groups.schema); i++)
-      await new Promise(r => setTimeout(r, 100));
     server.setupErrorMiddleware();
     request = supertest(server.app);
   });

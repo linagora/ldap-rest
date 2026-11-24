@@ -78,8 +78,6 @@ describe('Entity schema contract', function () {
     await server.registerPlugin('ldapGroups', groups);
     const organizations = new LdapOrganizations(server);
     await server.registerPlugin('ldapOrganizations', organizations);
-    for (let i = 0; i < 50 && !(groups.schema && organizations.schema); i++)
-      await new Promise(r => setTimeout(r, 100));
     expect(groups.schema?.attributes.l?.fixed, 'group schema').to.be.true;
     expect(organizations.schema?.attributes.l?.fixed, 'organization schema').to
       .be.true;

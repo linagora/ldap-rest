@@ -1138,6 +1138,7 @@ export class DM {
       }
     }
     if (this._compositionState.composed) await this.admitToComposition(obj);
+    await obj.init?.();
     if (obj.api) {
       this.mountAuthDispatcher(obj);
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);

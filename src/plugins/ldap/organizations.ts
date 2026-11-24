@@ -39,7 +39,7 @@ import {
   isAuthzRefusal,
 } from '../../lib/errors.js';
 import { extractLdapCode } from '../../lib/ldapCodes.js';
-import { loadSchemaFileAsync } from '../../lib/schemaFile.js';
+import { loadEntitySchema } from '../../lib/schemaFile.js';
 import { staticSchemaUrl } from '../../lib/staticFiles.js';
 import type { Schema } from '../../config/schema.js';
 import {
@@ -178,22 +178,11 @@ export default class LdapOrganizations extends DmPlugin {
       this.settings.ldap_organization_class,
       true
     );
+  }
 
-    // Load organization schema if provided
-    if (this.settings.organization_schema) {
-      const file = this.settings.organization_schema;
-      loadSchemaFileAsync<Schema>(file, { config: this.config })
-        .then(schema => {
-          this.schema = schema;
-          this.server.ldap.knowAttributeNames(Object.keys(schema.attributes));
-          this.logger.debug('Organization schema loaded');
-        })
-        .catch(err =>
-          this.logger.error(
-            `Failed to load organization schema from ${file}: ${err}`
-          )
-        );
-    }
+  async init(): Promise<void> {
+    const file = this.settings.organization_schema;
+    if (file) this.schema = await loadEntitySchema(this, file, 'organization');
   }
 
   /**

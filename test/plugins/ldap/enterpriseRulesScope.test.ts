@@ -195,10 +195,6 @@ describe('Enterprise rules: what the checks actually cover', function () {
         .catch(() => undefined);
       const organizations = new LdapOrganizations(orgServer);
       await orgServer.registerPlugin('ldapOrganizations', organizations);
-      // The organization schema is read asynchronously, and the rules bind to
-      // the entity only once it is there.
-      for (let i = 0; i < 50 && !organizations.schema; i++)
-        await new Promise(r => setTimeout(r, 100));
       await orgServer.registerPlugin(
         'ldapEnterpriseRules',
         new LdapEnterpriseRules(orgServer)

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Plugins can declare an `init()` step, awaited before their routes and hooks
+  are registered
+  ([plugin development](docs/plugin-development/README.md#core-properties))
+
+### Changed
+
+- The group and organization schemas are read, and the storage backend
+  opened, before the server serves; an unreadable schema or a backend that
+  cannot open now stops the server instead of running without it
+  ([#775](https://github.com/linagora/ldap-rest/issues/775),
+  [#776](https://github.com/linagora/ldap-rest/issues/776),
+  [upgrading](docs/usage/upgrading.md#an-unreadable-schema-or-an-unreachable-store-stops-the-server))
+
 ## v2.5.0 (2026-11-23)
 
 ### Security

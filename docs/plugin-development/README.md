@@ -57,6 +57,11 @@ export default class MyPlugin extends DmPlugin {
 - **hooks** (optional): Callbacks for LDAP operations
 - **provides** (optional): Typed services this plugin offers, see
   [plugin services](services.md)
+- **init()** (optional): Awaited before `api()` and the hooks are registered,
+  for what the plugin needs before it serves and a constructor cannot wait
+  for: a file to read, a connection to open. A throw or a rejection stops the
+  server from starting, and the plugin is not registered: its `close()` is
+  never called, so it lets go of what it opened before throwing
 - **api()** (optional): Method to register REST endpoints
 
 ### Available from Base Class

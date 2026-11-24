@@ -18,7 +18,6 @@ import AuthzScope from '../../../src/plugins/auth/authzScope';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import { skipIfMissingEnvVars } from '../../helpers/env';
-import { waitFor } from '../../helpers/waitFor';
 
 class TestAuthPlugin extends AuthBase {
   name = 'testAuth';
@@ -206,9 +205,6 @@ describe('AuthzLinid1 group delegation', function () {
     );
     const scope = new AuthzScope(server);
     await server.registerPlugin('authzScope', scope);
-    await waitFor(() => Boolean(groupsPlugin.schema), {
-      what: 'the group schema',
-    });
     scope.afterLoad();
     server.setupErrorMiddleware();
     request = supertest(server.app);

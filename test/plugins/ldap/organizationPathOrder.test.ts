@@ -56,10 +56,6 @@ describe('Organization paths', function () {
       );
     const organizations = new LdapOrganizations(server);
     await server.registerPlugin('ldapOrganizations', organizations);
-    // The organization schema is read asynchronously, and the rules bind to
-    // the entity only once it is there.
-    for (let i = 0; i < 50 && !organizations.schema; i++)
-      await new Promise(r => setTimeout(r, 100));
     if (!rulesFirst)
       await server.registerPlugin(
         'ldapEnterpriseRules',

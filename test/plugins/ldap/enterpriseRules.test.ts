@@ -242,8 +242,6 @@ describe('Enterprise rules', () => {
       );
       server.setupErrorMiddleware();
       request = supertest(server.app);
-      // The organization plugin reads its schema asynchronously.
-      await new Promise(resolve => setTimeout(resolve, 200));
     });
 
     after(async () => {
