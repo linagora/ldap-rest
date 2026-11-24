@@ -140,9 +140,11 @@ a link reaches and asks for no token, so without that check any page could end
 an administrator's session. The same check guards every request that changes
 something ([Cookie sessions and other sites](README.md#cookie-sessions-and-other-sites)).
 A console served from another origin than `--base-url` names that origin in
-`--auth-trusted-origin` (`DM_AUTH_TRUSTED_ORIGINS`, comma-separated), or in
-`--oidc-logout-origins` (`DM_OIDC_LOGOUT_ORIGINS`), its older name, which
-stays accepted. A link from such a console is recognized by its
+`--auth-trusted-origin` (`DM_AUTH_TRUSTED_ORIGINS`, comma-separated), the
+option to use: it covers logouts and every change, and `core/auth/llng`
+reads it too. `--oidc-logout-origins` (`DM_OIDC_LOGOUT_ORIGINS`) is a separate option kept
+for existing deployments: this plugin trusts the origins of both lists, for
+logouts and changes alike. A link from such a console is recognized by its
 `Referer`: a page setting `Referrer-Policy: no-referrer`, or a link marked
 `noreferrer`, sends neither `Referer` nor `Origin`, and its logout is refused.
 

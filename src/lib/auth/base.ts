@@ -2,7 +2,9 @@ import type { Express, Request, Response } from 'express';
 
 import DmPlugin from '../../abstract/plugin.js';
 import type { Config } from '../../config/args.js';
-import { serverError } from '../expressFormatedResponses.js';
+import { forbidden, serverError } from '../expressFormatedResponses.js';
+
+import { changesState, crossSite } from './crossSite.js';
 
 /**
  * A request as the authentication plugins leave it.
@@ -197,7 +199,9 @@ export function warnUnmatchedRuleKeys(
  *
  * Optional overrides: `knownIdentities()` and `identitySource()` describe
  * what the plugin publishes, for the startup checks; `afterChain()` gives a
- * verdict once every authenticator has run. A subclass overriding
+ * verdict once every authenticator has run; `trustedOrigins()` and
+ * `crossSiteExempt()` make a plugin whose credential is a cookie refuse the
+ * changes a browser sends from another site. A subclass overriding
  * `afterLoad()` calls `super.afterLoad()`.
  */
 export default abstract class AuthBase extends DmPlugin {
@@ -310,6 +314,14 @@ export default abstract class AuthBase extends DmPlugin {
     } catch (err) {
       return serverError(res, err);
     }
+    const trusted = this.trustedOrigins();
+    if (
+      trusted &&
+      changesState(req) &&
+      !this.crossSiteExempt(req) &&
+      crossSite(req, trusted)
+    )
+      return forbidden(res, 'Cross-site request refused');
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     this.authMethod(req, res, async (): Promise<void> => {
       try {
@@ -325,6 +337,37 @@ export default abstract class AuthBase extends DmPlugin {
         serverError(res, err);
       }
     });
+  }
+
+  /**
+   * The origins a browser may send a change from, for a plugin whose
+   * credential the browser attaches by itself — a cookie.
+   *
+   * A browser sends a cookie with every request to the server, whichever
+   * page asks, so such a plugin answers here and `authenticate` refuses
+   * (`403`), before `authMethod`, a request other than `GET`, `HEAD` or
+   * `OPTIONS` the browser reports as coming from anywhere else (see
+   * docs/usage/plugins/auth/README.md#cookie-sessions-and-other-sites).
+   * Called per request: compute the list once, at construction. Undefined,
+   * the default, for a credential a page cannot make the browser send — a
+   * token, a signature — which needs no such check.
+   *
+   * @returns origins as `URL.origin` writes them, or undefined
+   */
+  protected trustedOrigins(): readonly string[] | undefined {
+    return undefined;
+  }
+
+  /**
+   * Whether a request is let through the check of `trustedOrigins()`: a
+   * route another site posts to by design, and which protects itself — an
+   * identity provider's callback.
+   *
+   * @param _req the request about to be refused as coming from another site
+   * @returns true to leave it to `authMethod`
+   */
+  protected crossSiteExempt(_req: DmRequest): boolean {
+    return false;
   }
 
   /**

@@ -262,21 +262,29 @@ then make a signed-in administrator's browser submit a form that changes the
 directory.
 
 These two plugins therefore refuse (`403`) a request other than `GET`, `HEAD`
-or `OPTIONS` that the browser reports as coming from elsewhere: a
-`Sec-Fetch-Site` other than `same-origin` or `none`, or an `Origin` — a
-`Referer` when there is no `Origin` — naming an origin that is not trusted.
-The trusted origins are `--base-url`'s and those listed in
-`--auth-trusted-origin` (`DM_AUTH_TRUSTED_ORIGINS`, comma-separated). A
-console served by ldap-rest itself needs nothing; a console served from
-another origin must be listed. A client sending none of these headers — a
-script, a server — is not a browser acting for another page, and is served
-as before.
+or `OPTIONS` that the browser reports as coming from elsewhere. A
+`Sec-Fetch-Site` of `same-origin` or `none` is enough to be served.
+Otherwise the `Origin` and the `Referer` the browser sent must both name a
+trusted origin — a link sends only a `Referer` — and a request with neither
+is refused when it carries a `Sec-Fetch-Site`. The trusted origins are
+`--base-url`'s and those listed in `--auth-trusted-origin`
+(`DM_AUTH_TRUSTED_ORIGINS`, comma-separated), each written as an origin —
+`https://console.example.com`, with no path: anything else stops the server
+at startup, as does a `--base-url` that is not a URL. A console served by
+ldap-rest itself needs nothing; a console served from another origin must be
+listed. A client sending none of these headers — a script, a server — is not
+a browser acting for another page, and is served as before.
 
 The check belongs to the plugin that authenticates the request: a path
 guarded by a token, HMAC, TOTP or JWT plugin is not affected. OpenID Connect
 applies the same check to `/logout`, which is a `GET`
-([details](oidc.md#logout)); `/callback` and `/backchannel-logout`, which the
-provider posts to, are exempt.
+([details](oidc.md#logout)), and also trusts the origins of
+`--oidc-logout-origins`; the `/callback` and `/backchannel-logout` routes it
+serves, which the provider posts to, are exempt.
+
+A third-party authentication plugin whose credential is a cookie gets the
+same check from `AuthBase`: see
+[authentication plugins](../../../plugin-development/README.md#authentication-plugins).
 
 With LemonLDAP::NG, `--base-url` is optional. Browsers that do not send
 `Sec-Fetch-Site` (before Safari 16.4 or Firefox 90) identify a console served

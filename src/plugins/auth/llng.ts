@@ -11,13 +11,10 @@ import type { Express, Response } from 'express';
 import AuthBase, { DmRequest } from '../../lib/auth/base.js';
 import {
   assertOrigins,
-  changesState,
   configuredOrigins,
-  crossSite,
   originsOf,
 } from '../../lib/auth/crossSite.js';
 import type { Role } from '../../abstract/plugin.js';
-import { forbidden } from '../../lib/expressFormatedResponses.js';
 import type { DM } from '../../bin/index.js';
 
 import { llngOptions } from './auth.options.js';
@@ -215,24 +212,23 @@ export default class AuthLLNG extends AuthBase {
   /** How many keys of each list of location rules were found foldable */
   private readonly foldable = new WeakMap<object, number>();
 
+  /** `--base-url`'s origin when it is set, and `--auth-trusted-origin` */
+  private readonly origins: readonly string[];
+
   constructor(server: DM) {
     super(server);
-    assertOrigins(
-      configuredOrigins(this.config),
-      this.name,
-      '--auth-trusted-origin'
-    );
+    const baseUrl = this.config.base_url ?? '';
+    // Nothing else reads it under this plugin, so a typo would go unnoticed
+    // while it refuses the changes of a console served by this server, from
+    // the browsers that send no `Sec-Fetch-Site`.
+    if (baseUrl) assertOrigins([baseUrl], this.name, '--base-url');
+    const trusted = configuredOrigins(this.config);
+    assertOrigins(trusted, this.name, '--auth-trusted-origin', true);
+    this.origins = originsOf([baseUrl, ...trusted]);
   }
 
-  /**
-   * Origins a browser may send a change from: `--base-url` when it is set,
-   * and the consoles named in `--auth-trusted-origin`.
-   */
-  private trustedOrigins(): string[] {
-    return originsOf([
-      this.config.base_url ?? '',
-      ...configuredOrigins(this.config),
-    ]);
+  protected trustedOrigins(): readonly string[] {
+    return this.origins;
   }
 
   /**
@@ -464,8 +460,6 @@ export default class AuthLLNG extends AuthBase {
     if (!this.handler) {
       throw new Error(`${this.name}: lemonldap-ng-handler is not loaded`);
     }
-    if (changesState(req) && crossSite(req, this.trustedOrigins()))
-      return forbidden(res, 'Cross-site request refused');
     // Both names the client could supply, before the handler runs. The
     // second one matters as much as the first: `--llng-username-header`
     // names what `req.userName` is read from, an authorization rule can be

@@ -14,11 +14,15 @@ decision or a configuration change appear here; see the
 
 A request that changes something (`POST`, `PUT`, `PATCH`, `DELETE`) and that a
 browser reports as coming from another origin is refused with `403`. List the
-console's origin in `--auth-trusted-origin` (or `DM_AUTH_TRUSTED_ORIGINS`,
-comma-separated); an origin already in `--oidc-logout-origins` is trusted
-too. A console served by ldap-rest itself needs nothing, nor does a client
-authenticated by a token, HMAC, TOTP or JWT
+console's origin, with no path, in `--auth-trusted-origin` (or
+`DM_AUTH_TRUSTED_ORIGINS`, comma-separated); with OpenID Connect, an origin
+already in `--oidc-logout-origins` is trusted too. A console served by
+ldap-rest itself needs nothing, nor does a client authenticated by a token,
+HMAC, TOTP or JWT
 ([details](plugins/auth/README.md#cookie-sessions-and-other-sites)).
+
+With `core/auth/llng`, a `--base-url` (`DM_BASE_URL`) that is set but is not
+a URL now stops the server at startup: fix it or leave it empty.
 
 ## From 2.4.1
 

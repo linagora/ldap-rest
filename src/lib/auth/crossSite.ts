@@ -34,59 +34,64 @@ export function configuredOrigins(config: Config): string[] {
 }
 
 /**
- * Refuse, at startup, a trusted origin that is not a URL.
+ * Refuse, at startup, a value that is not a URL — or, with `bare`, not an
+ * origin: a scheme, a host and a port, with no user, path, query or
+ * fragment, so that the value means what the server compares.
  *
- * @param values the configured origins
+ * @param values the configured values
  * @param who the plugin asking, for the message
  * @param option the option they come from, for the message
- * @throws Error naming the first value that is not a URL
+ * @param bare whether each value must be an origin alone
+ * @throws Error naming the first value refused
  */
 export function assertOrigins(
   values: readonly unknown[],
   who: string,
-  option: string
+  option: string,
+  bare = false
 ): void {
   for (const value of values) {
+    let url: URL;
     try {
       if (typeof value !== 'string') throw new TypeError();
-      new URL(value);
+      url = new URL(value);
     } catch {
       throw new Error(
         `${who}: ${option} holds ${JSON.stringify(value)}, which is not a URL`
       );
     }
+    if (bare && url.href !== `${url.origin}/`)
+      throw new Error(
+        `${who}: ${option} holds ${JSON.stringify(value)}, which is not an ` +
+          'origin: write the scheme, the host and the port only, as in ' +
+          '"https://console.example.com"'
+      );
   }
 }
 
 /**
- * The origins of a list of URLs, without duplicates. A value that is not a
- * URL is left out: the configured ones were checked at startup.
+ * The origins of a list of URLs, without duplicates.
  *
- * @param values URLs, or empty strings for unset options
+ * @param values URLs the caller checked at startup with `assertOrigins`, or
+ *               empty strings for unset options
  * @returns their origins
  */
 export function originsOf(values: readonly string[]): string[] {
-  const origins = new Set<string>();
-  for (const value of values) {
-    if (!value) continue;
-    try {
-      origins.add(new URL(value).origin);
-    } catch {
-      // `--base-url` is checked by the plugin's library, if at all
-    }
-  }
-  return [...origins];
+  return [
+    ...new Set(values.filter(Boolean).map(value => new URL(value).origin)),
+  ];
 }
 
 /**
  * Whether a browser reports the request as coming from another site than
  * the trusted origins.
  *
- * `Sec-Fetch-Site: same-origin` or `none` settles it. Otherwise `Origin`
- * decides when the browser sent one, and `Referer` when it did not — a link
- * carries no `Origin` — so a console served from a trusted origin is told
- * apart from any other page, a sibling subdomain included. `Origin: null`
- * (a sandboxed frame, a redirect across origins) is another site. A client
+ * `Sec-Fetch-Site: same-origin` or `none` settles it. Otherwise every
+ * `Origin` and `Referer` the browser sent must name a trusted origin — a
+ * link carries no `Origin`, so `Referer` alone decides then — which tells a
+ * console served from a trusted origin apart from any other page, a sibling
+ * subdomain included. A value that is not a URL, `Origin: null` among them
+ * (a sandboxed frame, a redirect across origins), is another site. A client
  * sending none of the three — a script, a server — is not a browser acting
  * for another site, and is let through.
  *
@@ -97,14 +102,16 @@ export function originsOf(values: readonly string[]): string[] {
 export function crossSite(req: Request, trusted: readonly string[]): boolean {
   const site = req.headers['sec-fetch-site'];
   if (site === 'same-origin' || site === 'none') return false;
+  let seen = false;
   for (const name of ['origin', 'referer'] as const) {
     const value = req.headers[name];
     if (typeof value !== 'string') continue;
+    seen = true;
     try {
-      return !trusted.includes(new URL(value).origin);
+      if (!trusted.includes(new URL(value).origin)) return true;
     } catch {
       return true;
     }
   }
-  return typeof site === 'string';
+  return !seen && typeof site === 'string';
 }
