@@ -35,6 +35,12 @@ export interface StoredRecord {
   deadline: number;
 }
 
+/**
+ * A backend no retry can make work, such as a driver that is not installed:
+ * thrown by `open`, it stops the server where any other failure is retried.
+ */
+export class UnusableBackend extends Error {}
+
 export default abstract class Store {
   /** Name of the backend, for the log lines it writes. */
   abstract name: string;
@@ -106,6 +112,8 @@ export default abstract class Store {
    * Reach whatever the backend keeps its records in. Every operation opens
    * on its own; calling this early only moves a failure to startup, where an
    * operator reads it, instead of the first request that needs the store.
+   *
+   * @throws UnusableBackend when retrying cannot help
    */
   async open(): Promise<void> {
     // Nothing to reach for a backend that shares the server's own resources.

@@ -16,7 +16,10 @@ import { AsyncResource } from 'node:async_hooks';
 
 import type winston from 'winston';
 
-import Store, { type StoredRecord } from '../../lib/storage/store.js';
+import Store, {
+  type StoredRecord,
+  UnusableBackend,
+} from '../../lib/storage/store.js';
 import { PROBE_TIMEOUT_MS, type HealthStatus } from '../../lib/health.js';
 import { outsideAnyRequest } from '../../lib/requestContext.js';
 
@@ -104,7 +107,7 @@ export default class PostgresStore extends Store {
     try {
       pg = await this.driver();
     } catch (err) {
-      throw new Error(
+      throw new UnusableBackend(
         `${this.name}: requires the optional dependency "pg", which is not ` +
           'installed. Install it to keep the records in PostgreSQL, or ' +
           `choose another --storage-backend. (${errorText(err)})`

@@ -40,11 +40,8 @@ describe('Keyed storage, one instance', function () {
     await server.ready;
   });
 
-  after(() => {
-    if (first) {
-      first.store.stopSweeping();
-      Storage.release(first);
-    }
+  after(async () => {
+    await first?.close();
     rmSync(dir, { recursive: true, force: true });
     for (const [k, v] of Object.entries(previous))
       if (v === undefined) delete process.env[k];

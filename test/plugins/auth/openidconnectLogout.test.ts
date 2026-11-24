@@ -253,13 +253,10 @@ describe('OpenID Connect, /logout and a copy of the cookie', function () {
     dir = mkdtempSync(join(tmpdir(), 'oidc-logout-'));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     nock.cleanAll();
-    if (storage) {
-      storage.store.stopSweeping();
-      Storage.release(storage);
-      storage = undefined;
-    }
+    await storage?.close();
+    storage = undefined;
     rmSync(dir, { recursive: true, force: true });
   });
 

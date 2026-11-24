@@ -31,6 +31,7 @@ import DmPlugin from '../abstract/plugin.js';
 import type { DM } from '../bin/index.js';
 import type { HealthStatus } from '../lib/health.js';
 import type Store from '../lib/storage/store.js';
+import { UnusableBackend } from '../lib/storage/store.js';
 
 import FileStore from './storage/file.js';
 import LdapStore from './storage/ldap.js';
@@ -145,24 +146,30 @@ export default class Storage extends DmPlugin {
   }
 
   /**
-   * Reach the backend before any consumer can write: a wrong address or a
-   * missing driver stops the server instead of failing the first record.
+   * Reach the backend before any consumer can write, so an address that
+   * does not answer is in the log at startup. Only a backend no retry can
+   * fix stops the server: any other failure is logged, and every operation,
+   * the sweep included, tries to connect again.
    */
   async init(): Promise<void> {
     try {
       await this.store.open();
     } catch (err) {
-      // Refused, this instance is not the one: another may take its place
-      Storage.release(this);
-      throw err;
+      if (err instanceof UnusableBackend) throw err;
+      this.logger.error(err instanceof Error ? err.message : String(err));
     }
     this.store.startSweeping(
       this.options(storageOptions).storage_sweep_interval
     );
   }
 
+  /** Lets go of the single-instance hold too: another instance may load */
   async close(): Promise<void> {
-    await this.store.close();
+    try {
+      await this.store.close();
+    } finally {
+      Storage.release(this);
+    }
   }
 
   /** Set while the backend fails the probe, so the reason is logged once */
@@ -196,8 +203,8 @@ export default class Storage extends DmPlugin {
   /**
    * Release the single-instance hold.
    *
-   * For a test building several servers in one process; a running one has no
-   * reason to call it.
+   * `close()` releases it; this is for a test handing the hold over to
+   * another server while the store keeps working.
    */
   static release(instance: Storage): void {
     if (onlyInstance === instance) onlyInstance = undefined;

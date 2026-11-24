@@ -135,9 +135,11 @@ export default abstract class DmPlugin {
    * it serves and a constructor cannot wait for, a file to read or a
    * connection to open.
    *
-   * Throwing here, or rejecting, refuses the plugin and `DM.ready` rejects.
-   * A refused plugin is not registered and its `close()` is never called: let
-   * go of what was opened on the way before throwing.
+   * Called once, and not again after a failure. Throwing here, or rejecting,
+   * refuses the plugin and `DM.ready` rejects: the plugin is not registered
+   * and its `close()` is called at once, so what was opened on the way is
+   * let go of there. `close()` must therefore cope with a plugin `init()`
+   * left halfway.
    */
   init?(): MaybePromise<void>;
 
@@ -181,9 +183,9 @@ export default abstract class DmPlugin {
   health?(): MaybePromise<HealthStatus>;
 
   /**
-   * Called once by the shutdown, after the server stopped serving: let go
-   * of what this plugin holds, a connection, a timer, a queue. See
-   * `docs/usage/operations.md#shutdown`.
+   * Called once by the shutdown, after the server stopped serving, or right
+   * after an `init()` that failed: let go of what this plugin holds, a
+   * connection, a timer, a queue. See `docs/usage/operations.md#shutdown`.
    */
   close?(): MaybePromise<void>;
 

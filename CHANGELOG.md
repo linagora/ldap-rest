@@ -10,12 +10,16 @@
 
 ### Changed
 
-- The group and organization schemas are read, and the storage backend
-  opened, before the server serves; an unreadable schema or a backend that
-  cannot open now stops the server instead of running without it
-  ([#775](https://github.com/linagora/ldap-rest/issues/775),
-  [#776](https://github.com/linagora/ldap-rest/issues/776),
-  [upgrading](docs/usage/upgrading.md#an-unreadable-schema-or-an-unreachable-store-stops-the-server))
+- The group and organization schemas are read before the server serves; an
+  unreadable schema now stops the server instead of running without its
+  rules ([#775](https://github.com/linagora/ldap-rest/issues/775),
+  [upgrading](docs/usage/upgrading.md#an-unreadable-schema-or-a-missing-storage-package-stops-the-server))
+- The storage backend is opened before the plugins using it are loaded, and
+  its sweeper starts after: startup waits for a database or a Valkey that
+  does not answer, at most 10 s, then starts anyway; a missing `pg` or
+  `iovalkey` package now stops the server
+  ([#776](https://github.com/linagora/ldap-rest/issues/776),
+  [storage](docs/usage/plugins/utilities/storage.md#backends))
 
 ## v2.5.0 (2026-11-23)
 

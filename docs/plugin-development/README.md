@@ -59,9 +59,12 @@ export default class MyPlugin extends DmPlugin {
   [plugin services](services.md)
 - **init()** (optional): Awaited before `api()` and the hooks are registered,
   for what the plugin needs before it serves and a constructor cannot wait
-  for: a file to read, a connection to open. A throw or a rejection stops the
-  server from starting, and the plugin is not registered: its `close()` is
-  never called, so it lets go of what it opened before throwing
+  for: a file to read, a connection to open. It is called once and not
+  retried: a plugin that must wait for a resource retries in its own
+  operations, not in a loop here. A throw or a rejection stops the server
+  from starting and the plugin is not registered; its `close()` is called
+  right away, a failure of it logged, so the plugin lets go of what it holds
+  in one place, and `close()` copes with an `init()` left halfway
 - **api()** (optional): Method to register REST endpoints
 
 ### Available from Base Class

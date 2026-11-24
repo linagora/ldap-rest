@@ -17,7 +17,10 @@ import { AsyncResource } from 'node:async_hooks';
 
 import type winston from 'winston';
 
-import Store, { type StoredRecord } from '../../lib/storage/store.js';
+import Store, {
+  type StoredRecord,
+  UnusableBackend,
+} from '../../lib/storage/store.js';
 import type { HealthStatus } from '../../lib/health.js';
 import { outsideAnyRequest } from '../../lib/requestContext.js';
 
@@ -83,7 +86,7 @@ export default class ValkeyStore extends Store {
     try {
       driver = await this.driver();
     } catch (err) {
-      throw new Error(
+      throw new UnusableBackend(
         `${this.name}: requires the optional dependency "iovalkey", which ` +
           'is not installed. Install it to keep the records in Valkey, or ' +
           `choose another --storage-backend. (${errorText(err)})`

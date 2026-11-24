@@ -6,18 +6,19 @@ decision or a configuration change appear here; see the
 
 ## From 2.5.0
 
-### An unreadable schema or an unreachable store stops the server
+### An unreadable schema or a missing storage package stops the server
 
 **Who is affected:** a deployment loading `core/ldap/groups` or
 `core/ldap/organizations` with a `--group-schema` or `--organization-schema`
-that cannot be read or parsed, or `core/storage` with a backend that does not
-answer at startup.
+that cannot be read or parsed, or `core/storage` with the `postgres` or
+`valkey` backend and without the `pg` or `iovalkey` package.
 
 The server used to log the error and serve anyway: groups or organizations
-without the rules of their schema, a store failing its first operations. It
-now refuses to start (`Cannot load the group schema from …`, or the backend's
-error): fix the path or the file, or start the database or Valkey before
-LDAP-Rest.
+without the rules of their schema, a store failing every operation. It now
+refuses to start (`Cannot load the group schema from …`, or `requires the
+optional dependency …`): fix the path or the file, or install the package. A
+database or a Valkey that does not answer at startup still does not stop the
+server.
 
 ## From 2.4.1
 
