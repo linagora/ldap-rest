@@ -173,8 +173,8 @@ describe('OpenID Connect Plugin', () => {
       const plugin = new OpenIDConnect(dm);
       const result = await dm.registerPlugin('openidconnect', plugin);
 
-      // Verify plugin registration completed without errors
-      expect(result).to.not.throw;
+      expect(result).to.equal(true);
+      expect(dm.loadedPlugins.openidconnect).to.equal(plugin);
       expect(plugin.name).to.equal('openidconnect');
     });
 
@@ -396,7 +396,8 @@ describe('OpenID Connect Plugin', () => {
       // Register OpenID Connect first
       const result = await dm.registerPlugin('openidconnect', oidcPlugin);
 
-      expect(result).to.not.throw;
+      expect(result).to.equal(true);
+      expect(dm.loadedPlugins.openidconnect).to.equal(oidcPlugin);
       expect(oidcPlugin.name).to.equal('openidconnect');
     });
 
@@ -417,7 +418,8 @@ describe('OpenID Connect Plugin', () => {
       // Register OpenID Connect after DM is ready
       const result = await dm.registerPlugin('openidconnect', oidcPlugin);
 
-      expect(result).to.not.throw;
+      expect(result).to.equal(true);
+      expect(dm.loadedPlugins.openidconnect).to.equal(oidcPlugin);
       expect(oidcPlugin.server).to.equal(dm);
     });
   });
@@ -736,20 +738,18 @@ describe('OpenID Connect Plugin', () => {
     });
 
     it('should handle hook errors gracefully', async () => {
-      dm.hookBus.set(
-        'beforeAuth',
-        ...[
-          async () => {
-            throw new Error('Hook error');
-          },
-        ]
-      );
+      const failing = async (): Promise<never> => {
+        throw new Error('Hook error');
+      };
+      dm.hookBus.set('beforeAuth', failing);
 
       const oidcPlugin = new OpenIDConnect(dm);
       const result = await dm.registerPlugin('openidconnect', oidcPlugin);
 
-      // Plugin should register despite hook errors
-      expect(result).to.not.throw;
+      // Registration does not run the hook; the failing subscriber is kept
+      expect(result).to.equal(true);
+      expect(dm.loadedPlugins.openidconnect).to.equal(oidcPlugin);
+      expect(dm.hookBus.subscribers('beforeAuth')).to.include(failing);
       expect(oidcPlugin.name).to.equal('openidconnect');
     });
   });
