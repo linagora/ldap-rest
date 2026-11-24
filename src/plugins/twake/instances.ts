@@ -30,8 +30,10 @@ import {
   InstanceRefusedError,
   instanceSlug,
   type InstanceRequest,
+  MAX_SLUG_NUMBER,
   matrixId,
   numberedSlug,
+  slugAt,
 } from '../../lib/instanceProviders.js';
 import type {
   AttributesList,
@@ -86,9 +88,6 @@ interface PatternMatch {
   exec: RegExpExecArray;
   index: number;
 }
-
-/** The highest number a slug held by other accounts takes. */
-const MAX_SLUG_NUMBER = 99;
 
 /**
  * The provider refused the instance. A call that timed out or failed on the
@@ -897,24 +896,12 @@ export default class TwakeInstances extends DmPlugin {
    * this address
    */
   private slugAt(ids: string[], address: string): string | undefined {
-    const lower = address.toLowerCase();
-    const at = (id: string): string =>
-      this.provider.address({ id } as InstanceRequest);
-    return (
-      ids.find(id => at(id) === lower) ??
-      ids.map(id => this.numberedAt(id, lower)).find(Boolean)
+    return slugAt(
+      ids,
+      address,
+      id => this.provider.address({ id } as InstanceRequest),
+      this.provider.slugMaxLength
     );
-  }
-
-  /** The numbered form of slug `id` whose instance is at this address */
-  private numberedAt(id: string, address: string): string | undefined {
-    const lower = address.toLowerCase();
-    for (let n = 2; n <= MAX_SLUG_NUMBER; n++) {
-      const numbered = numberedSlug(id, n, this.provider.slugMaxLength);
-      if (this.provider.address({ id: numbered } as InstanceRequest) === lower)
-        return numbered;
-    }
-    return undefined;
   }
 
   protected async ready(

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `core/twake/clouderyProvision`: deleting an account deletes its Cloudery
+  instance only at the address of the account's own slug, when no other entry
+  holds that address and the instance's OIDC id is the account's; otherwise
+  the instance is left in place with a warning and no `domain.user.deleted` is
+  published
+  ([details](docs/usage/plugins/integrations/instances.md#which-account-an-instance-is))
+
 ## v2.5.0 (2026-11-23)
 
 ### Security

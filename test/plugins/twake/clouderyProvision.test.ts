@@ -920,13 +920,13 @@ describe('ClouderyProvision plugin', () => {
       plugin = new ClouderyProvision(dm);
       const dn = `uid=john.doe,${USER_BASE}`;
       ldap.entries[dn] = {
-        twakeWorkspaceUrl: 'johndoe.example.com',
+        twakeWorkspaceUrl: 'johndoeorg1.twake.app',
         mail: 'john.doe@example.com',
       };
 
       const scope = nock(CLOUDERY)
         .get('/api/v2/instances')
-        .query(q => q.fqdn === 'johndoe.example.com')
+        .query(q => q.fqdn === 'johndoeorg1.twake.app')
         .reply(200, { items: [{ _id: 'uuid-1' }] })
         .delete('/api/v1/instances/uuid-1')
         .query(q => q.user_request === 'true')
@@ -1010,6 +1010,144 @@ describe('ClouderyProvision plugin', () => {
     it('skips when the entry has no stored fqdn (not ours)', async () => {
       await remove('jane.doe', makeReq('acme123'));
       expect(rabbit.calls).to.have.length(0);
+    });
+
+    // The Cloudery answering for the instance at any address, and taking
+    // its DELETE: a test leaving it alone checks what is still pending
+    const cloudery = (oidc?: string): nock.Scope =>
+      nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .optionally()
+        .query(true)
+        .reply(200, { items: [{ _id: 'uuid-1', ...(oidc ? { oidc } : {}) }] })
+        .delete('/api/v1/instances/uuid-1')
+        .optionally()
+        .query(true)
+        .reply(200, {});
+
+    it('leaves alone an instance whose address is not the account’s slug', async () => {
+      ldap.entries[`uid=john.doe,${USER_BASE}`] = {
+        twakeWorkspaceUrl: 'janedoeacme123.twake.app',
+        mail: 'john.doe@acme.com',
+      };
+      const scope = cloudery();
+
+      await remove('john.doe', makeReq('acme123'));
+
+      expect(scope.activeMocks(), 'no lookup, no DELETE').to.have.length(2);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    it('leaves alone an address outside --cloudery-domain', async () => {
+      ldap.entries[`uid=john.doe,${USER_BASE}`] = {
+        twakeWorkspaceUrl: 'johndoeacme123.other.example',
+        mail: 'john.doe@acme.com',
+      };
+      const scope = cloudery('johndoeacme123');
+
+      await remove('john.doe', makeReq('acme123'));
+
+      expect(scope.activeMocks(), 'no lookup, no DELETE').to.have.length(2);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    it('leaves alone an instance whose address another entry holds', async () => {
+      // `john_doe` reduces to the same slug as `john.doe`
+      ldap.entries[`uid=john_doe,${USER_BASE}`] = {
+        twakeWorkspaceUrl: 'johndoeacme123.twake.app',
+        mail: 'john_doe@acme.com',
+      };
+      ldap.holders = [{ dn: `uid=john.doe,${USER_BASE}` }];
+      const scope = cloudery('johndoeacme123');
+
+      await remove('john_doe', makeReq('acme123'));
+
+      expect(scope.activeMocks(), 'no lookup, no DELETE').to.have.length(2);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    it('leaves the instance alone when the directory cannot say who holds it', async () => {
+      ldap.entries[`uid=john.doe,${USER_BASE}`] = {
+        twakeWorkspaceUrl: 'johndoeacme123.twake.app',
+        mail: 'john.doe@acme.com',
+      };
+      ldap.holderLookupFails = true;
+      const scope = cloudery('johndoeacme123');
+
+      await remove('john.doe', makeReq('acme123'));
+
+      expect(scope.activeMocks(), 'no lookup, no DELETE').to.have.length(2);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    it('leaves alone an instance whose OIDC id is another account’s', async () => {
+      ldap.entries[`uid=john.doe,${USER_BASE}`] = {
+        twakeWorkspaceUrl: 'johndoeacme123.twake.app',
+        mail: 'john.doe@acme.com',
+      };
+      const scope = cloudery('someoneelse');
+
+      await remove('john.doe', makeReq('acme123'));
+
+      expect(scope.activeMocks(), 'lookup, no DELETE').to.deep.equal([
+        `DELETE ${CLOUDERY}:80/api/v1/instances/uuid-1`,
+      ]);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
+    for (const [what, address, req] of [
+      ['its slug', 'johndoeacme123.twake.app', makeReq('acme123')],
+      [
+        'a numbered form of its slug',
+        'johndoeacme1232.twake.app',
+        makeReq('acme123'),
+      ],
+      [
+        'its slug, the org id read off the entry',
+        'johndoeacme123.twake.app',
+        makeReq(),
+      ],
+    ] as const)
+      it(`deletes the account’s instance at ${what}`, async () => {
+        ldap.entries[`uid=john.doe,${USER_BASE}`] = {
+          twakeWorkspaceUrl: address,
+          twakeOrganizationId: 'acme123',
+          mail: 'john.doe@acme.com',
+        };
+        const scope = nock(CLOUDERY)
+          .get('/api/v2/instances')
+          .query(q => q.fqdn === address)
+          .reply(200, { items: [{ _id: 'uuid-1', oidc: 'johndoeacme123' }] })
+          .delete('/api/v1/instances/uuid-1')
+          .query(q => q.user_request === 'true')
+          .reply(200, { workflow: 'wf-del' });
+
+        await remove('john.doe', req);
+
+        expect(scope.isDone(), 'search + delete').to.equal(true);
+        expect(rabbit.calls).to.have.length(1);
+        expect(rabbit.calls[0].message.workplaceFqdn).to.equal(address);
+      });
+
+    it('deletes the instance at the slug the other dash setting gives', async () => {
+      ldap.entries[`uid=jean-claude,${USER_BASE}`] = {
+        twakeWorkspaceUrl: 'jean-claudeacme123.twake.app',
+        mail: 'jean-claude@acme.com',
+      };
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'jean-claudeacme123.twake.app')
+        .reply(200, {
+          items: [{ _id: 'uuid-1', oidc: 'jean-claudeacme123' }],
+        })
+        .delete('/api/v1/instances/uuid-1')
+        .query(q => q.user_request === 'true')
+        .reply(200, { workflow: 'wf-del' });
+
+      await remove('jean-claude', makeReq('acme123'));
+
+      expect(scope.isDone(), 'search + delete').to.equal(true);
+      expect(rabbit.calls).to.have.length(1);
     });
   });
 });

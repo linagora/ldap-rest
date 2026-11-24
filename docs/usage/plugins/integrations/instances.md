@@ -217,6 +217,17 @@ such `uid`s apart.
   reserved the same way on its entry, when
   `--twake-instance-organization-fqdn-attribute` names where.
 
+`core/twake/clouderyProvision` deletes an account's instance on a SCIM delete
+under the same rules: only at the address of the account's slug, or of a
+numbered form of it, under `--cloudery-domain`, when no other entry holds that
+address (an entry [`core/ldap/trash`](../ldap/trash.md) keeps holds it too)
+and the instance's OIDC id is the account's. Otherwise, or when the directory
+cannot say who holds the address, the instance is left in place with a
+warning, and no `domain.user.deleted` is published for it. The slug is read
+with the organization id of the delete's `x-cloudery-org-id` header
+(`--cloudery-org-id-header`), else of the entry's `twakeOrganizationId`
+(`--cloudery-org-id-attribute`).
+
 The instance's email is not changed to the account's `mail`;
 [`core/twake/drive`](drive.md) sends it to cozy-stack when the `mail`
 changes.
