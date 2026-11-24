@@ -35,6 +35,7 @@ import { Hooks } from '../../hooks.js';
 import {
   CLOUDERY_SLUG_MAX_LENGTH,
   instanceSlug,
+  slugAt,
 } from '../../lib/instanceProviders.js';
 import { escapeLdapFilter, isChildOf, normalizeDn } from '../../lib/utils.js';
 import type RabbitMq from '../rabbitmq.js';
@@ -72,8 +73,11 @@ interface CreateContext {
 }
 
 interface DeleteContext {
+  dn: string;
   fqdn: string;
   domain: string;
+  /** The OIDC ids the account's instance may carry */
+  oidcs: string[];
 }
 
 /** The Cloudery answered the create with a refusal: no instance accepted */
@@ -594,7 +598,9 @@ export default class ClouderyProvision extends DmPlugin {
   /**
    * Pre-delete: read the stored FQDN (and domain from mail) while the entry
    * still exists, so the post-delete hook can tear the instance down. No stored
-   * FQDN means this user was not provisioned here.
+   * FQDN means this user was not provisioned here. A modify can write the
+   * FQDN, so it is kept only when it is the address of the account's slug, or
+   * of a numbered form of it.
    */
   private async captureDelete(id: string, req?: ReqWithUser): Promise<void> {
     const base = this.baseResolver.userBase(req);
@@ -643,7 +649,7 @@ export default class ClouderyProvision extends DmPlugin {
         {
           paged: false,
           scope: 'base',
-          attributes: [this.fqdnAttribute, 'mail'],
+          attributes: [this.fqdnAttribute, 'mail', this.orgIdAttribute],
         },
         dn
       )) as { searchEntries?: Record<string, unknown>[] };
@@ -661,12 +667,45 @@ export default class ClouderyProvision extends DmPlugin {
         });
         return;
       }
+      // Neither org id is trusted over the other: a modify can write the
+      // entry's, as it writes the address, and a replayed or batch delete can
+      // carry a wrong header. The holder and OIDC checks stand behind both.
+      const orgIds = [
+        this.readHeader(req, this.orgIdHeader)?.trim(),
+        entry ? firstValue(entry[this.orgIdAttribute])?.trim() : undefined,
+      ].filter((orgId): orgId is string => Boolean(orgId));
+      if (orgIds.length === 0) {
+        this.logger.warn({
+          plugin: this.name,
+          event: 'captureDelete',
+          id,
+          dn,
+          fqdn,
+          result: 'skipped',
+          reason: 'missing_org_id',
+          message: `the organization id of this account is unknown, ${fqdn} left in place`,
+        });
+        return;
+      }
+      const oidcs = [
+        ...new Set(orgIds.flatMap(orgId => this.ownOidcs(id, orgId, fqdn))),
+      ];
+      if (oidcs.length === 0) {
+        this.logger.warn({
+          plugin: this.name,
+          event: 'captureDelete',
+          id,
+          dn,
+          fqdn,
+          result: 'skipped',
+          reason: 'not_own_address',
+          message: `${fqdn} is not the address of this account's instance, left in place`,
+        });
+        return;
+      }
       const mail = entry ? firstValue(entry.mail) : undefined;
       const domain = mail ? emailDomain(mail) : '';
-      this.deleteStash.set(id, {
-        fqdn,
-        domain,
-      });
+      this.deleteStash.set(id, { dn, fqdn, domain, oidcs });
       this.logger.info({
         plugin: this.name,
         event: 'captureDelete',
@@ -687,7 +726,11 @@ export default class ClouderyProvision extends DmPlugin {
     }
   }
 
-  /** Post-delete: delete the Cloudery instance by FQDN and publish the event. */
+  /**
+   * Post-delete: delete the Cloudery instance by FQDN and publish the event.
+   * An instance another entry holds the address of, or whose OIDC id is not
+   * known to be the account's, is left in place and announced to nobody.
+   */
   private async deprovision(id: string): Promise<void> {
     this.logger.info({
       plugin: this.name,
@@ -713,17 +756,55 @@ export default class ClouderyProvision extends DmPlugin {
       id,
       fqdn: ctx.fqdn,
     };
+    // Addresses are reserved, and Cloudery instances named, in lower case
+    const address = ctx.fqdn.toLowerCase();
     let deleted = false;
     try {
+      const others = await this.holders(ctx.dn, address, log);
+      if (!others) {
+        this.logger.warn({
+          ...log,
+          result: 'skipped',
+          reason: 'holder_lookup_failed',
+          message: `the directory could not say who holds ${ctx.fqdn}, left in place`,
+        });
+        return;
+      }
+      if (others.length > 0) {
+        this.logger.warn({
+          ...log,
+          result: 'skipped',
+          reason: 'held_elsewhere',
+          message: `${ctx.fqdn} is held by another entry, left in place`,
+        });
+        return;
+      }
       this.logger.info({ ...log, result: 'resolving_uuid' });
-      const uuid = (await this.findInstanceByFqdn(ctx.fqdn, '_id'))?._id;
-      if (uuid) {
+      const found = await this.findInstanceByFqdn(address);
+      const uuid = found?._id;
+      if (!uuid) {
+        this.logger.warn({ ...log, result: 'not_found' });
+      } else if (!found.oidc) {
+        this.logger.warn({
+          ...log,
+          result: 'skipped',
+          reason: 'oidc_unknown',
+          uuid,
+          message: `the Cloudery did not give the OIDC id of ${ctx.fqdn}, left in place`,
+        });
+      } else if (!ctx.oidcs.includes(found.oidc.toLowerCase())) {
+        this.logger.warn({
+          ...log,
+          result: 'skipped',
+          reason: 'oidc_mismatch',
+          uuid,
+          message: `${ctx.fqdn} belongs to another user, left in place`,
+        });
+      } else {
         this.logger.info({ ...log, result: 'deleting_instance', uuid });
         await this.deleteInstance(uuid);
         deleted = true;
         this.logger.info({ ...log, result: 'deleted', uuid });
-      } else {
-        this.logger.warn({ ...log, result: 'not_found' });
       }
     } catch (err) {
       this.logger.error({
@@ -884,12 +965,6 @@ export default class ClouderyProvision extends DmPlugin {
   }
 
   /**
-   * The instance at this FQDN, if any.
-   *
-   * @param fqdn instance address
-   * @param only the one field to ask for, when the others are not needed
-   */
-  /**
    * Whether an entry other than `dn` holds this address. A failed lookup
    * counts as held: the instance would otherwise be handed over unchecked.
    */
@@ -973,9 +1048,9 @@ export default class ClouderyProvision extends DmPlugin {
     }
   }
 
+  /** The instance at this FQDN, if any */
   private async findInstanceByFqdn(
-    fqdn: string,
-    only?: string
+    fqdn: string
   ): Promise<ClouderyInstanceSummary | null> {
     this.logger.info({
       plugin: this.name,
@@ -984,7 +1059,6 @@ export default class ClouderyProvision extends DmPlugin {
     });
     const url = new URL(`${this.managerUrl}/api/v2/instances`);
     url.searchParams.set('fqdn', fqdn);
-    if (only) url.searchParams.set('only', only);
     url.searchParams.set('limit', '1');
     const res = await this.fetch(url.toString(), {
       headers: { Authorization: `Bearer ${this.managerToken}` },
@@ -1230,6 +1304,26 @@ export default class ClouderyProvision extends DmPlugin {
       role: raw,
     });
     return raw;
+  }
+
+  /**
+   * The OIDC ids an instance at `fqdn` may carry when it is this account's:
+   * its slug, as `provision` gives it under either `-` setting, and the
+   * numbered form of it the Cloudery may have given instead. Empty when
+   * `fqdn` is not the address of one of them under `--cloudery-domain`.
+   */
+  private ownOidcs(userName: string, orgId: string, fqdn: string): string[] {
+    const at = (id: string): string =>
+      `${id}.${this.clouderyDomain}`.toLowerCase();
+    for (const dashes of [this.slugDashes, !this.slugDashes]) {
+      const id = instanceSlug(userName + orgId, {
+        maxLength: CLOUDERY_SLUG_MAX_LENGTH,
+        dashes,
+      });
+      const slug = slugAt([id], fqdn, at, CLOUDERY_SLUG_MAX_LENGTH);
+      if (slug) return [...new Set([id, slug])];
+    }
+    return [];
   }
 
   private isAtOrUnder(dn: string, parent: string): boolean {

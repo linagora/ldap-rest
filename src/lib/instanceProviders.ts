@@ -70,6 +70,36 @@ export const numberedSlug = (
   return slug.slice(0, maxLength - suffix.length) + suffix;
 };
 
+/** The highest number a slug held by other accounts takes. */
+export const MAX_SLUG_NUMBER = 99;
+
+/**
+ * The slug among `ids`, or the numbered form of one, whose instance is at
+ * this address: an address written on an account is its own only then.
+ *
+ * @param ids the account's slugs
+ * @param address the address to recognize, in any case
+ * @param at the address a slug gives
+ * @param maxLength the provider's longest slug
+ */
+export const slugAt = (
+  ids: string[],
+  address: string,
+  at: (id: string) => string,
+  maxLength: number
+): string | undefined => {
+  const lower = address.toLowerCase();
+  const own = ids.filter(Boolean);
+  const found = own.find(id => at(id) === lower);
+  if (found) return found;
+  for (const id of own)
+    for (let n = 2; n <= MAX_SLUG_NUMBER; n++) {
+      const numbered = numberedSlug(id, n, maxLength);
+      if (at(numbered) === lower) return numbered;
+    }
+  return undefined;
+};
+
 /**
  * The account's Matrix ID, from its mail, for cozy-stack to store as is. A
  * value cozy-stack's `IsMatrixID` would refuse is not sent, nor one whose

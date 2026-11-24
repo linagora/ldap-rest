@@ -10,6 +10,12 @@
   another origin must be listed there. With `core/auth/llng`, a `--base-url`
   that is not a URL stops the server
   ([upgrading](docs/usage/upgrading.md#a-console-on-another-origin-must-be-trusted-for-changes))
+- `core/twake/clouderyProvision`: deleting an account deletes its Cloudery
+  instance only at the address of the account's own slug, when no other entry
+  holds that address and the Cloudery gives the instance's OIDC id and it is
+  the account's; otherwise the instance is left in place with a warning and no
+  `domain.user.deleted` is published
+  ([details](docs/usage/plugins/integrations/instances.md#which-account-an-instance-is))
 
 ### Added
 

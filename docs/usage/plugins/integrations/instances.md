@@ -217,6 +217,28 @@ such `uid`s apart.
   reserved the same way on its entry, when
   `--twake-instance-organization-fqdn-attribute` names where.
 
+`core/twake/clouderyProvision` deletes an account's instance on a SCIM delete
+under the same rules: only at the address of the account's slug, or of a
+numbered form of it, under `--cloudery-domain`, when no other entry holds that
+address (an entry [`core/ldap/trash`](../ldap/trash.md) keeps holds it too)
+and the Cloudery gives the instance's OIDC id and it is the account's. The
+slug is read with the organization id of the delete's `x-cloudery-org-id`
+header (`--cloudery-org-id-header`) and with the entry's
+`twakeOrganizationId` (`--cloudery-org-id-attribute`): the address is the
+account's when either gives it, so a wrong header does not stop the deletion
+when the entry has the right organization id, and the other checks still
+apply. Otherwise the instance is left in place with a warning, whose `reason`
+says why, and no `domain.user.deleted` is published for it:
+
+- `missing_org_id`: neither the header nor the entry gives an organization
+  id, so the account's slug is unknown.
+- `not_own_address`: the address is not the account's slug, or a numbered
+  form of it, with either organization id.
+- `held_elsewhere`: another entry holds the address.
+- `holder_lookup_failed`: the directory could not say who holds the address.
+- `oidc_unknown`: the Cloudery's answer gives no OIDC id for the instance.
+- `oidc_mismatch`: the instance's OIDC id is another account's.
+
 The instance's email is not changed to the account's `mail`;
 [`core/twake/drive`](drive.md) sends it to cozy-stack when the `mail`
 changes.

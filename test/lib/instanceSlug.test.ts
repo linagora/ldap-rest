@@ -5,6 +5,7 @@ import {
   COZY_SLUG_MAX_LENGTH,
   instanceSlug,
   numberedSlug,
+  slugAt,
 } from '../../src/lib/instanceProviders';
 
 const cloudery = { maxLength: CLOUDERY_SLUG_MAX_LENGTH };
@@ -76,5 +77,23 @@ describe('numberedSlug', () => {
   ] as [string, number, number, string][])
     it(`numbers ${slug} ${n} as ${numbered} within ${maxLength}`, () => {
       expect(numberedSlug(slug, n, maxLength)).to.equal(numbered);
+    });
+});
+
+describe('slugAt', () => {
+  const at = (id: string): string => `${id}.twake.app`;
+  for (const [address, ids, slug] of [
+    ['jeanclaude.twake.app', ['jeanclaude'], 'jeanclaude'],
+    ['JeanClaude.Twake.App', ['jeanclaude'], 'jeanclaude'],
+    ['jean-claude.twake.app', ['jeanclaude', 'jean-claude'], 'jean-claude'],
+    ['jeanclaude12.twake.app', ['jeanclaude'], 'jeanclaude12'],
+    [`${'a'.repeat(28)}99.twake.app`, ['a'.repeat(30)], `${'a'.repeat(28)}99`],
+    ['jeanclaude100.twake.app', ['jeanclaude'], undefined],
+    ['janedoe.twake.app', ['jeanclaude'], undefined],
+    ['jeanclaude.other.app', ['jeanclaude'], undefined],
+    ['2.twake.app', [''], undefined],
+  ] as [string, string[], string | undefined][])
+    it(`finds ${String(slug)} at ${address} among ${ids.join(', ')}`, () => {
+      expect(slugAt(ids, address, at, CLOUDERY_SLUG_MAX_LENGTH)).to.equal(slug);
     });
 });
