@@ -4,6 +4,22 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## From 2.5.0
+
+### A console on another origin must be trusted for changes
+
+**Who is affected:** a deployment loading `core/auth/openidconnect` or
+`core/auth/llng` whose console is served from an origin other than
+`--base-url`.
+
+A request that changes something (`POST`, `PUT`, `PATCH`, `DELETE`) and that a
+browser reports as coming from another origin is refused with `403`. List the
+console's origin in `--auth-trusted-origin` (or `DM_AUTH_TRUSTED_ORIGINS`,
+comma-separated); an origin already in `--oidc-logout-origins` is trusted
+too. A console served by ldap-rest itself needs nothing, nor does a client
+authenticated by a token, HMAC, TOTP or JWT
+([details](plugins/auth/README.md#cookie-sessions-and-other-sites)).
+
 ## From 2.4.1
 
 ### Invalid plugin overrides stop the server

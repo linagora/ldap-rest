@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `core/auth/openidconnect` and `core/auth/llng` refuse a request that changes
+  something when a browser sends it from another origin than `--base-url`
+  or those listed in the new `--auth-trusted-origin`: a console served from
+  another origin must be listed there
+  ([upgrading](docs/usage/upgrading.md#a-console-on-another-origin-must-be-trusted-for-changes))
+
 ## v2.5.0 (2026-11-23)
 
 ### Security

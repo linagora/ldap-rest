@@ -15,6 +15,13 @@ import type { ConfigParams } from 'express-openid-connect';
 const { auth, requiresAuth } = oidc;
 
 import AuthBase, { DmRequest } from '../../lib/auth/base.js';
+import {
+  assertOrigins,
+  changesState,
+  configuredOrigins,
+  crossSite,
+  originsOf,
+} from '../../lib/auth/crossSite.js';
 import { type Role } from '../../abstract/plugin.js';
 import {
   forbidden,
@@ -44,6 +51,14 @@ const NO_END_SESSION = /end_session_endpoint/;
 
 /** `/logout` as express matches a route: any case, trailing slash or not. */
 const LOGOUT = /^\/logout\/?$/i;
+
+/**
+ * The routes the provider posts to: `/callback`, from the provider's page
+ * with `response_mode=form_post`, so from another site, and protected by the
+ * `state` the library checks; `/backchannel-logout`, from the provider's
+ * server, with a signed logout token.
+ */
+const FROM_PROVIDER = /^\/(?:callback|backchannel-logout)\/?$/i;
 
 /**
  * Where the session keeps the id this server gave it at login, the one
@@ -141,15 +156,16 @@ export default class OpenIDConnect extends AuthBase {
             'splits when the value comes from DM_OIDC_SESSION_SECRET'
         );
     }
-    for (const origin of settings.oidc_logout_origins) {
-      try {
-        new URL(origin);
-      } catch {
-        throw new Error(
-          `${this.name}: --oidc-logout-origins holds "${origin}", which is not a URL`
-        );
-      }
-    }
+    assertOrigins(
+      settings.oidc_logout_origins,
+      this.name,
+      '--oidc-logout-origins'
+    );
+    assertOrigins(
+      configuredOrigins(this.config),
+      this.name,
+      '--auth-trusted-origin'
+    );
   }
 
   /**
@@ -350,55 +366,19 @@ export default class OpenIDConnect extends AuthBase {
   }
 
   /**
-   * Origins a logout may come from: `--base-url`, and the consoles named in
-   * `--oidc-logout-origins` when they are served elsewhere.
+   * Origins a browser may send a logout or a change from: `--base-url`, and
+   * the consoles named in `--auth-trusted-origin` or in
+   * `--oidc-logout-origins`, its older name. `--base-url` is checked by the
+   * library, the others at startup.
    */
-  private logoutOrigins(): string[] {
+  private trustedOrigins(): string[] {
     const { base_url, oidc_logout_origins } =
       this.options(openidconnectOptions);
-    const origins = new Set<string>();
-    for (const value of [base_url, ...oidc_logout_origins]) {
-      try {
-        origins.add(new URL(value).origin);
-      } catch {
-        // `--base-url` is checked by the library; a configured origin was
-        // refused at startup.
-      }
-    }
-    return [...origins];
-  }
-
-  /**
-   * Whether a browser reports the request as coming from another site.
-   *
-   * `/logout` is a `GET` a link reaches, so a page on another site can end
-   * the session without a token. The origin is what tells the caller's own
-   * link apart from someone else's. `Sec-Fetch-Site` answers where a browser
-   * sends it; `Origin` and `Referer` cover the others, and name the console
-   * when it is served from another origin. A client sending none of them — a
-   * script, a server — is not a browser navigating from another site, and is
-   * let through.
-   *
-   * @param req incoming request
-   * @returns true when the request comes from another site
-   */
-  private crossSite(req: DmRequest): boolean {
-    const site = req.headers['sec-fetch-site'];
-    if (site === 'same-origin' || site === 'none') return false;
-
-    const trusted = this.logoutOrigins();
-    let seen = false;
-    for (const name of ['origin', 'referer'] as const) {
-      const value = req.headers[name];
-      if (typeof value !== 'string') continue;
-      seen = true;
-      try {
-        if (trusted.includes(new URL(value).origin)) return false;
-      } catch {
-        return true;
-      }
-    }
-    return typeof site === 'string' || seen;
+    return originsOf([
+      base_url,
+      ...configuredOrigins(this.config),
+      ...oidc_logout_origins,
+    ]);
   }
 
   /**
@@ -418,12 +398,17 @@ export default class OpenIDConnect extends AuthBase {
    * @param next called once the request carries an identity
    */
   authMethod(req: DmRequest, res: Response, next: () => void): void {
-    if (
-      (req.method === 'GET' || req.method === 'HEAD') &&
-      LOGOUT.test(req.path) &&
-      this.crossSite(req)
-    )
+    // `/logout` is a GET a link reaches and asks for no token.
+    const logout =
+      (req.method === 'GET' || req.method === 'HEAD') && LOGOUT.test(req.path);
+    if (logout && crossSite(req, this.trustedOrigins()))
       return forbidden(res, 'Cross-site logout refused');
+    if (
+      changesState(req) &&
+      !FROM_PROVIDER.test(req.path) &&
+      crossSite(req, this.trustedOrigins())
+    )
+      return forbidden(res, 'Cross-site request refused');
     if (!this.router)
       return serverError(
         res,
@@ -437,10 +422,7 @@ export default class OpenIDConnect extends AuthBase {
         // that is the provider's limit, and a 500 would not lift it.
         return res.redirect(this.options(openidconnectOptions).base_url);
       if (err) return serverError(res, err);
-      if (
-        (req.method === 'GET' || req.method === 'HEAD') &&
-        LOGOUT.test(req.path)
-      )
+      if (logout)
         // A failure comes back through this same callback, as `err`.
         return void this.endHere(req).then(() =>
           (

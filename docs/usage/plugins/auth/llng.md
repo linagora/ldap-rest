@@ -44,6 +44,14 @@ identity that rule names. The consequence is that the value must come from
 the handler — a header set by an upstream proxy does not survive, and would
 only have been trustworthy if that proxy stripped the client's copy itself.
 
+## Requests from other sites
+
+The LemonLDAP::NG cookie goes with every request, whichever page asks: a
+request that changes something is refused (`403`) when the browser reports it
+as coming from an origin other than `--base-url` or those listed in
+`--auth-trusted-origin`. A console served from another origin must be listed
+([details](README.md#cookie-sessions-and-other-sites)).
+
 ## Location rules and letter case
 
 LDAP-Rest routes paths ignoring letter case: `/API/V1/LDAP/USERS` reaches the

@@ -184,6 +184,8 @@ interface Config {
     auth_totp_step?: number;
     // (undocumented)
     auth_totp_window?: number;
+    // (undocumented)
+    auth_trusted_origin?: string | string[];
     authz_combine?: boolean;
     // (undocumented)
     authz_dynamic_base?: string;

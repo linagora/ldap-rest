@@ -253,6 +253,36 @@ Note the converse: with a catch-all there is no public branch at all. Making one
 
 Note that a prefix scopes **authentication**, not authorization: once past it, a caller reaches everything the branch exposes. Restrict what each population may do with [authz-per-route](authz-per-route.md) or [authz-per-branch](authz-per-branch.md).
 
+## Cookie sessions and other sites
+
+`core/auth/openidconnect` and `core/auth/llng` authenticate with a cookie,
+which the browser sends with every request to the server, whichever page
+asks for it. A page of another site — a sibling subdomain included — could
+then make a signed-in administrator's browser submit a form that changes the
+directory.
+
+These two plugins therefore refuse (`403`) a request other than `GET`, `HEAD`
+or `OPTIONS` that the browser reports as coming from elsewhere: a
+`Sec-Fetch-Site` other than `same-origin` or `none`, or an `Origin` — a
+`Referer` when there is no `Origin` — naming an origin that is not trusted.
+The trusted origins are `--base-url`'s and those listed in
+`--auth-trusted-origin` (`DM_AUTH_TRUSTED_ORIGINS`, comma-separated). A
+console served by ldap-rest itself needs nothing; a console served from
+another origin must be listed. A client sending none of these headers — a
+script, a server — is not a browser acting for another page, and is served
+as before.
+
+The check belongs to the plugin that authenticates the request: a path
+guarded by a token, HMAC, TOTP or JWT plugin is not affected. OpenID Connect
+applies the same check to `/logout`, which is a `GET`
+([details](oidc.md#logout)); `/callback` and `/backchannel-logout`, which the
+provider posts to, are exempt.
+
+With LemonLDAP::NG, `--base-url` is optional. Browsers that do not send
+`Sec-Fetch-Site` (before Safari 16.4 or Firefox 90) identify a console served
+by ldap-rest by its `Origin` alone: set `--base-url`, or list the console's
+origin, for them.
+
 ## Combining with Authorization
 
 All authentication plugins set `req.user` to the authenticated identity. You can use hooks to implement custom authorization:

@@ -186,6 +186,10 @@ export interface Config {
   // JSON (`{"auth_path_prefix":"/api/m"}`) and never go through the array
   // parsing that `--auth-path-prefix` and `DM_AUTH_PATH_PREFIX` apply
   auth_path_prefix?: string | string[];
+  // Origins a browser may send a change from, for the plugins whose
+  // credential is a cookie (llng, openidconnect). A bare string, as above,
+  // when it comes from a plugin's overrides
+  auth_trusted_origin?: string | string[];
 
   // auth/llng
   llng_ini?: string;
@@ -679,6 +683,13 @@ const configArgs: ConfigTemplate = [
     [],
     'array',
     '--auth-path-prefixes',
+  ],
+  [
+    '--auth-trusted-origin',
+    'DM_AUTH_TRUSTED_ORIGINS',
+    [],
+    'array',
+    '--auth-trusted-origins',
   ],
 
   // Auth token, fake, TOTP and HMAC plugins
