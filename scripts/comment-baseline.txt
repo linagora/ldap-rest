@@ -26,7 +26,6 @@ cache stored nothing at all until #166, so no deployment has ever run
 checks — administering a branch read-only used to report `create: true`
 every request, so the plugin used to answer 500 to all of them while
 globally unique (see #88). Set to `uid` to restore the pre-#89 contract
-module name, so every named instance used to leave this pass for the
 once per level (#350)
 ones (#103).
 otherwise keep answering the entry that used to carry this DN.
