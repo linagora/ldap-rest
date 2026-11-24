@@ -289,6 +289,7 @@ ENV NODE_ENV=production \
  DM_JWT_IDENTITY_CLAIM="client_id" \
  DM_JWT_ALLOWED_CLIENTS= \
  DM_JWT_TYPE= \
+ DM_JWT_ISSUERS="{}" \
  DM_RATE_LIMIT_WINDOW_MS="900000" \
  DM_RATE_LIMIT_MAX="100" \
  DM_CROWDSEC_URL="http://localhost:8080/v1/decisions" \

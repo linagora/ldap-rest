@@ -742,6 +742,12 @@
     "env": "DM_JWT_ISSUER"
   },
   {
+    "cli": "--jwt-issuers",
+    "type": "json",
+    "default": {},
+    "env": "DM_JWT_ISSUERS"
+  },
+  {
     "cli": "--jwt-jwks-uri",
     "type": "string",
     "default": "",

@@ -65,6 +65,7 @@ const ENV = [
   'DM_JWT_IDENTITY_CLAIM',
   'DM_JWT_ALLOWED_CLIENTS',
   'DM_JWT_TYPE',
+  'DM_JWT_ISSUERS',
 ];
 
 describe('core/auth/jwt', () => {
@@ -469,6 +470,244 @@ describe('core/auth/jwt', () => {
           await sign({}, stranger, { alg: 'RS256', kid: `x${i}` })
         ).expect(401);
       expect(provider.jwksHits - hits).to.be.at.most(1);
+    });
+  });
+
+  describe('with several issuers', () => {
+    const second = new Provider();
+    let secondKey: CryptoKey;
+
+    before(async () => {
+      await second.start();
+      const pair = await generateKeyPair('ES256', { extractable: true });
+      secondKey = pair.privateKey;
+      second.keys = [
+        { ...(await exportJWK(pair.publicKey)), kid: 'b1', alg: 'ES256' },
+      ];
+      secondKeys = second.keys;
+    });
+
+    after(() => second.stop());
+
+    let secondKeys: JWK[];
+
+    afterEach(() => {
+      second.jwksStatus = 200;
+      second.discoveryIssuer = undefined;
+      second.keys = secondKeys;
+    });
+
+    const fromSecond = (claims: JWTPayload = {}): Promise<string> =>
+      sign({ iss: second.issuer, ...claims }, secondKey, {
+        alg: 'ES256',
+        kid: 'b1',
+      });
+
+    /**
+     * A server trusting both providers, prefixed `a:` and `b:`, the second
+     * one with `entry`
+     */
+    async function both(
+      entry: Record<string, unknown> = {},
+      env: Record<string, string> = {}
+    ): Promise<express.Express> {
+      for (const name of ENV) delete process.env[name];
+      process.env.DM_JWT_ISSUERS = JSON.stringify({
+        [provider.issuer]: { identity_prefix: 'a:' },
+        [second.issuer]: {
+          algorithm: ['ES256'],
+          identity_prefix: 'b:',
+          ...entry,
+        },
+      });
+      Object.assign(process.env, env);
+      const dm = new DM();
+      await dm.ready;
+      await dm.registerPlugin('authJwt', new AuthJwt(dm));
+      dm.app.get('/api/whoami', (req, res) => {
+        res.json({ user: (req as DmRequest).user });
+      });
+      return dm.app;
+    }
+
+    it('accepts a token from each issuer', async () => {
+      const app = await both();
+      await call(app, await sign({})).expect(200);
+      const res = await call(app, await fromSecond({ client_id: 'sync' }));
+      expect(res.status).to.equal(200);
+      expect(res.body.user).to.equal('b:sync');
+    });
+
+    it('judges a token with the keys of the issuer it names only', async () => {
+      const app = await both({ algorithm: ['ES256', 'RS256'] });
+      // The second provider publishes a key of its own under the first one's
+      // kid: the first one's key would verify the token, were it tried
+      const own = await generateKeyPair('RS256', { extractable: true });
+      second.keys = [
+        ...secondKeys,
+        { ...(await exportJWK(own.publicKey)), kid: 'k1', alg: 'RS256' },
+      ];
+      await call(app, await sign({ iss: second.issuer })).expect(401);
+      await call(
+        app,
+        await sign({ iss: second.issuer }, own.privateKey, {
+          alg: 'RS256',
+          kid: 'k1',
+        })
+      ).expect(200);
+      await call(app, await sign({})).expect(200);
+    });
+
+    it('judges a token without kid with the keys of the issuer it names only', async () => {
+      const app = await both({ algorithm: ['ES256', 'RS256'] });
+      const own = await generateKeyPair('RS256', { extractable: true });
+      second.keys = [
+        ...secondKeys,
+        { ...(await exportJWK(own.publicKey)), alg: 'RS256' },
+      ];
+      await call(
+        app,
+        await sign({ iss: second.issuer }, signing, { alg: 'RS256' })
+      ).expect(401);
+      await call(
+        app,
+        await sign({ iss: second.issuer }, own.privateKey, { alg: 'RS256' })
+      ).expect(200);
+      await call(app, await sign({}, signing, { alg: 'RS256' })).expect(200);
+    });
+
+    it('answers 503 only for an issuer whose discovery names another', async () => {
+      const app = await both();
+      second.discoveryIssuer = provider.issuer;
+      await call(app, await fromSecond()).expect(503);
+      await call(app, await sign({})).expect(200);
+    });
+
+    it('refuses an issuer it was not given, or no issuer, unfetched', async () => {
+      const app = await both();
+      const hits = provider.discoveryHits + second.discoveryHits;
+      await call(app, await sign({ iss: 'https://other.example' })).expect(401);
+      await call(app, await sign({ iss: undefined })).expect(401);
+      expect(provider.discoveryHits + second.discoveryHits).to.equal(hits);
+    });
+
+    it("checks each issuer's own algorithms and audience", async () => {
+      const app = await both(
+        { audience: ['directory'] },
+        { DM_JWT_AUDIENCES: 'ldap-rest', DM_JWT_ALGORITHMS: 'RS256' }
+      );
+      await call(app, await sign({})).expect(200);
+      await call(app, await fromSecond()).expect(401);
+      await call(app, await fromSecond({ aud: 'directory' })).expect(200);
+      // ES256 is the second issuer's only
+      await call(
+        app,
+        await sign({}, others.ES256, { alg: 'ES256', kid: 'ES256' })
+      ).expect(401);
+    });
+
+    it("checks each issuer's own allowed clients", async () => {
+      const app = await both(
+        { allowed_client: ['sync'] },
+        { DM_JWT_ALLOWED_CLIENTS: 'backup' }
+      );
+      await call(app, await sign({})).expect(200);
+      await call(app, await fromSecond({ client_id: 'backup' })).expect(403);
+      await call(app, await fromSecond({ client_id: 'sync' })).expect(200);
+    });
+
+    it('prefixes the identity of the issuer configured so', async () => {
+      const app = await both({ identity_prefix: 'b:', identity_claim: 'sub' });
+      const res = await call(app, await fromSecond({ sub: 'svc' })).expect(200);
+      expect(res.body.user).to.equal('b:svc');
+      const first = await call(app, await sign({})).expect(200);
+      expect(first.body.user).to.equal('a:backup');
+    });
+
+    it('answers 503 only for the tokens of an issuer it cannot reach', async () => {
+      const app = await both({ jwks_uri: `${second.issuer}/certs` });
+      second.jwksStatus = 500;
+      await call(app, await fromSecond()).expect(503);
+      await call(app, await sign({})).expect(200);
+    });
+
+    it('refuses to start on a list of issuers', async () => {
+      for (const name of ENV) delete process.env[name];
+      process.env.DM_JWT_ISSUERS = '["https://a.example"]';
+      const dm = new DM();
+      await dm.ready;
+      expect(() => new AuthJwt(dm)).to.throw(
+        '--jwt-issuers must be a JSON object'
+      );
+    });
+
+    for (const [issuers, env, message] of [
+      [{ x: [] }, {}, 'must be a JSON object'],
+      [
+        { 'https://a.example': { audiences: ['a'] } },
+        {},
+        'unknown field "audiences"',
+      ],
+      [
+        { 'https://a.example': { audience: 'a' } },
+        {},
+        '"audience" must be a list',
+      ],
+      [{ 'https://a.example': { algorithm: ['HS256'] } }, {}, 'HS256 refused'],
+      [{ 'https://a.example ': {} }, {}, 'named exactly'],
+      [{ 'ftp://a.example': {} }, {}, 'not an http(s) URL'],
+      [
+        { 'https://a.example': {} },
+        { DM_JWT_ISSUER: 'https://b.example' },
+        '--jwt-issuers replaces --jwt-issuer',
+      ],
+      // A's client "b:admin" would be taken for B's "admin"
+      [
+        {
+          'https://a.example': {},
+          'https://b.example': { identity_prefix: 'b:' },
+        },
+        {},
+        '"https://a.example": identity_prefix is required',
+      ],
+      // A's "b:x" and B's "x" would both be "a:b:x"
+      [
+        {
+          'https://a.example': { identity_prefix: 'a:' },
+          'https://b.example': { identity_prefix: 'a:b:' },
+        },
+        {},
+        'identity_prefix "a:b:" of https://b.example starts with "a:"',
+      ],
+      [
+        {
+          'https://a.example': { identity_prefix: 'x:' },
+          'https://b.example': { identity_prefix: 'x:' },
+        },
+        {},
+        'starts with "x:"',
+      ],
+    ] as Array<[Record<string, unknown>, Record<string, string>, string]>)
+      it(`refuses to start on ${JSON.stringify(issuers)}`, async () => {
+        for (const name of ENV) delete process.env[name];
+        process.env.DM_JWT_ISSUERS = JSON.stringify(issuers);
+        Object.assign(process.env, env);
+        const dm = new DM();
+        await dm.ready;
+        expect(() => new AuthJwt(dm)).to.throw(message);
+      });
+
+    it('needs no prefix for a single issuer', async () => {
+      for (const name of ENV) delete process.env[name];
+      process.env.DM_JWT_ISSUERS = JSON.stringify({ [provider.issuer]: {} });
+      const dm = new DM();
+      await dm.ready;
+      await dm.registerPlugin('authJwt', new AuthJwt(dm));
+      dm.app.get('/api/whoami', (req, res) => {
+        res.json({ user: (req as DmRequest).user });
+      });
+      const res = await call(dm.app, await sign({})).expect(200);
+      expect(res.body.user).to.equal('backup');
     });
   });
 });
