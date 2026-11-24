@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- SCIM: a group keeps its nested groups in `members` on POST, PUT and PATCH;
+  a member's `type` or `$ref` says whether it names a user or a group
+  ([#785](https://github.com/linagora/ldap-rest/issues/785),
+  [details](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior))
+
 ## v2.5.0 (2026-11-23)
 
 ### Security

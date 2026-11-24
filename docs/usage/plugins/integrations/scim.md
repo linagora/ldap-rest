@@ -352,11 +352,15 @@ included. A group left with no member the caller saw gets the
 `--group-dummy-user` placeholder.
 
 A member is resolved as the caller sees the directory, whether it is given
-by id or by DN: an account the caller cannot read is left out of the group,
-as one that does not exist is. Under an authorization model judging by
+by id or by DN: an account or a group the caller cannot read is left out of
+the group, as one that does not exist is. A member names a user unless its
+`type`, or the endpoint its `$ref` names, says otherwise: a group may hold
+another group, and a user and a group can share an id (`--scim-id-attribute`
+defaults to the RDN value), so a reference that says neither is looked up as
+a user first, then as a group. Under an authorization model judging by
 branch, a member in a branch the caller may not read refuses the whole write
-instead, whether the account exists or not. A DN outside the user base is
-left out.
+instead, whether the account exists or not. A DN outside the user and group
+bases is left out.
 
 ### Schema advertisement
 

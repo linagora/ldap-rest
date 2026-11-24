@@ -450,6 +450,124 @@ describe('SCIM Groups (integration)', function () {
     ).to.be.true;
   });
 
+  describe('nested groups', () => {
+    const nested = 'scim-nestedgroup';
+    const parent = 'scim-parentgroup';
+    // A group carrying the id of the user `scim-groupuser`
+    const namesake = 'scim-groupuser';
+
+    const post = (displayName: string, members?: unknown[]): supertest.Test =>
+      supertest(server.app)
+        .post('/scim/v2/Groups')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName,
+          ...(members ? { members } : {}),
+        });
+
+    const membersOf = (body: { members?: { value: string }[] }): string[] =>
+      (body.members ?? []).map(m => m.value).sort();
+
+    afterEach(async () => {
+      for (const id of [nested, parent, namesake])
+        await plugin.ldap
+          .delete(`cn=${id},${groupBase}`)
+          .catch(() => undefined);
+    });
+
+    it('keeps a nested group when a PUT sends back what a GET returned', async () => {
+      await post(nested, [{ value: 'scim-groupuser' }]).expect(201);
+      await post(parent, [
+        { value: 'scim-groupuser' },
+        { value: nested, type: 'Group' },
+      ]).expect(201);
+
+      const read = await supertest(server.app)
+        .get(`/scim/v2/Groups/${parent}`)
+        .expect(200);
+      const group = (
+        read.body.members as { value: string; type?: string; $ref?: string }[]
+      ).find(m => m.value === nested);
+      expect(group?.type).to.equal('Group');
+      expect(group?.$ref).to.match(/\/Groups\/scim-nestedgroup$/);
+
+      // The round trip from the bug report: what a read returned, sent back,
+      // keeps every member it showed.
+      const put = await supertest(server.app)
+        .put(`/scim/v2/Groups/${parent}`)
+        .set('Content-Type', 'application/scim+json')
+        .send(read.body)
+        .expect(200);
+      expect(membersOf(put.body)).to.deep.equal(['scim-groupuser', nested]);
+
+      // A client sending ids alone: looked up as a user, then as a group.
+      const untyped = await supertest(server.app)
+        .put(`/scim/v2/Groups/${parent}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: parent,
+          members: [{ value: 'scim-groupuser' }, { value: nested }],
+        })
+        .expect(200);
+      expect(membersOf(untyped.body)).to.deep.equal(['scim-groupuser', nested]);
+    });
+
+    it('adds a nested group by PATCH', async () => {
+      await post(nested, [{ value: 'scim-groupuser' }]).expect(201);
+      await post(parent, [{ value: 'scim-groupuser' }]).expect(201);
+
+      const res = await supertest(server.app)
+        .patch(`/scim/v2/Groups/${parent}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'add',
+              path: 'members',
+              value: [{ value: nested, type: 'Group' }],
+            },
+          ],
+        })
+        .expect(200);
+      expect(membersOf(res.body)).to.deep.equal(['scim-groupuser', nested]);
+    });
+
+    it("follows the member's type when a user and a group share an id", async () => {
+      await post(namesake, [{ value: 'scim-groupuser' }]).expect(201);
+      await post(parent, [
+        { value: namesake, type: 'User' },
+        { value: namesake, type: 'Group' },
+      ]).expect(201);
+
+      const found = (await plugin.ldap.search(
+        { paged: false, scope: 'base', attributes: ['member'] },
+        `cn=${parent},${groupBase}`
+      )) as { searchEntries: { member?: string | string[] }[] };
+      const dns = ([] as string[])
+        .concat(found.searchEntries[0]?.member ?? [])
+        .map(m => m.toLowerCase())
+        .sort();
+      expect(dns).to.deep.equal([
+        `cn=${namesake},${groupBase}`.toLowerCase(),
+        `uid=${namesake},${userBase}`.toLowerCase(),
+      ]);
+    });
+
+    // Left out rather than refused, as a member outside the tenant's bases
+    // already is: a client resending what it read must not fail because
+    // another writer removed a member meanwhile.
+    it('leaves out a member id that matches nothing', async () => {
+      const res = await post(parent, [
+        { value: 'scim-groupuser' },
+        { value: 'no-such-member', type: 'Group' },
+      ]).expect(201);
+      expect(membersOf(res.body)).to.deep.equal(['scim-groupuser']);
+    });
+  });
+
   it('filters groups by displayName eq', async () => {
     await supertest(server.app)
       .post('/scim/v2/Groups')
