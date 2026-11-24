@@ -52,10 +52,24 @@ import {
   mappingEntryOf,
 } from './mapping.js';
 
+/** A group member as a client sent it: its value, and what says its kind */
+export interface MemberReference {
+  value: string;
+  type?: string;
+  $ref?: string;
+}
+
 export interface PatchContext {
   mapping: ResourceMapping;
-  /** For Groups: resolve SCIM member value (id or $ref) → LDAP DN. Async. */
-  resolveMemberRef?: (value: string) => Promise<string | undefined>;
+  /**
+   * For Groups: resolve a SCIM member reference (id or DN) → LDAP DN. Async.
+   * The second argument is what the reference said about the entry it names,
+   * so a nested group is not taken for a user of the same id.
+   */
+  resolveMemberRef?: (
+    value: string,
+    ref?: MemberReference
+  ) => Promise<string | undefined>;
   /** The LDAP attribute holding members, default 'member'. */
   memberAttribute?: string;
   /**
@@ -305,17 +319,21 @@ function parsePath(path: string): {
 }
 
 /** A member as a PATCH names it: an id, alone or as the `value` of an object */
-function memberRef(v: unknown): string {
-  const value =
+function memberRef(v: unknown): MemberReference {
+  const ref =
     v && typeof v === 'object' && !Array.isArray(v)
-      ? (v as { value?: unknown }).value
-      : v;
-  if (value == null) return '';
-  if (typeof value === 'string' || typeof value === 'number')
-    return String(value);
-  throw scimInvalidValue(
-    `Each member must be a string or an object whose value is one, got ${kindOf(value)}`
-  );
+      ? (v as { value?: unknown; type?: unknown; $ref?: unknown })
+      : undefined;
+  const value = ref ? ref.value : v;
+  if (value == null) return { value: '' };
+  if (typeof value !== 'string' && typeof value !== 'number')
+    throw scimInvalidValue(
+      `Each member must be a string or an object whose value is one, got ${kindOf(value)}`
+    );
+  const out: MemberReference = { value: String(value) };
+  if (typeof ref?.type === 'string') out.type = ref.type;
+  if (typeof ref?.$ref === 'string') out.$ref = ref.$ref;
+  return out;
 }
 
 function coerceValue(v: unknown): string | string[] | undefined {
@@ -400,9 +418,9 @@ async function applyOperation(
       const list = Array.isArray(value) ? value : [value];
       const dns: string[] = [];
       for (const v of list) {
-        const memberValue = memberRef(v);
-        if (!memberValue) continue;
-        const dn = await resolveMemberRef(memberValue);
+        const ref = memberRef(v);
+        if (!ref.value) continue;
+        const dn = await resolveMemberRef(ref.value, ref);
         if (dn) dns.push(dn);
       }
       return dns;

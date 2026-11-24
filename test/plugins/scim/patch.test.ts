@@ -213,6 +213,40 @@ describe('SCIM PATCH applicator', () => {
     expect(req.replace).to.be.undefined;
   });
 
+  it('member add hands over what the reference says about its kind', async () => {
+    const seen: unknown[] = [];
+    await patchToModifyRequest(
+      {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          {
+            op: 'add',
+            path: 'members',
+            value: [
+              { value: 'team', type: 'Group', $ref: '/scim/v2/Groups/team' },
+              { value: 'alice' },
+            ],
+          },
+        ],
+      },
+      {
+        mapping: DEFAULT_USER_MAPPING,
+        memberAttribute: 'member',
+        current: {},
+        resolveMemberRef: async (_value, ref) => {
+          seen.push(ref);
+          return undefined;
+        },
+      }
+    );
+    // A user and a group may share an id: the resolver needs the type a read
+    // wrote to tell a nested group from a user of the same name.
+    expect(seen).to.deep.equal([
+      { value: 'team', type: 'Group', $ref: '/scim/v2/Groups/team' },
+      { value: 'alice' },
+    ]);
+  });
+
   it('adds concurrently without either request losing the other', async () => {
     // Both requests see the same entry and add a different value. Emitting
     // the computed set as a `replace` made each write `[snapshot + mine]`,

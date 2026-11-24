@@ -36,6 +36,14 @@
   ([#776](https://github.com/linagora/ldap-rest/issues/776),
   [storage](docs/usage/plugins/utilities/storage.md#backends))
 
+### Fixed
+
+- SCIM: a group keeps its nested groups in `members` on POST, PUT and PATCH;
+  a member's `type` or `$ref` says whether it names a user or a group, and a
+  group cannot be made a member of itself (`400 invalidValue`)
+  ([#785](https://github.com/linagora/ldap-rest/issues/785),
+  [details](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior))
+
 ## v2.5.0 (2026-11-23)
 
 ### Security
