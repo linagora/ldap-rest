@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Security
+
+- `core/auth/openidconnect` and `core/auth/llng` refuse a request that changes
+  something when a browser sends it from another origin than `--base-url`
+  or those listed in the new `--auth-trusted-origin`: a console served from
+  another origin must be listed there. With `core/auth/llng`, a `--base-url`
+  that is not a URL stops the server
+  ([upgrading](docs/usage/upgrading.md#a-console-on-another-origin-must-be-trusted-for-changes))
+
 ### Added
 
 - Plugins can declare an `init()` step, awaited before their routes and hooks

@@ -93,6 +93,13 @@
     "env": "DM_AUTH_TOTP_WINDOW"
   },
   {
+    "cli": "--auth-trusted-origin",
+    "type": "array",
+    "default": [],
+    "plural": "--auth-trusted-origins",
+    "env": "DM_AUTH_TRUSTED_ORIGINS"
+  },
+  {
     "cli": "--authz-combine",
     "type": "boolean",
     "default": false,

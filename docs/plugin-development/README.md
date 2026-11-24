@@ -300,10 +300,8 @@ variables are read: see
 An undeclared `--option-name value` pair still lands in `this.config.option_name`,
 but no `DM_*` variable does.
 
-An authentication plugin extends `AuthBase`, from `ldap-rest/auth-base`, and
-implements `authMethod(req, res, next)`; the error classes (`HttpError`,
-`UnauthorizedError`…) come from `ldap-rest/plugin`, the JSON responses from
-`ldap-rest/expressformatedresponses`.
+An authentication plugin extends `AuthBase`: see
+[Authentication Plugins](#authentication-plugins).
 
 ---
 
@@ -826,6 +824,43 @@ Available roles:
 - **logging** - Logging and audit plugins
 - **demo** - Example/demonstration plugins
 - **consistency** - Data consistency enforcement plugins
+
+### Authentication Plugins
+
+An authentication plugin extends `AuthBase`, from `ldap-rest/auth-base`, and
+implements `authMethod(req, res, next)`; the error classes (`HttpError`,
+`UnauthorizedError`…) come from `ldap-rest/plugin`, the JSON responses from
+`ldap-rest/expressformatedresponses`.
+
+A plugin whose credential the browser sends by itself — a cookie — also
+overrides `trustedOrigins()`, returning the origins a browser may send a
+change from (`URL.origin` values, computed once at construction). `AuthBase`
+then refuses with `403`, before `authMethod` runs, a request other than
+`GET`, `HEAD` or `OPTIONS` that the browser reports as coming from any other
+origin, by the rule of
+[Cookie sessions and other sites](../usage/plugins/auth/README.md#cookie-sessions-and-other-sites).
+`crossSiteExempt(req)` returns true for a route another site posts to by
+design and which protects itself, such as an identity provider's callback.
+The default `trustedOrigins()` returns `undefined`: a token or a signature,
+which a page cannot make the browser send, needs no such check.
+
+```typescript
+import AuthBase, { type DmRequest } from 'ldap-rest/auth-base';
+
+export default class MyCookieAuth extends AuthBase {
+  name = 'myCookieAuth';
+  roles: Role[] = ['auth'];
+  private readonly origins = [new URL(this.config.base_url as string).origin];
+
+  protected trustedOrigins(): readonly string[] {
+    return this.origins;
+  }
+
+  authMethod(req: DmRequest, res: Response, next: () => void): void {
+    // read the cookie, then this.publishIdentity(req, user) and next()
+  }
+}
+```
 
 ---
 

@@ -84,11 +84,13 @@ abstract class AuthBase extends DmPlugin {
     api(_app: Express_2): void;
     authenticate(req: Request_2, res: Response_2, next: () => void): Promise<void>;
     abstract authMethod(req: DmRequest, res: Response_2, next: () => void): void;
+    protected crossSiteExempt(_req: DmRequest): boolean;
     protected identitySource(): string;
     protected knownIdentities(): string[] | undefined;
     protected passThrough(req: Request_2, next: () => void): void;
     get pathPrefixes(): string[];
     protected publishIdentity(req: DmRequest, user: string, userName?: string): void;
+    protected trustedOrigins(): readonly string[] | undefined;
     vouchedFor(req: Request_2): boolean;
 }
 
@@ -217,6 +219,8 @@ interface Config {
     auth_totp_step?: number;
     // (undocumented)
     auth_totp_window?: number;
+    // (undocumented)
+    auth_trusted_origin?: string | string[];
     authz_combine?: boolean;
     // (undocumented)
     authz_dynamic_base?: string;

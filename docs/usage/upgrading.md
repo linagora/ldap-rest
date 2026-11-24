@@ -6,6 +6,24 @@ decision or a configuration change appear here; see the
 
 ## From 2.5.0
 
+### A console on another origin must be trusted for changes
+
+**Who is affected:** a deployment loading `core/auth/openidconnect` or
+`core/auth/llng` whose console is served from an origin other than
+`--base-url`.
+
+A request that changes something (`POST`, `PUT`, `PATCH`, `DELETE`) and that a
+browser reports as coming from another origin is refused with `403`. List the
+console's origin, with no path, in `--auth-trusted-origin` (or
+`DM_AUTH_TRUSTED_ORIGINS`, comma-separated); with OpenID Connect, an origin
+already in `--oidc-logout-origins` is trusted too. A console served by
+ldap-rest itself needs nothing, nor does a client authenticated by a token,
+HMAC, TOTP or JWT
+([details](plugins/auth/README.md#cookie-sessions-and-other-sites)).
+
+With `core/auth/llng`, a `--base-url` (`DM_BASE_URL`) that is set but is not
+a URL now stops the server at startup: fix it or leave it empty.
+
 ### An unreadable schema or a missing storage package stops the server
 
 **Who is affected:** a deployment loading `core/ldap/groups` or

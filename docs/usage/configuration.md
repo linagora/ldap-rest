@@ -336,9 +336,10 @@ Read-only low-level browsing (root DSE, schema, entries). See [raw plugin](plugi
 
 #### Common to every authentication plugin
 
-| CLI                  | Plural                 | Env                   | Default | Description                                 |
-| -------------------- | ---------------------- | --------------------- | ------- | ------------------------------------------- |
-| `--auth-path-prefix` | `--auth-path-prefixes` | `DM_AUTH_PATH_PREFIX` | `[]`    | Restrict this plugin to these path prefixes |
+| CLI                     | Plural                   | Env                       | Default | Description                                                                                                                                                                                                                                             |
+| ----------------------- | ------------------------ | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--auth-path-prefix`    | `--auth-path-prefixes`   | `DM_AUTH_PATH_PREFIX`     | `[]`    | Restrict this plugin to these path prefixes                                                                                                                                                                                                             |
+| `--auth-trusted-origin` | `--auth-trusted-origins` | `DM_AUTH_TRUSTED_ORIGINS` | `[]`    | Origins (`https://host[:port]`, nothing after) besides `--base-url` a browser may send changes from, for `core/auth/llng` and `core/auth/openidconnect` (see [Cookie sessions and other sites](plugins/auth/README.md#cookie-sessions-and-other-sites)) |
 
 Empty means the plugin guards every path. Scoping several instances to different prefixes lets one server serve populations that authenticate differently — see [Serving several populations from one server](plugins/auth/README.md#serving-several-populations-from-one-server), including the routes it can leave unauthenticated.
 
@@ -387,7 +388,7 @@ Development only, refused with `NODE_ENV=production` — see [Fake Authenticatio
 | `--oidc-client-secret`                             | `DM_OIDC_CLIENT_SECRET`  |         | OIDC Client Secret                                                                                                                                         |
 | `--oidc-session-secret` / `--oidc-session-secrets` | `DM_OIDC_SESSION_SECRET` |         | Key of the session cookie; required, and must differ from the client secret. Several values rotate sessions (see [OIDC](plugins/auth/oidc.md#session-key)) |
 | `--oidc-username-claim`                            | `DM_OIDC_USERNAME_CLAIM` | `sub`   | Claim naming the caller, published as `req.userName` (see [OIDC](plugins/auth/oidc.md))                                                                    |
-| `--oidc-logout-origins`                            | `DM_OIDC_LOGOUT_ORIGINS` | `[]`    | Other origins a console may log out from (see [OIDC](plugins/auth/oidc.md#logout))                                                                         |
+| `--oidc-logout-origins`                            | `DM_OIDC_LOGOUT_ORIGINS` | `[]`    | Kept for existing deployments; prefer `--auth-trusted-origin`. Its origins are trusted too, by this plugin only (see [OIDC](plugins/auth/oidc.md#logout))  |
 | `--base-url`                                       | `DM_BASE_URL`            |         | Public URL for callbacks                                                                                                                                   |
 
 #### `core/auth/jwt`

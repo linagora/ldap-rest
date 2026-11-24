@@ -241,6 +241,7 @@ ENV NODE_ENV=production \
  DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini" \
  DM_LLNG_USERNAME_HEADER= \
  DM_AUTH_PATH_PREFIX= \
+ DM_AUTH_TRUSTED_ORIGINS= \
  DM_AUTH_TOKENS= \
  DM_AUTH_FAKE_USER= \
  DM_AUTH_TOTP= \

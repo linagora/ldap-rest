@@ -9,7 +9,13 @@
 import type { Express, Response } from 'express';
 
 import AuthBase, { DmRequest } from '../../lib/auth/base.js';
+import {
+  assertOrigins,
+  configuredOrigins,
+  originsOf,
+} from '../../lib/auth/crossSite.js';
 import type { Role } from '../../abstract/plugin.js';
+import type { DM } from '../../bin/index.js';
 
 import { llngOptions } from './auth.options.js';
 
@@ -205,6 +211,25 @@ export default class AuthLLNG extends AuthBase {
   private instance?: LlngInstance;
   /** How many keys of each list of location rules were found foldable */
   private readonly foldable = new WeakMap<object, number>();
+
+  /** `--base-url`'s origin when it is set, and `--auth-trusted-origin` */
+  private readonly origins: readonly string[];
+
+  constructor(server: DM) {
+    super(server);
+    const baseUrl = this.config.base_url ?? '';
+    // Nothing else reads it under this plugin, so a typo would go unnoticed
+    // while it refuses the changes of a console served by this server, from
+    // the browsers that send no `Sec-Fetch-Site`.
+    if (baseUrl) assertOrigins([baseUrl], this.name, '--base-url');
+    const trusted = configuredOrigins(this.config);
+    assertOrigins(trusted, this.name, '--auth-trusted-origin', true);
+    this.origins = originsOf([baseUrl, ...trusted]);
+  }
+
+  protected trustedOrigins(): readonly string[] {
+    return this.origins;
+  }
 
   /**
    * Load the optional `lemonldap-ng-handler` dependency before the server

@@ -253,6 +253,44 @@ Note the converse: with a catch-all there is no public branch at all. Making one
 
 Note that a prefix scopes **authentication**, not authorization: once past it, a caller reaches everything the branch exposes. Restrict what each population may do with [authz-per-route](authz-per-route.md) or [authz-per-branch](authz-per-branch.md).
 
+## Cookie sessions and other sites
+
+`core/auth/openidconnect` and `core/auth/llng` authenticate with a cookie,
+which the browser sends with every request to the server, whichever page
+asks for it. A page of another site — a sibling subdomain included — could
+then make a signed-in administrator's browser submit a form that changes the
+directory.
+
+These two plugins therefore refuse (`403`) a request other than `GET`, `HEAD`
+or `OPTIONS` that the browser reports as coming from elsewhere. A
+`Sec-Fetch-Site` of `same-origin` or `none` is enough to be served.
+Otherwise the `Origin` and the `Referer` the browser sent must both name a
+trusted origin — a link sends only a `Referer` — and a request with neither
+is refused when it carries a `Sec-Fetch-Site`. The trusted origins are
+`--base-url`'s and those listed in `--auth-trusted-origin`
+(`DM_AUTH_TRUSTED_ORIGINS`, comma-separated), each written as an origin —
+`https://console.example.com`, with no path: anything else stops the server
+at startup, as does a `--base-url` that is not a URL. A console served by
+ldap-rest itself needs nothing; a console served from another origin must be
+listed. A client sending none of these headers — a script, a server — is not
+a browser acting for another page, and is served as before.
+
+The check belongs to the plugin that authenticates the request: a path
+guarded by a token, HMAC, TOTP or JWT plugin is not affected. OpenID Connect
+applies the same check to `/logout`, which is a `GET`
+([details](oidc.md#logout)), and also trusts the origins of
+`--oidc-logout-origins`; the `/callback` and `/backchannel-logout` routes it
+serves, which the provider posts to, are exempt.
+
+A third-party authentication plugin whose credential is a cookie gets the
+same check from `AuthBase`: see
+[authentication plugins](../../../plugin-development/README.md#authentication-plugins).
+
+With LemonLDAP::NG, `--base-url` is optional. Browsers that do not send
+`Sec-Fetch-Site` (before Safari 16.4 or Firefox 90) identify a console served
+by ldap-rest by its `Origin` alone: set `--base-url`, or list the console's
+origin, for them.
+
 ## Combining with Authorization
 
 All authentication plugins set `req.user` to the authenticated identity. You can use hooks to implement custom authorization:
