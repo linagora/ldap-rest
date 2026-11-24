@@ -20,6 +20,7 @@ import {
   escapeLdapFilter,
   isChildOf,
   isDummyMemberDn,
+  normalizeDn,
   parseDn,
   rdnValue,
   validateDnValue,
@@ -240,7 +241,9 @@ export class ScimGroups {
    * A user and a group can carry the same id — `--scim-id-attribute`
    * defaults to the RDN value — so the kind decides which base is searched,
    * and a reference that does not say is looked up as a user first, then as
-   * a group.
+   * a group. A bare value names a group only at its own DN, where its id
+   * says it is: a deleted user's id must not become a group of that name
+   * elsewhere under the branch.
    *
    * @param req the request, for the tenant's bases and the caller's rights
    * @param value the member's `value`, an id or a DN
@@ -257,11 +260,11 @@ export class ScimGroups {
         return this.users.resolveRef(req, value);
       case 'Group':
         return this.resolveRef(req, value);
-      default:
-        return (
-          (await this.users.resolveRef(req, value)) ??
-          this.resolveRef(req, value)
-        );
+      default: {
+        const user = await this.users.resolveRef(req, value);
+        if (user) return user;
+        return this.resolveAt(req, value);
+      }
     }
   }
 
@@ -451,6 +454,7 @@ export class ScimGroups {
     }
 
     const dn = this.dnForId(id, req);
+    this.assertNotSelfMember(dn, memberDns);
     const changes: ModifyRequest = { replace: {} };
     for (const [k, v] of Object.entries(attributes)) {
       if (k === 'objectClass' || k === this.rdnAttribute) continue;
@@ -478,6 +482,15 @@ export class ScimGroups {
         resolveMemberRef: (value, ref) => this.resolveMember(req, value, ref),
         current,
       });
+
+      // The group cannot hold itself; dropping a self-member the directory
+      // already holds stays possible, so only what is added or set is read.
+      this.assertNotSelfMember(
+        dn,
+        [changes.add?.member, changes.replace?.member]
+          .flatMap(v => (v == null ? [] : ([] as unknown[]).concat(v)))
+          .map(String)
+      );
 
       // groupOfNames requires at least one member, so a patch that empties the
       // attribute gets the configured placeholder instead of a schema
@@ -555,11 +568,36 @@ export class ScimGroups {
     this.hookBus.notify('scimgroupdeletedone', finalId);
   }
 
-  /** Used internally and by Bulk to resolve a Group SCIM reference to a DN. */
-  async resolveRef(req: DmRequest, value: string): Promise<string | undefined> {
+  /**
+   * Refuse a write that would make the group a member of itself: every
+   * consumer expanding memberships would loop.
+   *
+   * Only what a write adds or sets is checked, so a group the directory
+   * already holds as its own member can still drop it.
+   *
+   * @param dn the group being written
+   * @param written the member DNs the write adds or sets
+   * @throws Error when one of them is the group itself
+   */
+  private assertNotSelfMember(dn: string, written: readonly string[]): void {
+    if (written.some(m => sameDn(m, dn)))
+      throw scimInvalidValue('A group cannot be a member of itself');
+  }
+
+  /**
+   * The group at the DN a value names, under the group base and nowhere
+   * else: a bare value names `cn=<value>,<group base>`.
+   *
+   * @param req the request, for the tenant's base and the caller's rights
+   * @param value an id or a DN
+   * @returns its DN, undefined when nothing is there
+   */
+  private async resolveAt(
+    req: DmRequest,
+    value: string
+  ): Promise<string | undefined> {
     if (!value) return undefined;
     const base = this.baseResolver.groupBase(req);
-    // A DN under the base is looked up as a name is: as the caller
     const given = value.includes('=') && value.includes(',');
     if (given && !isChildOf(value, base)) return undefined;
     const dn = given
@@ -572,18 +610,24 @@ export class ScimGroups {
           { paged: false, scope: 'base', attributes: ['dn'] },
           dn
         )) as SearchResult;
-      if (res.searchEntries && res.searchEntries.length > 0) {
+      if (res.searchEntries && res.searchEntries.length > 0)
         return res.searchEntries[0].dn;
-      }
     } catch (err) {
       // Only "no such object" is a miss. Anything else — an authorization
       // refusal, a broken connection — must not be read as an absent member,
       // which would silently drop the reference from the group.
       if (extractLdapCode(err) !== 32) throw err;
-      // Not there under that DN; try a filter.
     }
+    return undefined;
+  }
+
+  /** Used internally and by Bulk to resolve a Group SCIM reference to a DN. */
+  async resolveRef(req: DmRequest, value: string): Promise<string | undefined> {
+    const found = await this.resolveAt(req, value);
+    if (found || !value) return found;
     // A DN names one entry: no filter finds it elsewhere
-    if (given) return undefined;
+    if (value.includes('=') && value.includes(',')) return undefined;
+    const base = this.baseResolver.groupBase(req);
     try {
       const res = (await this.ldap.forRequest(req).search(
         {
@@ -611,7 +655,8 @@ export class ScimGroups {
 
 /**
  * The kind of entry a member reference names, when it says: its `type`, or
- * else the endpoint its `$ref` points at.
+ * else the endpoint its `$ref` points at. `type` is the normative attribute
+ * (RFC 7643 section 4.2) and wins when the two disagree.
  *
  * @param ref what the member sent besides its value
  * @returns the kind, undefined when the reference does not say
@@ -631,4 +676,19 @@ function memberKind(ref?: {
   if (endpoint?.toLowerCase() === 'users') return 'User';
   if (endpoint?.toLowerCase() === 'groups') return 'Group';
   return undefined;
+}
+
+/**
+ * Whether two DNs name the same entry, however each is spelled.
+ *
+ * @param a a DN
+ * @param b another DN
+ * @returns true when the directory reads them as one
+ */
+function sameDn(a: string, b: string): boolean {
+  try {
+    return normalizeDn(a) === normalizeDn(b);
+  } catch {
+    return a.trim().toLowerCase() === b.trim().toLowerCase();
+  }
 }

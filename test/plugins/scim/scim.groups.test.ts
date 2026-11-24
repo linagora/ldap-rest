@@ -455,6 +455,9 @@ describe('SCIM Groups (integration)', function () {
     const parent = 'scim-parentgroup';
     // A group carrying the id of the user `scim-groupuser`
     const namesake = 'scim-groupuser';
+    // Built when a test runs: the bases are only known once `before` has run
+    const subOuDn = (): string => `ou=scim-teams,${groupBase}`;
+    const subGroupDn = (): string => `cn=scim-subgroup,${subOuDn()}`;
 
     const post = (displayName: string, members?: unknown[]): supertest.Test =>
       supertest(server.app)
@@ -470,10 +473,14 @@ describe('SCIM Groups (integration)', function () {
       (body.members ?? []).map(m => m.value).sort();
 
     afterEach(async () => {
-      for (const id of [nested, parent, namesake])
-        await plugin.ldap
-          .delete(`cn=${id},${groupBase}`)
-          .catch(() => undefined);
+      for (const dn of [
+        `cn=${nested},${groupBase}`,
+        `cn=${parent},${groupBase}`,
+        `cn=${namesake},${groupBase}`,
+        subGroupDn(),
+        subOuDn(),
+      ])
+        await plugin.ldap.delete(dn).catch(() => undefined);
     });
 
     it('keeps a nested group when a PUT sends back what a GET returned', async () => {
@@ -565,6 +572,95 @@ describe('SCIM Groups (integration)', function () {
         { value: 'no-such-member', type: 'Group' },
       ]).expect(201);
       expect(membersOf(res.body)).to.deep.equal(['scim-groupuser']);
+    });
+
+    it('refuses to make a group a member of itself', async () => {
+      await post(parent, [{ value: 'scim-groupuser' }]).expect(201);
+
+      const put = await supertest(server.app)
+        .put(`/scim/v2/Groups/${parent}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: parent,
+          members: [{ value: parent, type: 'Group' }],
+        })
+        .expect(400);
+      expect(put.body.scimType).to.equal('invalidValue');
+
+      const patch = await supertest(server.app)
+        .patch(`/scim/v2/Groups/${parent}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'add',
+              path: 'members',
+              value: [{ value: parent, type: 'Group' }],
+            },
+          ],
+        })
+        .expect(400);
+      expect(patch.body.scimType).to.equal('invalidValue');
+
+      // A consumer expanding memberships would loop on either write, and
+      // neither reached the directory.
+      const read = await supertest(server.app)
+        .get(`/scim/v2/Groups/${parent}`)
+        .expect(200);
+      expect(membersOf(read.body)).to.deep.equal(['scim-groupuser']);
+    });
+
+    it('names a group at its own DN when the member says no type', async () => {
+      await plugin.ldap
+        .add(subOuDn(), {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'scim-teams',
+        })
+        .catch(() => undefined);
+      await plugin.ldap
+        .add(subGroupDn(), {
+          objectClass: ['top', 'groupOfNames'],
+          cn: 'scim-subgroup',
+          member: `uid=scim-groupuser,${userBase}`,
+        })
+        .catch(() => undefined);
+
+      const fixture = (await plugin.ldap.search(
+        { paged: false, scope: 'base', attributes: ['cn'] },
+        subGroupDn()
+      )) as { searchEntries: { cn?: string }[] };
+      expect(
+        fixture.searchEntries,
+        'the nested-branch group exists'
+      ).to.have.lengthOf(1);
+
+      // A bare id names `cn=<value>,<group base>` and no other entry: a
+      // same-named group deeper in the branch must not stand in for it.
+      const bare = await post(parent, [
+        { value: 'scim-groupuser' },
+        { value: 'scim-subgroup' },
+      ]).expect(201);
+      expect(membersOf(bare.body)).to.deep.equal(['scim-groupuser']);
+
+      // Saying it is a group accepts the lookup under the whole branch.
+      const typed = await supertest(server.app)
+        .put(`/scim/v2/Groups/${parent}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: parent,
+          members: [
+            { value: 'scim-groupuser' },
+            { value: 'scim-subgroup', type: 'Group' },
+          ],
+        })
+        .expect(200);
+      expect(membersOf(typed.body)).to.deep.equal([
+        'scim-groupuser',
+        'scim-subgroup',
+      ]);
     });
   });
 
