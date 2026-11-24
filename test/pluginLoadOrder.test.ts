@@ -19,6 +19,7 @@ describe('Configured plugin passes', function () {
   const saved: Record<string, string | undefined> = {};
   const originalLoadPlugin = DM.prototype.loadPlugin;
   let events: string[];
+  let loads: Promise<boolean>[];
 
   before(() => {
     for (const k of ['DM_PLUGINS', 'DM_TRUSTED_PROXIES', 'NODE_ENV'])
@@ -40,22 +41,27 @@ describe('Configured plugin passes', function () {
   // On the prototype: the constructor starts loading before an instance can
   // be patched
   beforeEach(() => {
-    events = [];
+    const own: string[] = (events = []);
+    const mine: Promise<boolean>[] = (loads = []);
     DM.prototype.loadPlugin = function (
       this: DM,
       entry: string
     ): Promise<boolean> {
-      events.push(`start ${entry}`);
+      own.push(`start ${entry}`);
       const load = originalLoadPlugin.call(this, entry);
       load.then(
-        () => events.push(`end ${entry}`),
-        () => events.push(`fail ${entry}`)
+        () => own.push(`end ${entry}`),
+        () => own.push(`fail ${entry}`)
       );
+      mine.push(load);
       return load;
     };
   });
 
-  afterEach(() => {
+  // `ready` rejects on the first failure while the other loads go on: none
+  // may outlive its test
+  afterEach(async () => {
+    await Promise.allSettled(loads);
     DM.prototype.loadPlugin = originalLoadPlugin;
   });
 
