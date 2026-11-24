@@ -350,101 +350,84 @@ export class DM {
     this.ldap = new ldapActions(this);
     setLogger(this.logger);
     setDebug(this.config.debug);
-    const promises: Promise<void | boolean>[] = [];
+    this.ready = this.bootstrap();
+  }
 
-    if (this.config.plugin) {
-      // Separate configApi from other plugins
-      const configApiPlugin = this.config.plugin.find(p =>
-        p.includes('configApi')
+  /** Load the configured plugins and check what they compose: `ready` */
+  private async bootstrap(): Promise<void> {
+    if (!this.config.plugin) {
+      // No plugin yet: a host assembling the server registers its own,
+      // and answers for what they enforce
+      this.setupErrorMiddleware();
+      this._compositionState.composed = true;
+      return;
+    }
+    try {
+      await this.loadPlugins(this.config.plugin);
+      this.setupErrorMiddleware();
+      this.warnUnauthenticatedRoutes();
+      // Before `afterLoad`, and outside it: a plugin's opinion there is
+      // logged and served anyway, while two authorization models judging
+      // the same requests is a configuration nobody decided, and the
+      // server does not start on it.
+      await assertAuthzComposition(this);
+      assertEnforceable(this);
+      await this.learnAttributeTypes();
+      this._compositionState.composed = true;
+      this.reportUnknownOptions();
+      this.afterLoad();
+    } catch (err) {
+      throw new Error('Error loading plugins: ' + String(err));
+    }
+  }
+
+  /**
+   * Load `--plugin` entries: those whose module is in `priority.json` one at
+   * a time, in its order; then the others in parallel; then configApi. See
+   * docs/architecture/adr/0001-plugin-load-order.md.
+   *
+   * A priority module is matched on the module part of the entry: the form
+   * `module:name:{json}`, the only one that carries a per-instance option,
+   * never equals the bare module name. A `core/auth/trustedProxy` left to
+   * the parallel batch registers after the routes and lets a forged
+   * `X-Forwarded-For` reach them — the header `rateLimit` and `crowdsec`
+   * read their client from.
+   *
+   * Every instance of a priority module loads in the priority pass, in
+   * configuration order: two instances of one module each guard their own
+   * prefix, and one left to the parallel batch would come after the routes.
+   *
+   * @param entries the `--plugin` entries
+   */
+  private async loadPlugins(entries: readonly string[]): Promise<void> {
+    const configApiPlugin = entries.find(p => p.includes('configApi'));
+    let regularPlugins = entries.filter(p => !p.includes('configApi'));
+
+    for (const p of pluginPriority) {
+      const target = this.resolveModule(DM.moduleOf(p));
+      const matching = regularPlugins.filter(
+        entry => this.resolveModule(DM.moduleOf(entry)) === target
       );
-      let regularPlugins = this.config.plugin.filter(
-        p => !p.includes('configApi')
+      if (matching.length === 0) continue;
+      regularPlugins = regularPlugins.filter(
+        entry => !matching.includes(entry)
       );
-
-      // Load priority plugins first sequentially to ensure proper middleware
-      // order.
-      //
-      // Matched on the module, not on the whole `--plugin` string. An entry
-      // carrying a name and overrides — `module:name:{json}`, the only form
-      // that can hold a per-instance option — is never equal to the bare
-      // module name, so every named instance used to leave this pass for the
-      // parallel batch, where the order is import completion. A named
-      // `core/auth/trustedProxy` then registered after the routes it was
-      // meant to guard, and a forged `X-Forwarded-For` reached them — which
-      // `rateLimit` and `crowdsec` read their client from.
-      //
-      // Every instance of a priority module is loaded here, in configuration
-      // order: two instances of one module are a deliberate configuration
-      // (each guarding its own prefix), and splitting them across the two
-      // passes would put one of them after the routes.
-      // Captured: inside the closure below, the compiler no longer follows
-      // that the constructor has already built it.
-      const logger = this.logger;
-      const priorityPromise = (async (): Promise<void> => {
-        for (const p of pluginPriority) {
-          const target = this.resolveModule(DM.moduleOf(p));
-          const matching = regularPlugins.filter(
-            entry => this.resolveModule(DM.moduleOf(entry)) === target
-          );
-          if (matching.length === 0) continue;
-          regularPlugins = regularPlugins.filter(
-            entry => !matching.includes(entry)
-          );
-          for (const entry of matching) {
-            logger.debug(`Loading ${entry} in the priority pass`);
-            await this.loadPlugin(entry);
-          }
-        }
-      })();
-      promises.push(priorityPromise);
-
-      // Load remaining plugins in parallel after priority plugins
-      promises.push(
-        priorityPromise.then(async () => {
-          const regularPromises = regularPlugins.map(pluginName => {
-            // Which pass loaded what is otherwise invisible, and a plugin
-            // that lost its rank is invisible with it.
-            logger.debug(`Loading ${pluginName} in the parallel batch`);
-            return this.loadPlugin(pluginName);
-          });
-          await Promise.all(regularPromises);
-        })
-      );
-
-      // Load configApi last
-      if (configApiPlugin) {
-        promises.push(
-          Promise.all(promises).then(() => this.loadPlugin(configApiPlugin))
-        );
+      for (const entry of matching) {
+        this.logger.debug(`Loading ${entry} in the priority pass`);
+        await this.loadPlugin(entry);
       }
     }
-    this.ready = new Promise((resolve, reject) => {
-      if (promises.length > 0) {
-        Promise.all(promises)
-          .then(async () => {
-            this.setupErrorMiddleware();
-            this.warnUnauthenticatedRoutes();
-            // Before `afterLoad`, and outside it: a plugin's opinion there is
-            // logged and served anyway, while two authorization models
-            // judging the same requests is a configuration nobody decided,
-            // and the server does not start on it.
-            await assertAuthzComposition(this);
-            assertEnforceable(this);
-            await this.learnAttributeTypes();
-            this._compositionState.composed = true;
-            this.reportUnknownOptions();
-            this.afterLoad();
-            resolve();
-          })
-          .catch(err => reject(new Error('Error loading plugins: ' + err)));
-      } else {
-        // No plugin yet: a host assembling the server registers its own,
-        // and answers for what they enforce
-        this.setupErrorMiddleware();
-        this._compositionState.composed = true;
-        resolve();
-      }
-    });
+
+    await Promise.all(
+      regularPlugins.map(entry => {
+        // Which pass loaded what is otherwise invisible, and a plugin that
+        // lost its rank is invisible with it.
+        this.logger.debug(`Loading ${entry} in the parallel batch`);
+        return this.loadPlugin(entry);
+      })
+    );
+
+    if (configApiPlugin) await this.loadPlugin(configApiPlugin);
   }
 
   /**
