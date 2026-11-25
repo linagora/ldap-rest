@@ -11,6 +11,8 @@ export const SCHEMA_LIST_RESPONSE =
   'urn:ietf:params:scim:api:messages:2.0:ListResponse';
 export const SCHEMA_ERROR = 'urn:ietf:params:scim:api:messages:2.0:Error';
 export const SCHEMA_PATCH_OP = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
+export const SCHEMA_SEARCH_REQUEST =
+  'urn:ietf:params:scim:api:messages:2.0:SearchRequest';
 export const SCHEMA_BULK_REQUEST =
   'urn:ietf:params:scim:api:messages:2.0:BulkRequest';
 export const SCHEMA_BULK_RESPONSE =
@@ -190,7 +192,12 @@ export interface MappingEntry {
   readOnly?: boolean;
   operational?: boolean;
   writeOnly?: boolean;
-  converter?: 'boolean' | 'number' | 'string';
+  /**
+   * Type of a simple (`ldap`) entry's values: `boolean` is `TRUE`/`FALSE` in
+   * the directory and a JSON boolean in SCIM, `number` a JSON number, `date`
+   * a GeneralizedTime in the directory and an `xsd:dateTime` in SCIM.
+   */
+  converter?: 'boolean' | 'number' | 'string' | 'date';
 }
 
 export interface ResourceMapping {

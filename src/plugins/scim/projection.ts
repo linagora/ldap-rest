@@ -133,6 +133,22 @@ export function assertProjection(query: ProjectionQuery): void {
 }
 
 /**
+ * Does the projection keep some of a top-level attribute? Lets a handler
+ * skip the reads that only that attribute needs.
+ *
+ * @param query the request's `attributes` / `excludedAttributes`
+ * @param name the attribute, as a top-level path (`members`)
+ * @returns false when the answer leaves the whole attribute out
+ */
+export function projectionKeeps(query: ProjectionQuery, name: string): boolean {
+  const key = name.toLowerCase();
+  if (query.attributes?.length) return groupPaths(query.attributes).has(key);
+  if (query.excludedAttributes?.length)
+    return groupPaths(query.excludedAttributes).get(key) !== null;
+  return true;
+}
+
+/**
  * Did the projection leave nothing behind?
  *
  * Narrowing `name` to a sub-attribute the entry does not hold, or excluding

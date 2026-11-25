@@ -29,6 +29,7 @@ import {
 } from './mapping.js';
 import type { ResourceMapping } from './types.js';
 import { scimInvalidFilter } from './errors.js';
+import { converterFor, filterValueToLdap } from './converters.js';
 
 export type TokenKind =
   | 'LPAREN'
@@ -422,7 +423,12 @@ class Parser {
       throw scimInvalidFilter(`Operator '${op}' not supported with null`);
     }
 
-    const strValue = String(value);
+    // A typed attribute compares in the directory's form; a substring of it
+    // has none, and is matched as given
+    const converter = ['co', 'sw', 'ew'].includes(op)
+      ? undefined
+      : converterFor(path, this.mapping);
+    const strValue = filterValueToLdap(value, converter, path);
     const esc = escapeLdapFilter(strValue);
 
     switch (op) {

@@ -29,6 +29,8 @@ import { ScimDiscovery } from './discovery.js';
 import { touchesWriteOnly } from './mapping.js';
 import {
   scimAsyncHandler,
+  scimInvalidSyntax,
+  scimInvalidValue,
   writeScimError,
   writeScimErrorFromException,
   SCIM_CONTENT_TYPE,
@@ -38,6 +40,7 @@ import {
   type PatchRequest,
   type ScimGroup,
   type ScimUser,
+  SCHEMA_SEARCH_REQUEST,
 } from './types.js';
 import {
   type ProjectionQuery,
@@ -290,6 +293,23 @@ import {
  *       - op: replace
  *         path: emails[type eq "work"].value
  *         value: bjensen@newdomain.example.com
+ * ScimSearchRequest:
+ *   type: object
+ *   description: |
+ *     SCIM 2.0 search request body
+ *     (urn:ietf:params:scim:api:messages:2.0:SearchRequest, RFC 7644 §3.4.3).
+ *   properties:
+ *     schemas:
+ *       type: array
+ *       items: { type: string }
+ *       example: ['urn:ietf:params:scim:api:messages:2.0:SearchRequest']
+ *     filter: { type: string, example: 'userName eq "bjensen"' }
+ *     attributes: { type: array, items: { type: string } }
+ *     excludedAttributes: { type: array, items: { type: string } }
+ *     startIndex: { type: integer, example: 1 }
+ *     count: { type: integer, example: 10 }
+ *     sortBy: { type: string }
+ *     sortOrder: { type: string, enum: [ascending, descending] }
  * ScimBulkRequest:
  *   type: object
  *   description: |
@@ -724,6 +744,51 @@ export default class Scim extends DmPlugin {
         listUsers(req, res, next);
       },
     });
+    const searchUsers = scimAsyncHandler(async (req, res) => {
+      const q = this.parseSearchRequest(req);
+      assertProjection(q);
+      const list = await this.users.list(req as DmRequest, q);
+      this.scimJson(res, 200, projectList(list, q));
+    });
+    /**
+     * @openapi
+     * summary: Search users
+     * description: |
+     *   The list of SCIM User resources, with the query in a SearchRequest
+     *   body rather than in the URL (RFC 7644 §3.4.3): `filter`,
+     *   `startIndex`, `count`, `attributes`, `excludedAttributes`. Answers
+     *   what `GET /Users` answers for the same query.
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/scim+json:
+     *       schema: { $ref: '#/components/schemas/ScimSearchRequest' }
+     *       example:
+     *         schemas: ['urn:ietf:params:scim:api:messages:2.0:SearchRequest']
+     *         filter: 'userName eq "bjensen"'
+     *         attributes: [userName, displayName]
+     *         startIndex: 1
+     *         count: 10
+     * responses:
+     *   '200':
+     *     description: Matching users.
+     *     content:
+     *       application/scim+json:
+     *         schema: { $ref: '#/components/schemas/ScimListResponse' }
+     *   '400':
+     *     description: Malformed SearchRequest or invalid filter.
+     *     content:
+     *       application/scim+json:
+     *         schema: { $ref: '#/components/schemas/ScimError' }
+     */
+    defineRoute(app, {
+      method: 'post',
+      path: `${prefix}/Users/.search`,
+      json: false,
+      handler: ({ req, res, next }) => {
+        searchUsers(req, res, next);
+      },
+    });
     const getUser = scimAsyncHandler(async (req, res) => {
       const projection = this.parseProjection(req);
       const user = await this.users.get(
@@ -1136,11 +1201,53 @@ export default class Scim extends DmPlugin {
         listGroups(req, res, next);
       },
     });
+    const searchGroups = scimAsyncHandler(async (req, res) => {
+      const q = this.parseSearchRequest(req);
+      assertProjection(q);
+      const list = await this.groups.list(req as DmRequest, q);
+      this.scimJson(res, 200, projectList(list, q));
+    });
+    /**
+     * @openapi
+     * summary: Search groups
+     * description: |
+     *   The list of SCIM Group resources, with the query in a SearchRequest
+     *   body (RFC 7644 §3.4.3). Answers what `GET /Groups` answers for the
+     *   same query.
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/scim+json:
+     *       schema: { $ref: '#/components/schemas/ScimSearchRequest' }
+     *       example:
+     *         schemas: ['urn:ietf:params:scim:api:messages:2.0:SearchRequest']
+     *         filter: 'displayName eq "Employees"'
+     * responses:
+     *   '200':
+     *     description: Matching groups.
+     *     content:
+     *       application/scim+json:
+     *         schema: { $ref: '#/components/schemas/ScimListResponse' }
+     *   '400':
+     *     description: Malformed SearchRequest or invalid filter.
+     *     content:
+     *       application/scim+json:
+     *         schema: { $ref: '#/components/schemas/ScimError' }
+     */
+    defineRoute(app, {
+      method: 'post',
+      path: `${prefix}/Groups/.search`,
+      json: false,
+      handler: ({ req, res, next }) => {
+        searchGroups(req, res, next);
+      },
+    });
     const getGroup = scimAsyncHandler(async (req, res) => {
       const projection = this.parseProjection(req);
       const group = await this.groups.get(
         req as DmRequest,
-        req.params.id as string
+        req.params.id as string,
+        projection
       );
       this.scimJson(res, 200, projectResource(group, projection));
     });
@@ -1855,6 +1962,63 @@ export default class Scim extends DmPlugin {
         sortOrder === 'ascending' || sortOrder === 'descending'
           ? sortOrder
           : undefined,
+    };
+  }
+
+  /**
+   * A SearchRequest body (RFC 7644 section 3.4.3) read as the query a GET
+   * list takes. `schemas` may be left out; when given it must name the
+   * SearchRequest message.
+   */
+  private parseSearchRequest(req: Request): ReturnType<Scim['parseListQuery']> {
+    const body = this.readScimBody(req);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      throw scimInvalidSyntax('A SearchRequest must be a JSON object');
+    }
+    const b = body as Record<string, unknown>;
+    if (
+      b.schemas !== undefined &&
+      !(Array.isArray(b.schemas) && b.schemas.includes(SCHEMA_SEARCH_REQUEST))
+    ) {
+      throw scimInvalidSyntax(`schemas must contain ${SCHEMA_SEARCH_REQUEST}`);
+    }
+    const str = (k: string): string | undefined => {
+      const v = b[k];
+      if (v === undefined || v === null) return undefined;
+      if (typeof v !== 'string')
+        throw scimInvalidValue(`${k} must be a string`);
+      return v;
+    };
+    const int = (k: string): number | undefined => {
+      const v = b[k];
+      if (v === undefined || v === null) return undefined;
+      if (typeof v !== 'number' || !Number.isInteger(v))
+        throw scimInvalidValue(`${k} must be an integer`);
+      return v;
+    };
+    const list = (k: string): string[] | undefined => {
+      const v = b[k];
+      if (v === undefined || v === null) return undefined;
+      if (!Array.isArray(v) || v.some(x => typeof x !== 'string'))
+        throw scimInvalidValue(`${k} must be a list of strings`);
+      const out = (v as string[]).map(x => x.trim()).filter(Boolean);
+      return out.length > 0 ? out : undefined;
+    };
+    const sortOrder = str('sortOrder');
+    if (
+      sortOrder !== undefined &&
+      sortOrder !== 'ascending' &&
+      sortOrder !== 'descending'
+    )
+      throw scimInvalidValue('sortOrder must be ascending or descending');
+    return {
+      filter: str('filter'),
+      startIndex: int('startIndex'),
+      count: int('count'),
+      attributes: list('attributes'),
+      excludedAttributes: list('excludedAttributes'),
+      sortBy: str('sortBy'),
+      sortOrder,
     };
   }
 

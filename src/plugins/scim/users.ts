@@ -159,13 +159,59 @@ export class ScimUsers {
     );
   }
 
-  private dnForId(id: string, req?: DmRequest): string {
+  /** Whether a SCIM id is the RDN value, so its DN is built, not searched */
+  private get idIsRdn(): boolean {
+    return (
+      this.idAttribute === 'rdn' ||
+      this.idAttribute.toLowerCase() === this.rdnAttribute.toLowerCase()
+    );
+  }
+
+  /**
+   * DN of the entry a SCIM id names.
+   *
+   * With `--scim-id-attribute rdn` the id is the RDN value and the DN is
+   * built from it. With any other attribute (`entryUUID`…) the id is that
+   * attribute's value, so the entry is searched for under the user base: an
+   * id the server answered must name the same entry when the client sends it
+   * back.
+   */
+  private async dnForId(id: string, req: DmRequest): Promise<string> {
     const base = this.baseResolver.userBase(req);
-    return `${this.rdnAttribute}=${escapeDnValue(id)},${base}`;
+    if (this.idIsRdn)
+      return `${this.rdnAttribute}=${escapeDnValue(id)},${base}`;
+    let result: SearchResult;
+    try {
+      result = (await this.ldap.forRequest(req).search(
+        {
+          filter: `(${this.idAttribute}=${escapeLdapFilter(id)})`,
+          scope: 'sub',
+          paged: false,
+          attributes: ['dn'],
+        },
+        base
+      )) as SearchResult;
+    } catch (err) {
+      if (extractLdapCode(err) === 32)
+        throw scimNotFound(`User ${id} not found`);
+      throw err;
+    }
+    // An id names one entry: none, or several, is not this one
+    if (result.searchEntries?.length !== 1) {
+      throw scimNotFound(`User ${id} not found`);
+    }
+    return result.searchEntries[0].dn;
   }
 
   async get(req: DmRequest, id: string): Promise<ScimUser> {
-    const dn = this.dnForId(id, req);
+    return this.getByDn(req, await this.dnForId(id, req), id);
+  }
+
+  private async getByDn(
+    req: DmRequest,
+    dn: string,
+    id: string
+  ): Promise<ScimUser> {
     let result: SearchResult;
     try {
       result = (await this.ldap.forRequest(req).search(
@@ -305,7 +351,7 @@ export class ScimUsers {
       throw err;
     }
 
-    const created = await this.get(req, rdn);
+    const created = await this.getByDn(req, dn, rdn);
     this.hookBus.notify('scimusercreatedone', created);
     return created;
   }
@@ -315,7 +361,7 @@ export class ScimUsers {
     id: string,
     resource: ScimUser
   ): Promise<ScimUser> {
-    const dn = this.dnForId(id, req);
+    const dn = await this.dnForId(id, req);
     // Fetch current LDAP entry so we only delete attributes that actually
     // exist on the entry (avoids noSuchAttribute errors on atomic modify).
     let currentResult: SearchResult;
@@ -347,11 +393,13 @@ export class ScimUsers {
     ]);
     const incoming = hookInput[1];
 
+    const merge = this.options.scim_put_semantics === 'merge';
     const { attributes, active } = scimUserToLdap(
       incoming,
       this.mapping,
       this.ctx(req),
-      this.objectClass
+      this.objectClass,
+      !merge
     );
     const changes: ModifyRequest = { replace: {}, delete: [] };
     const skipAttrs = new Set([
@@ -378,6 +426,7 @@ export class ScimUsers {
       if (attributes[attr] != null) {
         changes.replace![attr] = attributes[attr];
       } else if (
+        !merge &&
         !writeOnly.has(attr.toLowerCase()) &&
         hasAttrValue(currentEntry[attr])
       ) {
@@ -434,9 +483,9 @@ export class ScimUsers {
     id: string,
     patch: PatchRequest
   ): Promise<ScimUser> {
-    const dn = this.dnForId(id, req);
+    const dn = await this.dnForId(id, req);
     await writePatch(dn, async () => {
-      const current = await this.currentEntry(req, id); // ensure exists
+      const current = await this.currentEntry(req, dn, id); // ensure exists
       const changes = await patchToModifyRequest(patch, {
         mapping: this.mapping,
         lockAttribute: this.lockAttribute,
@@ -494,9 +543,9 @@ export class ScimUsers {
   /** Fetch the raw LDAP entry backing a SCIM id, or raise 404. */
   private async currentEntry(
     req: DmRequest,
+    dn: string,
     id: string
   ): Promise<AttributesList> {
-    const dn = this.dnForId(id, req);
     let result: SearchResult;
     try {
       result = (await this.ldap.forRequest(req).search(
@@ -522,7 +571,7 @@ export class ScimUsers {
   async delete(req: DmRequest, id: string): Promise<void> {
     await this.get(req, id); // ensure exists
     const [finalId] = await this.hookBus.chain('scimuserdelete', [id, req]);
-    const dn = this.dnForId(finalId, req);
+    const dn = await this.dnForId(finalId, req);
     await this.ldap.forRequest(req).delete(dn);
     this.hookBus.notify('scimuserdeletedone', finalId);
   }
@@ -566,10 +615,16 @@ export class ScimUsers {
     }
     // A DN names one entry: no filter finds it elsewhere
     if (given) return undefined;
+    // A member value is a SCIM id: the RDN value, or the value of the id
+    // attribute when ids are not RDNs
+    const byName = `(${this.rdnAttribute}=${escapeLdapFilter(value)})`;
+    const filter = this.idIsRdn
+      ? byName
+      : `(|${byName}(${this.idAttribute}=${escapeLdapFilter(value)}))`;
     try {
       const res = (await this.ldap.forRequest(req).search(
         {
-          filter: `(${this.rdnAttribute}=${escapeLdapFilter(value)})`,
+          filter,
           scope: 'sub',
           paged: false,
           attributes: ['dn'],
