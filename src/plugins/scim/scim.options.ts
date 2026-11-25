@@ -82,6 +82,11 @@ export const scimOptions = defineOptions({
     env: 'DM_SCIM_ID_ATTRIBUTE',
     default: 'rdn',
   }),
+  scim_put_semantics: opt.string({
+    env: 'DM_SCIM_PUT_SEMANTICS',
+    default: 'replace',
+    choices: ['replace', 'merge'],
+  }),
   scim_user_mapping: opt.string({
     env: 'DM_SCIM_USER_MAPPING',
     default: '',

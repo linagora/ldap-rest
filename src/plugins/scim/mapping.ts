@@ -16,6 +16,7 @@ import { SECRET_ATTRIBUTES } from '../../lib/secretAttributes.js';
 import { hasOnlyRfc4514Escapes, parseDirectoryDate } from '../../lib/utils.js';
 
 import { kindOf, scimInvalidValue } from './errors.js';
+import { assertConverters, fromLdap, valuesToLdap } from './converters.js';
 import {
   type ScimUser,
   type ScimGroup,
@@ -102,7 +103,7 @@ export function withExternalId(
   };
 }
 
-function asString(v: AttributeValue | undefined): string | undefined {
+export function asString(v: AttributeValue | undefined): string | undefined {
   if (v == null) return undefined;
   if (Array.isArray(v)) {
     const first = v[0];
@@ -160,7 +161,7 @@ export function ldapTimeToIso(value: string | undefined): string | undefined {
   return date.toISOString().replace(/\.000Z$/, 'Z');
 }
 
-function asArray(v: AttributeValue | undefined): string[] {
+export function asArray(v: AttributeValue | undefined): string[] {
   if (v == null) return [];
   if (Array.isArray(v)) {
     return v.map(x => (Buffer.isBuffer(x) ? x.toString() : String(x)));
@@ -172,7 +173,9 @@ function asArray(v: AttributeValue | undefined): string[] {
 export function loadMappingFile(path: string): ResourceMapping | undefined {
   if (!path) return undefined;
   const content = fs.readFileSync(path, 'utf8');
-  return JSON.parse(content) as ResourceMapping;
+  const mapping = JSON.parse(content) as ResourceMapping;
+  assertConverters(mapping);
+  return mapping;
 }
 
 /**
@@ -537,11 +540,12 @@ export function ldapToScimUser(
     }
     if (m.ldap && !hidden(m.ldap)) {
       if (m.multi === 'array') {
-        const arr = asArray(entry[m.ldap]);
+        const arr = asArray(entry[m.ldap]).map(v => fromLdap(v, m.converter));
         if (arr.length > 0) (out as Record<string, unknown>)[m.scim] = arr;
       } else {
         const v = asString(entry[m.ldap]);
-        if (v != null) (out as Record<string, unknown>)[m.scim] = v;
+        if (v != null)
+          (out as Record<string, unknown>)[m.scim] = fromLdap(v, m.converter);
       }
     }
   }
@@ -570,7 +574,8 @@ export function scimUserToLdap(
   user: ScimUser,
   mapping: ResourceMapping,
   ctx: MappingContext,
-  objectClass: string[]
+  objectClass: string[],
+  fillRequired = true
 ): { rdn: string; attributes: AttributesList; active?: boolean } {
   const attributes: AttributesList = { objectClass };
   const rdnValue = namingValue(user, 'userName') || namingValue(user, 'id');
@@ -616,7 +621,12 @@ export function scimUserToLdap(
       }
       continue;
     }
-    if (m.ldap) attributes[m.ldap] = scalarValues(value, m.scim);
+    if (m.ldap)
+      attributes[m.ldap] = valuesToLdap(
+        scalarValues(value, m.scim),
+        m.converter,
+        m.scim
+      );
   }
 
   // `active` is not a mapping entry: false writes the lock attribute. True,
@@ -628,7 +638,9 @@ export function scimUserToLdap(
     attributes[ctx.lockAttribute] = ctx.lockValue || DEFAULT_LOCK_VALUE;
   }
 
-  // Ensure required inetOrgPerson attributes have sensible defaults
+  // Ensure required inetOrgPerson attributes have sensible defaults; a
+  // merge keeps the entry's own instead
+  if (!fillRequired) return { rdn: rdnValue, attributes, active };
   if (!attributes.cn && rdnValue) attributes.cn = rdnValue;
   if (!attributes.sn) {
     const sn = [user.name?.familyName, user.displayName, rdnValue].find(
@@ -656,11 +668,12 @@ export function ldapToScimGroup(
     const raw = entry[m.ldap];
     if (raw == null) continue;
     if (m.multi === 'array') {
-      const arr = asArray(raw);
+      const arr = asArray(raw).map(v => fromLdap(v, m.converter));
       if (arr.length > 0) (out as Record<string, unknown>)[m.scim] = arr;
     } else {
       const v = asString(raw);
-      if (v != null) (out as Record<string, unknown>)[m.scim] = v;
+      if (v != null)
+        (out as Record<string, unknown>)[m.scim] = fromLdap(v, m.converter);
     }
   }
 
@@ -706,7 +719,11 @@ export function scimGroupToLdap(
     if (!m.ldap) continue;
     const v = (group as Record<string, unknown>)[m.scim];
     if (v == null) continue;
-    attributes[m.ldap] = scalarValues(v, m.scim);
+    attributes[m.ldap] = valuesToLdap(
+      scalarValues(v, m.scim),
+      m.converter,
+      m.scim
+    );
   }
   return { rdn: rdnValue, attributes };
 }

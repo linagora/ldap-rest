@@ -140,6 +140,10 @@ const NO_TARGET: Record<string, string> = {
     'its members are resolved as those of a group replaced, which is probed',
   'POST /scim/v2/Bulk':
     'each operation is that of a SCIM route, probed on its own',
+  'POST /scim/v2/Users/.search':
+    'a read: the list GET /scim/v2/Users answers, from the query in a body',
+  'POST /scim/v2/Groups/.search':
+    'a read: the list GET /scim/v2/Groups answers, from the query in a body',
 };
 
 /** The two values of a route parameter: a target there, one not there */

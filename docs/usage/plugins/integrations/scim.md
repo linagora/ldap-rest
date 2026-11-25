@@ -57,6 +57,7 @@ All SCIM endpoints sit behind the auth middleware registered before the plugin
 | `--scim-group-rdn-attribute`         | `DM_SCIM_GROUP_RDN_ATTRIBUTE`         | `cn`                                               | RDN attribute for Groups                                                                         |
 | `--scim-group-external-id-attribute` | `DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE` | —                                                  | LDAP attribute storing a Group's `externalId` (unset: not supported)                             |
 | `--scim-id-attribute`                | `DM_SCIM_ID_ATTRIBUTE`                | `rdn`                                              | `rdn` (default) or `entryUUID` for SCIM `id`                                                     |
+| `--scim-put-semantics`               | `DM_SCIM_PUT_SEMANTICS`               | `replace`                                          | `replace` (RFC 7644) or `merge`: what a PUT does with the attributes it leaves out               |
 | `--scim-user-mapping`                | `DM_SCIM_USER_MAPPING`                | —                                                  | Path to JSON mapping override                                                                    |
 | `--scim-group-mapping`               | `DM_SCIM_GROUP_MAPPING`               | —                                                  | Same for Groups                                                                                  |
 | `--scim-max-results`                 | `DM_SCIM_MAX_RESULTS`                 | `200`                                              | Maximum page size (caps `count`)                                                                 |
@@ -100,12 +101,14 @@ All responses have `Content-Type: application/scim+json`.
 | Method                    | Path                                       | Description                           |
 | ------------------------- | ------------------------------------------ | ------------------------------------- |
 | GET                       | `/Users`                                   | List Users (filter, pagination, sort) |
+| POST                      | `/Users/.search`                           | List Users from a SearchRequest body  |
 | GET                       | `/Users/{id}`                              | Get a User                            |
 | POST                      | `/Users`                                   | Create a User                         |
 | PUT                       | `/Users/{id}`                              | Replace a User                        |
 | PATCH                     | `/Users/{id}`                              | Partial update (add/remove/replace)   |
 | DELETE                    | `/Users/{id}`                              | Delete a User                         |
 | GET/POST/PUT/PATCH/DELETE | `/Groups[/{id}]`                           | Same operations on Groups             |
+| POST                      | `/Groups/.search`                          | List Groups from a SearchRequest body |
 | POST                      | `/Bulk`                                    | Batch operations with `bulkId` refs   |
 | GET                       | `/ServiceProviderConfig`                   | Capabilities                          |
 | GET                       | `/ResourceTypes` / `/ResourceTypes/{name}` | Resource metadata                     |
@@ -241,6 +244,7 @@ Each element of `entries` is a `MappingEntry` with the following optional fields
 | `readOnly`      | `true` to skip this attribute on write: create and PUT ignore it, a PATCH naming it answers `400 mutability`.                 |
 | `operational`   | `true` for LDAP operational attributes (e.g. `entryUUID`) — loaded on read only, and read-only.                               |
 | `writeOnly`     | `true` to write this attribute but never return it nor accept it in a filter (RFC 7643 §7 `returned: "never"`).               |
+| `converter`     | Type of an `ldap` entry's values: `string` (default), `boolean`, `number` or `date` (see below).                              |
 
 Write-only is a property of the LDAP attribute: another entry naming it
 returns nothing either. Credential attributes (`userPassword`, `pwdHistory`,
@@ -249,6 +253,27 @@ and gMSA passwords…, the list `core/ldap/raw` hides) are
 write-only whatever the file says, so a mapping such as
 `{ "scim": "password", "ldap": "userPassword" }` lets clients set passwords
 without ever reading the stored hash back.
+
+`converter` turns the directory's text into the JSON type SCIM carries, and
+back, on write, on read and in filters (`eq`, `ne`, `gt`, `ge`, `lt`, `le`;
+substring operators match the text as given):
+
+| `converter` | SCIM                                   | LDAP                                |
+| ----------- | -------------------------------------- | ----------------------------------- |
+| `boolean`   | `true` / `false` (or the strings)      | `TRUE` / `FALSE` (RFC 4517 Boolean) |
+| `number`    | a JSON integer                         | its decimal text (RFC 4517 Integer) |
+| `date`      | `xsd:dateTime`, `2024-01-31T12:00:00Z` | GeneralizedTime, in UTC             |
+
+`number` takes integers only (`1.5`, `1e21` or `0x10` answer `400`), within
+±2^53−1; a stored integer beyond that range is answered as its text, which a
+JSON number would round. `date` takes a full `xsd:dateTime` with its zone: a
+bare date (`2024-01-31`), a time without seconds or a date that does not
+exist (`2024-02-30`, `T24:00:00`) is refused, and a fraction is kept down to
+the millisecond (`…12:00:00.750Z` is stored `…120000.75Z`).
+
+A value of the wrong type answers `400 invalidValue` (`invalidFilter` in a
+filter). A directory value the converter cannot read is answered as stored.
+An unknown `converter` stops the server at startup.
 
 ### Merging
 
@@ -359,11 +384,19 @@ another group, and a user and a group can share an id (`--scim-id-attribute`
 defaults to the RDN value). A reference that says neither is looked up as a
 user first, then as the group at `cn=<value>,<group base>` — not elsewhere
 under the group branch, so a user id that outlived its account does not take
-a group of that name for it. A group cannot be made a member of itself
-(`400 invalidValue`); a cycle through several groups is not detected. Under
+a group of that name for it. With `--scim-id-attribute entryUUID`, a bare
+value also names the one group holding that id. A group cannot be made a
+member of itself (`400 invalidValue`); a cycle through several groups is not
+detected. Under
 an authorization model judging by branch, a member in a branch the caller
 may not read refuses the whole write instead, whether the account exists or
 not. A DN outside the user and group bases is left out.
+
+With `--scim-id-attribute` set to another attribute than the RDN, a group's
+`members[].value` and `$ref` carry each member's id, which costs one read
+per member each time the group is answered; the read is skipped when
+`attributes` or `excludedAttributes` leaves `members` out. A member the
+caller may not read is answered by its RDN value.
 
 ### Schema advertisement
 
@@ -391,6 +424,16 @@ Without it, `externalId` sent on a Group is ignored and a filter on it answers
 `400 invalidFilter` — which is at least honest. Any free attribute of your
 group entries works; use a mapping override if you would rather name it there.
 
+## PUT: replace or merge
+
+A PUT replaces the resource (RFC 7644 §3.5.1): a mapped attribute the body
+leaves out is removed from the entry, and a Group's members are the ones the
+body lists. `--scim-put-semantics merge` serves clients written against a
+service whose PUT updated only what it was sent: an attribute, a
+sub-attribute of `name` or a Group's `members` left out of the body is kept,
+the ones sent replace what the entry holds. `active` is kept when left out
+under either.
+
 ## Filter syntax
 
 SCIM filters are translated to LDAP filters (RFC 4515). Values are always escaped
@@ -409,6 +452,27 @@ via `escapeLdapFilter()` — no LDAP injection is possible.
 
 Unknown SCIM attributes raise `400 invalidFilter`, as does a filter nested
 more than 32 levels deep (a parenthesis and a `not (` each count one).
+
+### Searching with POST
+
+`POST /Users/.search` and `POST /Groups/.search` take the query in a
+SearchRequest body (RFC 7644 §3.4.3) instead of the URL, which keeps filters
+holding personal data out of access logs and proxies. They answer what the
+`GET` list answers for the same query:
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
+  "filter": "userName eq \"alice\"",
+  "attributes": ["userName", "name.familyName"],
+  "startIndex": 1,
+  "count": 10
+}
+```
+
+`schemas` may be left out. `attributes` and `excludedAttributes` are lists of
+strings; a member of the wrong type answers `400 invalidValue`. The search at
+the server root (`POST /.search`, across resource types) is not served.
 
 ## Pagination
 
@@ -791,7 +855,8 @@ the `configurable` role automatically, and `core/configApi` picks it up.
 
 - No `/Me` endpoint (RFC 7644 §3.11).
 - ETag / `If-Match` advertised but not enforced.
-- No `/.search` POST endpoint (use GET with `?filter=…`).
+- No `POST /.search` at the server root; it is served per resource type
+  (`/Users/.search`, `/Groups/.search`).
 - A list walks its result set to count it, bounded by `--scim-max-scanned`
   (10000 by default). Past that bound it answers `400 tooMany`, as RFC 7644
   §3.12 allows; raise the bound or narrow the query with a filter.

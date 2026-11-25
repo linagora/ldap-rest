@@ -34,6 +34,7 @@ import {
   scimNoTarget,
   scimInvalidValue,
 } from './errors.js';
+import { converterFor, valuesToLdap } from './converters.js';
 import {
   type ResourceMapping,
   type PatchOperation,
@@ -520,7 +521,11 @@ async function applyOperation(
   if (value == null) {
     throw scimInvalidValue(`PATCH ${op.op} ${op.path} missing value`);
   }
-  const values = Array.isArray(value) ? value : [value];
+  const values = valuesToLdap(
+    Array.isArray(value) ? value : [value],
+    sub ? undefined : converterFor(top, ctx.mapping),
+    op.path
+  ) as string[];
   if (sub && isDnSubAttribute(ctx.mapping, top, sub))
     for (const v of values) assertReferenceDn(v, `${top}.${sub}`);
   // A write-only value cannot be read back, so adding to it would leave a

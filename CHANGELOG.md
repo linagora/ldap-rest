@@ -28,6 +28,19 @@
   it; the prefixes, required with several issuers, may not start one
   another, so that two issuers' callers cannot be taken for each other
   ([JWT](docs/usage/plugins/auth/jwt.md#several-issuers))
+- SCIM `POST /Users/.search` and `POST /Groups/.search` take the list query
+  in a SearchRequest body (RFC 7644 §3.4.3)
+  ([SCIM](docs/usage/plugins/integrations/scim.md#searching-with-post))
+- The `converter` of a SCIM mapping entry is applied: `boolean` writes
+  `TRUE`/`FALSE` and answers JSON booleans, `number` takes and answers JSON
+  integers, and the new `date` reads and writes GeneralizedTime as
+  `xsd:dateTime` (milliseconds kept, a bare date refused), in bodies, PATCH
+  values and filters
+  ([SCIM](docs/usage/plugins/integrations/scim.md#file-shape))
+- `--scim-put-semantics merge` makes a SCIM PUT keep the attributes, and the
+  Group members, the body leaves out; the default, `replace`, removes them as
+  RFC 7644 asks
+  ([SCIM](docs/usage/plugins/integrations/scim.md#put-replace-or-merge))
 
 ### Changed
 
@@ -49,6 +62,10 @@
   group cannot be made a member of itself (`400 invalidValue`)
   ([#785](https://github.com/linagora/ldap-rest/issues/785),
   [details](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior))
+- With `--scim-id-attribute` set to an attribute other than the RDN
+  (`entryUUID`…), a SCIM User or Group is found by the id the server answered:
+  GET, PUT, PATCH, DELETE and member references no longer answer 404, and a
+  Group's `members[].value` and `$ref` carry the member's id.
 
 ## v2.5.0 (2026-11-23)
 

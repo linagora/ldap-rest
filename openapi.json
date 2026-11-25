@@ -3541,6 +3541,79 @@
         }
       }
     },
+    "${prefix}/Users/.search": {
+      "post": {
+        "summary": "Search users",
+        "description": "The list of SCIM User resources, with the query in a SearchRequest\nbody rather than in the URL (RFC 7644 §3.4.3): `filter`,\n`startIndex`, `count`, `attributes`, `excludedAttributes`. Answers\nwhat `GET /Users` answers for the same query.\n",
+        "parameters": [
+          {
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "prefix parameter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching users.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed SearchRequest or invalid filter.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "tags": [
+          "SCIM 2.0"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimSearchRequest"
+              },
+              "example": {
+                "schemas": [
+                  "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+                ],
+                "filter": "userName eq \"bjensen\"",
+                "attributes": [
+                  "userName",
+                  "displayName"
+                ],
+                "startIndex": 1,
+                "count": 10
+              }
+            }
+          }
+        }
+      }
+    },
     "${prefix}/Users/{id}": {
       "get": {
         "summary": "Get user by ID",
@@ -4190,6 +4263,73 @@
                     "display": "Babs Jensen"
                   }
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "${prefix}/Groups/.search": {
+      "post": {
+        "summary": "Search groups",
+        "description": "The list of SCIM Group resources, with the query in a SearchRequest\nbody (RFC 7644 §3.4.3). Answers what `GET /Groups` answers for the\nsame query.\n",
+        "parameters": [
+          {
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "prefix parameter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching groups.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed SearchRequest or invalid filter.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "tags": [
+          "SCIM 2.0"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimSearchRequest"
+              },
+              "example": {
+                "schemas": [
+                  "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+                ],
+                "filter": "displayName eq \"Employees\""
               }
             }
           }
@@ -8998,6 +9138,55 @@
               "value": "bjensen@newdomain.example.com"
             }
           ]
+        }
+      },
+      "ScimSearchRequest": {
+        "type": "object",
+        "description": "SCIM 2.0 search request body\n(urn:ietf:params:scim:api:messages:2.0:SearchRequest, RFC 7644 §3.4.3).\n",
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+            ]
+          },
+          "filter": {
+            "type": "string",
+            "example": "userName eq \"bjensen\""
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludedAttributes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "startIndex": {
+            "type": "integer",
+            "example": 1
+          },
+          "count": {
+            "type": "integer",
+            "example": 10
+          },
+          "sortBy": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ascending",
+              "descending"
+            ]
+          }
         }
       },
       "ScimBulkRequest": {
