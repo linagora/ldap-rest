@@ -393,16 +393,17 @@ Development only, refused with `NODE_ENV=production` — see [Fake Authenticatio
 
 #### `core/auth/jwt`
 
-| CLI                                              | Env                      | Default          | Description                                                        |
-| ------------------------------------------------ | ------------------------ | ---------------- | ------------------------------------------------------------------ |
-| `--jwt-issuer`                                   | `DM_JWT_ISSUER`          |                  | Expected issuer, whose discovery document names the JWKS; required |
-| `--jwt-jwks-uri`                                 | `DM_JWT_JWKS_URI`        |                  | JWKS URL, instead of discovery                                     |
-| `--jwt-audience` / `--jwt-audiences`             | `DM_JWT_AUDIENCES`       | `[]`             | Accepted audiences; empty, any                                     |
-| `--jwt-algorithm` / `--jwt-algorithms`           | `DM_JWT_ALGORITHMS`      | every asymmetric | Accepted algorithms; HMAC and `none` refused                       |
-| `--jwt-clock-tolerance`                          | `DM_JWT_CLOCK_TOLERANCE` | `30`             | Seconds of clock skew allowed                                      |
-| `--jwt-identity-claim`                           | `DM_JWT_IDENTITY_CLAIM`  | `client_id`      | Claim published as `req.user` and `req.userName`                   |
-| `--jwt-allowed-client` / `--jwt-allowed-clients` | `DM_JWT_ALLOWED_CLIENTS` | `[]`             | Clients allowed in; empty, any (see [JWT](plugins/auth/jwt.md))    |
-| `--jwt-type`                                     | `DM_JWT_TYPE`            |                  | Required `typ` header, such as `at+jwt`; empty, not checked        |
+| CLI                                              | Env                      | Default          | Description                                                                                      |
+| ------------------------------------------------ | ------------------------ | ---------------- | ------------------------------------------------------------------------------------------------ |
+| `--jwt-issuer`                                   | `DM_JWT_ISSUER`          |                  | Expected issuer, whose discovery document names the JWKS; required unless `--jwt-issuers` is set |
+| `--jwt-jwks-uri`                                 | `DM_JWT_JWKS_URI`        |                  | JWKS URL, instead of discovery                                                                   |
+| `--jwt-audience` / `--jwt-audiences`             | `DM_JWT_AUDIENCES`       | `[]`             | Accepted audiences; empty, any                                                                   |
+| `--jwt-algorithm` / `--jwt-algorithms`           | `DM_JWT_ALGORITHMS`      | every asymmetric | Accepted algorithms; HMAC and `none` refused                                                     |
+| `--jwt-clock-tolerance`                          | `DM_JWT_CLOCK_TOLERANCE` | `30`             | Seconds of clock skew allowed                                                                    |
+| `--jwt-identity-claim`                           | `DM_JWT_IDENTITY_CLAIM`  | `client_id`      | Claim published as `req.user` and `req.userName`                                                 |
+| `--jwt-allowed-client` / `--jwt-allowed-clients` | `DM_JWT_ALLOWED_CLIENTS` | `[]`             | Clients allowed in; empty, any (see [JWT](plugins/auth/jwt.md))                                  |
+| `--jwt-type`                                     | `DM_JWT_TYPE`            |                  | Required `typ` header, such as `at+jwt`; empty, not checked                                      |
+| `--jwt-issuers`                                  | `DM_JWT_ISSUERS`         | `{}`             | Several trusted issuers, as JSON (see [JWT](plugins/auth/jwt.md#several-issuers))                |
 
 #### `core/bcl`
 

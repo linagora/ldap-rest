@@ -22,6 +22,12 @@
 - Plugins can declare an `init()` step, awaited before their routes and hooks
   are registered
   ([plugin development](docs/plugin-development/README.md#core-properties))
+- `core/auth/jwt` trusts several issuers on the same routes with
+  `--jwt-issuers`, each with its own keys, audience, algorithms, allowed
+  clients and identity prefix, the token's `iss` choosing which one judges
+  it; the prefixes, required with several issuers, may not start one
+  another, so that two issuers' callers cannot be taken for each other
+  ([JWT](docs/usage/plugins/auth/jwt.md#several-issuers))
 - SCIM `POST /Users/.search` and `POST /Groups/.search` take the list query
   in a SearchRequest body (RFC 7644 §3.4.3)
   ([SCIM](docs/usage/plugins/integrations/scim.md#searching-with-post))

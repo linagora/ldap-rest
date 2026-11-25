@@ -249,8 +249,27 @@ export const jwtOptions = defineOptions({
     kind: 'identifiers',
   }),
   jwt_type: opt.string({ env: 'DM_JWT_TYPE', default: '' }),
+  jwt_issuers: opt.json<Record<string, JwtIssuerSettings>>({
+    env: 'DM_JWT_ISSUERS',
+    default: {},
+  }),
 });
 export type JwtOptions = OptionsOf<typeof jwtOptions>;
+
+/**
+ * One trusted issuer of `--jwt-issuers`, keyed by the exact `iss` its tokens
+ * carry. A field left out takes the value of the `--jwt-*` option of the
+ * same name.
+ */
+export interface JwtIssuerSettings {
+  jwks_uri?: string;
+  audience?: string[];
+  algorithm?: string[];
+  identity_claim?: string;
+  allowed_client?: string[];
+  type?: string;
+  identity_prefix?: string;
+}
 
 export const rateLimitOptions = defineOptions({
   rate_limit_window_ms: opt.number({

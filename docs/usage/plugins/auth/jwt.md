@@ -20,19 +20,79 @@ carries its token.
 --jwt-allowed-client sync-service
 ```
 
-| Option                  | Default            | Meaning                                                                                        |
-| ----------------------- | ------------------ | ---------------------------------------------------------------------------------------------- |
-| `--jwt-issuer`          | (required)         | Expected `iss`; the discovery document is read under it                                        |
-| `--jwt-jwks-uri`        | from discovery     | The provider's JWKS, when it publishes no discovery document                                   |
-| `--jwt-audience`        | none               | Accepted `aud` values; a token must name one of them                                           |
-| `--jwt-algorithm`       | every asymmetric   | Accepted signature algorithms (`RS*`, `PS*`, `ES*`, `EdDSA`, `Ed25519`; `ML-DSA-*` on request) |
-| `--jwt-clock-tolerance` | `30`               | Seconds of clock skew allowed on `exp` and `nbf`                                               |
-| `--jwt-identity-claim`  | `client_id`        | Claim published as `req.user` and `req.userName`                                               |
-| `--jwt-allowed-client`  | none: every client | Identities allowed in; another valid token is answered 403                                     |
-| `--jwt-type`            | none               | Required `typ` header, such as `at+jwt` (RFC 9068); unset, not checked                         |
+| Option                  | Default                            | Meaning                                                                                        |
+| ----------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `--jwt-issuer`          | (required, unless `--jwt-issuers`) | Expected `iss`; the discovery document is read under it                                        |
+| `--jwt-jwks-uri`        | from discovery                     | The provider's JWKS, when it publishes no discovery document                                   |
+| `--jwt-audience`        | none                               | Accepted `aud` values; a token must name one of them                                           |
+| `--jwt-algorithm`       | every asymmetric                   | Accepted signature algorithms (`RS*`, `PS*`, `ES*`, `EdDSA`, `Ed25519`; `ML-DSA-*` on request) |
+| `--jwt-clock-tolerance` | `30`                               | Seconds of clock skew allowed on `exp` and `nbf`                                               |
+| `--jwt-identity-claim`  | `client_id`                        | Claim published as `req.user` and `req.userName`                                               |
+| `--jwt-allowed-client`  | none: every client                 | Identities allowed in; another valid token is answered 403                                     |
+| `--jwt-type`            | none                               | Required `typ` header, such as `at+jwt` (RFC 9068); unset, not checked                         |
 
 Each has an environment variable, see
 [configuration](../../configuration.md#coreauthjwt).
+
+## Several issuers
+
+Clients whose tokens come from different identity providers can call the
+same routes through one instance: `--jwt-issuers` lists the trusted issuers,
+keyed by the exact `iss` their tokens carry.
+
+```bash
+DM_JWT_AUDIENCES=ldap-rest
+DM_JWT_ISSUERS='{
+  "https://sso-a.example.com/realms/acme": { "identity_prefix": "a:" },
+  "https://sso-b.example.org/oauth2": {
+    "jwks_uri": "https://sso-b.example.org/oauth2/jwks",
+    "audience": ["directory"],
+    "algorithm": ["ES256"],
+    "allowed_client": ["sync-service"],
+    "identity_prefix": "b:"
+  }
+}'
+```
+
+Each entry takes the fields below; one left out takes the value of the
+option of the same name.
+
+| Field             | Default                | Meaning                                            |
+| ----------------- | ---------------------- | -------------------------------------------------- |
+| `jwks_uri`        | from discovery         | This issuer's JWKS, when it publishes no discovery |
+| `audience`        | `--jwt-audience`       | Accepted `aud` values for this issuer's tokens     |
+| `algorithm`       | `--jwt-algorithm`      | Accepted algorithms for this issuer's tokens       |
+| `identity_claim`  | `--jwt-identity-claim` | Claim published as the caller                      |
+| `allowed_client`  | `--jwt-allowed-client` | Identities allowed in, before the prefix           |
+| `type`            | `--jwt-type`           | Required `typ` header                              |
+| `identity_prefix` | none                   | Text put before the identity, required, see below  |
+
+An unknown field, or a value of the wrong type, stops the server: a
+misspelt `audiences` would otherwise drop the audience check.
+`--jwt-issuers` replaces `--jwt-issuer` and `--jwt-jwks-uri`, which cannot
+be set with it; `--jwt-clock-tolerance` applies to every issuer.
+
+A token is judged by the keys of the issuer its `iss` names, and by those
+only: a token naming an issuer that is not listed, or none, answers `401`
+without anything being fetched, and a key of one issuer never vouches for a
+token naming another. Each issuer has its own keys and its own retry delay,
+so a provider that cannot be reached answers `503` for its own tokens while
+the others keep working.
+
+Two providers can hand out the same identity to different clients, so the
+caller is published as the issuer's `identity_prefix` followed by the
+token's identity, and authorization rules name that prefixed identity
+(`b:sync-service`). With several issuers, each one needs a prefix, and no
+prefix may start with another one: with `b:` for one issuer and none, or
+`a:`, for another, a client of the latter named `b:admin` would be taken for
+the former's `admin`. The server refuses to start on such prefixes.
+
+Two issuers given the same `jwks_uri` trust the same keys: whoever holds
+them can sign tokens for both.
+
+Loading `core/auth/jwt` twice on the same routes does not do this: two
+authenticators on one path must both accept a request
+([authentication dispatch](../../../architecture/adr/0002-authentication-dispatch.md)).
 
 ## What is checked
 
