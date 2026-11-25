@@ -1,71 +1,58 @@
 # Changelog
 
-## Unreleased
+## v2.6.0 (2026-11-25)
 
 ### Security
 
-- `core/auth/openidconnect` and `core/auth/llng` refuse a request that changes
-  something when a browser sends it from another origin than `--base-url`
-  or those listed in the new `--auth-trusted-origin`: a console served from
-  another origin must be listed there. With `core/auth/llng`, a `--base-url`
-  that is not a URL stops the server
-  ([upgrading](docs/usage/upgrading.md#a-console-on-another-origin-must-be-trusted-for-changes))
-- `core/twake/clouderyProvision`: deleting an account deletes its Cloudery
-  instance only at the address of the account's own slug, when no other entry
-  holds that address and the Cloudery gives the instance's OIDC id and it is
-  the account's; otherwise the instance is left in place with a warning and no
-  `domain.user.deleted` is published
-  ([details](docs/usage/plugins/integrations/instances.md#which-account-an-instance-is))
+- `core/auth/openidconnect` and `core/auth/llng` refuse a change sent by a
+  browser from an origin other than `--base-url` or the new
+  `--auth-trusted-origin`
+  ([GHSA-cpph-5pcw-wv66](https://github.com/linagora/ldap-rest/security/advisories/GHSA-cpph-5pcw-wv66),
+  [upgrading](docs/usage/upgrading.md#a-console-on-another-origin-must-be-trusted-for-changes))
+- `core/twake/clouderyProvision` deletes a Cloudery instance only when it is
+  the deleted account's own; otherwise it is left in place with a warning
+  ([GHSA-mjvm-9m3x-j99r](https://github.com/linagora/ldap-rest/security/advisories/GHSA-mjvm-9m3x-j99r),
+  [details](docs/usage/plugins/integrations/instances.md#which-account-an-instance-is))
 
 ### Added
 
+- `core/auth/jwt` trusts several issuers with `--jwt-issuers`, each with its
+  own settings and a required identity prefix
+  ([#773](https://github.com/linagora/ldap-rest/pull/773),
+  [JWT](docs/usage/plugins/auth/jwt.md#several-issuers))
+- SCIM: `POST /Users/.search` and `POST /Groups/.search`
+  ([#772](https://github.com/linagora/ldap-rest/pull/772),
+  [SCIM](docs/usage/plugins/integrations/scim.md#searching-with-post))
+- SCIM mapping `converter`s are applied (`boolean`, `number`, and the new
+  `date`) in bodies, PATCH values and filters
+  ([#772](https://github.com/linagora/ldap-rest/pull/772),
+  [SCIM](docs/usage/plugins/integrations/scim.md#file-shape))
+- `--scim-put-semantics merge` makes a SCIM PUT keep what the body leaves out
+  ([#772](https://github.com/linagora/ldap-rest/pull/772),
+  [SCIM](docs/usage/plugins/integrations/scim.md#put-replace-or-merge))
 - Plugins can declare an `init()` step, awaited before their routes and hooks
   are registered
   ([plugin development](docs/plugin-development/README.md#core-properties))
-- `core/auth/jwt` trusts several issuers on the same routes with
-  `--jwt-issuers`, each with its own keys, audience, algorithms, allowed
-  clients and identity prefix, the token's `iss` choosing which one judges
-  it; the prefixes, required with several issuers, may not start one
-  another, so that two issuers' callers cannot be taken for each other
-  ([JWT](docs/usage/plugins/auth/jwt.md#several-issuers))
-- SCIM `POST /Users/.search` and `POST /Groups/.search` take the list query
-  in a SearchRequest body (RFC 7644 §3.4.3)
-  ([SCIM](docs/usage/plugins/integrations/scim.md#searching-with-post))
-- The `converter` of a SCIM mapping entry is applied: `boolean` writes
-  `TRUE`/`FALSE` and answers JSON booleans, `number` takes and answers JSON
-  integers, and the new `date` reads and writes GeneralizedTime as
-  `xsd:dateTime` (milliseconds kept, a bare date refused), in bodies, PATCH
-  values and filters
-  ([SCIM](docs/usage/plugins/integrations/scim.md#file-shape))
-- `--scim-put-semantics merge` makes a SCIM PUT keep the attributes, and the
-  Group members, the body leaves out; the default, `replace`, removes them as
-  RFC 7644 asks
-  ([SCIM](docs/usage/plugins/integrations/scim.md#put-replace-or-merge))
 
 ### Changed
 
-- The group and organization schemas are read before the server serves; an
-  unreadable schema now stops the server instead of running without its
-  rules ([#775](https://github.com/linagora/ldap-rest/issues/775),
+- An unreadable group or organization schema stops the server
+  ([#775](https://github.com/linagora/ldap-rest/issues/775),
   [upgrading](docs/usage/upgrading.md#an-unreadable-schema-or-a-missing-storage-package-stops-the-server))
-- The storage backend is opened before the plugins using it are loaded, and
-  its sweeper starts after: startup waits for a database or a Valkey that
-  does not answer, at most 10 s, then starts anyway; a missing `pg` or
-  `iovalkey` package now stops the server
+- The storage backend opens before the plugins using it, waiting at most 10 s;
+  a missing `pg` or `iovalkey` package stops the server
   ([#776](https://github.com/linagora/ldap-rest/issues/776),
   [storage](docs/usage/plugins/utilities/storage.md#backends))
 
 ### Fixed
 
-- SCIM: a group keeps its nested groups in `members` on POST, PUT and PATCH;
-  a member's `type` or `$ref` says whether it names a user or a group, and a
-  group cannot be made a member of itself (`400 invalidValue`)
+- SCIM: groups keep their nested groups in `members`, and a group cannot be
+  its own member
   ([#785](https://github.com/linagora/ldap-rest/issues/785),
   [details](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior))
-- With `--scim-id-attribute` set to an attribute other than the RDN
-  (`entryUUID`…), a SCIM User or Group is found by the id the server answered:
-  GET, PUT, PATCH, DELETE and member references no longer answer 404, and a
-  Group's `members[].value` and `$ref` carry the member's id.
+- SCIM with `--scim-id-attribute entryUUID`: resources are found by the id the
+  server answers, and group members carry their ids
+  ([#772](https://github.com/linagora/ldap-rest/pull/772))
 
 ## v2.5.0 (2026-11-23)
 
