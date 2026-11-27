@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   lsc-plugin-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_RUNNER || 'ubuntu-latest' }}
     name: LSC ldap-rest plugin (Java)
     env:
       LSC_CORE_TAG: v2.2
