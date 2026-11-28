@@ -166,12 +166,11 @@ class OnLdapChange extends DmPlugin {
         this.logger.warn(`Could not read ${dn} after modification`);
         return;
       }
-      this.publish(
-        dn,
-        ownBefore(before, after, touchedAttributes(changes)),
-        after,
-        context
-      );
+      const touched = touchedAttributes(changes);
+      // The operational attributes the change events read change on every
+      // write, and a rule may name them as what changed
+      for (const attribute of this.followedAttributes()) touched.add(attribute);
+      this.publish(dn, ownBefore(before, after, touched), after, context);
     },
 
     ldapmodifyend: op => {
@@ -250,12 +249,17 @@ class OnLdapChange extends DmPlugin {
     },
   };
 
-  async read(dn: string): Promise<Entry | undefined> {
-    const followed = new Set(
-      Object.values(this.server.loadedPlugins).flatMap(
-        p => p.followedOperationalAttributes || []
-      )
+  /** The operational attributes the loaded plugins ask to read, lowercased */
+  followedAttributes(): Set<string> {
+    return new Set(
+      Object.values(this.server.loadedPlugins)
+        .flatMap(p => p.followedOperationalAttributes || [])
+        .map(attribute => attribute.toLowerCase())
     );
+  }
+
+  async read(dn: string): Promise<Entry | undefined> {
+    const followed = this.followedAttributes();
     try {
       // As the server: what changed is read whole for the change events, whoever made the change
       const res = (await this.server.ldap.system.search(
