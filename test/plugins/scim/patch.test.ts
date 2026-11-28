@@ -6,6 +6,7 @@ import {
   writePatch,
 } from '../../../src/plugins/scim/patch';
 import { DEFAULT_USER_MAPPING } from '../../../src/plugins/scim/mapping';
+import type { ResourceMapping } from '../../../src/plugins/scim/types';
 import { ScimError } from '../../../src/plugins/scim/errors';
 
 describe('SCIM PATCH applicator', () => {
@@ -45,6 +46,48 @@ describe('SCIM PATCH applicator', () => {
     // sent, so a concurrent add of a third address is not overwritten.
     expect(req.add).to.deep.equal({ mail: 'b@x.test' });
     expect(req.replace).to.be.undefined;
+  });
+
+  describe('attribute names in another case', () => {
+    const mapping: ResourceMapping = {
+      ...DEFAULT_USER_MAPPING,
+      entries: [
+        { scim: 'userName', ldap: 'uid' },
+        { scim: 'displayName', ldap: 'displayname' },
+      ],
+    };
+    const caseCtx = (
+      current: Record<string, string | string[]>
+    ): {
+      mapping: ResourceMapping;
+      current: Record<string, string | string[]>;
+    } => ({
+      mapping,
+      current,
+    });
+
+    it('removes a value the entry holds under another spelling', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'remove', path: 'displayName' }],
+        },
+        caseCtx({ displayName: 'Alice' })
+      );
+      expect(req.delete).to.deep.equal({ displayname: '' });
+    });
+
+    it('adds only the new value when the entry holds one under another spelling', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'add', path: 'displayName', value: 'Bob' }],
+        },
+        caseCtx({ displayName: 'Alice' })
+      );
+      expect(req.add).to.deep.equal({ displayname: 'Bob' });
+      expect(req.replace).to.be.undefined;
+    });
   });
 
   it('replace sub-attribute → { replace: {...} }', async () => {

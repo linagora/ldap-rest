@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- SCIM: a mapping's LDAP attribute names are matched against the directory
+  case-insensitively, so a mapping written in another case than the schema
+  spelling reads, patches and replaces the same attribute
+  ([#771](https://github.com/linagora/ldap-rest/issues/771))
 - A password policy deleted while an account is assigned to it no longer
   leaves the account naming a policy that is gone: the delete and the
   assignment are serialised on one instance

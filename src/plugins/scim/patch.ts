@@ -44,6 +44,7 @@ import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
   assertReferenceDn,
+  attributeValue,
   holdsValue,
   isDnSubAttribute,
   readActive,
@@ -143,7 +144,7 @@ class WorkingEntry {
 
   get(attr: string): string[] {
     if (!this.values.has(attr))
-      this.values.set(attr, asValues(this.current[attr]));
+      this.values.set(attr, asValues(attributeValue(this.current, attr)));
     return this.values.get(attr) as string[];
   }
 
@@ -178,7 +179,7 @@ class WorkingEntry {
   diff(): ModifyRequest {
     const req: ModifyRequest = {};
     for (const attr of this.touched) {
-      const before = asValues(this.current[attr]);
+      const before = asValues(attributeValue(this.current, attr));
       const after = this.get(attr);
       const added = after.filter(v => !before.includes(v));
       const removed = before.filter(v => !after.includes(v));
