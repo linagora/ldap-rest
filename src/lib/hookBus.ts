@@ -470,6 +470,23 @@ export default class HookBus implements FlatHookBus {
   }
 
   /**
+   * Wait for work a subscriber detached from its own answer, as `settled`
+   * waits for the notifications. The caller is not awaited, so the
+   * notification keeps its ordering.
+   *
+   * @param promise the detached work
+   */
+  track(promise: Promise<void>): void {
+    const { pending } = this.tracked;
+    pending.add(promise);
+    void promise
+      .catch((): undefined => undefined)
+      .finally((): void => {
+        pending.delete(promise);
+      });
+  }
+
+  /**
    * Write a hook's subscribers the way `server.hooks` spells them: no entry
    * when nothing is subscribed, the function itself for one subscriber.
    */

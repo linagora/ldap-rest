@@ -870,6 +870,15 @@ export class DM {
       await DM.within(closed, drain);
       server.closeAllConnections();
     }
+    // The subscribers of the writes just answered run detached from their
+    // response: let them finish before the plugins and the directory go
+    if (
+      !(await DM.within(
+        this.hookBus.settled(),
+        Math.max(1000, drain - (Date.now() - started))
+      ))
+    )
+      this.logger.warn('Shut down with change notifications still running');
     const closing = new Map<string, Promise<void>>();
     for (const [name, plugin] of Object.entries(this.loadedPlugins)) {
       closing.set(

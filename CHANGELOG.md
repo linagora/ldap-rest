@@ -8,6 +8,10 @@
   case-insensitively, so a mapping written in another case than the schema
   spelling reads, patches and replaces the same attribute
   ([#771](https://github.com/linagora/ldap-rest/issues/771))
+- On shutdown, the server waits for the change notifications of the writes
+  already answered before closing the plugins and the directory, within the
+  drain budget, so their side effects are not lost on a restart
+  ([#791](https://github.com/linagora/ldap-rest/issues/791))
 
 ## v2.6.0 (2026-11-25)
 
