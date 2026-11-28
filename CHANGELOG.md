@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- On shutdown, the server waits for the change notifications of the writes
+  already answered before closing the plugins and the directory, within the
+  drain budget, so their side effects are not lost on a restart
+  ([#791](https://github.com/linagora/ldap-rest/issues/791))
+
 ## v2.6.0 (2026-11-25)
 
 ### Security

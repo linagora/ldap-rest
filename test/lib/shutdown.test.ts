@@ -151,6 +151,44 @@ describe('Shutdown', function () {
     expect(holding.closed, 'and lets go once').to.deep.equal(['holding']);
   });
 
+  it('lets the change notifications of answered writes finish', async () => {
+    const { server } = await serve(8000);
+    const base = process.env.DM_LDAP_BASE!;
+    const dn = `uid=shutdownhook,ou=users,${base}`;
+    let outcome = '';
+    // As a consistency plugin does after its outbound call: write back once
+    // the response has gone, detached from the request
+    const hook = async (added: string): Promise<void> => {
+      if (added !== dn) return;
+      await pause(20);
+      try {
+        await server.ldap.system.modify(dn, {
+          replace: { description: 'notified' },
+        });
+        await server.ldap.system.delete(dn);
+        outcome = 'written';
+      } catch (err) {
+        outcome = err instanceof Error ? err.message : String(err);
+      }
+    };
+    server.hookBus.subscribe('ldapadddone', hook);
+    try {
+      await server.ldap.add(dn, {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'shutdownhook',
+        cn: 'shutdownhook',
+        sn: 'Hook',
+      });
+      await server.shutdown();
+    } finally {
+      server.hookBus.unsubscribe('ldapadddone', hook);
+    }
+    expect(
+      outcome,
+      'the subscriber wrote before the directory closed'
+    ).to.equal('written');
+  });
+
   /** A raw keep-alive connection: what it received, and when it closed */
   const open = async (
     port: number

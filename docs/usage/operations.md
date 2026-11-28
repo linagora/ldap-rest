@@ -191,10 +191,12 @@ On `SIGTERM` or `SIGINT`, the binary stops in order:
    response they carry, sent with `Connection: close`, or are cut when the
    drain is spent: `--shutdown-timeout` (20 s) less the 5 s kept for the
    steps below, 1 s at least;
-3. every plugin's `close()` runs, at once: the broker connection, the
+3. the change notifications of the writes already answered finish, within
+   what remains of the drain; one that outlives it is logged and cut;
+4. every plugin's `close()` runs, at once: the broker connection, the
    storage backend;
-4. the directory connections are closed;
-5. the signal ends the process, with its usual code (143 on `SIGTERM`).
+5. the directory connections are closed;
+6. the signal ends the process, with its usual code (143 on `SIGTERM`).
 
 The whole takes `--shutdown-timeout` at most: a `close()` that does not
 settle in what remains of the budget is logged and left behind, by
