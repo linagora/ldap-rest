@@ -185,6 +185,14 @@ never reaches its "done" hook; its "end" hook fires all the same.
   attribute ones fire only while the entry has the attribute configured for
   them. A delete fires `onLdapEntryChange`, `onLdapChange` and
   `onLdapMailChange` only.
+- A modify or a rename announces only the attributes its own write changed:
+  another write of the same entry landing between its two reads is not
+  attributed to it when it changed another attribute. Two writes of the same
+  attribute still overlap, and the event may carry the other's value.
+- The `before` entry is rebuilt rather than read: for an attribute this write
+  did not touch, it carries the after value. A subscriber reading
+  `before[attribute]` for such an attribute sees the concurrent write's value,
+  not the value the entry held before.
 
 ## Ordering
 

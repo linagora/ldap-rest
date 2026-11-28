@@ -8,6 +8,10 @@
   case-insensitively, so a mapping written in another case than the schema
   spelling reads, patches and replaces the same attribute
   ([#771](https://github.com/linagora/ldap-rest/issues/771))
+- The change events of a modify or a rename name only the attributes its own
+  write changed: a concurrent write of the same entry is no longer attributed
+  to it, so subscribers do not act on a change twice
+  ([#790](https://github.com/linagora/ldap-rest/issues/790))
 
 ## v2.6.0 (2026-11-25)
 
