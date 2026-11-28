@@ -189,6 +189,44 @@ describe('Shutdown', function () {
     ).to.equal('written');
   });
 
+  it('waits for work a subscriber detaches from its answer', async () => {
+    const { server } = await serve(8000);
+    const base = process.env.DM_LDAP_BASE!;
+    const dn = `uid=shutdowntrack,ou=users,${base}`;
+    let outcome = '';
+    // A plugin that queues its work and answers at once, as core/twake/spaces
+    // does: the bus is told to wait for the chain without the hook awaiting it.
+    const hook = async (added: string): Promise<void> => {
+      if (added !== dn) return;
+      const detached = (async () => {
+        await pause(20);
+        try {
+          await server.ldap.system.delete(dn);
+          outcome = 'written';
+        } catch (err) {
+          outcome = err instanceof Error ? err.message : String(err);
+        }
+      })();
+      server.hookBus.track(detached);
+    };
+    server.hookBus.subscribe('ldapadddone', hook);
+    try {
+      await server.ldap.add(dn, {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'shutdowntrack',
+        cn: 'shutdowntrack',
+        sn: 'Track',
+      });
+      await server.shutdown();
+    } finally {
+      server.hookBus.unsubscribe('ldapadddone', hook);
+    }
+    expect(
+      outcome,
+      'the detached work ran before the directory closed'
+    ).to.equal('written');
+  });
+
   /** A raw keep-alive connection: what it received, and when it closed */
   const open = async (
     port: number

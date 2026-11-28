@@ -498,6 +498,9 @@ export default class TwakeSpaces extends DmPlugin {
         });
       })
     );
+    // The hook answered before this work runs: let the bus wait for it on
+    // shutdown without holding up the next subscriber.
+    this.hookBus.track(this.following);
   }
 
   /** The organization a space DN belongs to, if it is a space at all. */
@@ -1478,6 +1481,7 @@ export default class TwakeSpaces extends DmPlugin {
     );
     // Also marks a failure handled, for the events of a write
     this.publishing = sent.catch(() => undefined);
+    this.hookBus.track(this.publishing);
     return sent;
   }
 
