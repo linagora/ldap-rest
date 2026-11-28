@@ -17,6 +17,7 @@ import {
   withExternalId,
   type MappingContext,
 } from '../../../src/plugins/scim/mapping';
+import type { ResourceMapping } from '../../../src/plugins/scim/types';
 
 const userCtx: MappingContext = {
   idAttribute: 'rdn',
@@ -118,6 +119,44 @@ describe('SCIM mapping', () => {
           ctx
         ).active
       ).to.be.true;
+    });
+    it('reads attributes the mapping spells in another case', () => {
+      const mapping: ResourceMapping = {
+        ...DEFAULT_USER_MAPPING,
+        entries: [
+          { scim: 'userName', ldap: 'uid' },
+          { scim: 'displayName', ldap: 'displayname' },
+          {
+            scim: 'emails',
+            ldapPrimary: 'mail',
+            ldapSecondary: 'mailalternateaddress',
+            multi: 'array',
+          },
+        ],
+      };
+      const user = ldapToScimUser(
+        {
+          uid: 'alice',
+          displayName: 'Alice',
+          mail: 'alice@example.test',
+          mailAlternateAddress: ['alice@corp.example.test'],
+        },
+        mapping,
+        userCtx
+      );
+      expect(user.displayName).to.equal('Alice');
+      expect(user.emails).to.deep.equal([
+        { value: 'alice@example.test', primary: true },
+        { value: 'alice@corp.example.test' },
+      ]);
+    });
+    it('finds the id attribute whatever case it is configured in', () => {
+      const user = ldapToScimUser(
+        { uid: 'alice', entryUUID: '0123' },
+        DEFAULT_USER_MAPPING,
+        { ...userCtx, idAttribute: 'entryuuid' }
+      );
+      expect(user.id).to.equal('0123');
     });
   });
 
@@ -556,6 +595,19 @@ describe('SCIM mapping', () => {
         }
       );
       expect(g.members?.[0]).to.deep.equal({ value: 'alice', type: 'User' });
+    });
+    it('reads the group attribute whatever case the mapping spells it in', () => {
+      const mapping: ResourceMapping = {
+        ...DEFAULT_GROUP_MAPPING,
+        entries: [{ scim: 'displayName', ldap: 'CN' }],
+      };
+      const g = ldapToScimGroup(
+        { cn: 'admins', member: ['uid=alice,ou=users,dc=example,dc=com'] },
+        mapping,
+        groupCtx
+      );
+      expect(g.displayName).to.equal('admins');
+      expect(g.members).to.have.lengthOf(1);
     });
   });
 
