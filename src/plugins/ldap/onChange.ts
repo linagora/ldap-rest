@@ -169,7 +169,8 @@ class OnLdapChange extends DmPlugin {
       const touched = touchedAttributes(changes);
       // The operational attributes the change events read change on every
       // write, and a rule may name them as what changed
-      for (const attribute of this.followedAttributes()) touched.add(attribute);
+      for (const attribute of await this.operationalAttributes())
+        touched.add(attribute);
       this.publish(dn, ownBefore(before, after, touched), after, context);
     },
 
@@ -203,13 +204,14 @@ class OnLdapChange extends DmPlugin {
         this.logger.warn(`Could not read ${newDn} after the rename of ${dn}`);
         return;
       }
+      const touched = new Set([
+        ...rdnTypes(pending.dn),
+        ...rdnTypes(newDn),
+        ...(await this.operationalAttributes()),
+      ]);
       this.publish(
         newDn,
-        ownBefore(
-          pending.entry,
-          after,
-          new Set([...rdnTypes(pending.dn), ...rdnTypes(newDn)])
-        ),
+        ownBefore(pending.entry, after, touched),
         after,
         context
       );
@@ -249,18 +251,29 @@ class OnLdapChange extends DmPlugin {
     },
   };
 
-  /** The operational attributes the loaded plugins ask to read, lowercased */
-  followedAttributes(): Set<string> {
-    return new Set(
+  /**
+   * The operational attributes the loaded plugins ask to read, lowercased.
+   * A plugin may name user attributes too, but only the operational ones need
+   * asking for: `*` already returns the others.
+   */
+  async operationalAttributes(): Promise<Set<string>> {
+    const asked = new Set(
       Object.values(this.server.loadedPlugins)
         .flatMap(p => p.followedOperationalAttributes || [])
         .map(attribute => attribute.toLowerCase())
     );
+    if (asked.size === 0) return asked;
+    const index = await this.server.ldap.schemaIndex();
+    return new Set(
+      [...asked].filter(
+        name => index.getAttributeType(name)?.usage !== 'userApplications'
+      )
+    );
   }
 
   async read(dn: string): Promise<Entry | undefined> {
-    const followed = this.followedAttributes();
     try {
+      const followed = await this.operationalAttributes();
       // As the server: what changed is read whole for the change events, whoever made the change
       const res = (await this.server.ldap.system.search(
         {

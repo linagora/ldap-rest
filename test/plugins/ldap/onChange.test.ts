@@ -417,6 +417,45 @@ describe('onChange', () => {
       expect(events.some(c => c.displayName)).to.equal(true);
     });
 
+    it('leaves a followed user attribute to the request that changed it', async () => {
+      const dn = await addUser('ochfollow', {
+        mail: ['m0@example.com'],
+        displayName: ['Old'],
+      });
+      // A plugin may name a user attribute in followedOperationalAttributes;
+      // only the operational ones are added to the diff, so the outer write
+      // still carries its own attribute alone.
+      dm.loadedPlugins.follower = {
+        followedOperationalAttributes: ['displayName'],
+      } as unknown as DmPlugin;
+      try {
+        const hook: NonNullable<Hooks['ldapmodifyrequest']> = async ([
+          target,
+          changes,
+          op,
+          req,
+        ]) => {
+          if (target === dn && changes.replace?.mail)
+            await dm.ldap.modify(dn, { replace: { displayName: 'New' } });
+          return [target, changes, op, req];
+        };
+        dm.hookBus.subscribe('ldapmodifyrequest', hook);
+        try {
+          await dm.ldap.modify(dn, { replace: { mail: 'm1@example.com' } });
+        } finally {
+          dm.hookBus.unsubscribe('ldapmodifyrequest', hook);
+        }
+      } finally {
+        delete dm.loadedPlugins.follower;
+      }
+      await waitFor(() => ldapChanges.filter(([d]) => d === dn).length >= 2);
+      const events = ldapChanges.filter(([d]) => d === dn).map(([, c]) => c);
+      for (const changes of events)
+        expect(Object.keys(changes)).to.have.lengthOf(1);
+      expect(events.some(c => c.mail)).to.equal(true);
+      expect(events.some(c => c.displayName)).to.equal(true);
+    });
+
     it('fires nothing for a replace with the value already there', async () => {
       const dn = await addUser('ochnoop', { description: ['a', 'b'] });
       await dm.ldap.modify(dn, {
@@ -458,6 +497,23 @@ describe('onChange', () => {
       expect(got).to.equal(newDn);
       expect(before).to.include({ dn, uid: 'ochren' });
       expect(after).to.include({ dn: newDn, uid: 'ochren2' });
+    });
+
+    it('reports a followed operational attribute changed by a rename', async () => {
+      const dn = await addUser('ochrenops');
+      const newDn = user('ochrenops2');
+      dm.loadedPlugins.follower = {
+        followedOperationalAttributes: ['entryCSN'],
+      } as unknown as DmPlugin;
+      try {
+        await dm.ldap.rename(dn, newDn);
+        created.push(newDn);
+        await waitFor(() => ldapChanges.some(([d]) => d === newDn));
+      } finally {
+        delete dm.loadedPlugins.follower;
+      }
+      const changes = ldapChanges.find(([d]) => d === newDn)![1];
+      expect(changes).to.have.property('entryCSN');
     });
 
     it('gives the entry before a delete, and nothing after', async () => {
