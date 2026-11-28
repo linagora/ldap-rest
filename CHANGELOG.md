@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- SCIM: a mapping's LDAP attribute names are matched against the directory
+  case-insensitively, so a mapping written in another case than the schema
+  spelling reads, patches and replaces the same attribute
+  ([#771](https://github.com/linagora/ldap-rest/issues/771))
+
 ## v2.6.0 (2026-11-25)
 
 ### Security
