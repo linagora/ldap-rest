@@ -928,6 +928,7 @@ class HookBus implements FlatHookBus {
     subscribe<K extends keyof Hooks>(name: K, fn: NonNullable<Hooks[K]>): void;
     subscribers(name: keyof Hooks): readonly HookFn[];
     toLast(name: keyof Hooks, hook: HookFn): boolean;
+    track(promise: Promise<void>): void;
     unsubscribe<K extends keyof Hooks>(name: K, fn: NonNullable<Hooks[K]>): void;
 }
 
