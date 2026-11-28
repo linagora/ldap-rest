@@ -46,6 +46,9 @@ import {
   requiredLdapAttributes,
   asArray,
   asString,
+  attributeKey,
+  attributeValue,
+  setAttribute,
   type MappingContext,
 } from './mapping.js';
 import { scimFilterToLdap } from './filter.js';
@@ -238,7 +241,7 @@ export class ScimGroups {
     const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
     const dns = new Map<string, string>();
     for (const e of entries)
-      for (const dn of asArray(e['member']))
+      for (const dn of asArray(attributeValue(e, 'member')))
         if (dn && !isDummyMemberDn(dn, placeholder))
           dns.set(dn.toLowerCase(), dn);
     const directory = this.ldap.forRequest(req);
@@ -256,7 +259,9 @@ export class ScimGroups {
             dn
           )) as SearchResult;
           const entry = result.searchEntries?.[0];
-          const id = entry ? asString(entry[this.idAttribute]) : undefined;
+          const id = entry
+            ? asString(attributeValue(entry, this.idAttribute))
+            : undefined;
           if (id) ids.set(key, id);
         } catch (err) {
           if (!isUnreadableMember(err)) throw err;
@@ -536,10 +541,12 @@ export class ScimGroups {
       this.mapping,
       this.objectClass
     );
-    const rdn = (!attributes[this.rdnAttribute] && group.id) || named;
+    const rdnKey =
+      attributeKey(attributes, this.rdnAttribute) ?? this.rdnAttribute;
+    const rdn = (!attributes[rdnKey] && group.id) || named;
     if (!rdn) throw scimInvalidValue('displayName is required');
     validateDnValue(rdn, this.rdnAttribute);
-    attributes[this.rdnAttribute] = rdn;
+    attributes[rdnKey] = rdn;
 
     // Resolve members (SCIM value → LDAP DN)
     const memberDns =
@@ -552,7 +559,7 @@ export class ScimGroups {
       const placeholder = this.config.group_dummy_user || 'cn=fakeuser';
       memberDns.push(placeholder);
     }
-    attributes.member = memberDns;
+    setAttribute(attributes, 'member', memberDns);
 
     const dn = `${this.rdnAttribute}=${escapeDnValue(rdn)},${base}`;
 
@@ -604,11 +611,13 @@ export class ScimGroups {
     const dn = await this.dnForId(id, req);
     this.assertNotSelfMember(dn, memberDns);
     const changes: ModifyRequest = { replace: {} };
+    const rdn = this.rdnAttribute.toLowerCase();
     for (const [k, v] of Object.entries(attributes)) {
-      if (k === 'objectClass' || k === this.rdnAttribute) continue;
+      if (k.toLowerCase() === 'objectclass' || k.toLowerCase() === rdn)
+        continue;
       changes.replace![k] = v;
     }
-    if (!keepMembers) changes.replace!.member = memberDns;
+    if (!keepMembers) setAttribute(changes.replace!, 'member', memberDns);
     await this.ldap.forRequest(req).modify(dn, changes);
 
     const updated = await this.get(req, id);
