@@ -32,6 +32,8 @@ import {
 } from './types.js';
 import {
   DEFAULT_USER_MAPPING,
+  attributeKey,
+  attributeValue,
   loadMappingFile,
   mergeMapping,
   replaceableLdapAttributes,
@@ -331,7 +333,11 @@ export class ScimUsers {
     );
     if (!rdn) throw scimInvalidValue('userName is required');
     validateDnValue(rdn, this.rdnAttribute);
-    attributes[this.rdnAttribute] = rdn;
+    // The mapping may spell the RDN attribute in another case; set its key
+    // rather than adding a second spelling of the same attribute
+    attributes[
+      attributeKey(attributes, this.rdnAttribute) ?? this.rdnAttribute
+    ] = rdn;
 
     const base = this.baseResolver.userBase(req);
     const dn = `${this.rdnAttribute}=${escapeDnValue(rdn)},${base}`;
@@ -345,7 +351,7 @@ export class ScimUsers {
       // The lock attribute is written here whenever the body said
       // `active: false`, and a directory without the schema for it refuses
       // the whole add.
-      if (attributes[this.lockAttribute] !== undefined) {
+      if (attributeValue(attributes, this.lockAttribute) !== undefined) {
         throw this.lockSchemaError(err);
       }
       throw err;
@@ -402,18 +408,20 @@ export class ScimUsers {
       !merge
     );
     const changes: ModifyRequest = { replace: {}, delete: [] };
-    const skipAttrs = new Set([
-      'objectClass',
-      'entryUUID',
-      'createTimestamp',
-      'modifyTimestamp',
-      this.rdnAttribute,
-      // The lock attribute is not a mapped attribute: `active` decides it,
-      // below, and a body that says nothing about `active` must leave it
-      // alone. Clearing it here would silently release a lock the directory
-      // owns — a ppolicy auto-lockout, or one an administrator set.
-      this.lockAttribute,
-    ]);
+    const skipAttrs = new Set(
+      [
+        'objectClass',
+        'entryUUID',
+        'createTimestamp',
+        'modifyTimestamp',
+        this.rdnAttribute,
+        // The lock attribute is not a mapped attribute: `active` decides it,
+        // below, and a body that says nothing about `active` must leave it
+        // alone. Clearing it here would silently release a lock the directory
+        // owns — a ppolicy auto-lockout, or one an administrator set.
+        this.lockAttribute,
+      ].map(name => name.toLowerCase())
+    );
     const hasAttrValue = (v: unknown): boolean => {
       if (v == null) return false;
       if (typeof v === 'string') return v.length > 0;
@@ -421,14 +429,19 @@ export class ScimUsers {
       return true;
     };
     const { writable, writeOnly } = replaceableLdapAttributes(this.mapping);
+    const seen = new Set<string>();
     for (const attr of this.ldapAttributes(true)) {
-      if (skipAttrs.has(attr) || !writable.has(attr.toLowerCase())) continue;
-      if (attributes[attr] != null) {
-        changes.replace![attr] = attributes[attr];
+      const name = attr.toLowerCase();
+      if (seen.has(name) || skipAttrs.has(name) || !writable.has(name))
+        continue;
+      seen.add(name);
+      const value = attributeValue(attributes, attr);
+      if (value != null) {
+        changes.replace![attr] = value;
       } else if (
         !merge &&
-        !writeOnly.has(attr.toLowerCase()) &&
-        hasAttrValue(currentEntry[attr])
+        !writeOnly.has(name) &&
+        hasAttrValue(attributeValue(currentEntry, attr))
       ) {
         (changes.delete as string[]).push(attr);
       }
