@@ -754,6 +754,22 @@ describe('PasswordPolicy Plugin: policy management', () => {
     expect((await request.delete(`${api}/default`)).status).to.equal(409);
   });
 
+  it('leaves no unhandled rejection behind a refused delete', async () => {
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', listener);
+    try {
+      expect((await request.delete(`${api}/software`)).status).to.equal(409);
+      // Let the rejection surface, if the lock's tail kept it
+      await new Promise(resolve => setTimeout(resolve, 50));
+    } finally {
+      process.off('unhandledRejection', listener);
+    }
+    expect(unhandled).to.eql([]);
+  });
+
   it('serialises a delete and an assignment of one policy', async () => {
     const raceDn = `cn=race,${policyBase}`;
     const raceUser = `uid=ppolicy.race,ou=users,${process.env.DM_LDAP_BASE}`;

@@ -1691,10 +1691,17 @@ export default class PasswordPolicy extends DmPlugin {
   private withPolicy<T>(dn: string, write: () => Promise<T>): Promise<T> {
     const key = normalizeDn(dn);
     const previous = this.policyLocks.get(key) ?? Promise.resolve();
-    const next = previous.catch(() => undefined).then(write);
-    const tail = next.finally(() => {
-      if (this.policyLocks.get(key) === tail) this.policyLocks.delete(key);
-    });
+    const next = previous.then(write);
+    // The stored tail never rejects: its rejection belongs to the caller,
+    // and a caller that fails would otherwise leave it unhandled
+    const tail = next
+      .then(
+        () => undefined,
+        () => undefined
+      )
+      .finally(() => {
+        if (this.policyLocks.get(key) === tail) this.policyLocks.delete(key);
+      });
     this.policyLocks.set(key, tail);
     return next;
   }
