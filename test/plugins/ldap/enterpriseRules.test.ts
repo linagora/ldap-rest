@@ -348,6 +348,8 @@ describe('Enterprise rules', () => {
       afterEach(async () => {
         await remove('rules.uniq');
         await remove('rules.other');
+        await remove('rules.race1');
+        await remove('rules.race2');
       });
 
       // A payroll number of its own per call: it is unique across the base, so
@@ -404,6 +406,38 @@ describe('Enterprise rules', () => {
           employeeNumber: 'E12345',
         });
         expect(res.status).to.equal(409);
+      });
+
+      it('should refuse one of two concurrent writes of a unique value', async () => {
+        // The check and the write are separate operations: without a lock,
+        // both searches find the value free and both adds land.
+        const [first, second] = await Promise.all([
+          create('rules.race1@example.com', { employeeNumber: 'ERACE1' }),
+          create('rules.race2@example.com', { employeeNumber: 'ERACE1' }),
+        ]);
+        expect([first.status, second.status].sort()).to.deep.equal([201, 409]);
+      });
+
+      it('should accept an address also given as an alias of the same entry', async () => {
+        // The mail and alias checks share the same key; taking it twice would
+        // make the write wait on itself forever.
+        await create('rules.uniq@example.com', {
+          mailAlternateAddress: ['rules.uniq@example.com'],
+        }).expect(201);
+      });
+
+      it('should not deadlock two writes swapping mail and alias', async () => {
+        // Each write takes the other's keys in the opposite order without a
+        // single global order; the second search then finds the first entry.
+        const [first, second] = await Promise.all([
+          create('rules.race1@example.com', {
+            mailAlternateAddress: ['rules.race2@example.com'],
+          }),
+          create('rules.race2@example.com', {
+            mailAlternateAddress: ['rules.race1@example.com'],
+          }),
+        ]);
+        expect([first.status, second.status].sort()).to.deep.equal([201, 409]);
       });
 
       // The shipped schema exempts `UNIT`, the placeholder the interface

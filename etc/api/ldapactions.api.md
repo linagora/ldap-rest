@@ -880,6 +880,7 @@ interface Hooks {
     ldapaddafter?: (dn: string, entry: AttributesList, context?: ChangeContext) => MaybePromise<void>;
     // (undocumented)
     ldapadddone?: (dn: string, entry: AttributesList, context?: ChangeContext) => MaybePromise<void>;
+    ldapaddend?: (op: number) => MaybePromise<void>;
     // (undocumented)
     ldapaddrequest?: ChainedHook<[string, AttributesList, Request_2?]>;
     // (undocumented)

@@ -66,6 +66,7 @@ await server.hookBus.settled();
 - **ldapaddrequest**: chained before any add, with `[dn, entry, request]`
 - **ldapadddone**: notified once an add has written the entry, with the DN, the entry and the context, one by one; not awaited
 - **ldapaddafter**: notified once an add has written the entry, before it answers, with the DN, the entry and the context, one by one, see [below](#ldapaddafter)
+- **ldapaddend**: notified once an add is over, whatever became of it, and its after subscribers have returned
 - **ldapmodifyrequest**: chained before any modify, with `[dn, changes, op, request]`
 - **ldapmodifydone**: notified once a modify is written, with the DN, the changes, the operation number and the context, one by one
 - **ldapmodifyend**: notified once a modify is over, whatever became of it, and its done subscribers have returned
@@ -155,7 +156,7 @@ the account the entry describes.
   no set order with it: an add event may or may not include what a
   subscriber here wrote.
 
-### ldapmodifyend, ldapdeleteend, ldaprenameend
+### ldapaddend, ldapmodifyend, ldapdeleteend, ldaprenameend
 
 For a plugin that keeps something from a request hook to the matching "done"
 one, as core/ldap/onChange keeps the entry it read. A write that is refused
@@ -164,13 +165,14 @@ and core/twake/tombstone do with a delete), or that the directory refuses,
 never reaches its "done" hook; its "end" hook fires all the same.
 
 - Each gets the number of its operation. A modify's request and "done" hooks
-  are given it in their arguments; for every modify, delete and rename,
+  are given it in their arguments; for every add, modify, delete and rename,
   `currentOperation()` (`lib/operation`) returns it inside the request and
   "done" hooks. Key what you keep by it rather than by DN: two writes of one
   DN may be under way, and only the operation tells them apart.
-  Outside those hooks it is whatever encloses the call (an add made from a
+  Outside those hooks it is whatever encloses the call (a search made from a
   delete's request hook sees the delete's number): in an end hook, use the
   number it is given.
+- An add's end hook fires after its `ldapaddafter` subscribers have returned.
 - It is launched once the "done" subscribers of the operation have returned,
   and is not awaited by the write.
 - A move (`ldapActions.move`) launches no request hook and no end hook, and

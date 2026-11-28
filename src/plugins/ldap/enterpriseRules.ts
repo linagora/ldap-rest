@@ -75,6 +75,7 @@ import {
 import type { ChangeContext } from '../../lib/changeContext.js';
 import { BadRequestError, ConflictError } from '../../lib/errors.js';
 import { extractLdapCode } from '../../lib/ldapCodes.js';
+import { currentOperation } from '../../lib/operation.js';
 
 /** One entity the rules apply to: its branch and the schema describing it. */
 interface EntityBinding {
@@ -386,6 +387,18 @@ export default class LdapEnterpriseRules extends DmPlugin {
   private readonly enterpriseSettings: EnterpriseRulesOptions;
   private readonly orgSettings: OrganizationOptions;
 
+  /**
+   * The write holding each unique value, by `attribute=value`. A second
+   * write of the same value waits for the first to end, so its search sees
+   * the entry the first wrote. The directory's own `unique` overlay is the
+   * only guard across replicas.
+   */
+  private readonly uniqueLocks = new Map<string, Promise<void>>();
+  /** What releases the locks a write took, by operation number */
+  private readonly uniqueReleases = new Map<number, (() => void)[]>();
+  /** The keys each operation already holds, so a second check skips them */
+  private readonly uniqueHeld = new Map<number, Set<string>>();
+
   constructor(server: DM) {
     super(server);
     this.enterpriseSettings = this.options(enterpriseRulesOptions);
@@ -624,6 +637,9 @@ export default class LdapEnterpriseRules extends DmPlugin {
       if (movedToTrash(this.config.trash_base, oldDn, newDn))
         await this.removeReferences(oldDn, context);
     },
+
+    ldapaddend: op => this.releaseUnique(op),
+    ldapmodifyend: op => this.releaseUnique(op),
   };
 
   /**
@@ -642,6 +658,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
     current: AttributesList | null
   ): Promise<void> {
     const names = Object.keys(entity.schema.attributes);
+    const unique: { name: string; attr: SchemaAttribute; list: string[] }[] =
+      [];
     for (const [key, value] of Object.entries(values)) {
       // Its rule whatever the spelling: a write to `MAIL` or `mail;lang-en`
       // is one to `mail`, and found no rule under that name
@@ -651,9 +669,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
       const list = valueList(value);
       if (list.length === 0) continue;
 
-      if (attr.unique) {
-        await this.checkUnique(entity, name, attr, list, dn, current);
-      }
+      if (attr.unique) unique.push({ name, attr, list });
       if (attr.mailDomainScope) {
         await this.checkMailDomains(entity, name, attr, list, values, current);
       }
@@ -661,6 +677,68 @@ export default class LdapEnterpriseRules extends DmPlugin {
         this.checkNotInThePast(name, attr, list);
       }
     }
+    // Take every unique lock of the write at once, in one global order: a
+    // write checking its attributes one by one waits on itself when two of
+    // them name the same value, and two writes wait on each other in opposite
+    // orders when they share values under different attributes.
+    const keys = [
+      ...new Set(
+        unique.flatMap(({ name, attr, list }) =>
+          this.uniqueKeys(entity, name, attr, list, dn, current)
+        )
+      ),
+    ].sort();
+    if (keys.length > 0) await this.lockUnique(keys);
+    for (const { name, attr, list } of unique) {
+      await this.checkUnique(entity, name, attr, list, dn, current);
+    }
+  }
+
+  /**
+   * Take the locks of the unique values a write is about to check, waiting
+   * for the writes already holding them. Released by the end hook of the
+   * operation that took them.
+   *
+   * @param keys `attribute=value` pairs, in a stable order
+   */
+  private async lockUnique(keys: string[]): Promise<void> {
+    const op = currentOperation();
+    const held =
+      op === undefined
+        ? undefined
+        : (this.uniqueHeld.get(op) ?? new Set<string>());
+    if (op !== undefined && held) this.uniqueHeld.set(op, held);
+    for (const key of keys) {
+      if (held?.has(key)) continue;
+      const previous = this.uniqueLocks.get(key) ?? Promise.resolve();
+      let release!: () => void;
+      const heldPromise = new Promise<void>(resolve => (release = resolve));
+      const tail = previous.then(() => heldPromise);
+      this.uniqueLocks.set(key, tail);
+      held?.add(key);
+      await previous.catch(() => undefined);
+      const done = (): void => {
+        release();
+        if (this.uniqueLocks.get(key) === tail) this.uniqueLocks.delete(key);
+      };
+      if (op === undefined) {
+        // No write to release it later: the check runs outside one
+        done();
+        continue;
+      }
+      const releases = this.uniqueReleases.get(op) ?? [];
+      releases.push(done);
+      this.uniqueReleases.set(op, releases);
+    }
+  }
+
+  /** Let go of the locks a write took, once it has ended */
+  private releaseUnique(op: number): void {
+    this.uniqueHeld.delete(op);
+    const releases = this.uniqueReleases.get(op);
+    if (!releases) return;
+    this.uniqueReleases.delete(op);
+    for (const release of releases) release();
   }
 
   /**
@@ -779,36 +857,37 @@ export default class LdapEnterpriseRules extends DmPlugin {
     values[pathAttr] = parentPath ? `${parentPath}${separator}${name}` : name;
   }
 
-  /**
-   * Refuse a value already used elsewhere.
-   *
-   * Two things the rule this replaces got wrong are fixed here: values are
-   * compared by content, and the entry being updated is excluded from the
-   * search — so re-sending an unchanged name no longer conflicts with itself.
-   *
-   * Nor with its copies: a value the entry already holds, as stored, is not
-   * looked for again, or the copies other plugins keep of the entry — the
-   * applicative accounts of `appAccountsConsistency` carry its mail — would
-   * hold it against it. Held under another attribute, it is skipped only
-   * when that attribute's own constraint looked for it wherever this one
-   * looks: a value accepted under a narrower one is checked here.
-   *
-   * @param entity entity the entry belongs to
-   * @param name attribute being checked
-   * @param attr its schema definition
-   * @param values values submitted for it
-   * @param dn entry being written
-   * @param current entry as stored, on a modification; its DN is excluded
-   * @throws ConflictError naming the entry that already holds the value
-   */
-  private async checkUnique(
+  /** The locks a unique check takes, from the plan it searches with */
+  private uniqueKeys(
     entity: EntityBinding,
     name: string,
     attr: SchemaAttribute,
     values: string[],
     dn: string,
     current: AttributesList | null
-  ): Promise<void> {
+  ): string[] {
+    return this.uniquePlan(entity, name, attr, values, dn, current).keys;
+  }
+
+  /**
+   * What a unique check searches for and the locks it needs: the attributes
+   * and values, the bases, the excluded DN and the constraint's filter.
+   */
+  private uniquePlan(
+    entity: EntityBinding,
+    name: string,
+    attr: SchemaAttribute,
+    values: string[],
+    dn: string,
+    current: AttributesList | null
+  ): {
+    attributes: string[];
+    toCheck: string[];
+    keys: string[];
+    bases: string[];
+    selfDn: string | null;
+    constraintFilter?: string;
+  } {
     const constraint: UniqueConstraint =
       typeof attr.unique === 'object' ? attr.unique : {};
     const attributes = [name, ...(constraint.attributes || [])];
@@ -841,15 +920,67 @@ export default class LdapEnterpriseRules extends DmPlugin {
       attributes.filter(covers).flatMap(a => allValues(current, a))
     );
 
-    for (const value of values) {
-      if (constraint.sentinel !== undefined && value === constraint.sentinel)
-        continue;
-      if (held.has(value)) continue;
+    const toCheck = values.filter(
+      value =>
+        (constraint.sentinel === undefined || value !== constraint.sentinel) &&
+        !held.has(value)
+    );
+    const keys = [
+      ...new Set(
+        toCheck.flatMap(value =>
+          attributes.map(a => `${a.toLowerCase()}=${value.toLowerCase()}`)
+        )
+      ),
+    ].sort();
+    return {
+      attributes,
+      toCheck,
+      keys,
+      bases,
+      selfDn,
+      constraintFilter: constraint.filter,
+    };
+  }
+
+  /**
+   * Refuse a value already used elsewhere.
+   *
+   * Two things the rule this replaces got wrong are fixed here: values are
+   * compared by content, and the entry being updated is excluded from the
+   * search — so re-sending an unchanged name no longer conflicts with itself.
+   *
+   * Nor with its copies: a value the entry already holds, as stored, is not
+   * looked for again, or the copies other plugins keep of the entry — the
+   * applicative accounts of `appAccountsConsistency` carry its mail — would
+   * hold it against it. Held under another attribute, it is skipped only
+   * when that attribute's own constraint looked for it wherever this one
+   * looks: a value accepted under a narrower one is checked here.
+   *
+   * @param entity entity the entry belongs to
+   * @param name attribute being checked
+   * @param attr its schema definition
+   * @param values values submitted for it
+   * @param dn entry being written
+   * @param current entry as stored, on a modification; its DN is excluded
+   * @throws ConflictError naming the entry that already holds the value
+   */
+  private async checkUnique(
+    entity: EntityBinding,
+    name: string,
+    attr: SchemaAttribute,
+    values: string[],
+    dn: string,
+    current: AttributesList | null
+  ): Promise<void> {
+    const { attributes, toCheck, bases, selfDn, constraintFilter } =
+      this.uniquePlan(entity, name, attr, values, dn, current);
+
+    for (const value of toCheck) {
       const terms = attributes
         .map(a => `(${a}=${escapeLdapFilter(value)})`)
         .join('');
       let filter = attributes.length > 1 ? `(|${terms})` : terms;
-      if (constraint.filter) filter = `(&${constraint.filter}${filter})`;
+      if (constraintFilter) filter = `(&${constraintFilter}${filter})`;
 
       for (const base of bases) {
         // As the server: a value is taken or not whoever may read the entry holding it
