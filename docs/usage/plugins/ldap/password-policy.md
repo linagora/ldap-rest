@@ -387,6 +387,12 @@ name the policy searches the whole of `--ldap-base`; unless
 `{"policy": "software"}` sets the account's `pwdPolicySubentry`; with
 `{"policy": null}` the account gets the default policy again.
 
+A delete and an assignment of the same policy are serialised on one
+instance: the request that loses the race answers `404` when the policy is
+gone, or `409` when the account still names it. Across several instances, a
+delete on another instance can still land between the assignment's read and
+its write; the account then names a policy that no longer exists.
+
 ## OpenLDAP ppolicy Attributes
 
 The plugin reads these operational attributes from user entries:

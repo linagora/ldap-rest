@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A password policy deleted while an account is assigned to it no longer
+  leaves the account naming a policy that is gone: the delete and the
+  assignment are serialised on one instance
+  ([#792](https://github.com/linagora/ldap-rest/issues/792))
+
 ## v2.6.0 (2026-11-25)
 
 ### Security
