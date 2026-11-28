@@ -170,6 +170,42 @@ export function asArray(v: AttributeValue | undefined): string[] {
   return [String(v)];
 }
 
+/**
+ * The key an entry holds an attribute under, whatever case the name is
+ * written in. LDAP attribute names are case-insensitive and the directory
+ * answers them under their schema spelling, so a mapping may spell one
+ * differently without losing the value.
+ */
+export function attributeKey(
+  entry: AttributesList,
+  attribute: string
+): string | undefined {
+  if (Object.hasOwn(entry, attribute)) return attribute;
+  const name = attribute.toLowerCase();
+  return Object.keys(entry).find(k => k.toLowerCase() === name);
+}
+
+/** The value of an LDAP attribute, whatever case the name is written in */
+export function attributeValue(
+  entry: AttributesList,
+  attribute: string
+): AttributeValue | undefined {
+  const key = attributeKey(entry, attribute);
+  return key === undefined ? undefined : entry[key];
+}
+
+/**
+ * Write an attribute value under the key the entry already holds it under,
+ * whatever its case, so one request never names an attribute twice.
+ */
+export function setAttribute(
+  entry: AttributesList,
+  attribute: string,
+  value: AttributeValue
+): void {
+  entry[attributeKey(entry, attribute) ?? attribute] = value;
+}
+
 export function loadMappingFile(path: string): ResourceMapping | undefined {
   if (!path) return undefined;
   const content = fs.readFileSync(path, 'utf8');
@@ -469,9 +505,7 @@ export function holdsValue(
   value: string
 ): boolean {
   if (!attribute) return false;
-  const name = attribute.toLowerCase();
-  const key = Object.keys(entry).find(k => k.toLowerCase() === name);
-  const raw = key === undefined ? undefined : entry[key];
+  const raw = attributeValue(entry, attribute);
   if (raw == null) return false;
   const wanted = value.toLowerCase();
   return (Array.isArray(raw) ? raw : [raw]).some(
@@ -485,10 +519,10 @@ export function resolveScimId(
   ctx: MappingContext
 ): string | undefined {
   if (ctx.idAttribute === 'rdn') {
-    return asString(entry[ctx.rdnAttribute]);
+    return asString(attributeValue(entry, ctx.rdnAttribute));
   }
-  const v = asString(entry[ctx.idAttribute]);
-  return v ?? asString(entry[ctx.rdnAttribute]);
+  const v = asString(attributeValue(entry, ctx.idAttribute));
+  return v ?? asString(attributeValue(entry, ctx.rdnAttribute));
 }
 
 export function buildLocation(
@@ -516,7 +550,7 @@ export function ldapToScimUser(
       const sub: Record<string, string> = {};
       for (const [scimKey, ldapKey] of Object.entries(m.sub)) {
         if (hidden(ldapKey)) continue;
-        const v = asString(entry[ldapKey]);
+        const v = asString(attributeValue(entry, ldapKey));
         if (v != null) sub[scimKey] = v;
       }
       if (Object.keys(sub).length > 0) {
@@ -527,11 +561,11 @@ export function ldapToScimUser(
     if (m.ldapPrimary || m.ldapSecondary) {
       const arr: MultiValued[] = [];
       if (m.ldapPrimary && !hidden(m.ldapPrimary)) {
-        const primary = asString(entry[m.ldapPrimary]);
+        const primary = asString(attributeValue(entry, m.ldapPrimary));
         if (primary != null) arr.push({ value: primary, primary: true });
       }
       if (m.ldapSecondary && !hidden(m.ldapSecondary)) {
-        for (const v of asArray(entry[m.ldapSecondary])) {
+        for (const v of asArray(attributeValue(entry, m.ldapSecondary))) {
           arr.push({ value: v });
         }
       }
@@ -540,10 +574,12 @@ export function ldapToScimUser(
     }
     if (m.ldap && !hidden(m.ldap)) {
       if (m.multi === 'array') {
-        const arr = asArray(entry[m.ldap]).map(v => fromLdap(v, m.converter));
+        const arr = asArray(attributeValue(entry, m.ldap)).map(v =>
+          fromLdap(v, m.converter)
+        );
         if (arr.length > 0) (out as Record<string, unknown>)[m.scim] = arr;
       } else {
-        const v = asString(entry[m.ldap]);
+        const v = asString(attributeValue(entry, m.ldap));
         if (v != null)
           (out as Record<string, unknown>)[m.scim] = fromLdap(v, m.converter);
       }
@@ -557,8 +593,12 @@ export function ldapToScimUser(
   if (id) {
     out.meta = {
       resourceType: 'User',
-      created: ldapTimeToIso(asString(entry['createTimestamp'])),
-      lastModified: ldapTimeToIso(asString(entry['modifyTimestamp'])),
+      created: ldapTimeToIso(
+        asString(attributeValue(entry, 'createTimestamp'))
+      ),
+      lastModified: ldapTimeToIso(
+        asString(attributeValue(entry, 'modifyTimestamp'))
+      ),
       location: buildLocation(id, ctx),
     };
   }
@@ -598,7 +638,7 @@ export function scimUserToLdap(
         if (sv !== undefined && sv !== '') {
           if (m.subDn?.includes(scimKey))
             assertReferenceDn(sv, `${m.scim}.${scimKey}`);
-          attributes[ldapKey] = sv;
+          setAttribute(attributes, ldapKey, sv);
         }
       }
       continue;
@@ -614,18 +654,22 @@ export function scimUserToLdap(
       const primary = mv.find(v => v.primary === true) || mv[0];
       const others = mv.filter(v => v !== primary);
       if (m.ldapPrimary && primary && primary.value) {
-        attributes[m.ldapPrimary] = primary.value;
+        setAttribute(attributes, m.ldapPrimary, primary.value);
       }
       if (m.ldapSecondary && others.length > 0) {
-        attributes[m.ldapSecondary] = others.map(v => v.value).filter(Boolean);
+        setAttribute(
+          attributes,
+          m.ldapSecondary,
+          others.map(v => v.value).filter(Boolean)
+        );
       }
       continue;
     }
     if (m.ldap)
-      attributes[m.ldap] = valuesToLdap(
-        scalarValues(value, m.scim),
-        m.converter,
-        m.scim
+      setAttribute(
+        attributes,
+        m.ldap,
+        valuesToLdap(scalarValues(value, m.scim), m.converter, m.scim)
       );
   }
 
@@ -635,18 +679,23 @@ export function scimUserToLdap(
   // anything about it at all.
   const active = readActive(user.active);
   if (active === false) {
-    attributes[ctx.lockAttribute] = ctx.lockValue || DEFAULT_LOCK_VALUE;
+    setAttribute(
+      attributes,
+      ctx.lockAttribute,
+      ctx.lockValue || DEFAULT_LOCK_VALUE
+    );
   }
 
   // Ensure required inetOrgPerson attributes have sensible defaults; a
   // merge keeps the entry's own instead
   if (!fillRequired) return { rdn: rdnValue, attributes, active };
-  if (!attributes.cn && rdnValue) attributes.cn = rdnValue;
-  if (!attributes.sn) {
+  if (!attributeValue(attributes, 'cn') && rdnValue)
+    setAttribute(attributes, 'cn', rdnValue);
+  if (!attributeValue(attributes, 'sn')) {
     const sn = [user.name?.familyName, user.displayName, rdnValue].find(
       (v): v is string => typeof v === 'string' && v.length > 0
     );
-    if (sn) attributes.sn = sn;
+    if (sn) setAttribute(attributes, 'sn', sn);
   }
 
   // Set RDN attribute value explicitly
@@ -665,7 +714,7 @@ export function ldapToScimGroup(
 
   for (const m of mapping.entries) {
     if (!m.ldap || isWriteOnlyAttribute(m.ldap, mapping)) continue;
-    const raw = entry[m.ldap];
+    const raw = attributeValue(entry, m.ldap);
     if (raw == null) continue;
     if (m.multi === 'array') {
       const arr = asArray(raw).map(v => fromLdap(v, m.converter));
@@ -678,7 +727,7 @@ export function ldapToScimGroup(
   }
 
   // Resolve members from LDAP `member` DN list
-  const memberDns = asArray(entry['member']);
+  const memberDns = asArray(attributeValue(entry, 'member'));
   const members: MultiValued[] = [];
   for (const dn of memberDns) {
     if (!dn) continue;
@@ -694,8 +743,12 @@ export function ldapToScimGroup(
   if (id) {
     out.meta = {
       resourceType: 'Group',
-      created: ldapTimeToIso(asString(entry['createTimestamp'])),
-      lastModified: ldapTimeToIso(asString(entry['modifyTimestamp'])),
+      created: ldapTimeToIso(
+        asString(attributeValue(entry, 'createTimestamp'))
+      ),
+      lastModified: ldapTimeToIso(
+        asString(attributeValue(entry, 'modifyTimestamp'))
+      ),
       location: buildLocation(id, ctx),
     };
   }
@@ -719,10 +772,10 @@ export function scimGroupToLdap(
     if (!m.ldap) continue;
     const v = (group as Record<string, unknown>)[m.scim];
     if (v == null) continue;
-    attributes[m.ldap] = valuesToLdap(
-      scalarValues(v, m.scim),
-      m.converter,
-      m.scim
+    setAttribute(
+      attributes,
+      m.ldap,
+      valuesToLdap(scalarValues(v, m.scim), m.converter, m.scim)
     );
   }
   return { rdn: rdnValue, attributes };
@@ -792,14 +845,19 @@ export function requiredLdapAttributes(
   extra: string[] = [],
   withWriteOnly = false
 ): string[] {
-  const attrs = new Set<string>([
-    'objectClass',
-    ...OPERATIONAL_ATTRIBUTES,
-    ...extra,
-  ]);
+  const attrs = new Set<string>();
+  const seen = new Set<string>();
+  const add = (name: string): void => {
+    const lower = name.toLowerCase();
+    if (seen.has(lower)) return;
+    seen.add(lower);
+    attrs.add(name);
+  };
+  for (const name of ['objectClass', ...OPERATIONAL_ATTRIBUTES, ...extra])
+    add(name);
   for (const m of mapping.entries)
     for (const a of ldapAttributesOf(m))
-      if (withWriteOnly || !isWriteOnlyAttribute(a, mapping)) attrs.add(a);
+      if (withWriteOnly || !isWriteOnlyAttribute(a, mapping)) add(a);
   return Array.from(attrs);
 }
 

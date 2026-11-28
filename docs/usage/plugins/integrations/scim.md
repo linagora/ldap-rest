@@ -246,6 +246,10 @@ Each element of `entries` is a `MappingEntry` with the following optional fields
 | `writeOnly`     | `true` to write this attribute but never return it nor accept it in a filter (RFC 7643 §7 `returned: "never"`).               |
 | `converter`     | Type of an `ldap` entry's values: `string` (default), `boolean`, `number` or `date` (see below).                              |
 
+LDAP attribute names are case-insensitive: the directory answers them under
+its schema spelling, so a mapping may write `displayname` or `mailalternateaddress`
+and read and write the same attribute as `displayName` or `mailAlternateAddress`.
+
 Write-only is a property of the LDAP attribute: another entry naming it
 returns nothing either. Credential attributes (`userPassword`, `pwdHistory`,
 `sambaNTPassword`, `krbPrincipalKey`, `authPassword`, `unicodePwd`, the LAPS

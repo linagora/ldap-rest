@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- SCIM: a mapping's LDAP attribute names are matched against the directory
+  case-insensitively, so a mapping written in another case than the schema
+  spelling reads, patches and replaces the same attribute
+  ([#771](https://github.com/linagora/ldap-rest/issues/771))
 - Two concurrent writes carrying the same value of an attribute a schema marks
   `unique` no longer both succeed: the second is refused with a conflict
   ([#789](https://github.com/linagora/ldap-rest/issues/789))
