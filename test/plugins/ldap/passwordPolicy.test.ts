@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { Request } from 'express';
 
 import { DM } from '../../../src/bin';
 import PasswordPolicy from '../../../src/plugins/ldap/passwordPolicy';
@@ -387,6 +388,7 @@ describe('PasswordPolicy Plugin', () => {
 
 describe('PasswordPolicy Plugin: policy management', () => {
   let dm: DM;
+  let plugin: PasswordPolicy;
   let request: ReturnType<typeof supertest>;
   let policyBase: string;
   let userDn: string;
@@ -417,7 +419,8 @@ describe('PasswordPolicy Plugin: policy management', () => {
     dm.config.ppolicy_base = policyBase;
     dm.config.ldap_users_base = `ou=users,${base}`;
     dm.config.ppolicy_default_dn = `cn=default,${policyBase}`;
-    await dm.registerPlugin('passwordPolicy', new PasswordPolicy(dm));
+    plugin = new PasswordPolicy(dm);
+    await dm.registerPlugin('passwordPolicy', plugin);
     dm.setupErrorMiddleware();
     request = supertest(dm.app);
   });
@@ -749,6 +752,81 @@ describe('PasswordPolicy Plugin: policy management', () => {
   it('refuses to delete a policy still applied, or the default one', async () => {
     expect((await request.delete(`${api}/software`)).status).to.equal(409);
     expect((await request.delete(`${api}/default`)).status).to.equal(409);
+  });
+
+  it('leaves no unhandled rejection behind a refused delete', async () => {
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', listener);
+    try {
+      expect((await request.delete(`${api}/software`)).status).to.equal(409);
+      // Let the rejection surface, if the lock's tail kept it
+      await new Promise(resolve => setTimeout(resolve, 50));
+    } finally {
+      process.off('unhandledRejection', listener);
+    }
+    expect(unhandled).to.eql([]);
+  });
+
+  it('serialises a delete and an assignment of one policy', async () => {
+    const raceDn = `cn=race,${policyBase}`;
+    const raceUser = `uid=ppolicy.race,ou=users,${process.env.DM_LDAP_BASE}`;
+    await dm.ldap.delete(raceUser).catch(() => undefined);
+    await dm.ldap.delete(raceDn).catch(() => undefined);
+    await dm.ldap.add(raceDn, {
+      objectClass: ['top', 'person', 'pwdPolicy'],
+      cn: 'race',
+      sn: 'race',
+      pwdAttribute: 'userPassword',
+    });
+    await dm.ldap.add(raceUser, {
+      objectClass: ['top', 'inetOrgPerson'],
+      uid: 'ppolicy.race',
+      cn: 'Ppolicy Race',
+      sn: 'Race',
+      userPassword: 'Initial-Passw0rd',
+    });
+
+    // Hold the delete after its "still applied" search: without the lock the
+    // assignment would land in that window and the delete would remove the
+    // policy the account now names
+    const originalDelete = dm.ldap.delete.bind(dm.ldap);
+    let release!: () => void;
+    let entered!: () => void;
+    const gate = new Promise<void>(resolve => (release = resolve));
+    const reached = new Promise<void>(resolve => (entered = resolve));
+    dm.ldap.delete = (async (dn: string, req?: Request) => {
+      if (dn === raceDn) {
+        entered();
+        await gate;
+      }
+      return originalDelete(dn, req);
+    }) as typeof dm.ldap.delete;
+
+    const methods = plugin as unknown as {
+      deletePolicy(cn: string): Promise<void>;
+      assignPolicy(userId: string, policy: string | null): Promise<unknown>;
+    };
+    try {
+      const deleting = methods.deletePolicy('race');
+      await reached;
+      const assigning = methods.assignPolicy('ppolicy.race', 'race');
+      // The window the assignment would use without the lock
+      await new Promise(resolve => setTimeout(resolve, 50));
+      release();
+      const [deleted, assigned] = await Promise.allSettled([
+        deleting,
+        assigning,
+      ]);
+      expect(deleted.status).to.equal('fulfilled');
+      expect(assigned.status).to.equal('rejected');
+    } finally {
+      dm.ldap.delete = originalDelete;
+      await dm.ldap.delete(raceUser).catch(() => undefined);
+      await dm.ldap.delete(raceDn).catch(() => undefined);
+    }
   });
 
   it('gives an account back the default policy', async () => {

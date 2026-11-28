@@ -522,6 +522,9 @@ export default class PasswordPolicy extends DmPlugin {
   private warnedMissingBase = false;
   private warnedUnreadableSchema = false;
   private readonly POLICY_CACHE_TTL = 60000; // 1 minute
+  // The writes under way per policy, by normalized DN: a delete and an
+  // assignment of one policy must not interleave on this replica
+  private readonly policyLocks = new Map<string, Promise<unknown>>();
 
   private get settings(): PasswordPolicyOptions {
     return this.options(passwordPolicyOptions);
@@ -1680,33 +1683,60 @@ export default class PasswordPolicy extends DmPlugin {
     return this.toPolicyRecord(await this.findPolicy(cn, req));
   }
 
+  /**
+   * Run `write` with the other writes of the same policy, keyed by its
+   * normalized DN. Covers this replica only: a delete on another replica can
+   * still land between the checks and the write.
+   */
+  private withPolicy<T>(dn: string, write: () => Promise<T>): Promise<T> {
+    const key = normalizeDn(dn);
+    const previous = this.policyLocks.get(key) ?? Promise.resolve();
+    const next = previous.then(write);
+    // The stored tail never rejects: its rejection belongs to the caller,
+    // and a caller that fails would otherwise leave it unhandled
+    const tail = next
+      .then(
+        () => undefined,
+        () => undefined
+      )
+      .finally(() => {
+        if (this.policyLocks.get(key) === tail) this.policyLocks.delete(key);
+      });
+    this.policyLocks.set(key, tail);
+    return next;
+  }
+
   private async deletePolicy(cn: string, req?: Request): Promise<void> {
-    const entry = await this.findPolicy(cn, req);
-    // Judged before the checks below, which search the whole directory:
-    // which policies are in use is not for a caller who may not delete one
-    await this.server.ldap.authorize('ldapdeleterequest', [entry.dn, req]);
-    const defaultDn = (await this.readPolicyConfig()).dn;
-    if (defaultDn && normalizeDn(defaultDn) === normalizeDn(entry.dn)) {
-      throw new ConflictError(`${entry.dn} is the default password policy`);
-    }
-    // As the server: an entry the caller cannot read still uses the policy
-    const users = (await this.server.ldap.system.search(
-      {
-        filter: `(pwdPolicySubentry=${escapeLdapFilter(entry.dn)})`,
-        scope: 'sub',
-        attributes: ['1.1'],
-        sizeLimit: 1,
-        paged: false,
-      },
-      this.config.ldap_base || ''
-    )) as SearchResult;
-    if (users.searchEntries.length > 0) {
-      throw new ConflictError(
-        `${entry.dn} is still applied to at least one entry`
-      );
-    }
-    await this.server.ldap.delete(entry.dn, req);
-    this.forgetPolicies();
+    const found = await this.findPolicy(cn, req);
+    return this.withPolicy(found.dn, async () => {
+      // Re-read under the lock: a delete that won the lock may have removed it
+      const entry = await this.findPolicy(cn, req);
+      // Judged before the checks below, which search the whole directory:
+      // which policies are in use is not for a caller who may not delete one
+      await this.server.ldap.authorize('ldapdeleterequest', [entry.dn, req]);
+      const defaultDn = (await this.readPolicyConfig()).dn;
+      if (defaultDn && normalizeDn(defaultDn) === normalizeDn(entry.dn)) {
+        throw new ConflictError(`${entry.dn} is the default password policy`);
+      }
+      // As the server: an entry the caller cannot read still uses the policy
+      const users = (await this.server.ldap.system.search(
+        {
+          filter: `(pwdPolicySubentry=${escapeLdapFilter(entry.dn)})`,
+          scope: 'sub',
+          attributes: ['1.1'],
+          sizeLimit: 1,
+          paged: false,
+        },
+        this.config.ldap_base || ''
+      )) as SearchResult;
+      if (users.searchEntries.length > 0) {
+        throw new ConflictError(
+          `${entry.dn} is still applied to at least one entry`
+        );
+      }
+      await this.server.ldap.delete(entry.dn, req);
+      this.forgetPolicies();
+    });
   }
 
   private async assignPolicy(
@@ -1729,13 +1759,17 @@ export default class PasswordPolicy extends DmPlugin {
       }
       return { dn, policy: null };
     }
-    const entry = await this.findPolicy(policy, req);
-    await this.server.ldap.modify(
-      dn,
-      { replace: { pwdPolicySubentry: entry.dn } },
-      req
-    );
-    return { dn, policy: entry.dn };
+    const found = await this.findPolicy(policy, req);
+    return this.withPolicy(found.dn, async () => {
+      // Re-read under the lock: answer 404 if a delete won the lock
+      const entry = await this.findPolicy(policy, req);
+      await this.server.ldap.modify(
+        dn,
+        { replace: { pwdPolicySubentry: entry.dn } },
+        req
+      );
+      return { dn, policy: entry.dn };
+    });
   }
 
   /**
