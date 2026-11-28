@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Two concurrent writes carrying the same value of an attribute a schema marks
+  `unique` no longer both succeed: the second is refused with a conflict
+  ([#789](https://github.com/linagora/ldap-rest/issues/789))
+
 ## v2.6.0 (2026-11-25)
 
 ### Security

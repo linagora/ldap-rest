@@ -89,6 +89,12 @@ export interface Hooks {
     entry: AttributesList,
     context?: ChangeContext
   ) => MaybePromise<void>;
+  /**
+   * Once an add is over, whatever became of it, after its `ldapaddafter`
+   * subscribers have returned; with the operation number its request hook
+   * reads from `currentOperation()`
+   */
+  ldapaddend?: (op: number) => MaybePromise<void>;
   // modify
   ldapmodifyrequest?: ChainedHook<[string, ModifyRequest, number, Request?]>;
   ldapmodifydone?: (

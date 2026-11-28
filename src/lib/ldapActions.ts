@@ -72,7 +72,8 @@ const AUTHORIZED_REQUEST_AT: Record<AuthorizedHook, number> = {
 };
 
 /** The hooks a write launches once its "done" hooks have returned */
-type EndHook = 'ldapmodifyend' | 'ldapdeleteend' | 'ldaprenameend';
+type EndHook =
+  'ldapaddend' | 'ldapmodifyend' | 'ldapdeleteend' | 'ldaprenameend';
 
 /** The operations {@link ldapActions.system} makes as the server. */
 const SYSTEM_OPERATIONS = new Set<string | symbol>([
@@ -879,6 +880,21 @@ class ldapActions {
     req?: Request
   ): Promise<boolean> {
     req ??= currentRequest();
+    const op = this.opNumber();
+    const done: Promise<void>[] = [];
+    try {
+      return await runOperation(op, () => this.applyAdd(dn, entry, req, done));
+    } finally {
+      this.endOperation(done, 'ldapaddend', op);
+    }
+  }
+
+  private async applyAdd(
+    dn: string,
+    entry: AttributesList,
+    req: Request | undefined,
+    done: Promise<void>[]
+  ): Promise<boolean> {
     dn = this.setDn(dn);
     await this.canonicalAttributes(entry);
     if (
@@ -955,12 +971,14 @@ class ldapActions {
     }
     // After the connection is released, so none is held while subscribers
     // run; a failure is logged and goes no further, the add having succeeded
-    await this.parent.hookBus.notifyAndWait(
+    const after = this.parent.hookBus.notifyAndWait(
       'ldapaddafter',
       dn,
       entry,
       changeContext(req)
     );
+    done.push(after);
+    await after;
     return true;
   }
 

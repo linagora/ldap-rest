@@ -75,6 +75,7 @@ import {
 import type { ChangeContext } from '../../lib/changeContext.js';
 import { BadRequestError, ConflictError } from '../../lib/errors.js';
 import { extractLdapCode } from '../../lib/ldapCodes.js';
+import { currentOperation } from '../../lib/operation.js';
 
 /** One entity the rules apply to: its branch and the schema describing it. */
 interface EntityBinding {
@@ -386,6 +387,16 @@ export default class LdapEnterpriseRules extends DmPlugin {
   private readonly enterpriseSettings: EnterpriseRulesOptions;
   private readonly orgSettings: OrganizationOptions;
 
+  /**
+   * The write holding each unique value, by `attribute=value`. A second
+   * write of the same value waits for the first to end, so its search sees
+   * the entry the first wrote. The directory's own `unique` overlay is the
+   * only guard across replicas.
+   */
+  private readonly uniqueLocks = new Map<string, Promise<void>>();
+  /** What releases the locks a write took, by operation number */
+  private readonly uniqueReleases = new Map<number, (() => void)[]>();
+
   constructor(server: DM) {
     super(server);
     this.enterpriseSettings = this.options(enterpriseRulesOptions);
@@ -624,6 +635,9 @@ export default class LdapEnterpriseRules extends DmPlugin {
       if (movedToTrash(this.config.trash_base, oldDn, newDn))
         await this.removeReferences(oldDn, context);
     },
+
+    ldapaddend: op => this.releaseUnique(op),
+    ldapmodifyend: op => this.releaseUnique(op),
   };
 
   /**
@@ -661,6 +675,45 @@ export default class LdapEnterpriseRules extends DmPlugin {
         this.checkNotInThePast(name, attr, list);
       }
     }
+  }
+
+  /**
+   * Take the locks of the unique values a write is about to check, waiting
+   * for the writes already holding them. Released by the end hook of the
+   * operation that took them.
+   *
+   * @param keys `attribute=value` pairs, in a stable order
+   */
+  private async lockUnique(keys: string[]): Promise<void> {
+    const op = currentOperation();
+    for (const key of keys) {
+      const previous = this.uniqueLocks.get(key) ?? Promise.resolve();
+      let release!: () => void;
+      const held = new Promise<void>(resolve => (release = resolve));
+      const tail = previous.then(() => held);
+      this.uniqueLocks.set(key, tail);
+      await previous.catch(() => undefined);
+      const done = (): void => {
+        release();
+        if (this.uniqueLocks.get(key) === tail) this.uniqueLocks.delete(key);
+      };
+      if (op === undefined) {
+        // No write to release it later: the check runs outside one
+        done();
+        continue;
+      }
+      const releases = this.uniqueReleases.get(op) ?? [];
+      releases.push(done);
+      this.uniqueReleases.set(op, releases);
+    }
+  }
+
+  /** Let go of the locks a write took, once it has ended */
+  private releaseUnique(op: number): void {
+    const releases = this.uniqueReleases.get(op);
+    if (!releases) return;
+    this.uniqueReleases.delete(op);
+    for (const release of releases) release();
   }
 
   /**
@@ -841,10 +894,23 @@ export default class LdapEnterpriseRules extends DmPlugin {
       attributes.filter(covers).flatMap(a => allValues(current, a))
     );
 
-    for (const value of values) {
-      if (constraint.sentinel !== undefined && value === constraint.sentinel)
-        continue;
-      if (held.has(value)) continue;
+    const toCheck = values.filter(
+      value =>
+        (constraint.sentinel === undefined || value !== constraint.sentinel) &&
+        !held.has(value)
+    );
+    // A stable order within the check, so two writes sharing these values
+    // cannot wait for each other in opposite orders
+    const keys = [
+      ...new Set(
+        toCheck.flatMap(value =>
+          attributes.map(a => `${a.toLowerCase()}=${value.toLowerCase()}`)
+        )
+      ),
+    ].sort();
+    await this.lockUnique(keys);
+
+    for (const value of toCheck) {
       const terms = attributes
         .map(a => `(${a}=${escapeLdapFilter(value)})`)
         .join('');
