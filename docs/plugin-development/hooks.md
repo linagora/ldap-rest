@@ -185,6 +185,9 @@ never reaches its "done" hook; its "end" hook fires all the same.
   attribute ones fire only while the entry has the attribute configured for
   them. A delete fires `onLdapEntryChange`, `onLdapChange` and
   `onLdapMailChange` only.
+- A modify or a rename announces only the attributes its own write changed:
+  another write of the same entry landing between its two reads is not
+  attributed to it.
 
 ## Ordering
 

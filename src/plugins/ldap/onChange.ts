@@ -10,10 +10,15 @@ import type { Request } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin.js';
 import type { Hooks } from '../../hooks.js';
-import type { AttributeValue, SearchResult } from '../../lib/ldapActions.js';
+import type {
+  AttributeValue,
+  ModifyRequest,
+  SearchResult,
+} from '../../lib/ldapActions.js';
 import type { Config } from '../../bin/index.js';
 import type { ChangeContext } from '../../lib/changeContext.js';
 import { currentOperation } from '../../lib/operation.js';
+import { rdnTypes } from '../../lib/utils.js';
 
 export type ChangesToNotify = Record<
   string,
@@ -63,6 +68,44 @@ export function diffEntries(
     ];
   }
   return res;
+}
+
+/** The attribute names a modify request touches, in lower case. */
+export function touchedAttributes(changes: ModifyRequest): Set<string> {
+  const touched = new Set<string>();
+  const add = (name: string): void => {
+    touched.add(name.toLowerCase());
+  };
+  for (const name of Object.keys(changes.add || {})) add(name);
+  for (const name of Object.keys(changes.replace || {})) add(name);
+  if (Array.isArray(changes.delete)) {
+    for (const name of changes.delete) add(name);
+  } else {
+    for (const name of Object.keys(changes.delete || {})) add(name);
+  }
+  return touched;
+}
+
+/**
+ * `after` with the attributes the write touched as they were before it, and
+ * the DN the entry had before. A concurrent write's change of an attribute
+ * this one did not touch is left out of the diff, so it is not published
+ * twice.
+ */
+export function ownBefore(
+  before: Entry,
+  after: Entry,
+  touched: Set<string>
+): Entry {
+  const own: Entry = { ...after };
+  for (const key of Object.keys(own)) {
+    if (key !== 'dn' && touched.has(key.toLowerCase())) delete own[key];
+  }
+  for (const key of Object.keys(before)) {
+    if (key !== 'dn' && touched.has(key.toLowerCase())) own[key] = before[key];
+  }
+  own.dn = before.dn ?? own.dn;
+  return own;
 }
 
 const events = {
@@ -123,7 +166,12 @@ class OnLdapChange extends DmPlugin {
         this.logger.warn(`Could not read ${dn} after modification`);
         return;
       }
-      this.publish(dn, before, after, context);
+      this.publish(
+        dn,
+        ownBefore(before, after, touchedAttributes(changes)),
+        after,
+        context
+      );
     },
 
     ldapmodifyend: op => {
@@ -156,7 +204,16 @@ class OnLdapChange extends DmPlugin {
         this.logger.warn(`Could not read ${newDn} after the rename of ${dn}`);
         return;
       }
-      this.publish(newDn, pending.entry, after, context);
+      this.publish(
+        newDn,
+        ownBefore(
+          pending.entry,
+          after,
+          new Set([...rdnTypes(pending.dn), ...rdnTypes(newDn)])
+        ),
+        after,
+        context
+      );
     },
 
     ldaprenameend: op => {

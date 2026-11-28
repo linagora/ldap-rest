@@ -5,6 +5,8 @@ import type { Request } from 'express';
 import { DM } from '../../../src/bin';
 import OnLdapChange, {
   diffEntries,
+  ownBefore,
+  touchedAttributes,
   type ChangesToNotify,
 } from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
@@ -65,6 +67,57 @@ describe('onChange', () => {
       expect(diffEntries(entry({ cn: 'x' }), null)).to.eql({
         cn: ['x', null],
       });
+    });
+  });
+
+  describe('ownBefore', () => {
+    const dn = 'uid=x,dc=example,dc=com';
+    const entry = (attrs: Record<string, string | string[]>): Entry => ({
+      dn,
+      ...attrs,
+    });
+
+    it('names the attributes a request touches, in any case', () => {
+      expect(
+        touchedAttributes({
+          add: { MAIL: 'a' },
+          replace: { displayName: 'b' },
+          delete: { 'member;range': 'c' },
+        })
+      ).to.eql(new Set(['mail', 'displayname', 'member;range']));
+      expect(touchedAttributes({ delete: ['TelephoneNumber'] })).to.eql(
+        new Set(['telephonenumber'])
+      );
+    });
+
+    it('puts the touched attributes back as they were before', () => {
+      const before = entry({ mail: 'm0@example.com', displayName: 'Old' });
+      const after = entry({ mail: 'm1@example.com', displayName: 'Old' });
+      expect(
+        ownBefore(before, after, touchedAttributes({ replace: { mail: 'm1' } }))
+      ).to.eql(entry({ mail: 'm0@example.com', displayName: 'Old' }));
+    });
+
+    it('leaves out another write’s change of an untouched attribute', () => {
+      const before = entry({ mail: 'm0@example.com', displayName: 'Old' });
+      const after = entry({ mail: 'm1@example.com', displayName: 'New' });
+      expect(
+        ownBefore(before, after, touchedAttributes({ replace: { mail: 'm1' } }))
+      ).to.eql(entry({ mail: 'm0@example.com', displayName: 'New' }));
+    });
+
+    it('matches attribute names whatever their case', () => {
+      const before = entry({ Mail: 'm0@example.com' });
+      const after = entry({ mail: 'm1@example.com' });
+      expect(
+        ownBefore(before, after, touchedAttributes({ replace: { MAIL: 'm1' } }))
+      ).to.eql(entry({ Mail: 'm0@example.com' }));
+    });
+
+    it('keeps the DN the entry had before', () => {
+      const before = entry({ uid: 'x' });
+      const after = { ...entry({ uid: 'y' }), dn: 'uid=y,dc=example,dc=com' };
+      expect(ownBefore(before, after, new Set(['uid']))).to.include({ dn });
     });
   });
 
@@ -328,6 +381,40 @@ describe('onChange', () => {
       expect(after).to.not.have.property('*');
       await waitFor(() => ldapChanges.length > 0);
       expect(ldapChanges[0][1]).to.eql({ sn: ['Doe', 'Smith'] });
+    });
+
+    it('publishes only the attributes its own write changed', async () => {
+      const dn = await addUser('ochforeign', {
+        mail: ['m0@example.com'],
+        displayName: ['Old'],
+      });
+      // This hook runs after onChange's request hook, so the snapshot it
+      // publishes is the entry before this write. A second write lands before
+      // the first one is issued, as a concurrent request would.
+      const hook: NonNullable<Hooks['ldapmodifyrequest']> = async ([
+        target,
+        changes,
+        op,
+        req,
+      ]) => {
+        if (target === dn && changes.replace?.mail)
+          await dm.ldap.modify(dn, { replace: { displayName: 'New' } });
+        return [target, changes, op, req];
+      };
+      dm.hookBus.subscribe('ldapmodifyrequest', hook);
+      try {
+        await dm.ldap.modify(dn, { replace: { mail: 'm1@example.com' } });
+      } finally {
+        dm.hookBus.unsubscribe('ldapmodifyrequest', hook);
+      }
+      await waitFor(() => ldapChanges.filter(([d]) => d === dn).length >= 2);
+      // The inner write changed displayName, the outer one mail: each event
+      // carries its own attribute only, not the other write's change too.
+      const events = ldapChanges.filter(([d]) => d === dn).map(([, c]) => c);
+      for (const changes of events)
+        expect(Object.keys(changes)).to.have.lengthOf(1);
+      expect(events.some(c => c.mail)).to.equal(true);
+      expect(events.some(c => c.displayName)).to.equal(true);
     });
 
     it('fires nothing for a replace with the value already there', async () => {
